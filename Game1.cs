@@ -25,10 +25,17 @@ public class Game1 : Game
     private KeyboardState _prevKb;
 
     private float _fireCooldown;
-    private const float FireRate = 0.15f; // seconds between shots
+    private const float FireRate = 0.25f; // seconds between shots
 
     private const int FloorY = 550; // ground level
     private const int FloorHeight = 50;
+
+    private static readonly Rectangle[] Platforms = new[]
+    {
+        new Rectangle(150, 430, 160, 12),
+        new Rectangle(480, 430, 160, 12),
+        new Rectangle(300, 320, 200, 12),
+    };
 
     public Game1()
     {
@@ -85,7 +92,7 @@ public class Game1 : Game
 
         var dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
 
-        _player.Update(dt, kb, FloorY);
+        _player.Update(dt, kb, FloorY, Platforms);
 
         // Shoot bullets
         _fireCooldown -= dt;
@@ -155,8 +162,14 @@ public class Game1 : Game
 
         // Draw floor
         _spriteBatch.Draw(_pixel, new Rectangle(0, FloorY, 800, FloorHeight), new Color(40, 40, 40));
-        // Floor edge line
         _spriteBatch.Draw(_pixel, new Rectangle(0, FloorY, 800, 2), new Color(80, 80, 80));
+
+        // Draw platforms
+        foreach (var plat in Platforms)
+        {
+            _spriteBatch.Draw(_pixel, plat, new Color(50, 50, 50));
+            _spriteBatch.Draw(_pixel, new Rectangle(plat.X, plat.Y, plat.Width, 2), new Color(90, 90, 90));
+        }
 
         // Draw player
         if (!_isDead) _player.Draw(_spriteBatch, _pixel);
