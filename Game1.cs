@@ -27,6 +27,9 @@ public class Game1 : Game
     private float _fireCooldown;
     private const float FireRate = 0.15f; // seconds between shots
 
+    private const int FloorY = 550; // ground level
+    private const int FloorHeight = 50;
+
     public Game1()
     {
         _graphics = new GraphicsDeviceManager(this);
@@ -46,7 +49,7 @@ public class Game1 : Game
 
     private void Restart()
     {
-        _player = new Player(new Vector2(400 - Player.Size / 2, 300 - Player.Size / 2));
+        _player = new Player(new Vector2(400 - Player.Width / 2, FloorY - Player.Height));
         _bullets = new List<Bullet>();
         _enemies = new List<Enemy>();
         _spawnTimer = 0f;
@@ -64,6 +67,9 @@ public class Game1 : Game
         _pixel.SetData(new[] { Color.White });
     }
 
+    private Vector2 PlayerCenter =>
+        _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
+
     protected override void Update(GameTime gameTime)
     {
         var kb = Keyboard.GetState();
@@ -79,7 +85,7 @@ public class Game1 : Game
 
         var dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
 
-        _player.Update(dt, kb);
+        _player.Update(dt, kb, FloorY);
 
         // Shoot bullets
         _fireCooldown -= dt;
@@ -87,36 +93,33 @@ public class Game1 : Game
         if (mouse.LeftButton == ButtonState.Pressed && _fireCooldown <= 0f)
         {
             _fireCooldown = FireRate;
-            var dir = new Vector2(mouse.X, mouse.Y) - (_player.Position + new Vector2(Player.Size / 2f));
+            var dir = new Vector2(mouse.X, mouse.Y) - PlayerCenter;
             if (dir != Vector2.Zero) dir.Normalize();
 
-            _bullets.Add(new Bullet(_player.Position + new Vector2(Player.Size / 2f), dir));
+            _bullets.Add(new Bullet(PlayerCenter, dir));
         }
 
         // Update bullets
         _bullets.ForEach(b => b.Update(dt));
         _bullets.RemoveAll(b => b.IsDead);
 
-        // Spawn enemies
+        // Spawn enemies from left and right edges on the ground
         _spawnTimer += dt;
         if (_spawnTimer >= _spawnInterval)
         {
             _spawnTimer = 0;
             _spawnInterval = MathF.Max(0.3f, _spawnInterval - 0.03f);
 
-            var edge = _rng.Next(4);
-            var pos = edge switch
-            {
-                0 => new Vector2(_rng.Next(800), -Enemy.Size),        // Top
-                1 => new Vector2(_rng.Next(800), 600),               // Bottom
-                2 => new Vector2(-Enemy.Size, _rng.Next(600)),       // Left
-                _ => new Vector2(800, _rng.Next(600))                // Right
-            };
+            var fromLeft = _rng.Next(2) == 0;
+            var pos = new Vector2(
+                fromLeft ? -Enemy.Size : 800,
+                FloorY - Enemy.Size
+            );
             _enemies.Add(new Enemy(pos));
         }
 
         // Update enemies
-        _enemies.ForEach(e => e.Update(dt, _player.Position + new Vector2(Player.Size / 2f)));
+        _enemies.ForEach(e => e.Update(dt, PlayerCenter));
 
         // Check collisions
         foreach (var e in _enemies)
@@ -127,10 +130,8 @@ public class Game1 : Game
                 var bRect = new Rectangle((int)b.Position.X, (int)b.Position.Y, Bullet.Size, Bullet.Size);
                 if (bRect.Intersects(eRect)) { e.IsDead = true; b.IsDead = true; }
             }
-            // Check player collision last
-            var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Size, Player.Size);
-            
-            // Minor edge clamping
+            // Check player collision
+            var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
             if (eRect.Intersects(pRect))
             {
                 _isDead = true;
@@ -151,6 +152,11 @@ public class Game1 : Game
         GraphicsDevice.Clear(_isDead ? Color.DarkRed : new Color(20, 20, 20));
 
         _spriteBatch.Begin();
+
+        // Draw floor
+        _spriteBatch.Draw(_pixel, new Rectangle(0, FloorY, 800, FloorHeight), new Color(40, 40, 40));
+        // Floor edge line
+        _spriteBatch.Draw(_pixel, new Rectangle(0, FloorY, 800, 2), new Color(80, 80, 80));
 
         // Draw player
         if (!_isDead) _player.Draw(_spriteBatch, _pixel);
