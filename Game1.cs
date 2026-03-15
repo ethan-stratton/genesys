@@ -24,6 +24,9 @@ public class Game1 : Game
     private bool _isDead;
     private KeyboardState _prevKb;
 
+    private float _fireCooldown;
+    private const float FireRate = 0.15f; // seconds between shots
+
     public Game1()
     {
         _graphics = new GraphicsDeviceManager(this);
@@ -51,6 +54,7 @@ public class Game1 : Game
         _rng = new Random();
 
         _isDead = false;
+        _fireCooldown = 0f;
     }
 
     protected override void LoadContent()
@@ -78,9 +82,11 @@ public class Game1 : Game
         _player.Update(dt, kb);
 
         // Shoot bullets
+        _fireCooldown -= dt;
         var mouse = Mouse.GetState();
-        if (mouse.LeftButton == ButtonState.Pressed)
+        if (mouse.LeftButton == ButtonState.Pressed && _fireCooldown <= 0f)
         {
+            _fireCooldown = FireRate;
             var dir = new Vector2(mouse.X, mouse.Y) - (_player.Position + new Vector2(Player.Size / 2f));
             if (dir != Vector2.Zero) dir.Normalize();
 
