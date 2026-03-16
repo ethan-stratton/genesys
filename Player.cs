@@ -542,16 +542,31 @@ public class Player
                 _jumpHeld = true;
                 _jumpsLeft = MaxJumps - 1;
             }
-            // Jump off wall
+            // Jump off wall — press away to detach, otherwise wall hop (pop up, stay on)
             else if (spaceFreshWall)
             {
-                IsOnWall = false;
-                _wallDisengaged = true;
-                vel.Y = JumpForce;
-                vel.X = _currentWallClimbSide * Speed; // push away from wall
-                _jumpsLeft = MaxJumps - 1;
-                IsGrounded = false;
-                _wasGrounded = false;
+                if (inputX == _currentWallClimbSide)
+                {
+                    // Jumping away from wall — detach
+                    IsOnWall = false;
+                    _wallDisengaged = true;
+                    vel.Y = JumpForce;
+                    vel.X = _currentWallClimbSide * Speed;
+                    _jumpsLeft = MaxJumps - 1;
+                    IsGrounded = false;
+                    _wasGrounded = false;
+                }
+                else
+                {
+                    // Wall hop — launch up, momentarily detach, will reattach if still near wall
+                    IsOnWall = false;
+                    // Don't set _wallDisengaged — allows immediate reattach
+                    vel.Y = JumpForce * 0.7f; // shorter hop than full jump
+                    vel.X = 0;
+                    _jumpsLeft = 0; // no double jump off wall hop
+                    IsGrounded = false;
+                    _wasGrounded = false;
+                }
                 _jumpHeld = true;
             }
 
