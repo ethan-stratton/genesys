@@ -821,12 +821,15 @@ public class Player
                 if (_spinMeleeCooldown <= 0)
                 {
                     _spinMeleeCooldown = SpinMeleeRate;
-                    var dir = SpinDirections[_spinMeleeAngleIndex];
+                    // Use player's WASD input for direction
+                    var dir = Vector2.Zero;
+                    if (inputX != 0) dir.X = inputX;
+                    if (inputY != 0) dir.Y = inputY;
+                    if (dir == Vector2.Zero) dir.X = FacingDir; // default to facing
                     dir.Normalize();
                     WantsToMelee = true;
                     MeleeDirection = dir;
-                    MeleeTimer = SpinMeleeRate * 0.9f; // hitbox stays almost until next swing
-                    _spinMeleeAngleIndex = (_spinMeleeAngleIndex + 1) % SpinDirections.Length;
+                    MeleeTimer = SpinMeleeRate * 0.9f;
                 }
             }
         }
