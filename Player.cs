@@ -332,12 +332,11 @@ public class Player
 
         // --- Slide (S + Space while grounded, OR Shift + Space with no direction from crouch — one per crouch hold) ---
         bool spacePressed = kb.IsKeyDown(Keys.Space);
-        bool wantsCrouchSlide = IsCrouching && inputX == 0 && !_crouchSlideUsed;
+        bool wantsCrouchSlide = IsCrouching && inputX == 0;
         bool wantsSlide = (inputY > 0 && !IsCrouching) || wantsCrouchSlide;
         if (EnableSlide && wantsSlide && spacePressed && !_jumpHeld && _wasGrounded && !IsSliding && !IsCartwheeling && _slideCooldownTimer <= 0f)
         {
             IsSliding = true;
-            if (IsCrouching) _crouchSlideUsed = true;
             _slideTimer = SlideDuration;
             _slideCooldownTimer = SlideCooldown;
             _slideDir = FacingDir;

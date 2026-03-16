@@ -1,2 +1,3 @@
 Source File,Dest File,Processor Type,Content Type,Source File Size,Dest File Size,Build Seconds
+"/Users/ethanstratton/Documents/OpenClaw/OpenClaw/workspace/arena-shooter/Content/bgm.mp3","/Users/ethanstratton/Documents/OpenClaw/OpenClaw/workspace/arena-shooter/Content/bin/DesktopGL/Content/bgm.xnb","SongProcessor","SongContent",2894204,121,3.684111
 "/Users/ethanstratton/Documents/OpenClaw/OpenClaw/workspace/arena-shooter/Content/DefaultFont.spritefont","/Users/ethanstratton/Documents/OpenClaw/OpenClaw/workspace/arena-shooter/Content/bin/DesktopGL/Content/DefaultFont.xnb","FontDescriptionProcessor","SpriteFontContent",474,37913,0.630313
