@@ -63,6 +63,19 @@ public class Player
     public float MeleeTimer { get; private set; }
     private const float MeleeActiveTime = 0.12f; // how long the hitbox stays out
     public const int MeleeRange = 40;
+
+    // Spinning melee (hold K for 0.2s+ while grounded)
+    public bool IsSpinningMelee { get; private set; }
+    private float _meleeHoldTimer; // how long K has been held
+    private const float SpinMeleeActivateTime = 0.2f; // hold threshold
+    private const float SpinMeleeRate = 0.08f; // much faster than normal melee
+    private float _spinMeleeCooldown;
+    private int _spinMeleeAngleIndex; // cycles through 8 directions
+    private static readonly Vector2[] SpinDirections = new Vector2[]
+    {
+        new(1, 0), new(1, 1), new(0, 1), new(-1, 1),
+        new(-1, 0), new(-1, -1), new(0, -1), new(1, -1),
+    };
     public const int MeleeWidth = 20;
 
     // Cartwheel/dash flip (Shift + A/D + Space)
@@ -147,6 +160,7 @@ public class Player
     public bool EnableDropThrough { get; set; } = true;
     public bool EnableVaultKick { get; set; } = true;
     public bool EnableUppercut { get; set; } = true;
+    public bool EnableSpinMelee { get; set; } = true;
 
     private KeyboardState _prevKb;
 
@@ -794,7 +808,39 @@ public class Player
 
         // --- Left hand / Melee (K) ---
         bool kPressed = kb.IsKeyDown(Keys.K);
-        if (kPressed && !_meleeHeld && _meleeCooldown <= 0f)
+
+        // Spinning melee: hold K while grounded
+        if (EnableSpinMelee && kPressed && _wasGrounded)
+        {
+            _meleeHoldTimer += dt;
+            if (_meleeHoldTimer >= SpinMeleeActivateTime)
+            {
+                IsSpinningMelee = true;
+                vel.X = 0; // stationary
+                _spinMeleeCooldown -= dt;
+                if (_spinMeleeCooldown <= 0)
+                {
+                    _spinMeleeCooldown = SpinMeleeRate;
+                    var dir = SpinDirections[_spinMeleeAngleIndex];
+                    dir.Normalize();
+                    WantsToMelee = true;
+                    MeleeDirection = dir;
+                    MeleeTimer = SpinMeleeRate * 0.9f; // hitbox stays almost until next swing
+                    _spinMeleeAngleIndex = (_spinMeleeAngleIndex + 1) % SpinDirections.Length;
+                }
+            }
+        }
+        else
+        {
+            _meleeHoldTimer = 0;
+            if (IsSpinningMelee)
+            {
+                IsSpinningMelee = false;
+                _spinMeleeAngleIndex = 0;
+            }
+        }
+
+        if (!IsSpinningMelee && kPressed && !_meleeHeld && _meleeCooldown <= 0f)
         {
             _meleeCooldown = MeleeRate;
             WantsToMelee = true;
@@ -954,6 +1000,12 @@ public class Player
             spriteBatch.Draw(pixel,
                 new Rectangle(notchX, (int)Position.Y + Height / 2 - 3, 4, 6),
                 Color.LightGray);
+        }
+
+        // Spinning melee overlay — draw the current melee hitbox in red
+        if (IsSpinningMelee && MeleeTimer > 0)
+        {
+            spriteBatch.Draw(pixel, MeleeHitbox, Color.Red * 0.5f);
         }
 
         // Draw melee hitbox when active
