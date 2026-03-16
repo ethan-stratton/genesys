@@ -70,7 +70,7 @@ public class Game1 : Game
     private bool _enableMusic;
 
     // --- Editor state ---
-    private enum EditorTool { Platform = 1, Rope = 2, Wall = 3, Spike = 4, Exit = 5, Spawn = 6, WallSpike = 7, OverworldExit = 8 }
+    private enum EditorTool { Platform = 1, Rope = 2, Wall = 3, Spike = 4, Exit = 5, Spawn = 6, WallSpike = 7, OverworldExit = 8, Ceiling = 9 }
     // Wall climbSide values: 0=both, 1=right face, -1=left face, 99=no climb (solid only)
     private EditorTool _editorTool = EditorTool.Platform;
     private Vector2 _editorCursor; // world position
@@ -175,6 +175,7 @@ public class Game1 : Game
                 {
                     case "Play":
                         _gameState = GameState.Playing;
+                        Restart();
                         break;
                     case "Settings":
                         _menuOpen = true;
@@ -269,7 +270,7 @@ public class Game1 : Game
         var ropeTopsToPass = _enableRopeClimb ? _level.RopeTops : null;
         var ropeBottomsToPass = _enableRopeClimb ? _level.RopeBottoms : null;
 
-        _player.Update(dt, kb, _level.Floor.Y, _level.AllPlatforms, ropesToPass, ropeTopsToPass, ropeBottomsToPass, wallsToPass, wallSidesToPass, _level.WallRects);
+        _player.Update(dt, kb, _level.Floor.Y, _level.AllPlatforms, ropesToPass, ropeTopsToPass, ropeBottomsToPass, wallsToPass, wallSidesToPass, _level.WallRects, _level.CeilingRects);
 
         // Update camera
         _camera.Update(dt, _player.Position, Player.Width, Player.Height, _player.FacingDir, _player.IsGrounded, _player.Velocity.Y);
@@ -452,6 +453,7 @@ public class Game1 : Game
 
         if (kb.IsKeyDown(Keys.D7) && _prevKb.IsKeyUp(Keys.D7)) _editorTool = EditorTool.WallSpike;
         if (kb.IsKeyDown(Keys.D8) && _prevKb.IsKeyUp(Keys.D8)) _editorTool = EditorTool.OverworldExit;
+        if (kb.IsKeyDown(Keys.D9) && _prevKb.IsKeyUp(Keys.D9)) _editorTool = EditorTool.Ceiling;
 
         // Grid snap toggle
         if (kb.IsKeyDown(Keys.G) && _prevKb.IsKeyUp(Keys.G))
@@ -526,11 +528,24 @@ public class Game1 : Game
                     SetEditorStatus("Wall added (both sides, [F] to cycle)");
                     break;
                 case EditorTool.Spike:
+                    // Check if near a ceiling bottom — snap upward (hanging spikes)
+                    int spikeY = y;
+                    bool ceilingSpike = false;
+                    foreach (var ceil in _level.Ceilings)
+                    {
+                        if (MathF.Abs(y - (ceil.Y + ceil.H)) < 20 &&
+                            x + w > ceil.X && x < ceil.X + ceil.W)
+                        {
+                            spikeY = ceil.Y + ceil.H;
+                            ceilingSpike = true;
+                            break;
+                        }
+                    }
                     var sList = new List<RectData>(_level.Spikes);
-                    sList.Add(new RectData { X = x, Y = y, W = w, H = 12 });
+                    sList.Add(new RectData { X = x, Y = spikeY, W = w, H = 12 });
                     _level.Spikes = sList.ToArray();
                     _level.Build();
-                    SetEditorStatus("Spike added");
+                    SetEditorStatus(ceilingSpike ? "Ceiling spike added" : "Spike added");
                     break;
                 case EditorTool.Exit:
                     var eList = new List<ExitData>(_level.Exits);
@@ -578,6 +593,13 @@ public class Game1 : Game
                     _level.Exits = owList.ToArray();
                     _level.Build();
                     SetEditorStatus("Overworld exit added");
+                    break;
+                case EditorTool.Ceiling:
+                    var cList = new List<RectData>(_level.Ceilings);
+                    cList.Add(new RectData { X = x, Y = y, W = w, H = 12 });
+                    _level.Ceilings = cList.ToArray();
+                    _level.Build();
+                    SetEditorStatus("Ceiling added");
                     break;
             }
         }
@@ -706,6 +728,19 @@ public class Game1 : Game
                 var list = new List<WallSpikeData>(_level.WallSpikes);
                 list.RemoveAt(i);
                 _level.WallSpikes = list.ToArray();
+                _level.Build();
+                return true;
+            }
+        }
+        // Check ceilings
+        for (int i = _level.Ceilings.Length - 1; i >= 0; i--)
+        {
+            var c = _level.Ceilings[i];
+            if (new Rectangle(c.X, c.Y, c.W, c.H).Contains(p))
+            {
+                var list = new List<RectData>(_level.Ceilings);
+                list.RemoveAt(i);
+                _level.Ceilings = list.ToArray();
                 _level.Build();
                 return true;
             }
@@ -910,6 +945,13 @@ public class Game1 : Game
         foreach (var s in _level.Spikes)
             _spriteBatch.Draw(_pixel, new Rectangle(s.X, s.Y, s.W, s.H), Color.Red * 0.6f);
 
+        // Draw ceilings
+        foreach (var c in _level.Ceilings)
+        {
+            _spriteBatch.Draw(_pixel, new Rectangle(c.X, c.Y, c.W, c.H), new Color(50, 50, 50));
+            _spriteBatch.Draw(_pixel, new Rectangle(c.X, c.Y + c.H - 2, c.W, 2), new Color(90, 90, 90));
+        }
+
         // Draw walls (editor)
         foreach (var w in _level.Walls)
         {
@@ -988,12 +1030,13 @@ public class Game1 : Game
                 EditorTool.Spike => Color.Red * 0.3f,
                 EditorTool.Exit => Color.LimeGreen * 0.3f,
                 EditorTool.WallSpike => Color.Red * 0.3f,
+                EditorTool.Ceiling => Color.Gray * 0.3f,
                 _ => Color.White * 0.2f
             };
 
             if (_editorTool == EditorTool.Rope)
                 _spriteBatch.Draw(_pixel, new Rectangle((int)_editorDragStart.X - 1, py, 3, ph), previewColor);
-            else if (_editorTool == EditorTool.Platform || _editorTool == EditorTool.Spike)
+            else if (_editorTool == EditorTool.Platform || _editorTool == EditorTool.Spike || _editorTool == EditorTool.Ceiling)
                 _spriteBatch.Draw(_pixel, new Rectangle(px, py, pw, 12), previewColor);
             else
                 _spriteBatch.Draw(_pixel, new Rectangle(px, py, pw, ph), previewColor);
@@ -1011,7 +1054,7 @@ public class Game1 : Game
         _spriteBatch.Begin();
 
         // Toolbar
-        string[] toolNames = { "1:Platform", "2:Rope", "3:Wall", "4:Spike", "5:Exit", "6:Spawn", "7:WallSpike", "8:Overworld" };
+        string[] toolNames = { "1:Plat", "2:Rope", "3:Wall", "4:Spike", "5:Exit", "6:Spawn", "7:WSpike", "8:Overworld", "9:Ceiling" };
         float tx = 10;
         for (int i = 0; i < toolNames.Length; i++)
         {
@@ -1231,6 +1274,13 @@ public class Game1 : Game
                 _spriteBatch.Draw(_pixel, new Rectangle(tx, spike.Y - 4, 8, 4), Color.Red * 0.6f);
                 _spriteBatch.Draw(_pixel, new Rectangle(tx + 2, spike.Y - 8, 4, 4), Color.Red * 0.4f);
             }
+        }
+
+        // Draw ceilings
+        foreach (var ceil in _level.CeilingRects)
+        {
+            _spriteBatch.Draw(_pixel, ceil, new Color(50, 50, 50));
+            _spriteBatch.Draw(_pixel, new Rectangle(ceil.X, ceil.Bottom - 2, ceil.Width, 2), new Color(90, 90, 90));
         }
 
         // Draw wall spikes

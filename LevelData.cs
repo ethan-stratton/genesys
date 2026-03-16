@@ -17,6 +17,7 @@ public class LevelData
     [JsonPropertyName("ropes")] public RopeData[] Ropes { get; set; } = Array.Empty<RopeData>();
     [JsonPropertyName("walls")] public WallData[] Walls { get; set; } = Array.Empty<WallData>();
     [JsonPropertyName("spikes")] public RectData[] Spikes { get; set; } = Array.Empty<RectData>();
+    [JsonPropertyName("ceilings")] public RectData[] Ceilings { get; set; } = Array.Empty<RectData>();
     [JsonPropertyName("wallSpikes")] public WallSpikeData[] WallSpikes { get; set; } = Array.Empty<WallSpikeData>();
     [JsonPropertyName("exits")] public ExitData[] Exits { get; set; } = Array.Empty<ExitData>();
 
@@ -27,6 +28,7 @@ public class LevelData
     [JsonIgnore] public Rectangle[] WallLedges { get; private set; } = Array.Empty<Rectangle>();
     [JsonIgnore] public Rectangle[] AllPlatforms { get; private set; } = Array.Empty<Rectangle>();
     [JsonIgnore] public Rectangle[] SpikeRects { get; private set; } = Array.Empty<Rectangle>();
+    [JsonIgnore] public Rectangle[] CeilingRects { get; private set; } = Array.Empty<Rectangle>();
     [JsonIgnore] public Rectangle[] WallSpikeRects { get; private set; } = Array.Empty<Rectangle>();
     [JsonIgnore] public Rectangle[] AllSpikeRects { get; private set; } = Array.Empty<Rectangle>();
     [JsonIgnore] public Rectangle[] ExitRects { get; private set; } = Array.Empty<Rectangle>();
@@ -68,6 +70,14 @@ public class LevelData
         {
             var s = Spikes[i];
             SpikeRects[i] = new Rectangle(s.X, s.Y, s.W, s.H);
+        }
+
+        // Ceilings
+        CeilingRects = new Rectangle[Ceilings.Length];
+        for (int i = 0; i < Ceilings.Length; i++)
+        {
+            var c = Ceilings[i];
+            CeilingRects[i] = new Rectangle(c.X, c.Y, c.W, c.H);
         }
 
         // Wall spikes

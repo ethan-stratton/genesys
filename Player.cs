@@ -250,7 +250,7 @@ public class Player
         }
     }
 
-    public void Update(float dt, KeyboardState kb, float floorY, Rectangle[] platforms, float[] ropeXPositions = null, float[] ropeTops = null, float[] ropeBottoms = null, Rectangle[] walls = null, int[] wallClimbSides = null, Rectangle[] solidWalls = null)
+    public void Update(float dt, KeyboardState kb, float floorY, Rectangle[] platforms, float[] ropeXPositions = null, float[] ropeTops = null, float[] ropeBottoms = null, Rectangle[] walls = null, int[] wallClimbSides = null, Rectangle[] solidWalls = null, Rectangle[] ceilings = null)
     {
         WantsToShoot = false;
         WantsToMelee = false;
@@ -1027,6 +1027,22 @@ public class Player
                     vel.Y = 0;
                     IsGrounded = true;
                     _jumpsLeft = MaxJumps;
+                }
+            }
+        }
+
+        // Ceiling collision (bonk head)
+        if (ceilings != null && vel.Y < 0)
+        {
+            foreach (var ceil in ceilings)
+            {
+                float prevTop = Position.Y;
+                float newTop = pos.Y;
+                if (prevTop >= ceil.Bottom - 2 && newTop < ceil.Bottom &&
+                    pos.X + Width > ceil.X && pos.X < ceil.X + ceil.Width)
+                {
+                    pos.Y = ceil.Bottom;
+                    vel.Y = 0;
                 }
             }
         }
