@@ -13,15 +13,19 @@ public class Camera
     private const float LerpSpeedX = 4f;
     private const float LerpSpeedY = 6f;
     
+    // Dead zone: player can move this far from center before camera follows
+    private const float DeadZoneX = 60f;
+    private const float DeadZoneY = 30f;
+    
     // Forward bias: offset camera ahead of facing direction
     private const float ForwardBias = 80f;
     private const float BiasLerpSpeed = 3f;
     private float _currentBias;
     
     // Vertical: snap to ground, only follow sustained air
-    private const float AirFollowDelay = 0.25f; // seconds before camera follows upward
+    private const float AirFollowDelay = 0.25f;
     private float _airTimer;
-    private float _lastGroundY; // last Y when player was grounded
+    private float _lastGroundY;
     
     // World bounds
     private readonly float _worldLeft;
@@ -44,38 +48,59 @@ public class Camera
         float playerCenterX = playerPos.X + playerWidth / 2f;
         float playerCenterY = playerPos.Y + playerHeight / 2f;
         
-        // --- Horizontal: lerp with forward bias ---
+        // --- Forward bias (smooth transition when turning) ---
         float targetBias = facingDir * ForwardBias;
         _currentBias += (targetBias - _currentBias) * BiasLerpSpeed * dt;
-        float targetX = playerCenterX + _currentBias - _viewWidth / 2f;
         
-        // --- Vertical: ground-snapping with delayed air follow ---
+        // Camera center = where the camera is currently looking
+        float camCenterX = Position.X + _viewWidth / 2f;
+        float camCenterY = Position.Y + _viewHeight / 2f;
+        
+        // --- Horizontal: dead zone + forward bias ---
+        // Ideal position is player + bias, but only move if player exits dead zone
+        float idealX = playerCenterX + _currentBias;
+        float diffX = idealX - camCenterX;
+        float targetX;
+        if (MathF.Abs(diffX) > DeadZoneX)
+        {
+            // Player pushed past dead zone — target moves to keep them at edge
+            float sign = MathF.Sign(diffX);
+            targetX = idealX - sign * DeadZoneX - _viewWidth / 2f;
+        }
+        else
+        {
+            targetX = Position.X; // stay put
+        }
+        
+        // --- Vertical: dead zone + ground snap ---
         float targetY;
         if (isGrounded)
         {
             _lastGroundY = playerCenterY;
             _airTimer = 0;
-            targetY = _lastGroundY - _viewHeight / 2f;
         }
         else
         {
             _airTimer += dt;
-            if (_airTimer > AirFollowDelay || playerCenterY > _lastGroundY)
-            {
-                // Follow player if in air long enough or falling below ground level
-                targetY = playerCenterY - _viewHeight / 2f;
-            }
-            else
-            {
-                // Stay at ground level during short hops
-                targetY = _lastGroundY - _viewHeight / 2f;
-            }
+        }
+        
+        float verticalRef = (isGrounded || _airTimer <= AirFollowDelay) && playerCenterY <= _lastGroundY
+            ? _lastGroundY : playerCenterY;
+        
+        float diffY = verticalRef - camCenterY;
+        if (MathF.Abs(diffY) > DeadZoneY)
+        {
+            float sign = MathF.Sign(diffY);
+            targetY = verticalRef - sign * DeadZoneY - _viewHeight / 2f;
+        }
+        else
+        {
+            targetY = Position.Y;
         }
         
         // Lerp toward target
-        var current = Position;
-        float newX = current.X + (targetX - current.X) * LerpSpeedX * dt;
-        float newY = current.Y + (targetY - current.Y) * LerpSpeedY * dt;
+        float newX = Position.X + (targetX - Position.X) * LerpSpeedX * dt;
+        float newY = Position.Y + (targetY - Position.Y) * LerpSpeedY * dt;
         
         // Clamp to world bounds
         newX = MathHelper.Clamp(newX, _worldLeft, _worldRight - _viewWidth);

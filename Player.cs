@@ -303,7 +303,7 @@ public class Player
 
         // --- Wall attachment check ---
         _wallHopCooldown -= dt;
-        if (!IsOnWall && !IsOnRope && walls != null && !IsSliding && !IsDashing && _wallHopCooldown <= 0f)
+        if (!IsOnWall && !IsOnRope && walls != null && !IsSliding && _wallHopCooldown <= 0f)
         {
             float playerCenterY = Position.Y + Height / 2f;
             bool nearAnyWall = false;
@@ -325,6 +325,7 @@ public class Player
                     if (!_wallDisengaged)
                     {
                         IsOnWall = true;
+                        IsDashing = false; // cancel dash on wall grab
                         _currentWall = w;
                         _currentWallClimbSide = side;
                         FacingDir = side; // face away from wall
