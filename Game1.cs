@@ -13,6 +13,7 @@ public class Game1 : Game
 {
     private GameState _gameState = GameState.Title;
     private int _titleCursor;
+    private bool _settingsFromTitle;
     private readonly string[] _titleOptions = { "Play", "Settings", "Quit" };
 
     private GraphicsDeviceManager _graphics;
@@ -200,11 +201,25 @@ public class Game1 : Game
                     case "Settings":
                         _menuOpen = true;
                         _menuCursor = 0;
-                        _gameState = GameState.Playing; // go to playing with menu open
+                        _settingsFromTitle = true;
                         break;
                     case "Quit":
                         Exit();
                         break;
+                }
+            }
+
+            // Handle settings menu while on title screen
+            if (_menuOpen && _settingsFromTitle)
+            {
+                if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape))
+                {
+                    _menuOpen = false;
+                    _settingsFromTitle = false;
+                }
+                else
+                {
+                    UpdateMenu(kb);
                 }
             }
 
@@ -222,23 +237,7 @@ public class Game1 : Game
 
         if (_menuOpen)
         {
-            // Menu navigation
-            if (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W))
-                _menuCursor = (_menuCursor - 1 + _settings.Length) % _settings.Length;
-            if (kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S))
-                _menuCursor = (_menuCursor + 1) % _settings.Length;
-            if (kb.IsKeyDown(Keys.Up) && _prevKb.IsKeyUp(Keys.Up))
-                _menuCursor = (_menuCursor - 1 + _settings.Length) % _settings.Length;
-            if (kb.IsKeyDown(Keys.Down) && _prevKb.IsKeyUp(Keys.Down))
-                _menuCursor = (_menuCursor + 1) % _settings.Length;
-
-            // Toggle/activate with Enter or Space
-            if ((kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter)) ||
-                (kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space)))
-            {
-                _settings[_menuCursor].Toggle();
-            }
-
+            UpdateMenu(kb);
             _prevKb = kb;
             return; // game is paused while menu is open
         }
@@ -347,6 +346,46 @@ public class Game1 : Game
         base.Update(gameTime);
     }
 
+    private void DrawSettingsMenu()
+    {
+        float startY = 150f;
+        float lineHeight = 30f;
+        _spriteBatch.DrawString(_font, "SETTINGS  [Esc to close]", new Vector2(280, startY - 40), Color.White);
+
+        for (int i = 0; i < _settings.Length; i++)
+        {
+            var s = _settings[i];
+            bool selected = i == _menuCursor;
+            string prefix = selected ? "> " : "  ";
+            string value = s.IsAction ? "" : (s.Get() ? "  ON" : "  OFF");
+            var color = selected ? Color.Yellow : Color.Gray;
+            if (!s.IsAction && s.Get()) color = selected ? Color.Yellow : Color.LightGreen;
+            if (s.IsAction) color = selected ? Color.Red : Color.DarkGray;
+
+            _spriteBatch.DrawString(_font, $"{prefix}{s.Label}{value}", new Vector2(280, startY + i * lineHeight), color);
+        }
+
+        _spriteBatch.DrawString(_font, "[Space/Enter] Toggle  [W/S] Navigate", new Vector2(230, startY + _settings.Length * lineHeight + 20), Color.Gray * 0.6f);
+    }
+
+    private void UpdateMenu(KeyboardState kb)
+    {
+        if (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W))
+            _menuCursor = (_menuCursor - 1 + _settings.Length) % _settings.Length;
+        if (kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S))
+            _menuCursor = (_menuCursor + 1) % _settings.Length;
+        if (kb.IsKeyDown(Keys.Up) && _prevKb.IsKeyUp(Keys.Up))
+            _menuCursor = (_menuCursor - 1 + _settings.Length) % _settings.Length;
+        if (kb.IsKeyDown(Keys.Down) && _prevKb.IsKeyUp(Keys.Down))
+            _menuCursor = (_menuCursor + 1) % _settings.Length;
+
+        if ((kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter)) ||
+            (kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space)))
+        {
+            _settings[_menuCursor].Toggle();
+        }
+    }
+
     protected override void Draw(GameTime gameTime)
     {
         GraphicsDevice.Clear(new Color(20, 20, 20));
@@ -356,12 +395,12 @@ public class Game1 : Game
             _spriteBatch.Begin();
 
             // Title
-            string title = "GENESIS";
+            string title = "GENESYS";
             var titleSize = _font.MeasureString(title);
             _spriteBatch.DrawString(_font, title, new Vector2(400 - titleSize.X / 2, 180), Color.White);
 
             // Subtitle
-            string sub = "Arena Prototype";
+            string sub = "Adam & Eve";
             var subSize = _font.MeasureString(sub);
             _spriteBatch.DrawString(_font, sub, new Vector2(400 - subSize.X / 2, 210), Color.Gray * 0.6f);
 
@@ -379,6 +418,13 @@ public class Game1 : Game
             }
 
             _spriteBatch.DrawString(_font, "[W/S] Navigate  [Space/Enter] Select", new Vector2(200, 480), Color.Gray * 0.4f);
+
+            // Settings overlay on title screen
+            if (_menuOpen && _settingsFromTitle)
+            {
+                _spriteBatch.Draw(_pixel, new Rectangle(0, 0, 800, 600), new Color(20, 20, 20));
+                DrawSettingsMenu();
+            }
 
             _spriteBatch.End();
             base.Draw(gameTime);
@@ -446,27 +492,9 @@ public class Game1 : Game
         // --- Settings menu overlay ---
         if (_menuOpen)
         {
-            // Dim background
+            // Semi-transparent dim when in-game (gameplay visible behind)
             _spriteBatch.Draw(_pixel, new Rectangle(0, 0, 800, 600), Color.Black * 0.7f);
-
-            float startY = 150f;
-            float lineHeight = 30f;
-            _spriteBatch.DrawString(_font, "SETTINGS  [Esc to close]", new Vector2(280, startY - 40), Color.White);
-
-            for (int i = 0; i < _settings.Length; i++)
-            {
-                var s = _settings[i];
-                bool selected = i == _menuCursor;
-                string prefix = selected ? "> " : "  ";
-                string value = s.IsAction ? "" : (s.Get() ? "  ON" : "  OFF");
-                var color = selected ? Color.Yellow : Color.Gray;
-                if (!s.IsAction && s.Get()) color = selected ? Color.Yellow : Color.LightGreen;
-                if (s.IsAction) color = selected ? Color.Red : Color.DarkGray;
-
-                _spriteBatch.DrawString(_font, $"{prefix}{s.Label}{value}", new Vector2(280, startY + i * lineHeight), color);
-            }
-
-            _spriteBatch.DrawString(_font, "[Space/Enter] Toggle  [W/S] Navigate", new Vector2(230, startY + _settings.Length * lineHeight + 20), Color.Gray * 0.6f);
+            DrawSettingsMenu();
         }
         else if (!_isDead)
         {
