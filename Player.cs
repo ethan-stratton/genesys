@@ -86,6 +86,18 @@ public class Player
     public const int VaultKickHitboxW = 28;
     public const int VaultKickHitboxH = 20;
 
+    // Uppercut (down → up + jump) — high jump with melee hurtbox, i-frames
+    public bool IsUppercutting { get; private set; }
+    private float _uppercutTimer;
+    private const float UppercutDuration = 0.4f;
+    private const float UppercutJumpForce = -650f; // higher than normal jump
+    private const float UppercutHSpeed = 80f; // slight horizontal drift allowed
+    private bool _uppercutInputReady; // true after pressing down, waiting for up+jump
+    private float _uppercutInputWindow; // time window after pressing down
+    private const float UppercutInputWindowTime = 0.4f;
+    public const int UppercutHitboxW = 20;
+    public const int UppercutHitboxH = 30;
+
     // Dash (double-tap A or D)
     public bool IsDashing { get; private set; }
     private const float DashSpeed = 420f;
@@ -134,6 +146,7 @@ public class Player
     public bool EnableDoubleJump { get; set; } = true;
     public bool EnableDropThrough { get; set; } = true;
     public bool EnableVaultKick { get; set; } = true;
+    public bool EnableUppercut { get; set; } = true;
 
     private KeyboardState _prevKb;
 
@@ -156,6 +169,17 @@ public class Player
             int hbX = _vaultKickDir == 1 ? (int)Position.X + Width : (int)Position.X - VaultKickHitboxW;
             int hbY = (int)Position.Y + Height - VaultKickHitboxH - 4;
             return new Rectangle(hbX, hbY, VaultKickHitboxW, VaultKickHitboxH);
+        }
+    }
+
+    public Rectangle UppercutHitbox
+    {
+        get
+        {
+            // Hitbox above the player's head
+            int hbX = (int)Position.X + (Width - UppercutHitboxW) / 2;
+            int hbY = (int)Position.Y - UppercutHitboxH;
+            return new Rectangle(hbX, hbY, UppercutHitboxW, UppercutHitboxH);
         }
     }
 
@@ -355,6 +379,30 @@ public class Player
             _cartwheelCooldownTimer = CartwheelCooldown;
             _cartwheelDir = inputX;
             IsCrouching = false; // override crouch
+        }
+
+        // --- Uppercut input detection (down → up + jump) ---
+        if (EnableUppercut)
+        {
+            // Track: pressing S sets the input ready, then W+Space within window triggers it
+            if (inputY > 0 && _wasGrounded) // pressing down while grounded
+            {
+                _uppercutInputReady = true;
+                _uppercutInputWindow = UppercutInputWindowTime;
+            }
+            if (_uppercutInputReady)
+            {
+                _uppercutInputWindow -= dt;
+                if (_uppercutInputWindow <= 0) _uppercutInputReady = false;
+            }
+            if (_uppercutInputReady && inputY < 0 && spacePressed && !_jumpHeld && !IsUppercutting && !IsSliding && !IsCartwheeling && !IsVaultKicking)
+            {
+                _uppercutInputReady = false;
+                IsUppercutting = true;
+                _uppercutTimer = UppercutDuration;
+                IsCrouching = false;
+                _jumpHeld = true;
+            }
         }
 
         // --- Facing direction ---
@@ -649,6 +697,28 @@ public class Player
                 vel.X = _vaultKickDir * Speed; // return to normal speed
             }
         }
+        else if (IsUppercutting)
+        {
+            _uppercutTimer -= dt;
+            if (_uppercutTimer > UppercutDuration - 0.05f)
+            {
+                // Initial burst frame
+                vel.Y = UppercutJumpForce;
+                vel.X = inputX * UppercutHSpeed;
+            }
+            else
+            {
+                vel.Y += Gravity * dt;
+                vel.X = inputX * UppercutHSpeed;
+            }
+            IsGrounded = false;
+            _wasGrounded = false;
+            if (_uppercutTimer <= 0)
+            {
+                IsUppercutting = false;
+                _jumpsLeft = 0; // no double jump after uppercut — it IS the double jump substitute
+            }
+        }
         else if (IsSliding)
         {
             _slideTimer -= dt;
@@ -838,6 +908,15 @@ public class Player
                 Color.Orange * 0.9f);
             var kickBox = VaultKickHitbox;
             spriteBatch.Draw(pixel, kickBox, Color.Red * 0.6f);
+        }
+        else if (IsUppercutting)
+        {
+            // Yellow body with red hurtbox above head
+            spriteBatch.Draw(pixel,
+                new Rectangle((int)Position.X, (int)Position.Y, Width, Height),
+                Color.Yellow * 0.9f);
+            var ucBox = UppercutHitbox;
+            spriteBatch.Draw(pixel, ucBox, Color.Red * 0.6f);
         }
         else if (IsSliding)
         {
