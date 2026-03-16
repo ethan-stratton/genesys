@@ -280,24 +280,24 @@ public class Player
             Velocity = vel;
 
             // Ranged/melee still available on rope
-            bool jPressed = kb.IsKeyDown(Keys.J);
-            if (jPressed && !_shootHeld && _shootCooldown <= 0f)
+            bool jOnRope = kb.IsKeyDown(Keys.J);
+            if (jOnRope && !_shootHeld && _shootCooldown <= 0f)
             {
                 _shootCooldown = ShootRate;
                 WantsToShoot = true;
                 ShootDirection = AimDir;
             }
-            _shootHeld = jPressed;
+            _shootHeld = jOnRope;
 
-            bool kPressed2 = kb.IsKeyDown(Keys.K);
-            if (kPressed2 && !_meleeHeld && _meleeCooldown <= 0f)
+            bool kOnRope = kb.IsKeyDown(Keys.K);
+            if (kOnRope && !_meleeHeld && _meleeCooldown <= 0f)
             {
                 _meleeCooldown = MeleeRate;
                 WantsToMelee = true;
                 MeleeDirection = AimDir;
                 MeleeTimer = MeleeActiveTime;
             }
-            _meleeHeld = kPressed2;
+            _meleeHeld = kOnRope;
 
             _prevKb = kb;
             return; // skip normal physics
