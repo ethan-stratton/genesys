@@ -420,7 +420,7 @@ public class Game1 : Game
             _spriteBatch.DrawString(_font, title, new Vector2(400 - titleSize.X / 2, 180), Color.White);
 
             // Subtitle
-            string sub = "Adam & Eve";
+            string sub = "Admin & Eve";
             var subSize = _font.MeasureString(sub);
             _spriteBatch.DrawString(_font, sub, new Vector2(400 - subSize.X / 2, 210), Color.Gray * 0.6f);
 
