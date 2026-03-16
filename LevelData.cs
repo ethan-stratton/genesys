@@ -17,6 +17,7 @@ public class LevelData
     [JsonPropertyName("ropes")] public RopeData[] Ropes { get; set; } = Array.Empty<RopeData>();
     [JsonPropertyName("walls")] public WallData[] Walls { get; set; } = Array.Empty<WallData>();
     [JsonPropertyName("spikes")] public RectData[] Spikes { get; set; } = Array.Empty<RectData>();
+    [JsonPropertyName("wallSpikes")] public WallSpikeData[] WallSpikes { get; set; } = Array.Empty<WallSpikeData>();
     [JsonPropertyName("exits")] public ExitData[] Exits { get; set; } = Array.Empty<ExitData>();
 
     // Derived arrays (populated after load)
@@ -26,6 +27,8 @@ public class LevelData
     [JsonIgnore] public Rectangle[] WallLedges { get; private set; } = Array.Empty<Rectangle>();
     [JsonIgnore] public Rectangle[] AllPlatforms { get; private set; } = Array.Empty<Rectangle>();
     [JsonIgnore] public Rectangle[] SpikeRects { get; private set; } = Array.Empty<Rectangle>();
+    [JsonIgnore] public Rectangle[] WallSpikeRects { get; private set; } = Array.Empty<Rectangle>();
+    [JsonIgnore] public Rectangle[] AllSpikeRects { get; private set; } = Array.Empty<Rectangle>();
     [JsonIgnore] public Rectangle[] ExitRects { get; private set; } = Array.Empty<Rectangle>();
     [JsonIgnore] public string[] ExitTargets { get; private set; } = Array.Empty<string>();
     [JsonIgnore] public float[] RopeXPositions { get; private set; } = Array.Empty<float>();
@@ -66,6 +69,19 @@ public class LevelData
             var s = Spikes[i];
             SpikeRects[i] = new Rectangle(s.X, s.Y, s.W, s.H);
         }
+
+        // Wall spikes
+        WallSpikeRects = new Rectangle[WallSpikes.Length];
+        for (int i = 0; i < WallSpikes.Length; i++)
+        {
+            var ws = WallSpikes[i];
+            WallSpikeRects[i] = new Rectangle(ws.X, ws.Y, ws.W, ws.H);
+        }
+
+        // All spikes combined
+        AllSpikeRects = new Rectangle[SpikeRects.Length + WallSpikeRects.Length];
+        SpikeRects.CopyTo(AllSpikeRects, 0);
+        WallSpikeRects.CopyTo(AllSpikeRects, SpikeRects.Length);
 
         // Exits
         ExitRects = new Rectangle[Exits.Length];
@@ -141,6 +157,15 @@ public class WallData
     [JsonPropertyName("w")] public int W { get; set; }
     [JsonPropertyName("h")] public int H { get; set; }
     [JsonPropertyName("climbSide")] public int ClimbSide { get; set; } = 1;
+}
+
+public class WallSpikeData
+{
+    [JsonPropertyName("x")] public int X { get; set; }
+    [JsonPropertyName("y")] public int Y { get; set; }
+    [JsonPropertyName("w")] public int W { get; set; } = 12;
+    [JsonPropertyName("h")] public int H { get; set; } = 48;
+    [JsonPropertyName("side")] public int Side { get; set; } = 1; // 1=right side of wall, -1=left side
 }
 
 public class ExitData

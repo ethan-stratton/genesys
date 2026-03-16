@@ -311,13 +311,21 @@ public class Player
             {
                 var w = walls[i];
                 int side = wallClimbSides[i];
-                // Check if player is against the climbable face
-                float climbX = side == 1 ? w.Right : w.Left;
-                float playerEdge = side == 1 ? Position.X : Position.X + Width;
+                // climbSide: 1=right face, -1=left face, 0=both sides
+                // Determine effective side based on player position relative to wall
+                int effectiveSide = side;
+                if (side == 0)
+                {
+                    float wallCenter = w.Left + w.Width / 2f;
+                    float playerCenter = Position.X + Width / 2f;
+                    effectiveSide = playerCenter < wallCenter ? 1 : -1; // 1=approach from left (climb right face), -1=from right
+                }
+                float climbX = effectiveSide == 1 ? w.Right : w.Left;
+                float playerEdge = effectiveSide == 1 ? Position.X : Position.X + Width;
                 bool xTouch = MathF.Abs(playerEdge - climbX) < 6f;
                 bool yInRange = playerCenterY >= w.Top && playerCenterY <= w.Bottom;
                 // Require pressing toward wall to attach (not automatic after hop)
-                bool pressingToward = inputX == -side;
+                bool pressingToward = inputX == -effectiveSide;
                 bool groundedNear = _wasGrounded;
                 if (xTouch && yInRange && (pressingToward || groundedNear))
                 {
@@ -327,8 +335,8 @@ public class Player
                         IsOnWall = true;
                         IsDashing = false; // cancel dash on wall grab
                         _currentWall = w;
-                        _currentWallClimbSide = side;
-                        FacingDir = side; // face away from wall
+                        _currentWallClimbSide = effectiveSide;
+                        FacingDir = effectiveSide; // face away from wall
                         break;
                     }
                 }
