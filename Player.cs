@@ -250,7 +250,7 @@ public class Player
         }
     }
 
-    public void Update(float dt, KeyboardState kb, float floorY, Rectangle[] platforms, float[] ropeXPositions = null, float[] ropeTops = null, float[] ropeBottoms = null, Rectangle[] walls = null, int[] wallClimbSides = null, Rectangle[] solidWalls = null, Rectangle[] ceilings = null)
+    public void Update(float dt, KeyboardState kb, float floorY, Rectangle[] platforms, float[] ropeXPositions = null, float[] ropeTops = null, float[] ropeBottoms = null, Rectangle[] walls = null, int[] wallClimbSides = null, Rectangle[] solidWalls = null, Rectangle[] ceilings = null, Rectangle[] solidFloors = null)
     {
         WantsToShoot = false;
         WantsToMelee = false;
@@ -1043,6 +1043,55 @@ public class Player
                 {
                     pos.Y = ceil.Bottom;
                     vel.Y = 0;
+                }
+            }
+        }
+
+        // Solid floor collision (stand on top + block from below)
+        if (solidFloors != null)
+        {
+            foreach (var sf in solidFloors)
+            {
+                bool xOverlap = pos.X + Width > sf.X && pos.X < sf.X + sf.Width;
+                if (xOverlap)
+                {
+                    // Landing on top
+                    if (vel.Y >= 0)
+                    {
+                        float prevBottom = Position.Y + Height;
+                        float newBottom = pos.Y + Height;
+                        if (prevBottom <= sf.Y + 2 && newBottom >= sf.Y)
+                        {
+                            pos.Y = sf.Y - Height;
+                            vel.Y = 0;
+                            IsGrounded = true;
+                            _jumpsLeft = MaxJumps;
+                        }
+                    }
+                    // Hitting from below
+                    if (vel.Y < 0)
+                    {
+                        float prevTop = Position.Y;
+                        float newTop = pos.Y;
+                        if (prevTop >= sf.Bottom - 2 && newTop < sf.Bottom)
+                        {
+                            pos.Y = sf.Bottom;
+                            vel.Y = 0;
+                        }
+                    }
+                    // Push out horizontally if inside
+                    float playerBottom = pos.Y + Height;
+                    float playerTop = pos.Y;
+                    if (playerBottom > sf.Y + 4 && playerTop < sf.Bottom - 4)
+                    {
+                        float playerCenterX = pos.X + Width / 2f;
+                        float sfCenterX = sf.X + sf.Width / 2f;
+                        if (playerCenterX < sfCenterX)
+                            pos.X = sf.X - Width;
+                        else
+                            pos.X = sf.X + sf.Width;
+                        vel.X = 0;
+                    }
                 }
             }
         }

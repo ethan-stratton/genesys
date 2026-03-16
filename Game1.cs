@@ -70,7 +70,7 @@ public class Game1 : Game
     private bool _enableMusic;
 
     // --- Editor state ---
-    private enum EditorTool { Platform = 1, Rope = 2, Wall = 3, Spike = 4, Exit = 5, Spawn = 6, WallSpike = 7, OverworldExit = 8, Ceiling = 9 }
+    private enum EditorTool { SolidFloor = 0, Platform = 1, Rope = 2, Wall = 3, Spike = 4, Exit = 5, Spawn = 6, WallSpike = 7, OverworldExit = 8, Ceiling = 9 }
     // Wall climbSide values: 0=both, 1=right face, -1=left face, 99=no climb (solid only)
     private EditorTool _editorTool = EditorTool.Platform;
     private Vector2 _editorCursor; // world position
@@ -174,6 +174,8 @@ public class Game1 : Game
                 switch (_titleOptions[_titleCursor])
                 {
                     case "Play":
+                        LoadLevel(DefaultLevel);
+                        _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
                         _gameState = GameState.Playing;
                         Restart();
                         break;
@@ -270,7 +272,7 @@ public class Game1 : Game
         var ropeTopsToPass = _enableRopeClimb ? _level.RopeTops : null;
         var ropeBottomsToPass = _enableRopeClimb ? _level.RopeBottoms : null;
 
-        _player.Update(dt, kb, _level.Floor.Y, _level.AllPlatforms, ropesToPass, ropeTopsToPass, ropeBottomsToPass, wallsToPass, wallSidesToPass, _level.WallRects, _level.CeilingRects);
+        _player.Update(dt, kb, _level.Floor.Y, _level.AllPlatforms, ropesToPass, ropeTopsToPass, ropeBottomsToPass, wallsToPass, wallSidesToPass, _level.WallRects, _level.CeilingRects, _level.SolidFloorRects);
 
         // Update camera
         _camera.Update(dt, _player.Position, Player.Width, Player.Height, _player.FacingDir, _player.IsGrounded, _player.Velocity.Y);
@@ -375,6 +377,7 @@ public class Game1 : Game
                     if (System.IO.File.Exists(nextPath))
                     {
                         LoadLevel(nextPath);
+                        _editorSaveFile = nextPath;
                         _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
                         Restart();
                     }
@@ -444,6 +447,7 @@ public class Game1 : Game
         if (kb.IsKeyDown(Keys.D)) _editorCursor.X += speed * dt;
 
         // Tool select with number keys
+        if (kb.IsKeyDown(Keys.D0) && _prevKb.IsKeyUp(Keys.D0)) _editorTool = EditorTool.SolidFloor;
         if (kb.IsKeyDown(Keys.D1) && _prevKb.IsKeyUp(Keys.D1)) _editorTool = EditorTool.Platform;
         if (kb.IsKeyDown(Keys.D2) && _prevKb.IsKeyUp(Keys.D2)) _editorTool = EditorTool.Rope;
         if (kb.IsKeyDown(Keys.D3) && _prevKb.IsKeyUp(Keys.D3)) _editorTool = EditorTool.Wall;
@@ -502,6 +506,13 @@ public class Game1 : Game
 
             switch (_editorTool)
             {
+                case EditorTool.SolidFloor:
+                    var sfList = new List<RectData>(_level.SolidFloors);
+                    sfList.Add(new RectData { X = x, Y = y, W = w, H = h < 12 ? 24 : h });
+                    _level.SolidFloors = sfList.ToArray();
+                    _level.Build();
+                    SetEditorStatus("Solid floor added");
+                    break;
                 case EditorTool.Platform:
                     var pList = new List<RectData>(_level.Platforms);
                     pList.Add(new RectData { X = x, Y = y, W = w, H = 12 });
@@ -745,6 +756,19 @@ public class Game1 : Game
                 return true;
             }
         }
+        // Check solid floors
+        for (int i = _level.SolidFloors.Length - 1; i >= 0; i--)
+        {
+            var sf = _level.SolidFloors[i];
+            if (new Rectangle(sf.X, sf.Y, sf.W, sf.H).Contains(p))
+            {
+                var list = new List<RectData>(_level.SolidFloors);
+                list.RemoveAt(i);
+                _level.SolidFloors = list.ToArray();
+                _level.Build();
+                return true;
+            }
+        }
         return false;
     }
 
@@ -952,6 +976,13 @@ public class Game1 : Game
             _spriteBatch.Draw(_pixel, new Rectangle(c.X, c.Y + c.H - 2, c.W, 2), new Color(90, 90, 90));
         }
 
+        // Draw solid floors
+        foreach (var sf in _level.SolidFloors)
+        {
+            _spriteBatch.Draw(_pixel, new Rectangle(sf.X, sf.Y, sf.W, sf.H), new Color(70, 50, 30));
+            _spriteBatch.Draw(_pixel, new Rectangle(sf.X, sf.Y, sf.W, 2), new Color(110, 80, 50));
+        }
+
         // Draw walls (editor)
         foreach (var w in _level.Walls)
         {
@@ -1030,6 +1061,7 @@ public class Game1 : Game
                 EditorTool.Spike => Color.Red * 0.3f,
                 EditorTool.Exit => Color.LimeGreen * 0.3f,
                 EditorTool.WallSpike => Color.Red * 0.3f,
+                EditorTool.SolidFloor => new Color(70, 50, 30) * 0.3f,
                 EditorTool.Ceiling => Color.Gray * 0.3f,
                 _ => Color.White * 0.2f
             };
@@ -1054,7 +1086,7 @@ public class Game1 : Game
         _spriteBatch.Begin();
 
         // Toolbar
-        string[] toolNames = { "1:Plat", "2:Rope", "3:Wall", "4:Spike", "5:Exit", "6:Spawn", "7:WSpike", "8:Overworld", "9:Ceiling" };
+        string[] toolNames = { "0:Floor", "1:Plat", "2:Rope", "3:Wall", "4:Spike", "5:Exit", "6:Spawn", "7:WSpike", "8:Overworld", "9:Ceiling" };
         float tx = 10;
         for (int i = 0; i < toolNames.Length; i++)
         {
@@ -1281,6 +1313,13 @@ public class Game1 : Game
         {
             _spriteBatch.Draw(_pixel, ceil, new Color(50, 50, 50));
             _spriteBatch.Draw(_pixel, new Rectangle(ceil.X, ceil.Bottom - 2, ceil.Width, 2), new Color(90, 90, 90));
+        }
+
+        // Draw solid floors
+        foreach (var sf in _level.SolidFloorRects)
+        {
+            _spriteBatch.Draw(_pixel, sf, new Color(70, 50, 30));
+            _spriteBatch.Draw(_pixel, new Rectangle(sf.X, sf.Y, sf.Width, 2), new Color(110, 80, 50));
         }
 
         // Draw wall spikes

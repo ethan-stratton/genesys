@@ -67,6 +67,7 @@
     }
   ],
   "spikes": [],
+  "ceilings": [],
   "wallSpikes": [],
   "exits": [
     {
@@ -82,6 +83,13 @@
       "w": 32,
       "h": 48,
       "targetLevel": "__overworld__"
+    },
+    {
+      "x": 112,
+      "y": 496,
+      "w": 32,
+      "h": 48,
+      "targetLevel": "test-arena"
     }
   ]
 }
