@@ -75,6 +75,16 @@ public class Player
     private float _cartwheelCooldownTimer;
     private int _cartwheelDir;
 
+    // Dash (double-tap A or D)
+    public bool IsDashing { get; private set; }
+    private const float DashSpeed = 420f;
+    private float _lastATapTime;
+    private float _lastDTapTime;
+    private bool _aWasUp;
+    private bool _dWasUp;
+    private const float DashDoubleTapWindow = 0.25f;
+    private int _dashDir;
+
     // Rope climbing
     public bool IsOnRope { get; private set; }
     private float _ropeX; // X position of the rope we're attached to
@@ -176,6 +186,33 @@ public class Player
         if (kb.IsKeyDown(Keys.D)) inputX += 1;
         if (kb.IsKeyDown(Keys.W)) inputY -= 1;
         if (kb.IsKeyDown(Keys.S)) inputY += 1;
+
+        // --- Dash detection (double-tap A or D) ---
+        bool aDown = kb.IsKeyDown(Keys.A);
+        bool dDown = kb.IsKeyDown(Keys.D);
+        float now_dash = (float)System.DateTime.UtcNow.TimeOfDay.TotalSeconds;
+        if (!aDown) _aWasUp = true;
+        if (aDown && _aWasUp)
+        {
+            _aWasUp = false;
+            if (now_dash - _lastATapTime < DashDoubleTapWindow)
+            { IsDashing = true; _dashDir = -1; }
+            _lastATapTime = now_dash;
+        }
+        if (!dDown) _dWasUp = true;
+        if (dDown && _dWasUp)
+        {
+            _dWasUp = false;
+            if (now_dash - _lastDTapTime < DashDoubleTapWindow)
+            { IsDashing = true; _dashDir = 1; }
+            _lastDTapTime = now_dash;
+        }
+        // Stop dashing when you release the dash direction key or press opposite
+        if (IsDashing)
+        {
+            if ((_dashDir == -1 && !aDown) || (_dashDir == 1 && !dDown) || inputX == -_dashDir)
+                IsDashing = false;
+        }
 
         // --- Crouch (shift while grounded, not sliding) ---
         IsCrouching = shift && (_wasGrounded || IsOnRope) && !IsSliding;
@@ -360,7 +397,8 @@ public class Player
         }
         else
         {
-            vel.X = inputX * Speed;
+            float moveSpeed = (IsDashing && inputX == _dashDir) ? DashSpeed : Speed;
+            vel.X = inputX * moveSpeed;
 
             // Jump (Space) — only if NOT holding S (S+Space = slide)
             if (spacePressed && !_jumpHeld && _jumpsLeft > 0 && inputY <= 0)
@@ -483,9 +521,10 @@ public class Player
         }
         else
         {
+            var bodyColor = IsDashing ? new Color(180, 180, 180) : Color.Gray;
             spriteBatch.Draw(pixel,
                 new Rectangle((int)Position.X, (int)Position.Y, Width, Height),
-                Color.Gray);
+                bodyColor);
 
             int notchX = FacingDir == 1 ? (int)Position.X + Width - 4 : (int)Position.X;
             spriteBatch.Draw(pixel,
