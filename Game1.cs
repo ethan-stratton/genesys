@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using Microsoft.Xna.Framework.Media;
 
 namespace ArenaShooter;
 
@@ -12,6 +13,7 @@ public class Game1 : Game
     private SpriteBatch _spriteBatch;
     private Texture2D _pixel;
     private SpriteFont _font;
+    private Song _bgm;
     private Player _player;
 
     private List<Bullet> _bullets;
@@ -84,6 +86,7 @@ public class Game1 : Game
     private bool _enableRopeClimb = true;
     private bool _enableDropThrough = true;
     private bool _enableVaultKick = true;
+    private bool _enableMusic;
 
     public Game1()
     {
@@ -109,6 +112,7 @@ public class Game1 : Game
             new() { Label = "Rope Climb", Get = () => _enableRopeClimb, Toggle = () => _enableRopeClimb = !_enableRopeClimb },
             new() { Label = "Drop Through", Get = () => _enableDropThrough, Toggle = () => _enableDropThrough = !_enableDropThrough },
             new() { Label = "Vault Kick", Get = () => _enableVaultKick, Toggle = () => _enableVaultKick = !_enableVaultKick },
+            new() { Label = "Music", Get = () => _enableMusic, Toggle = () => { _enableMusic = !_enableMusic; if (_enableMusic) { MediaPlayer.IsRepeating = true; MediaPlayer.Play(_bgm); } else { MediaPlayer.Stop(); } } },
             new() { Label = "Quit Game", Get = () => false, Toggle = () => Exit(), IsAction = true },
         };
 
@@ -134,6 +138,7 @@ public class Game1 : Game
         _pixel = new Texture2D(GraphicsDevice, 1, 1);
         _pixel.SetData(new[] { Color.White });
         _font = Content.Load<SpriteFont>("DefaultFont");
+        _bgm = Content.Load<Song>("bgm");
     }
 
     private Vector2 PlayerCenter =>

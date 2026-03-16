@@ -35,6 +35,9 @@ public class Player
     private bool _sWasUp;
     private const float DoubleTapWindow = 0.3f;
 
+    // Crouch-slide limiter (one per crouch hold)
+    private bool _crouchSlideUsed;
+
     // Slide (S + Space while grounded)
     public bool IsSliding { get; private set; }
     private float _slideTimer;
@@ -327,12 +330,14 @@ public class Player
         }
         WantsDropThrough = EnableDropThrough && _dropIgnoreTimer > 0f;
 
-        // --- Slide (S + Space while grounded, OR Shift + Space with no direction from crouch) ---
+        // --- Slide (S + Space while grounded, OR Shift + Space with no direction from crouch — one per crouch hold) ---
         bool spacePressed = kb.IsKeyDown(Keys.Space);
-        bool wantsSlide = (inputY > 0 && !IsCrouching) || (IsCrouching && inputX == 0);
+        bool wantsCrouchSlide = IsCrouching && inputX == 0 && !_crouchSlideUsed;
+        bool wantsSlide = (inputY > 0 && !IsCrouching) || wantsCrouchSlide;
         if (EnableSlide && wantsSlide && spacePressed && !_jumpHeld && _wasGrounded && !IsSliding && !IsCartwheeling && _slideCooldownTimer <= 0f)
         {
             IsSliding = true;
+            if (IsCrouching) _crouchSlideUsed = true;
             _slideTimer = SlideDuration;
             _slideCooldownTimer = SlideCooldown;
             _slideDir = FacingDir;
@@ -663,9 +668,12 @@ public class Player
         {
             vel.X = 0;
             vel.Y = 0;
+            // Track space so vault kick/jump works properly after crouch-slide
+            _jumpHeld = kb.IsKeyDown(Keys.Space);
         }
         else
         {
+            _crouchSlideUsed = false; // reset when not crouching
             float moveSpeed = (IsDashing && inputX == _dashDir) ? DashSpeed : Speed;
             vel.X = inputX * moveSpeed;
 
