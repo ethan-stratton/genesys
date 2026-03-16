@@ -35,9 +35,6 @@ public class Player
     private bool _sWasUp;
     private const float DoubleTapWindow = 0.3f;
 
-    // Crouch-slide limiter (one per crouch hold)
-    private bool _crouchSlideUsed;
-
     // Slide (S + Space while grounded)
     public bool IsSliding { get; private set; }
     private float _slideTimer;
@@ -117,6 +114,8 @@ public class Player
     private int _currentWallClimbSide; // 1 = climbable on right, -1 = climbable on left
     private const float WallClimbSpeed = 180f;
     private bool _wallDisengaged;
+    private float _wallHopCooldown; // brief cooldown before wall can re-grab
+    private const float WallHopCooldownTime = 0.25f;
 
     // Wall vault (smooth climb-over animation)
     public bool IsVaulting { get; private set; }
@@ -218,8 +217,17 @@ public class Player
             if (!nearAnyRope) _ropeDisengaged = false;
         }
 
+        // --- Raw directional input ---
+        int inputX = 0;
+        int inputY = 0;
+        if (kb.IsKeyDown(Keys.A)) inputX -= 1;
+        if (kb.IsKeyDown(Keys.D)) inputX += 1;
+        if (kb.IsKeyDown(Keys.W)) inputY -= 1;
+        if (kb.IsKeyDown(Keys.S)) inputY += 1;
+
         // --- Wall attachment check ---
-        if (!IsOnWall && !IsOnRope && walls != null && !IsSliding && !IsDashing)
+        _wallHopCooldown -= dt;
+        if (!IsOnWall && !IsOnRope && walls != null && !IsSliding && !IsDashing && _wallHopCooldown <= 0f)
         {
             float playerCenterY = Position.Y + Height / 2f;
             bool nearAnyWall = false;
@@ -232,7 +240,10 @@ public class Player
                 float playerEdge = side == 1 ? Position.X : Position.X + Width;
                 bool xTouch = MathF.Abs(playerEdge - climbX) < 6f;
                 bool yInRange = playerCenterY >= w.Top && playerCenterY <= w.Bottom;
-                if (xTouch && yInRange)
+                // Require pressing toward wall to attach (not automatic after hop)
+                bool pressingToward = inputX == -side;
+                bool groundedNear = _wasGrounded;
+                if (xTouch && yInRange && (pressingToward || groundedNear))
                 {
                     nearAnyWall = true;
                     if (!_wallDisengaged)
@@ -274,13 +285,7 @@ public class Player
             }
         }
 
-        // --- Raw directional input ---
-        int inputX = 0;
-        int inputY = 0;
-        if (kb.IsKeyDown(Keys.A)) inputX -= 1;
-        if (kb.IsKeyDown(Keys.D)) inputX += 1;
-        if (kb.IsKeyDown(Keys.W)) inputY -= 1;
-        if (kb.IsKeyDown(Keys.S)) inputY += 1;
+        // (raw input moved up, was here)
 
         // --- Dash detection (double-tap A or D) ---
         if (!EnableDash) IsDashing = false;
@@ -558,12 +563,12 @@ public class Player
                 }
                 else
                 {
-                    // Wall hop — launch up, momentarily detach, will reattach if still near wall
+                    // Wall hop — launch up, reattach by pressing toward wall
                     IsOnWall = false;
-                    // Don't set _wallDisengaged — allows immediate reattach
-                    vel.Y = JumpForce * 0.7f; // shorter hop than full jump
+                    _wallHopCooldown = WallHopCooldownTime;
+                    vel.Y = JumpForce * 0.7f;
                     vel.X = 0;
-                    _jumpsLeft = 0; // no double jump off wall hop
+                    _jumpsLeft = 0;
                     IsGrounded = false;
                     _wasGrounded = false;
                 }
@@ -687,7 +692,6 @@ public class Player
         }
         else
         {
-            _crouchSlideUsed = false; // reset when not crouching
             float moveSpeed = (IsDashing && inputX == _dashDir) ? DashSpeed : Speed;
             vel.X = inputX * moveSpeed;
 
