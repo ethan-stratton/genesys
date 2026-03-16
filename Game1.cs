@@ -11,6 +11,7 @@ public class Game1 : Game
     private GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch;
     private Texture2D _pixel;
+    private SpriteFont _font;
     private Player _player;
 
     private List<Bullet> _bullets;
@@ -23,9 +24,7 @@ public class Game1 : Game
 
     private bool _isDead;
     private KeyboardState _prevKb;
-
-    private float _fireCooldown;
-    private const float FireRate = 0.25f; // seconds between shots
+    private bool _spawnEnemies = true;
 
     private const int FloorY = 550; // ground level
     private const int FloorHeight = 50;
@@ -64,7 +63,6 @@ public class Game1 : Game
         _rng = new Random();
 
         _isDead = false;
-        _fireCooldown = 0f;
     }
 
     protected override void LoadContent()
@@ -72,6 +70,7 @@ public class Game1 : Game
         _spriteBatch = new SpriteBatch(GraphicsDevice);
         _pixel = new Texture2D(GraphicsDevice, 1, 1);
         _pixel.SetData(new[] { Color.White });
+        _font = Content.Load<SpriteFont>("DefaultFont");
     }
 
     private Vector2 PlayerCenter =>
@@ -81,6 +80,10 @@ public class Game1 : Game
     {
         var kb = Keyboard.GetState();
         if (kb.IsKeyDown(Keys.Escape)) Exit();
+
+        // Toggle enemy spawning
+        if (kb.IsKeyDown(Keys.Q) && _prevKb.IsKeyUp(Keys.Q))
+            _spawnEnemies = !_spawnEnemies;
 
         if (_isDead)
         {
@@ -94,16 +97,10 @@ public class Game1 : Game
 
         _player.Update(dt, kb, FloorY, Platforms);
 
-        // Shoot bullets
-        _fireCooldown -= dt;
-        var mouse = Mouse.GetState();
-        if (mouse.LeftButton == ButtonState.Pressed && _fireCooldown <= 0f)
+        // Shoot bullets (from player attack input)
+        if (_player.WantsToShoot)
         {
-            _fireCooldown = FireRate;
-            var dir = new Vector2(mouse.X, mouse.Y) - PlayerCenter;
-            if (dir != Vector2.Zero) dir.Normalize();
-
-            _bullets.Add(new Bullet(PlayerCenter, dir));
+            _bullets.Add(new Bullet(PlayerCenter, _player.ShootDirection));
         }
 
         // Update bullets
@@ -111,6 +108,8 @@ public class Game1 : Game
         _bullets.RemoveAll(b => b.IsDead);
 
         // Spawn enemies from left and right edges on the ground
+        if (_spawnEnemies)
+        {
         _spawnTimer += dt;
         if (_spawnTimer >= _spawnInterval)
         {
@@ -124,6 +123,7 @@ public class Game1 : Game
             );
             _enemies.Add(new Enemy(pos));
         }
+        } // end _spawnEnemies
 
         // Update enemies
         _enemies.ForEach(e => e.Update(dt, PlayerCenter));
@@ -137,9 +137,14 @@ public class Game1 : Game
                 var bRect = new Rectangle((int)b.Position.X, (int)b.Position.Y, Bullet.Size, Bullet.Size);
                 if (bRect.Intersects(eRect)) { e.IsDead = true; b.IsDead = true; }
             }
-            // Check player collision
+            // Melee hit
+            if (_player.MeleeTimer > 0 && _player.MeleeHitbox.Intersects(eRect))
+            {
+                e.IsDead = true;
+            }
+            // Check player collision (skip if sliding — invulnerable)
             var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
-            if (eRect.Intersects(pRect))
+            if (!_player.IsSliding && eRect.Intersects(pRect))
             {
                 _isDead = true;
                 break;
@@ -185,6 +190,10 @@ public class Game1 : Game
         {
             _spriteBatch.Draw(_pixel, new Rectangle(0, 0, 800, 600), Color.Black * 0.6f);
         }
+
+        // HUD - debug info
+        var enemyStatus = _spawnEnemies ? "ON" : "OFF";
+        _spriteBatch.DrawString(_font, $"[Q] Enemies: {enemyStatus}", new Vector2(10, 10), Color.Gray * 0.7f);
 
         _spriteBatch.End();
         base.Draw(gameTime);
