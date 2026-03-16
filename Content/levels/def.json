@@ -1,0 +1,68 @@
+{
+  "name": "def",
+  "author": "",
+  "playerSpawn": {
+    "x": 0,
+    "y": 496
+  },
+  "bounds": {
+    "left": -600,
+    "right": 1400,
+    "top": -200,
+    "bottom": 600
+  },
+  "floor": {
+    "y": 550,
+    "height": 50
+  },
+  "platforms": [
+    {
+      "x": 48,
+      "y": 400,
+      "w": 384,
+      "h": 12
+    },
+    {
+      "x": 272,
+      "y": 256,
+      "w": 192,
+      "h": 12
+    }
+  ],
+  "ropes": [
+    {
+      "x": -48,
+      "top": 144,
+      "bottom": 288
+    }
+  ],
+  "walls": [
+    {
+      "x": 560,
+      "y": 384,
+      "w": 32,
+      "h": 160,
+      "climbSide": 0
+    }
+  ],
+  "spikes": [],
+  "ceilings": [
+    {
+      "x": -96,
+      "y": 128,
+      "w": 176,
+      "h": 12
+    }
+  ],
+  "solidFloors": [],
+  "wallSpikes": [],
+  "exits": [
+    {
+      "x": 432,
+      "y": 512,
+      "w": 32,
+      "h": 32,
+      "targetLevel": ""
+    }
+  ]
+}

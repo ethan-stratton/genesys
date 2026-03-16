@@ -14,9 +14,12 @@ public class Game1 : Game
     private GameState _gameState = GameState.Title;
     private int _titleCursor;
     private bool _settingsFromTitle;
-    private readonly string[] _titleOptions = { "Play", "Settings", "Quit" };
+    private string[] _titleOptions => SaveData.Exists()
+        ? new[] { "Continue", "New Game", "Settings", "Quit" }
+        : new[] { "New Game", "Settings", "Quit" };
 
     private GraphicsDeviceManager _graphics;
+    private SaveData _saveData;
     private SpriteBatch _spriteBatch;
     private Camera _camera;
     private Texture2D _pixel;
@@ -176,6 +179,7 @@ public class Game1 : Game
 
         if (_gameState == GameState.Title)
         {
+            if (_titleCursor >= _titleOptions.Length) _titleCursor = 0;
             if (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W))
                 _titleCursor = (_titleCursor - 1 + _titleOptions.Length) % _titleOptions.Length;
             if (kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S))
@@ -187,11 +191,34 @@ public class Game1 : Game
             {
                 switch (_titleOptions[_titleCursor])
                 {
-                    case "Play":
+                    case "Continue":
+                        _saveData = SaveData.Load();
+                        if (_saveData != null)
+                        {
+                            string path = $"Content/levels/{_saveData.CurrentLevel}.json";
+                            if (System.IO.File.Exists(path))
+                                LoadLevel(path);
+                            else
+                                LoadLevel(DefaultLevel);
+                            _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
+                            _gameState = GameState.Playing;
+                            _player = new Player(new Microsoft.Xna.Framework.Vector2(_saveData.SpawnX, _saveData.SpawnY));
+                            _camera.SnapTo(_player.Position, Player.Width, Player.Height);
+                            _bullets = new List<Bullet>();
+                            _enemies = new List<Enemy>();
+                        }
+                        break;
+                    case "New Game":
+                        SaveData.Delete();
+                        _saveData = new SaveData();
                         LoadLevel(DefaultLevel);
                         _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
                         _gameState = GameState.Playing;
                         Restart();
+                        _saveData.CurrentLevel = System.IO.Path.GetFileNameWithoutExtension(DefaultLevel);
+                        _saveData.SpawnX = _player.Position.X;
+                        _saveData.SpawnY = _player.Position.Y;
+                        _saveData.Save();
                         break;
                     case "Settings":
                         _menuOpen = true;
@@ -288,6 +315,8 @@ public class Game1 : Game
 
         _player.Update(dt, kb, _level.Floor.Y, _level.AllPlatforms, ropesToPass, ropeTopsToPass, ropeBottomsToPass, wallsToPass, wallSidesToPass, _level.WallRects, _level.CeilingRects, _level.SolidFloorRects);
 
+        // Track play time
+        if (_saveData != null) _saveData.PlayTime += dt;
         // Update camera
         _camera.Update(dt, _player.Position, Player.Width, Player.Height, _player.FacingDir, _player.IsGrounded, _player.Velocity.Y);
 
@@ -394,6 +423,14 @@ public class Game1 : Game
                         _editorSaveFile = nextPath;
                         _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
                         Restart();
+                        // Auto-save on level transition
+                        if (_saveData != null)
+                        {
+                            _saveData.CurrentLevel = target;
+                            _saveData.SpawnX = _player.Position.X;
+                            _saveData.SpawnY = _player.Position.Y;
+                            _saveData.Save();
+                        }
                     }
                     break;
                 }
