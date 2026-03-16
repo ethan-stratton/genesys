@@ -130,7 +130,21 @@ public class Game1 : Game
 
     private void Restart()
     {
-        if (_level == null) LoadLevel(DefaultLevel);
+        if (_level == null)
+        {
+            if (System.IO.File.Exists(DefaultLevel))
+                LoadLevel(DefaultLevel);
+            else
+            {
+                // Generate empty level if none exist
+                _level = new LevelData { Name = "empty" };
+                _level.Build();
+                if (!System.IO.Directory.Exists("Content/levels"))
+                    System.IO.Directory.CreateDirectory("Content/levels");
+                _editorSaveFile = DefaultLevel;
+                SaveLevel();
+            }
+        }
         var spawn = _level.PlayerSpawn;
         _player = new Player(new Vector2(spawn.X, spawn.Y));
         _camera?.SnapTo(_player.Position, Player.Width, Player.Height);
@@ -798,7 +812,7 @@ public class Game1 : Game
             return;
         }
 
-        string[] options = { "Save", "Save As...", "Load Level...", "New Level", "Back to Game (=)", "Help" };
+        string[] options = { "Save", "Save As...", "Load Level...", "New Level", "Delete Level", "Back to Game (=)", "Help" };
         int count = options.Length;
 
         if (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W))
@@ -835,14 +849,40 @@ public class Game1 : Game
                     SetEditorStatus("New empty level");
                     _editorMenuOpen = false;
                     break;
-                case 4: // Back to game
+                case 4: // Delete Level
+                    if (System.IO.File.Exists(_editorSaveFile))
+                    {
+                        System.IO.File.Delete(_editorSaveFile);
+                        SetEditorStatus($"Deleted {System.IO.Path.GetFileName(_editorSaveFile)}");
+                    }
+                    // Load another level or generate empty
+                    var remaining = System.IO.Directory.Exists("Content/levels")
+                        ? System.IO.Directory.GetFiles("Content/levels", "*.json")
+                        : Array.Empty<string>();
+                    if (remaining.Length > 0)
+                    {
+                        LoadLevel(remaining[0]);
+                        _editorSaveFile = remaining[0];
+                    }
+                    else
+                    {
+                        _level = new LevelData { Name = "empty" };
+                        _level.Build();
+                        _editorSaveFile = "Content/levels/empty.json";
+                        SaveLevel();
+                    }
+                    _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
+                    _editorCursor = new Vector2(_level.PlayerSpawn.X, _level.PlayerSpawn.Y);
+                    _editorMenuOpen = false;
+                    break;
+                case 5: // Back to game
                     _gameState = GameState.Playing;
                     _level.Build();
                     _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
                     Restart();
                     _editorMenuOpen = false;
                     break;
-                case 5: // Help
+                case 6: // Help
                     _editorMenuOpen = false;
                     break;
             }
@@ -1142,7 +1182,7 @@ public class Game1 : Game
             }
             else
             {
-                string[] options = { "Save", "Save As...", "Load Level...", "New Level", "Back to Game (=)", "Help" };
+                string[] options = { "Save", "Save As...", "Load Level...", "New Level", "Delete Level", "Back to Game (=)", "Help" };
                 float startY = 150f;
                 _spriteBatch.DrawString(_font, "EDITOR MENU  [Esc to close]", new Vector2(280, startY - 40), Color.White);
                 for (int i = 0; i < options.Length; i++)
