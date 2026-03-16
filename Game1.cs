@@ -7,7 +7,7 @@ using Microsoft.Xna.Framework.Media;
 
 namespace ArenaShooter;
 
-public enum GameState { Title, Playing }
+public enum GameState { Title, Playing, Editing }
 
 public class Game1 : Game
 {
@@ -68,6 +68,21 @@ public class Game1 : Game
     private bool _enableFlip = true;
     private bool _enableBladeDash = true;
     private bool _enableMusic;
+
+    // --- Editor state ---
+    private enum EditorTool { Platform = 1, Rope = 2, Wall = 3, Spike = 4, Exit = 5, Spawn = 6 }
+    private EditorTool _editorTool = EditorTool.Platform;
+    private Vector2 _editorCursor; // world position
+    private bool _editorGridSnap = true;
+    private int _editorGridSize = 16;
+    private bool _editorDragging;
+    private Vector2 _editorDragStart;
+    private bool _editorMenuOpen;
+    private int _editorMenuCursor;
+    private MouseState _prevMouse;
+    private string _editorSaveFile = "Content/levels/test-arena.json";
+    private string _editorStatusMsg = "";
+    private float _editorStatusTimer;
 
     public Game1()
     {
@@ -187,6 +202,27 @@ public class Game1 : Game
 
             _prevKb = kb;
             base.Update(gameTime);
+            return;
+        }
+
+        // --- Editor state ---
+        if (_gameState == GameState.Editing)
+        {
+            UpdateEditor(gameTime, kb);
+            _prevKb = kb;
+            _prevMouse = Mouse.GetState();
+            base.Update(gameTime);
+            return;
+        }
+
+        // Toggle editor with =
+        if (kb.IsKeyDown(Keys.OemPlus) && _prevKb.IsKeyUp(Keys.OemPlus))
+        {
+            _gameState = GameState.Editing;
+            _editorCursor = _player.Position;
+            _editorMenuOpen = false;
+            _prevKb = kb;
+            _prevMouse = Mouse.GetState();
             return;
         }
 
@@ -342,6 +378,465 @@ public class Game1 : Game
         base.Update(gameTime);
     }
 
+    // ===================== EDITOR =====================
+
+    private void UpdateEditor(GameTime gameTime, KeyboardState kb)
+    {
+        var dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
+        var mouse = Mouse.GetState();
+
+        // Status message countdown
+        if (_editorStatusTimer > 0) _editorStatusTimer -= dt;
+
+        // Editor menu (Esc)
+        if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape))
+        {
+            _editorMenuOpen = !_editorMenuOpen;
+            _editorMenuCursor = 0;
+        }
+
+        if (_editorMenuOpen)
+        {
+            UpdateEditorMenu(kb);
+            return;
+        }
+
+        // Back to play mode with =
+        if (kb.IsKeyDown(Keys.OemPlus) && _prevKb.IsKeyUp(Keys.OemPlus))
+        {
+            _gameState = GameState.Playing;
+            // Rebuild level arrays
+            _level.Build();
+            _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
+            Restart();
+            return;
+        }
+
+        // Move cursor with WASD
+        float speed = kb.IsKeyDown(Keys.LeftShift) ? 600f : 200f;
+        if (kb.IsKeyDown(Keys.W)) _editorCursor.Y -= speed * dt;
+        if (kb.IsKeyDown(Keys.S)) _editorCursor.Y += speed * dt;
+        if (kb.IsKeyDown(Keys.A)) _editorCursor.X -= speed * dt;
+        if (kb.IsKeyDown(Keys.D)) _editorCursor.X += speed * dt;
+
+        // Tool select with number keys
+        if (kb.IsKeyDown(Keys.D1) && _prevKb.IsKeyUp(Keys.D1)) _editorTool = EditorTool.Platform;
+        if (kb.IsKeyDown(Keys.D2) && _prevKb.IsKeyUp(Keys.D2)) _editorTool = EditorTool.Rope;
+        if (kb.IsKeyDown(Keys.D3) && _prevKb.IsKeyUp(Keys.D3)) _editorTool = EditorTool.Wall;
+        if (kb.IsKeyDown(Keys.D4) && _prevKb.IsKeyUp(Keys.D4)) _editorTool = EditorTool.Spike;
+        if (kb.IsKeyDown(Keys.D5) && _prevKb.IsKeyUp(Keys.D5)) _editorTool = EditorTool.Exit;
+        if (kb.IsKeyDown(Keys.D6) && _prevKb.IsKeyUp(Keys.D6)) _editorTool = EditorTool.Spawn;
+
+        // Grid snap toggle
+        if (kb.IsKeyDown(Keys.G) && _prevKb.IsKeyUp(Keys.G))
+            _editorGridSnap = !_editorGridSnap;
+
+        // Camera follows cursor
+        _camera.SnapTo(_editorCursor, 0, 0);
+
+        // Convert mouse to world coordinates
+        var worldMouse = Vector2.Transform(
+            new Vector2(mouse.X, mouse.Y),
+            Matrix.Invert(_camera.TransformMatrix));
+
+        var snapped = _editorGridSnap
+            ? new Vector2(
+                MathF.Round(worldMouse.X / _editorGridSize) * _editorGridSize,
+                MathF.Round(worldMouse.Y / _editorGridSize) * _editorGridSize)
+            : worldMouse;
+
+        // Left click — place / start drag
+        if (mouse.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released)
+        {
+            if (_editorTool == EditorTool.Spawn)
+            {
+                _level.PlayerSpawn = new PointData { X = (int)snapped.X, Y = (int)snapped.Y };
+                SetEditorStatus("Spawn point set");
+            }
+            else
+            {
+                _editorDragging = true;
+                _editorDragStart = snapped;
+            }
+        }
+
+        // Left release — finish placing
+        if (mouse.LeftButton == ButtonState.Released && _prevMouse.LeftButton == ButtonState.Pressed && _editorDragging)
+        {
+            _editorDragging = false;
+            var dragEnd = snapped;
+            int x = (int)MathF.Min(_editorDragStart.X, dragEnd.X);
+            int y = (int)MathF.Min(_editorDragStart.Y, dragEnd.Y);
+            int w = (int)MathF.Abs(dragEnd.X - _editorDragStart.X);
+            int h = (int)MathF.Abs(dragEnd.Y - _editorDragStart.Y);
+            if (w < 8) w = 32; // minimum sizes
+            if (h < 8) h = 12;
+
+            switch (_editorTool)
+            {
+                case EditorTool.Platform:
+                    var pList = new List<RectData>(_level.Platforms);
+                    pList.Add(new RectData { X = x, Y = y, W = w, H = 12 });
+                    _level.Platforms = pList.ToArray();
+                    _level.Build();
+                    SetEditorStatus("Platform added");
+                    break;
+                case EditorTool.Rope:
+                    var rList = new List<RopeData>(_level.Ropes);
+                    rList.Add(new RopeData { X = _editorDragStart.X, Top = MathF.Min(_editorDragStart.Y, dragEnd.Y), Bottom = MathF.Max(_editorDragStart.Y, dragEnd.Y) });
+                    _level.Ropes = rList.ToArray();
+                    _level.Build();
+                    SetEditorStatus("Rope added");
+                    break;
+                case EditorTool.Wall:
+                    var wList = new List<WallData>(_level.Walls);
+                    wList.Add(new WallData { X = x, Y = y, W = w, H = h, ClimbSide = 1 });
+                    _level.Walls = wList.ToArray();
+                    _level.Build();
+                    SetEditorStatus("Wall added (side=1, press F to flip)");
+                    break;
+                case EditorTool.Spike:
+                    var sList = new List<RectData>(_level.Spikes);
+                    sList.Add(new RectData { X = x, Y = y, W = w, H = 12 });
+                    _level.Spikes = sList.ToArray();
+                    _level.Build();
+                    SetEditorStatus("Spike added");
+                    break;
+                case EditorTool.Exit:
+                    var eList = new List<ExitData>(_level.Exits);
+                    eList.Add(new ExitData { X = x, Y = y, W = w, H = h, TargetLevel = "" });
+                    _level.Exits = eList.ToArray();
+                    _level.Build();
+                    SetEditorStatus("Exit added (set target in JSON)");
+                    break;
+            }
+        }
+
+        // Right click — delete nearest object
+        if (mouse.RightButton == ButtonState.Pressed && _prevMouse.RightButton == ButtonState.Released)
+        {
+            var wp = new Point((int)worldMouse.X, (int)worldMouse.Y);
+            if (TryDeleteAt(wp))
+                SetEditorStatus("Deleted");
+        }
+
+        // F — flip last wall's climb side
+        if (kb.IsKeyDown(Keys.F) && _prevKb.IsKeyUp(Keys.F) && _level.Walls.Length > 0)
+        {
+            var last = _level.Walls[_level.Walls.Length - 1];
+            last.ClimbSide = last.ClimbSide == 1 ? -1 : 1;
+            _level.Walls[_level.Walls.Length - 1] = last;
+            _level.Build();
+            SetEditorStatus($"Wall climb side flipped to {last.ClimbSide}");
+        }
+    }
+
+    private bool TryDeleteAt(Point p)
+    {
+        // Check platforms
+        for (int i = _level.Platforms.Length - 1; i >= 0; i--)
+        {
+            var r = _level.Platforms[i];
+            if (new Rectangle(r.X, r.Y, r.W, r.H).Contains(p))
+            {
+                var list = new List<RectData>(_level.Platforms);
+                list.RemoveAt(i);
+                _level.Platforms = list.ToArray();
+                _level.Build();
+                return true;
+            }
+        }
+        // Check spikes
+        for (int i = _level.Spikes.Length - 1; i >= 0; i--)
+        {
+            var r = _level.Spikes[i];
+            if (new Rectangle(r.X, r.Y, r.W, r.H).Contains(p))
+            {
+                var list = new List<RectData>(_level.Spikes);
+                list.RemoveAt(i);
+                _level.Spikes = list.ToArray();
+                _level.Build();
+                return true;
+            }
+        }
+        // Check walls
+        for (int i = _level.Walls.Length - 1; i >= 0; i--)
+        {
+            var w = _level.Walls[i];
+            if (new Rectangle(w.X, w.Y, w.W, w.H).Contains(p))
+            {
+                var list = new List<WallData>(_level.Walls);
+                list.RemoveAt(i);
+                _level.Walls = list.ToArray();
+                _level.Build();
+                return true;
+            }
+        }
+        // Check exits
+        for (int i = _level.Exits.Length - 1; i >= 0; i--)
+        {
+            var e = _level.Exits[i];
+            if (new Rectangle(e.X, e.Y, e.W, e.H).Contains(p))
+            {
+                var list = new List<ExitData>(_level.Exits);
+                list.RemoveAt(i);
+                _level.Exits = list.ToArray();
+                _level.Build();
+                return true;
+            }
+        }
+        // Check ropes (10px tolerance around X)
+        for (int i = _level.Ropes.Length - 1; i >= 0; i--)
+        {
+            var r = _level.Ropes[i];
+            if (MathF.Abs(p.X - r.X) < 10 && p.Y >= r.Top && p.Y <= r.Bottom)
+            {
+                var list = new List<RopeData>(_level.Ropes);
+                list.RemoveAt(i);
+                _level.Ropes = list.ToArray();
+                _level.Build();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void SetEditorStatus(string msg)
+    {
+        _editorStatusMsg = msg;
+        _editorStatusTimer = 2f;
+    }
+
+    private void UpdateEditorMenu(KeyboardState kb)
+    {
+        string[] options = { "Save Level", "Load Level", "New Level", "Back to Game (=)", "Help" };
+        int count = options.Length;
+
+        if (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W))
+            _editorMenuCursor = (_editorMenuCursor - 1 + count) % count;
+        if (kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S))
+            _editorMenuCursor = (_editorMenuCursor + 1) % count;
+
+        bool confirm = (kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter)) ||
+                       (kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space));
+        if (confirm)
+        {
+            switch (_editorMenuCursor)
+            {
+                case 0: // Save
+                    SaveLevel();
+                    _editorMenuOpen = false;
+                    break;
+                case 1: // Load
+                    if (System.IO.File.Exists(_editorSaveFile))
+                    {
+                        LoadLevel(_editorSaveFile);
+                        SetEditorStatus($"Loaded {_editorSaveFile}");
+                    }
+                    else
+                        SetEditorStatus("File not found");
+                    _editorMenuOpen = false;
+                    break;
+                case 2: // New
+                    _level = new LevelData();
+                    _level.Build();
+                    _editorCursor = Vector2.Zero;
+                    SetEditorStatus("New empty level");
+                    _editorMenuOpen = false;
+                    break;
+                case 3: // Back to game
+                    _gameState = GameState.Playing;
+                    _level.Build();
+                    _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
+                    Restart();
+                    _editorMenuOpen = false;
+                    break;
+                case 4: // Help — just close, help is always visible
+                    _editorMenuOpen = false;
+                    break;
+            }
+        }
+    }
+
+    private void SaveLevel()
+    {
+        var dir = System.IO.Path.GetDirectoryName(_editorSaveFile);
+        if (!string.IsNullOrEmpty(dir) && !System.IO.Directory.Exists(dir))
+            System.IO.Directory.CreateDirectory(dir);
+
+        var opts = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
+        var json = System.Text.Json.JsonSerializer.Serialize(_level, opts);
+        System.IO.File.WriteAllText(_editorSaveFile, json);
+        SetEditorStatus($"Saved to {_editorSaveFile}");
+    }
+
+    private void DrawEditor()
+    {
+        var mouse = Mouse.GetState();
+
+        // World-space rendering with camera
+        _spriteBatch.Begin(transformMatrix: _camera.TransformMatrix);
+
+        // Draw floor
+        int floorY = _level.Floor.Y;
+        int floorH = _level.Floor.Height;
+        int bL = _level.Bounds.Left;
+        int bR = _level.Bounds.Right;
+        _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, floorH), new Color(40, 40, 40) * 0.5f);
+
+        // Draw grid
+        if (_editorGridSnap)
+        {
+            var camInv = Matrix.Invert(_camera.TransformMatrix);
+            var topLeft = Vector2.Transform(Vector2.Zero, camInv);
+            var botRight = Vector2.Transform(new Vector2(800, 600), camInv);
+            int gs = _editorGridSize;
+            int startX = ((int)topLeft.X / gs) * gs;
+            int startY = ((int)topLeft.Y / gs) * gs;
+            for (int gx = startX; gx < (int)botRight.X; gx += gs)
+                _spriteBatch.Draw(_pixel, new Rectangle(gx, (int)topLeft.Y, 1, (int)(botRight.Y - topLeft.Y)), Color.White * 0.04f);
+            for (int gy = startY; gy < (int)botRight.Y; gy += gs)
+                _spriteBatch.Draw(_pixel, new Rectangle((int)topLeft.X, gy, (int)(botRight.X - topLeft.X), 1), Color.White * 0.04f);
+        }
+
+        // Draw platforms
+        foreach (var p in _level.Platforms)
+            _spriteBatch.Draw(_pixel, new Rectangle(p.X, p.Y, p.W, p.H), new Color(50, 50, 50));
+
+        // Draw spikes
+        foreach (var s in _level.Spikes)
+            _spriteBatch.Draw(_pixel, new Rectangle(s.X, s.Y, s.W, s.H), Color.Red * 0.6f);
+
+        // Draw walls
+        foreach (var w in _level.Walls)
+        {
+            _spriteBatch.Draw(_pixel, new Rectangle(w.X, w.Y, w.W, w.H), new Color(60, 60, 60));
+            // Arrow showing climb side
+            int arrowX = w.ClimbSide == 1 ? w.X + w.W + 2 : w.X - 6;
+            _spriteBatch.Draw(_pixel, new Rectangle(arrowX, w.Y + w.H / 2 - 2, 4, 4), Color.Cyan * 0.6f);
+        }
+
+        // Draw ropes
+        foreach (var r in _level.Ropes)
+            _spriteBatch.Draw(_pixel, new Rectangle((int)r.X - 1, (int)r.Top, 3, (int)(r.Bottom - r.Top)), new Color(120, 80, 40));
+
+        // Draw exits
+        foreach (var e in _level.Exits)
+            _spriteBatch.Draw(_pixel, new Rectangle(e.X, e.Y, e.W, e.H), Color.LimeGreen * 0.4f);
+
+        // Draw spawn point
+        _spriteBatch.Draw(_pixel, new Rectangle(_level.PlayerSpawn.X - 2, _level.PlayerSpawn.Y - 2, Player.Width + 4, Player.Height + 4), Color.Cyan * 0.3f);
+        _spriteBatch.Draw(_pixel, new Rectangle(_level.PlayerSpawn.X, _level.PlayerSpawn.Y, Player.Width, Player.Height), Color.Cyan * 0.5f);
+
+        // Draw drag preview
+        if (_editorDragging)
+        {
+            var worldMouse = Vector2.Transform(new Vector2(mouse.X, mouse.Y), Matrix.Invert(_camera.TransformMatrix));
+            var dragEnd = _editorGridSnap
+                ? new Vector2(MathF.Round(worldMouse.X / _editorGridSize) * _editorGridSize, MathF.Round(worldMouse.Y / _editorGridSize) * _editorGridSize)
+                : worldMouse;
+
+            int px = (int)MathF.Min(_editorDragStart.X, dragEnd.X);
+            int py = (int)MathF.Min(_editorDragStart.Y, dragEnd.Y);
+            int pw = (int)MathF.Abs(dragEnd.X - _editorDragStart.X);
+            int ph = (int)MathF.Abs(dragEnd.Y - _editorDragStart.Y);
+            if (pw < 8) pw = 32;
+            if (ph < 8) ph = 12;
+
+            Color previewColor = _editorTool switch
+            {
+                EditorTool.Platform => Color.White * 0.3f,
+                EditorTool.Rope => new Color(120, 80, 40) * 0.5f,
+                EditorTool.Wall => Color.Gray * 0.3f,
+                EditorTool.Spike => Color.Red * 0.3f,
+                EditorTool.Exit => Color.LimeGreen * 0.3f,
+                _ => Color.White * 0.2f
+            };
+
+            if (_editorTool == EditorTool.Rope)
+                _spriteBatch.Draw(_pixel, new Rectangle((int)_editorDragStart.X - 1, py, 3, ph), previewColor);
+            else if (_editorTool == EditorTool.Platform || _editorTool == EditorTool.Spike)
+                _spriteBatch.Draw(_pixel, new Rectangle(px, py, pw, 12), previewColor);
+            else
+                _spriteBatch.Draw(_pixel, new Rectangle(px, py, pw, ph), previewColor);
+        }
+
+        // Draw world bounds outline
+        _spriteBatch.Draw(_pixel, new Rectangle(bL, _level.Bounds.Top, bR - bL, 1), Color.Yellow * 0.2f);
+        _spriteBatch.Draw(_pixel, new Rectangle(bL, _level.Bounds.Bottom, bR - bL, 1), Color.Yellow * 0.2f);
+        _spriteBatch.Draw(_pixel, new Rectangle(bL, _level.Bounds.Top, 1, _level.Bounds.Bottom - _level.Bounds.Top), Color.Yellow * 0.2f);
+        _spriteBatch.Draw(_pixel, new Rectangle(bR, _level.Bounds.Top, 1, _level.Bounds.Bottom - _level.Bounds.Top), Color.Yellow * 0.2f);
+
+        _spriteBatch.End();
+
+        // Screen-space UI
+        _spriteBatch.Begin();
+
+        // Toolbar
+        string[] toolNames = { "1:Platform", "2:Rope", "3:Wall", "4:Spike", "5:Exit", "6:Spawn" };
+        float tx = 10;
+        for (int i = 0; i < toolNames.Length; i++)
+        {
+            bool active = (int)_editorTool == i + 1;
+            _spriteBatch.DrawString(_font, toolNames[i], new Vector2(tx, 10), active ? Color.Yellow : Color.Gray * 0.6f);
+            tx += _font.MeasureString(toolNames[i]).X + 15;
+        }
+
+        // Grid snap indicator
+        _spriteBatch.DrawString(_font, $"Grid: {(_editorGridSnap ? "ON" : "OFF")} [G]", new Vector2(10, 30), _editorGridSnap ? Color.LightGreen : Color.Gray * 0.5f);
+
+        // Level name
+        _spriteBatch.DrawString(_font, $"Level: {_level.Name}", new Vector2(10, 50), Color.White * 0.6f);
+
+        // Cursor world position
+        _spriteBatch.DrawString(_font, $"Pos: {(int)_editorCursor.X}, {(int)_editorCursor.Y}", new Vector2(10, 70), Color.White * 0.4f);
+
+        // Status message
+        if (_editorStatusTimer > 0)
+            _spriteBatch.DrawString(_font, _editorStatusMsg, new Vector2(10, 570), Color.Yellow);
+
+        // Controls hint
+        _spriteBatch.DrawString(_font, "[=] Play  [Esc] Menu  [Click+Drag] Place  [RightClick] Delete  [F] Flip wall", new Vector2(10, 550), Color.Gray * 0.35f);
+
+        // Editor menu overlay
+        if (_editorMenuOpen)
+        {
+            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, 800, 600), Color.Black * 0.8f);
+
+            string[] options = { "Save Level", "Load Level", "New Level", "Back to Game (=)", "Help" };
+            float startY = 150f;
+            _spriteBatch.DrawString(_font, "EDITOR MENU  [Esc to close]", new Vector2(280, startY - 40), Color.White);
+            for (int i = 0; i < options.Length; i++)
+            {
+                bool sel = i == _editorMenuCursor;
+                _spriteBatch.DrawString(_font, (sel ? "> " : "  ") + options[i],
+                    new Vector2(300, startY + i * 30), sel ? Color.Yellow : Color.Gray);
+            }
+
+            // Help text always visible below menu
+            float hy = startY + options.Length * 30 + 30;
+            string[] help = {
+                "WASD = Move cursor (Shift = fast)",
+                "1-6 = Select tool (Platform/Rope/Wall/Spike/Exit/Spawn)",
+                "Click + Drag = Place object",
+                "Right Click = Delete object under cursor",
+                "G = Toggle grid snap",
+                "F = Flip last wall's climb side",
+                "= = Switch to play mode (test level)",
+                "Esc = This menu (Save/Load/New)",
+            };
+            foreach (var line in help)
+            {
+                _spriteBatch.DrawString(_font, line, new Vector2(200, hy), Color.Gray * 0.6f);
+                hy += 22;
+            }
+        }
+
+        _spriteBatch.End();
+    }
+
+    // ===================== END EDITOR =====================
+
     private void DrawSettingsMenu()
     {
         float startY = 150f;
@@ -385,6 +880,14 @@ public class Game1 : Game
     protected override void Draw(GameTime gameTime)
     {
         GraphicsDevice.Clear(new Color(20, 20, 20));
+
+        // Editor draw
+        if (_gameState == GameState.Editing)
+        {
+            DrawEditor();
+            base.Draw(gameTime);
+            return;
+        }
 
         if (_gameState == GameState.Title)
         {
