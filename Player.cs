@@ -195,7 +195,7 @@ public class Player
         if (aDown && _aWasUp)
         {
             _aWasUp = false;
-            if (now_dash - _lastATapTime < DashDoubleTapWindow)
+            if (now_dash - _lastATapTime < DashDoubleTapWindow && _wasGrounded)
             { IsDashing = true; _dashDir = -1; }
             _lastATapTime = now_dash;
         }
@@ -203,7 +203,7 @@ public class Player
         if (dDown && _dWasUp)
         {
             _dWasUp = false;
-            if (now_dash - _lastDTapTime < DashDoubleTapWindow)
+            if (now_dash - _lastDTapTime < DashDoubleTapWindow && _wasGrounded)
             { IsDashing = true; _dashDir = 1; }
             _lastDTapTime = now_dash;
         }
@@ -306,6 +306,7 @@ public class Player
                 _cartwheelDir = inputX;
                 IsCrouching = false;
                 _jumpHeld = true;
+                _jumpsLeft = MaxJumps - 1; // one jump used for cartwheel launch
             }
             // Jump off rope
             else if (spaceFresh)
@@ -466,7 +467,7 @@ public class Player
         }
 
         // End slide/cartwheel if airborne (slide only)
-        if (!IsGrounded && IsSliding) IsSliding = false;
+        if (!IsGrounded && IsSliding) { IsSliding = false; _ropeDisengaged = true; }
 
         pos.X = MathHelper.Clamp(pos.X, 0, 800 - Width);
 
