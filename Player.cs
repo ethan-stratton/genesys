@@ -70,7 +70,6 @@ public class Player
     private const float SpinMeleeActivateTime = 0.2f; // hold threshold
     private const float SpinMeleeRate = 0.08f; // much faster than normal melee
     private float _spinMeleeCooldown;
-    private int _spinMeleeAngleIndex; // cycles through 8 directions
     private static readonly Vector2[] SpinDirections = new Vector2[]
     {
         new(1, 0), new(1, 1), new(0, 1), new(-1, 1),
@@ -887,7 +886,6 @@ public class Player
             if (IsSpinningMelee)
             {
                 IsSpinningMelee = false;
-                _spinMeleeAngleIndex = 0;
             }
         }
 
