@@ -492,8 +492,12 @@ public class Game1 : Game
                     SetEditorStatus("Rope added");
                     break;
                 case EditorTool.Wall:
+                    // Clamp wall bottom to floor
+                    int wallH = h;
+                    if (y + wallH > _level.Floor.Y) wallH = _level.Floor.Y - y;
+                    if (wallH < 16) wallH = 16;
                     var wList = new List<WallData>(_level.Walls);
-                    wList.Add(new WallData { X = x, Y = y, W = w, H = h, ClimbSide = 0 });
+                    wList.Add(new WallData { X = x, Y = y, W = w, H = wallH, ClimbSide = 0 });
                     _level.Walls = wList.ToArray();
                     _level.Build();
                     SetEditorStatus("Wall added (both sides, [F] to cycle)");

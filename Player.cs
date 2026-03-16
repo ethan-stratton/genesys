@@ -664,8 +664,13 @@ public class Player
                 if (inputY != 0) vel.Y = inputY * WallClimbSpeed;
             }
 
-            // Drop off bottom of wall (holding S at the bottom edge)
-            if (inputY > 0 && Position.Y + Height >= _currentWall.Bottom - 2)
+            // Drop off bottom of wall (holding S at the bottom edge OR reaching floor)
+            float wallClimbBottom = MathF.Min(_currentWall.Bottom, floorY) - Height;
+            if (Position.Y >= wallClimbBottom - 2)
+            {
+                Position = new Vector2(Position.X, wallClimbBottom);
+            }
+            if (inputY > 0 && Position.Y >= wallClimbBottom - 2)
             {
                 IsOnWall = false;
                 _wallDisengaged = true;
