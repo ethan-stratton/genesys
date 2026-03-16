@@ -240,8 +240,12 @@ public class Game1 : Game
             {
                 e.IsDead = true;
             }
+            if (_player.IsVaultKicking && _player.VaultKickHitbox.Intersects(eRect))
+            {
+                e.IsDead = true;
+            }
             var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
-            if (!_player.IsSliding && !_player.IsCartwheeling && !_player.IsVaulting && eRect.Intersects(pRect))
+            if (!_player.IsSliding && !_player.IsCartwheeling && !_player.IsVaulting && !_player.IsVaultKicking && eRect.Intersects(pRect))
             {
                 _isDead = true;
                 break;

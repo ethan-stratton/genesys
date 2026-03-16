@@ -75,6 +75,16 @@ public class Player
     private float _cartwheelCooldownTimer;
     private int _cartwheelDir;
 
+    // Vault kick (Jump during slide)
+    public bool IsVaultKicking { get; private set; }
+    private float _vaultKickTimer;
+    private const float VaultKickDuration = 0.35f;
+    private const float VaultKickSpeed = 600f;
+    private const float VaultKickJumpForce = -350f;
+    private int _vaultKickDir;
+    public const int VaultKickHitboxW = 28;
+    public const int VaultKickHitboxH = 20;
+
     // Dash (double-tap A or D)
     public bool IsDashing { get; private set; }
     private const float DashSpeed = 420f;
@@ -133,6 +143,17 @@ public class Player
     }
 
     public int CurrentHeight => IsSliding ? SlideHeight : (IsCrouching ? CrouchHeight : Height);
+
+    public Rectangle VaultKickHitbox
+    {
+        get
+        {
+            // Hitbox extends from player's feet in the kick direction
+            int hbX = _vaultKickDir == 1 ? (int)Position.X + Width : (int)Position.X - VaultKickHitboxW;
+            int hbY = (int)Position.Y + Height - VaultKickHitboxH - 4;
+            return new Rectangle(hbX, hbY, VaultKickHitboxW, VaultKickHitboxH);
+        }
+    }
 
     public Rectangle MeleeHitbox
     {
@@ -591,19 +612,47 @@ public class Player
                 vel.X = _cartwheelDir * Speed;
             }
         }
+        else if (IsVaultKicking)
+        {
+            _vaultKickTimer -= dt;
+            vel.X = _vaultKickDir * VaultKickSpeed;
+            vel.Y += Gravity * dt;
+            if (_vaultKickTimer <= 0)
+            {
+                IsVaultKicking = false;
+                vel.X = _vaultKickDir * Speed; // return to normal speed
+            }
+        }
         else if (IsSliding)
         {
             _slideTimer -= dt;
-            // Decelerate from start speed to end speed over duration
-            float t = 1f - (_slideTimer / SlideDuration); // 0 at start, 1 at end
-            float speed = MathHelper.Lerp(SlideStartSpeed, SlideEndSpeed, t);
-            vel.X = _slideDir * speed;
-            vel.Y = 0;
-            if (_slideTimer <= 0)
+            // Vault kick: jump during slide
+            bool spaceSlide = kb.IsKeyDown(Keys.Space);
+            if (spaceSlide && !_jumpHeld)
             {
                 IsSliding = false;
-                // Brief momentum carry — keep end speed in slide direction
-                vel.X = _slideDir * SlideEndSpeed;
+                IsVaultKicking = true;
+                _vaultKickTimer = VaultKickDuration;
+                _vaultKickDir = _slideDir;
+                vel.X = _vaultKickDir * VaultKickSpeed;
+                vel.Y = VaultKickJumpForce;
+                IsGrounded = false;
+                _wasGrounded = false;
+                _jumpsLeft = MaxJumps - 1;
+                _jumpHeld = true;
+            }
+            else
+            {
+                // Normal slide deceleration
+                float t = 1f - (_slideTimer / SlideDuration);
+                float speed = MathHelper.Lerp(SlideStartSpeed, SlideEndSpeed, t);
+                vel.X = _slideDir * speed;
+                vel.Y = 0;
+                if (_slideTimer <= 0)
+                {
+                    IsSliding = false;
+                    vel.X = _slideDir * SlideEndSpeed;
+                }
             }
         }
         else if (IsCrouching)
@@ -751,6 +800,14 @@ public class Player
             spriteBatch.Draw(pixel,
                 new Rectangle((int)Position.X, (int)Position.Y, Width, Height),
                 Color.CornflowerBlue * 0.8f);
+        }
+        else if (IsVaultKicking)
+        {
+            spriteBatch.Draw(pixel,
+                new Rectangle((int)Position.X, (int)Position.Y, Width, Height),
+                Color.Orange * 0.9f);
+            var kickBox = VaultKickHitbox;
+            spriteBatch.Draw(pixel, kickBox, Color.Red * 0.6f);
         }
         else if (IsSliding)
         {
