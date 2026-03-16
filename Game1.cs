@@ -83,6 +83,7 @@ public class Game1 : Game
     private bool _enableWallClimb = true;
     private bool _enableRopeClimb = true;
     private bool _enableDropThrough = true;
+    private bool _enableVaultKick = true;
 
     public Game1()
     {
@@ -107,6 +108,7 @@ public class Game1 : Game
             new() { Label = "Wall Climb", Get = () => _enableWallClimb, Toggle = () => _enableWallClimb = !_enableWallClimb },
             new() { Label = "Rope Climb", Get = () => _enableRopeClimb, Toggle = () => _enableRopeClimb = !_enableRopeClimb },
             new() { Label = "Drop Through", Get = () => _enableDropThrough, Toggle = () => _enableDropThrough = !_enableDropThrough },
+            new() { Label = "Vault Kick", Get = () => _enableVaultKick, Toggle = () => _enableVaultKick = !_enableVaultKick },
             new() { Label = "Quit Game", Get = () => false, Toggle = () => Exit(), IsAction = true },
         };
 
@@ -187,6 +189,7 @@ public class Game1 : Game
         _player.EnableDash = _enableDash;
         _player.EnableDoubleJump = _enableDoubleJump;
         _player.EnableDropThrough = _enableDropThrough;
+        _player.EnableVaultKick = _enableVaultKick;
 
         var wallsToPass = _enableWallClimb ? Walls : null;
         var wallSidesToPass = _enableWallClimb ? WallClimbSides : null;

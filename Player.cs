@@ -81,6 +81,7 @@ public class Player
     private const float VaultKickDuration = 0.35f;
     private const float VaultKickSpeed = 600f;
     private const float VaultKickJumpForce = -350f;
+    private const float VaultKickMinSlideTime = 0.12f; // must slide at least this long before cancelling
     private int _vaultKickDir;
     public const int VaultKickHitboxW = 28;
     public const int VaultKickHitboxH = 20;
@@ -130,6 +131,7 @@ public class Player
     public bool EnableDash { get; set; } = true;
     public bool EnableDoubleJump { get; set; } = true;
     public bool EnableDropThrough { get; set; } = true;
+    public bool EnableVaultKick { get; set; } = true;
 
     private KeyboardState _prevKb;
 
@@ -626,9 +628,10 @@ public class Player
         else if (IsSliding)
         {
             _slideTimer -= dt;
-            // Vault kick: jump during slide
+            float elapsed = SlideDuration - _slideTimer;
+            // Vault kick: jump during slide (after minimum slide time)
             bool spaceSlide = kb.IsKeyDown(Keys.Space);
-            if (spaceSlide && !_jumpHeld)
+            if (EnableVaultKick && spaceSlide && !_jumpHeld && elapsed >= VaultKickMinSlideTime)
             {
                 IsSliding = false;
                 IsVaultKicking = true;
