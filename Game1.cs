@@ -35,60 +35,9 @@ public class Game1 : Game
     private bool _isDead;
     private KeyboardState _prevKb;
 
-    private const int FloorY = 550; // ground level
-    private const int FloorHeight = 50;
-
-    // World bounds (wider than viewport)
-    private const int WorldLeft = -600;
-    private const int WorldRight = 1400;
-    private const int WorldTop = -200;
-    private const int WorldBottom = 600;
-
-    private static readonly Rectangle[] Platforms = new[]
-    {
-        new Rectangle(150, 430, 160, 12),
-        new Rectangle(480, 430, 160, 12),
-        new Rectangle(300, 320, 200, 12),
-        // Extended area platforms
-        new Rectangle(-400, 400, 180, 12),
-        new Rectangle(-200, 300, 140, 12),
-        new Rectangle(800, 430, 160, 12),
-        new Rectangle(1000, 350, 180, 12),
-        new Rectangle(1200, 430, 140, 12),
-    };
-
-    // Spikes: rectangles on the ground that kill the player
-    private static readonly Rectangle[] Spikes = new[]
-    {
-        new Rectangle(550, FloorY - 12, 80, 12),
-    };
-
-    // Ropes: X position, top, bottom
-    private static readonly float[] RopeXPositions = new float[] { 100f, 350f, 650f, -300f, 900f };
-    private static readonly float[] RopeTops = new float[] { -100f, -100f, -100f, -100f, -100f };
-    private static readonly float[] RopeBottoms = new float[] { 390f, 320f, 390f, 360f, 390f };
-
-    // Walls
-    private static readonly Rectangle[] Walls = new[]
-    {
-        new Rectangle(-600, 100, 40, 370),
-        new Rectangle(1360, 100, 40, 370),
-    };
-    private static readonly int[] WallClimbSides = new[] { 1, -1 };
-    private static readonly Rectangle[] WallLedges = new[]
-    {
-        new Rectangle(-600, 100, 40, 12),
-        new Rectangle(1360, 100, 40, 12),
-    };
-
-    private static readonly Rectangle[] AllPlatforms;
-
-    static Game1()
-    {
-        AllPlatforms = new Rectangle[Platforms.Length + WallLedges.Length];
-        Platforms.CopyTo(AllPlatforms, 0);
-        WallLedges.CopyTo(AllPlatforms, Platforms.Length);
-    }
+    // Level data (loaded from JSON)
+    private LevelData _level;
+    private const string DefaultLevel = "Content/levels/test-arena.json";
 
     // --- Settings menu ---
     private bool _menuOpen;
@@ -125,8 +74,6 @@ public class Game1 : Game
         _graphics = new GraphicsDeviceManager(this);
         Content.RootDirectory = "Content";
         IsMouseVisible = true;
-        Player.WorldLeft = WorldLeft;
-        Player.WorldRight = WorldRight;
     }
 
     protected override void Initialize()
@@ -158,9 +105,18 @@ public class Game1 : Game
         base.Initialize();
     }
 
+    private void LoadLevel(string path)
+    {
+        _level = LevelData.Load(path);
+        Player.WorldLeft = _level.Bounds.Left;
+        Player.WorldRight = _level.Bounds.Right;
+    }
+
     private void Restart()
     {
-        _player = new Player(new Vector2(400 - Player.Width / 2, FloorY - Player.Height));
+        if (_level == null) LoadLevel(DefaultLevel);
+        var spawn = _level.PlayerSpawn;
+        _player = new Player(new Vector2(spawn.X, spawn.Y));
         _camera?.SnapTo(_player.Position, Player.Width, Player.Height);
         _bullets = new List<Bullet>();
         _enemies = new List<Enemy>();
@@ -174,7 +130,7 @@ public class Game1 : Game
     protected override void LoadContent()
     {
         _spriteBatch = new SpriteBatch(GraphicsDevice);
-        _camera = new Camera(800, 600, WorldLeft, WorldRight, WorldTop, WorldBottom);
+        _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
         _pixel = new Texture2D(GraphicsDevice, 1, 1);
         _pixel.SetData(new[] { Color.White });
         _font = Content.Load<SpriteFont>("DefaultFont");
@@ -270,13 +226,13 @@ public class Game1 : Game
         _player.EnableFlip = _enableFlip;
         _player.EnableBladeDash = _enableBladeDash;
 
-        var wallsToPass = _enableWallClimb ? Walls : null;
-        var wallSidesToPass = _enableWallClimb ? WallClimbSides : null;
-        var ropesToPass = _enableRopeClimb ? RopeXPositions : null;
-        var ropeTopsToPass = _enableRopeClimb ? RopeTops : null;
-        var ropeBottomsToPass = _enableRopeClimb ? RopeBottoms : null;
+        var wallsToPass = _enableWallClimb ? _level.WallRects : null;
+        var wallSidesToPass = _enableWallClimb ? _level.WallClimbSides : null;
+        var ropesToPass = _enableRopeClimb ? _level.RopeXPositions : null;
+        var ropeTopsToPass = _enableRopeClimb ? _level.RopeTops : null;
+        var ropeBottomsToPass = _enableRopeClimb ? _level.RopeBottoms : null;
 
-        _player.Update(dt, kb, FloorY, AllPlatforms, ropesToPass, ropeTopsToPass, ropeBottomsToPass, wallsToPass, wallSidesToPass, Walls);
+        _player.Update(dt, kb, _level.Floor.Y, _level.AllPlatforms, ropesToPass, ropeTopsToPass, ropeBottomsToPass, wallsToPass, wallSidesToPass, _level.WallRects);
 
         // Update camera
         _camera.Update(dt, _player.Position, Player.Width, Player.Height, _player.FacingDir, _player.IsGrounded, _player.Velocity.Y);
@@ -302,8 +258,8 @@ public class Game1 : Game
 
                 var fromLeft = _rng.Next(2) == 0;
                 var pos = new Vector2(
-                    fromLeft ? WorldLeft - Enemy.Size : WorldRight,
-                    FloorY - Enemy.Size
+                    fromLeft ? _level.Bounds.Left - Enemy.Size : _level.Bounds.Right,
+                    _level.Floor.Y - Enemy.Size
                 );
                 _enemies.Add(new Enemy(pos));
             }
@@ -352,11 +308,31 @@ public class Game1 : Game
         if (!_isDead)
         {
             var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
-            foreach (var spike in Spikes)
+            foreach (var spike in _level.SpikeRects)
             {
                 if (pRect.Intersects(spike))
                 {
                     _isDead = true;
+                    break;
+                }
+            }
+        }
+
+        // Exit collision — load next level
+        if (!_isDead)
+        {
+            var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
+            for (int i = 0; i < _level.ExitRects.Length; i++)
+            {
+                if (pRect.Intersects(_level.ExitRects[i]) && _level.ExitTargets[i] != "")
+                {
+                    string nextPath = $"Content/levels/{_level.ExitTargets[i]}.json";
+                    if (System.IO.File.Exists(nextPath))
+                    {
+                        LoadLevel(nextPath);
+                        _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
+                        Restart();
+                    }
                     break;
                 }
             }
@@ -457,18 +433,22 @@ public class Game1 : Game
         _spriteBatch.Begin(transformMatrix: _camera.TransformMatrix);
 
         // Draw floor (extended across world)
-        _spriteBatch.Draw(_pixel, new Rectangle(WorldLeft, FloorY, WorldRight - WorldLeft, FloorHeight), new Color(40, 40, 40));
-        _spriteBatch.Draw(_pixel, new Rectangle(WorldLeft, FloorY, WorldRight - WorldLeft, 2), new Color(80, 80, 80));
+        int floorY = _level.Floor.Y;
+        int floorH = _level.Floor.Height;
+        int bL = _level.Bounds.Left;
+        int bR = _level.Bounds.Right;
+        _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, floorH), new Color(40, 40, 40));
+        _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, 2), new Color(80, 80, 80));
 
         // Draw platforms
-        foreach (var plat in Platforms)
+        foreach (var plat in _level.PlatformRects)
         {
             _spriteBatch.Draw(_pixel, plat, new Color(50, 50, 50));
             _spriteBatch.Draw(_pixel, new Rectangle(plat.X, plat.Y, plat.Width, 2), new Color(90, 90, 90));
         }
 
         // Draw spikes
-        foreach (var spike in Spikes)
+        foreach (var spike in _level.SpikeRects)
         {
             _spriteBatch.Draw(_pixel, spike, Color.Red * 0.8f);
             // Triangle-ish look: draw smaller rects stacked
@@ -482,11 +462,11 @@ public class Game1 : Game
         }
 
         // Draw walls
-        foreach (var wall in Walls)
+        foreach (var wall in _level.WallRects)
         {
             _spriteBatch.Draw(_pixel, wall, _enableWallClimb ? new Color(60, 60, 60) : new Color(45, 45, 45));
         }
-        foreach (var ledge in WallLedges)
+        foreach (var ledge in _level.WallLedges)
         {
             _spriteBatch.Draw(_pixel, new Rectangle(ledge.X, ledge.Y, ledge.Width, 2), new Color(100, 100, 100));
         }
@@ -494,13 +474,19 @@ public class Game1 : Game
         // Draw ropes
         if (_enableRopeClimb)
         {
-            for (int i = 0; i < RopeXPositions.Length; i++)
+            for (int i = 0; i < _level.RopeXPositions.Length; i++)
             {
-                int rx = (int)RopeXPositions[i];
-                int rt = (int)RopeTops[i];
-                int rb = (int)RopeBottoms[i];
+                int rx = (int)_level.RopeXPositions[i];
+                int rt = (int)_level.RopeTops[i];
+                int rb = (int)_level.RopeBottoms[i];
                 _spriteBatch.Draw(_pixel, new Rectangle(rx - 1, rt, 3, rb - rt), new Color(120, 80, 40));
             }
+        }
+
+        // Draw exits
+        for (int i = 0; i < _level.ExitRects.Length; i++)
+        {
+            _spriteBatch.Draw(_pixel, _level.ExitRects[i], Color.LimeGreen * 0.5f);
         }
 
         // Draw player

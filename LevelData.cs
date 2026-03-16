@@ -1,0 +1,153 @@
+using System;
+using System.IO;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Microsoft.Xna.Framework;
+
+namespace ArenaShooter;
+
+public class LevelData
+{
+    [JsonPropertyName("name")] public string Name { get; set; } = "Untitled";
+    [JsonPropertyName("author")] public string Author { get; set; } = "";
+    [JsonPropertyName("playerSpawn")] public PointData PlayerSpawn { get; set; } = new();
+    [JsonPropertyName("bounds")] public BoundsData Bounds { get; set; } = new();
+    [JsonPropertyName("floor")] public FloorData Floor { get; set; } = new();
+    [JsonPropertyName("platforms")] public RectData[] Platforms { get; set; } = Array.Empty<RectData>();
+    [JsonPropertyName("ropes")] public RopeData[] Ropes { get; set; } = Array.Empty<RopeData>();
+    [JsonPropertyName("walls")] public WallData[] Walls { get; set; } = Array.Empty<WallData>();
+    [JsonPropertyName("spikes")] public RectData[] Spikes { get; set; } = Array.Empty<RectData>();
+    [JsonPropertyName("exits")] public ExitData[] Exits { get; set; } = Array.Empty<ExitData>();
+
+    // Derived arrays (populated after load)
+    [JsonIgnore] public Rectangle[] PlatformRects { get; private set; } = Array.Empty<Rectangle>();
+    [JsonIgnore] public Rectangle[] WallRects { get; private set; } = Array.Empty<Rectangle>();
+    [JsonIgnore] public int[] WallClimbSides { get; private set; } = Array.Empty<int>();
+    [JsonIgnore] public Rectangle[] WallLedges { get; private set; } = Array.Empty<Rectangle>();
+    [JsonIgnore] public Rectangle[] AllPlatforms { get; private set; } = Array.Empty<Rectangle>();
+    [JsonIgnore] public Rectangle[] SpikeRects { get; private set; } = Array.Empty<Rectangle>();
+    [JsonIgnore] public Rectangle[] ExitRects { get; private set; } = Array.Empty<Rectangle>();
+    [JsonIgnore] public string[] ExitTargets { get; private set; } = Array.Empty<string>();
+    [JsonIgnore] public float[] RopeXPositions { get; private set; } = Array.Empty<float>();
+    [JsonIgnore] public float[] RopeTops { get; private set; } = Array.Empty<float>();
+    [JsonIgnore] public float[] RopeBottoms { get; private set; } = Array.Empty<float>();
+
+    public void Build()
+    {
+        // Platforms
+        PlatformRects = new Rectangle[Platforms.Length];
+        for (int i = 0; i < Platforms.Length; i++)
+        {
+            var p = Platforms[i];
+            PlatformRects[i] = new Rectangle(p.X, p.Y, p.W, p.H);
+        }
+
+        // Walls
+        WallRects = new Rectangle[Walls.Length];
+        WallClimbSides = new int[Walls.Length];
+        WallLedges = new Rectangle[Walls.Length];
+        for (int i = 0; i < Walls.Length; i++)
+        {
+            var w = Walls[i];
+            WallRects[i] = new Rectangle(w.X, w.Y, w.W, w.H);
+            WallClimbSides[i] = w.ClimbSide;
+            WallLedges[i] = new Rectangle(w.X, w.Y, w.W, 12);
+        }
+
+        // AllPlatforms = platforms + wall ledges
+        AllPlatforms = new Rectangle[PlatformRects.Length + WallLedges.Length];
+        PlatformRects.CopyTo(AllPlatforms, 0);
+        WallLedges.CopyTo(AllPlatforms, PlatformRects.Length);
+
+        // Spikes
+        SpikeRects = new Rectangle[Spikes.Length];
+        for (int i = 0; i < Spikes.Length; i++)
+        {
+            var s = Spikes[i];
+            SpikeRects[i] = new Rectangle(s.X, s.Y, s.W, s.H);
+        }
+
+        // Exits
+        ExitRects = new Rectangle[Exits.Length];
+        ExitTargets = new string[Exits.Length];
+        for (int i = 0; i < Exits.Length; i++)
+        {
+            var e = Exits[i];
+            ExitRects[i] = new Rectangle(e.X, e.Y, e.W, e.H);
+            ExitTargets[i] = e.TargetLevel;
+        }
+
+        // Ropes
+        RopeXPositions = new float[Ropes.Length];
+        RopeTops = new float[Ropes.Length];
+        RopeBottoms = new float[Ropes.Length];
+        for (int i = 0; i < Ropes.Length; i++)
+        {
+            RopeXPositions[i] = Ropes[i].X;
+            RopeTops[i] = Ropes[i].Top;
+            RopeBottoms[i] = Ropes[i].Bottom;
+        }
+    }
+
+    public static LevelData Load(string path)
+    {
+        var json = File.ReadAllText(path);
+        var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var level = JsonSerializer.Deserialize<LevelData>(json, opts) ?? new LevelData();
+        level.Build();
+        return level;
+    }
+}
+
+public class PointData
+{
+    [JsonPropertyName("x")] public int X { get; set; }
+    [JsonPropertyName("y")] public int Y { get; set; }
+}
+
+public class BoundsData
+{
+    [JsonPropertyName("left")] public int Left { get; set; } = -600;
+    [JsonPropertyName("right")] public int Right { get; set; } = 1400;
+    [JsonPropertyName("top")] public int Top { get; set; } = -200;
+    [JsonPropertyName("bottom")] public int Bottom { get; set; } = 600;
+}
+
+public class FloorData
+{
+    [JsonPropertyName("y")] public int Y { get; set; } = 550;
+    [JsonPropertyName("height")] public int Height { get; set; } = 50;
+}
+
+public class RectData
+{
+    [JsonPropertyName("x")] public int X { get; set; }
+    [JsonPropertyName("y")] public int Y { get; set; }
+    [JsonPropertyName("w")] public int W { get; set; }
+    [JsonPropertyName("h")] public int H { get; set; }
+}
+
+public class RopeData
+{
+    [JsonPropertyName("x")] public float X { get; set; }
+    [JsonPropertyName("top")] public float Top { get; set; }
+    [JsonPropertyName("bottom")] public float Bottom { get; set; }
+}
+
+public class WallData
+{
+    [JsonPropertyName("x")] public int X { get; set; }
+    [JsonPropertyName("y")] public int Y { get; set; }
+    [JsonPropertyName("w")] public int W { get; set; }
+    [JsonPropertyName("h")] public int H { get; set; }
+    [JsonPropertyName("climbSide")] public int ClimbSide { get; set; } = 1;
+}
+
+public class ExitData
+{
+    [JsonPropertyName("x")] public int X { get; set; }
+    [JsonPropertyName("y")] public int Y { get; set; }
+    [JsonPropertyName("w")] public int W { get; set; } = 20;
+    [JsonPropertyName("h")] public int H { get; set; } = 48;
+    [JsonPropertyName("targetLevel")] public string TargetLevel { get; set; } = "";
+}
