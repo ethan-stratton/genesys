@@ -178,7 +178,7 @@ public class Player
         if (kb.IsKeyDown(Keys.S)) inputY += 1;
 
         // --- Crouch (shift while grounded, not sliding) ---
-        IsCrouching = shift && _wasGrounded && !IsSliding;
+        IsCrouching = shift && (_wasGrounded || IsOnRope) && !IsSliding;
 
         // --- Drop through platform (double-tap S only) ---
         _dropIgnoreTimer -= dt;
