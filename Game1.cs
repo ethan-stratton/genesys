@@ -71,6 +71,7 @@ public class Game1 : Game
 
     // --- Editor state ---
     private enum EditorTool { Platform = 1, Rope = 2, Wall = 3, Spike = 4, Exit = 5, Spawn = 6, WallSpike = 7 }
+    // Wall climbSide values: 0=both, 1=right face, -1=left face, 99=no climb (solid only)
     private EditorTool _editorTool = EditorTool.Platform;
     private Vector2 _editorCursor; // world position
     private bool _editorGridSnap = true;
@@ -512,13 +513,37 @@ public class Game1 : Game
                     SetEditorStatus("Exit added (Tab over exit to set target)");
                     break;
                 case EditorTool.WallSpike:
-                    // Determine side based on drag direction
-                    int wsSide = dragEnd.X >= _editorDragStart.X ? 1 : -1;
-                    var wsList = new List<WallSpikeData>(_level.WallSpikes);
-                    wsList.Add(new WallSpikeData { X = x, Y = y, W = 12, H = h, Side = wsSide });
-                    _level.WallSpikes = wsList.ToArray();
-                    _level.Build();
-                    SetEditorStatus($"Wall spike added (side={wsSide})");
+                    // Find nearest wall to snap to
+                    int bestWallIdx = -1;
+                    float bestDist = float.MaxValue;
+                    int snapSide = 1;
+                    for (int wi = 0; wi < _level.Walls.Length; wi++)
+                    {
+                        var wall = _level.Walls[wi];
+                        // Check distance to left face
+                        float dLeft = MathF.Abs(x - wall.X);
+                        // Check distance to right face
+                        float dRight = MathF.Abs(x - (wall.X + wall.W));
+                        if (dLeft < bestDist) { bestDist = dLeft; bestWallIdx = wi; snapSide = -1; }
+                        if (dRight < bestDist) { bestDist = dRight; bestWallIdx = wi; snapSide = 1; }
+                    }
+                    if (bestWallIdx >= 0 && bestDist < 60)
+                    {
+                        var wall = _level.Walls[bestWallIdx];
+                        int wsX = snapSide == 1 ? wall.X + wall.W : wall.X - 12;
+                        int wsY = Math.Max(y, wall.Y);
+                        int wsH = Math.Min(h, wall.Y + wall.H - wsY);
+                        if (wsH < 12) wsH = 12;
+                        var wsList = new List<WallSpikeData>(_level.WallSpikes);
+                        wsList.Add(new WallSpikeData { X = wsX, Y = wsY, W = 12, H = wsH, Side = snapSide });
+                        _level.WallSpikes = wsList.ToArray();
+                        _level.Build();
+                        SetEditorStatus($"Wall spike snapped to wall ({(snapSide == 1 ? "right" : "left")} face)");
+                    }
+                    else
+                    {
+                        SetEditorStatus("No wall nearby — place closer to a wall");
+                    }
                     break;
             }
         }
@@ -535,10 +560,10 @@ public class Game1 : Game
         if (kb.IsKeyDown(Keys.F) && _prevKb.IsKeyUp(Keys.F) && _level.Walls.Length > 0)
         {
             var last = _level.Walls[_level.Walls.Length - 1];
-            last.ClimbSide = last.ClimbSide switch { 0 => 1, 1 => -1, _ => 0 };
+            last.ClimbSide = last.ClimbSide switch { 0 => 1, 1 => -1, -1 => 99, _ => 0 };
             _level.Walls[_level.Walls.Length - 1] = last;
             _level.Build();
-            string sideStr = last.ClimbSide switch { 0 => "both", 1 => "right", _ => "left" };
+            string sideStr = last.ClimbSide switch { 0 => "both", 1 => "right", -1 => "left", _ => "none (solid)" };
             SetEditorStatus($"Wall climb side: {sideStr}");
         }
 
@@ -851,13 +876,26 @@ public class Game1 : Game
         foreach (var s in _level.Spikes)
             _spriteBatch.Draw(_pixel, new Rectangle(s.X, s.Y, s.W, s.H), Color.Red * 0.6f);
 
-        // Draw walls
+        // Draw walls (editor)
         foreach (var w in _level.Walls)
         {
-            _spriteBatch.Draw(_pixel, new Rectangle(w.X, w.Y, w.W, w.H), new Color(60, 60, 60));
-            // Arrow showing climb side
-            int arrowX = w.ClimbSide == 1 ? w.X + w.W + 2 : w.X - 6;
-            _spriteBatch.Draw(_pixel, new Rectangle(arrowX, w.Y + w.H / 2 - 2, 4, 4), Color.Cyan * 0.6f);
+            Color wallColor = w.ClimbSide == 99 ? new Color(80, 40, 40) : new Color(60, 60, 60);
+            _spriteBatch.Draw(_pixel, new Rectangle(w.X, w.Y, w.W, w.H), wallColor);
+            // Climb side indicators
+            if (w.ClimbSide == 0) // both
+            {
+                _spriteBatch.Draw(_pixel, new Rectangle(w.X - 4, w.Y + w.H / 2 - 2, 4, 4), Color.Cyan * 0.6f);
+                _spriteBatch.Draw(_pixel, new Rectangle(w.X + w.W, w.Y + w.H / 2 - 2, 4, 4), Color.Cyan * 0.6f);
+            }
+            else if (w.ClimbSide == 1)
+            {
+                _spriteBatch.Draw(_pixel, new Rectangle(w.X + w.W, w.Y + w.H / 2 - 2, 4, 4), Color.Cyan * 0.6f);
+            }
+            else if (w.ClimbSide == -1)
+            {
+                _spriteBatch.Draw(_pixel, new Rectangle(w.X - 4, w.Y + w.H / 2 - 2, 4, 4), Color.Cyan * 0.6f);
+            }
+            // 99 = no indicator (solid, no climb)
         }
 
         // Draw ropes

@@ -318,7 +318,9 @@ public class Player
                 {
                     float wallCenter = w.Left + w.Width / 2f;
                     float playerCenter = Position.X + Width / 2f;
-                    effectiveSide = playerCenter < wallCenter ? 1 : -1; // 1=approach from left (climb right face), -1=from right
+                    // Player to the left of wall → they approach the left face (side=-1, face away = right)
+                    // Player to the right → they approach the right face (side=1, face away = left)
+                    effectiveSide = playerCenter < wallCenter ? -1 : 1;
                 }
                 float climbX = effectiveSide == 1 ? w.Right : w.Left;
                 float playerEdge = effectiveSide == 1 ? Position.X : Position.X + Width;
