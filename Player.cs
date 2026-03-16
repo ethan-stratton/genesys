@@ -76,6 +76,16 @@ public class Player
         new(1, 0), new(1, 1), new(0, 1), new(-1, 1),
         new(-1, 0), new(-1, -1), new(0, -1), new(1, -1),
     };
+
+    // Frontflip/backflip (double-tap jump quickly)
+    public bool IsFlipping { get; private set; }
+    private float _flipTimer;
+    private const float FlipDuration = 0.3f;
+    private const float FlipSpeed = 450f;
+    private const float FlipJumpForce = -350f;
+    private int _flipDir; // +1 = frontflip (facing dir), -1 = backflip
+    private float _firstJumpTime; // timestamp of first jump for flip window
+    private const float FlipInputWindow = 0.15f;
     public const int MeleeWidth = 20;
 
     // Cartwheel/dash flip (Shift + A/D + Space)
@@ -161,6 +171,7 @@ public class Player
     public bool EnableVaultKick { get; set; } = true;
     public bool EnableUppercut { get; set; } = true;
     public bool EnableSpinMelee { get; set; } = true;
+    public bool EnableFlip { get; set; } = true;
 
     private KeyboardState _prevKb;
 
@@ -736,6 +747,17 @@ public class Player
                 _jumpsLeft = 0; // no double jump after uppercut — it IS the double jump substitute
             }
         }
+        else if (IsFlipping)
+        {
+            _flipTimer -= dt;
+            vel.X = _flipDir * FlipSpeed;
+            vel.Y += Gravity * dt;
+            if (_flipTimer <= 0)
+            {
+                IsFlipping = false;
+                vel.X = inputX * Speed; // return to normal
+            }
+        }
         else if (IsSliding)
         {
             _slideTimer -= dt;
@@ -786,8 +808,32 @@ public class Player
             int minJumpsLeft = EnableDoubleJump ? 0 : 1; // 1 = block second jump
             if (spacePressed && !_jumpHeld && _jumpsLeft > minJumpsLeft && inputY <= 0)
             {
-                vel.Y = JumpForce;
-                _jumpsLeft--;
+                float now_flip = (float)System.DateTime.UtcNow.TimeOfDay.TotalSeconds;
+                bool isSecondJump = _jumpsLeft < MaxJumps; // already used first jump
+
+                // Flip: second jump within tight window
+                if (EnableFlip && isSecondJump && (now_flip - _firstJumpTime) < FlipInputWindow)
+                {
+                    IsFlipping = true;
+                    _flipTimer = FlipDuration;
+                    // Frontflip if pressing facing dir, backflip otherwise
+                    if (inputX == FacingDir)
+                        _flipDir = FacingDir;
+                    else if (inputX == -FacingDir)
+                        _flipDir = -FacingDir;
+                    else
+                        _flipDir = -FacingDir; // no input = backflip
+                    vel.Y = FlipJumpForce;
+                    vel.X = _flipDir * FlipSpeed;
+                    _jumpsLeft = 0; // consumed
+                }
+                else
+                {
+                    // Normal jump
+                    vel.Y = JumpForce;
+                    _jumpsLeft--;
+                    if (!isSecondJump) _firstJumpTime = now_flip;
+                }
                 IsGrounded = false;
                 _wasGrounded = false;
             }
@@ -969,6 +1015,17 @@ public class Player
                 Color.Yellow * 0.9f);
             var ucBox = UppercutHitbox;
             spriteBatch.Draw(pixel, ucBox, Color.Red * 0.6f);
+        }
+        else if (IsFlipping)
+        {
+            // Compact tuck — square shape, magenta tint
+            float t = 1f - (_flipTimer / FlipDuration);
+            int size = (int)(Width * 0.75f);
+            int cx = (int)Position.X + (Width - size) / 2;
+            int cy = (int)Position.Y + (Height - size) / 2;
+            spriteBatch.Draw(pixel,
+                new Rectangle(cx, cy, size, size),
+                Color.Magenta * 0.85f);
         }
         else if (IsSliding)
         {
