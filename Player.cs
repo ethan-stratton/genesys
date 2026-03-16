@@ -88,6 +88,8 @@ public class Player
     // Rope climbing
     public bool IsOnRope { get; private set; }
     private float _ropeX; // X position of the rope we're attached to
+    private float _ropeTopCurrent; // top of current rope
+    private float _ropeBottomCurrent; // bottom of current rope
     private const float RopeClimbSpeed = 200f;
     private bool _ropeDropRequested;
     private float _lastDownTapTime;
@@ -126,7 +128,7 @@ public class Player
         }
     }
 
-    public void Update(float dt, KeyboardState kb, float floorY, Rectangle[] platforms, float[] ropeXPositions = null, float ropeTop = 0f, float ropeBottom = 550f)
+    public void Update(float dt, KeyboardState kb, float floorY, Rectangle[] platforms, float[] ropeXPositions = null, float[] ropeTops = null, float[] ropeBottoms = null)
     {
         WantsToShoot = false;
         WantsToMelee = false;
@@ -145,15 +147,20 @@ public class Player
             float playerCenterX = Position.X + Width / 2f;
             float playerCenterY = Position.Y + Height / 2f;
             bool nearAnyRope = false;
-            foreach (var rx in ropeXPositions)
+            for (int i = 0; i < ropeXPositions.Length; i++)
             {
-                if (MathF.Abs(playerCenterX - rx) < 16f && playerCenterY >= ropeTop && playerCenterY <= ropeBottom)
+                float rx = ropeXPositions[i];
+                float rt = ropeTops != null ? ropeTops[i] : 0f;
+                float rb = ropeBottoms != null ? ropeBottoms[i] : 550f;
+                if (MathF.Abs(playerCenterX - rx) < 16f && playerCenterY >= rt && playerCenterY <= rb)
                 {
                     nearAnyRope = true;
                     if (!_ropeDisengaged && !IsSliding && !IsDashing)
                     {
                         IsOnRope = true;
                         _ropeX = rx;
+                        _ropeTopCurrent = rt;
+                        _ropeBottomCurrent = rb;
                         _ropeDropRequested = false;
                         _downWasUp_rope = true;
                         break;
@@ -328,7 +335,7 @@ public class Player
             // Snap X to rope
             var posRope = Position;
             posRope.X = _ropeX - Width / 2f;
-            posRope.Y = MathHelper.Clamp(Position.Y + vel.Y * dt, ropeTop, ropeBottom - Height);
+            posRope.Y = MathHelper.Clamp(Position.Y + vel.Y * dt, _ropeTopCurrent, _ropeBottomCurrent - Height);
             Position = posRope;
             Velocity = vel;
 

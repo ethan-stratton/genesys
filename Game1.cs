@@ -36,10 +36,10 @@ public class Game1 : Game
         new Rectangle(300, 320, 200, 12),
     };
 
-    // Ropes hang from top of screen to just above ground
+    // Ropes: X position, top, bottom
     private static readonly float[] RopeXPositions = new float[] { 100f, 350f, 650f };
-    private const float RopeTop = 0f;
-    private const float RopeBottom = 550f; // FloorY
+    private static readonly float[] RopeTops = new float[] { 0f, 0f, 0f };
+    private static readonly float[] RopeBottoms = new float[] { 390f, 320f, 390f }; // middle to platform (320), sides shorter than floor
 
     public Game1()
     {
@@ -100,7 +100,7 @@ public class Game1 : Game
 
         var dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
 
-        _player.Update(dt, kb, FloorY, Platforms, RopeXPositions, RopeTop, RopeBottom);
+        _player.Update(dt, kb, FloorY, Platforms, RopeXPositions, RopeTops, RopeBottoms);
 
         // Shoot bullets (from player attack input)
         if (_player.WantsToShoot)
@@ -182,9 +182,12 @@ public class Game1 : Game
         }
 
         // Draw ropes
-        foreach (var rx in RopeXPositions)
+        for (int i = 0; i < RopeXPositions.Length; i++)
         {
-            _spriteBatch.Draw(_pixel, new Rectangle((int)rx - 1, (int)RopeTop, 3, (int)(RopeBottom - RopeTop)), new Color(120, 80, 40));
+            int rx = (int)RopeXPositions[i];
+            int rt = (int)RopeTops[i];
+            int rb = (int)RopeBottoms[i];
+            _spriteBatch.Draw(_pixel, new Rectangle(rx - 1, rt, 3, rb - rt), new Color(120, 80, 40));
         }
 
         // Draw player
