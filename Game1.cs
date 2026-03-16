@@ -1167,7 +1167,7 @@ public class Game1 : Game
         float tx = 10;
         for (int i = 0; i < toolNames.Length; i++)
         {
-            bool active = (int)_editorTool == i + 1;
+            bool active = (int)_editorTool == i;
             _spriteBatch.DrawString(_font, toolNames[i], new Vector2(tx, 10), active ? Color.Yellow : Color.Gray * 0.6f);
             tx += _font.MeasureString(toolNames[i]).X + 15;
         }
