@@ -114,6 +114,13 @@ public class Player
     // Aim direction
     public Vector2 AimDir { get; private set; }
 
+    // Feature toggles (set by Game1 from settings menu)
+    public bool EnableSlide { get; set; } = true;
+    public bool EnableCartwheel { get; set; } = true;
+    public bool EnableDash { get; set; } = true;
+    public bool EnableDoubleJump { get; set; } = true;
+    public bool EnableDropThrough { get; set; } = true;
+
     private KeyboardState _prevKb;
 
     public Player(Vector2 startPos)
@@ -250,6 +257,9 @@ public class Player
         if (kb.IsKeyDown(Keys.S)) inputY += 1;
 
         // --- Dash detection (double-tap A or D) ---
+        if (!EnableDash) IsDashing = false;
+        else
+        {
         bool aDown = kb.IsKeyDown(Keys.A);
         bool dDown = kb.IsKeyDown(Keys.D);
         float now_dash = (float)System.DateTime.UtcNow.TimeOfDay.TotalSeconds;
@@ -275,6 +285,7 @@ public class Player
             if ((_dashDir == -1 && !aDown) || (_dashDir == 1 && !dDown) || inputX == -_dashDir)
                 IsDashing = false;
         }
+        }
 
         // --- Crouch (shift while grounded, not sliding) ---
         IsCrouching = shift && (_wasGrounded || IsOnRope || IsOnWall) && !IsSliding;
@@ -291,12 +302,12 @@ public class Player
                 _dropIgnoreTimer = DropIgnoreTime;
             _lastSTapTime = now;
         }
-        WantsDropThrough = _dropIgnoreTimer > 0f;
+        WantsDropThrough = EnableDropThrough && _dropIgnoreTimer > 0f;
 
         // --- Slide (S + Space while grounded, OR Shift + Space with no direction from crouch) ---
         bool spacePressed = kb.IsKeyDown(Keys.Space);
         bool wantsSlide = (inputY > 0 && !IsCrouching) || (IsCrouching && inputX == 0);
-        if (wantsSlide && spacePressed && !_jumpHeld && _wasGrounded && !IsSliding && !IsCartwheeling && _slideCooldownTimer <= 0f)
+        if (EnableSlide && wantsSlide && spacePressed && !_jumpHeld && _wasGrounded && !IsSliding && !IsCartwheeling && _slideCooldownTimer <= 0f)
         {
             IsSliding = true;
             _slideTimer = SlideDuration;
@@ -305,7 +316,7 @@ public class Player
         }
 
         // --- Cartwheel (Shift + A/D + Space while grounded) ---
-        if (shift && inputX != 0 && spacePressed && !_jumpHeld && _wasGrounded && !IsSliding && !IsCartwheeling && _cartwheelCooldownTimer <= 0f)
+        if (EnableCartwheel && shift && inputX != 0 && spacePressed && !_jumpHeld && _wasGrounded && !IsSliding && !IsCartwheeling && _cartwheelCooldownTimer <= 0f)
         {
             IsCartwheeling = true;
             _cartwheelTimer = CartwheelDuration;
@@ -359,7 +370,7 @@ public class Player
             bool spaceFresh = spaceRope && !_jumpHeld; // only on new press
 
             // Cartwheel off rope (Shift + direction + Space) — check first since it's more specific
-            if (shift && inputX != 0 && spaceFresh && _cartwheelCooldownTimer <= 0f)
+            if (EnableCartwheel && shift && inputX != 0 && spaceFresh && _cartwheelCooldownTimer <= 0f)
             {
                 IsOnRope = false;
                 _ropeDisengaged = true;
@@ -492,7 +503,7 @@ public class Player
             bool spaceFreshWall = spaceWall && !_jumpHeld;
 
             // Cartwheel off wall (Shift + direction + Space)
-            if (shift && inputX != 0 && inputX == _currentWallClimbSide && spaceFreshWall && _cartwheelCooldownTimer <= 0f)
+            if (EnableCartwheel && shift && inputX != 0 && inputX == _currentWallClimbSide && spaceFreshWall && _cartwheelCooldownTimer <= 0f)
             {
                 IsOnWall = false;
                 _wallDisengaged = true;
@@ -606,7 +617,8 @@ public class Player
             vel.X = inputX * moveSpeed;
 
             // Jump (Space) — only if NOT holding S (S+Space = slide)
-            if (spacePressed && !_jumpHeld && _jumpsLeft > 0 && inputY <= 0)
+            int minJumpsLeft = EnableDoubleJump ? 0 : 1; // 1 = block second jump
+            if (spacePressed && !_jumpHeld && _jumpsLeft > minJumpsLeft && inputY <= 0)
             {
                 vel.Y = JumpForce;
                 _jumpsLeft--;

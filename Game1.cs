@@ -24,7 +24,6 @@ public class Game1 : Game
 
     private bool _isDead;
     private KeyboardState _prevKb;
-    private bool _spawnEnemies = true;
 
     private const int FloorY = 550; // ground level
     private const int FloorHeight = 50;
@@ -39,22 +38,20 @@ public class Game1 : Game
     // Ropes: X position, top, bottom
     private static readonly float[] RopeXPositions = new float[] { 100f, 350f, 650f };
     private static readonly float[] RopeTops = new float[] { 0f, 0f, 0f };
-    private static readonly float[] RopeBottoms = new float[] { 390f, 320f, 390f }; // middle to platform (320), sides shorter than floor
+    private static readonly float[] RopeBottoms = new float[] { 390f, 320f, 390f };
 
-    // Walls: rectangle + which side is climbable (1 = right side, -1 = left side)
-    // Left wall: gap at bottom (enemies enter), top is a ledge
+    // Walls
     private static readonly Rectangle[] Walls = new[]
     {
-        new Rectangle(0, 100, 40, 370), // left wall: top=100, bottom=470, gap below for enemies
+        new Rectangle(0, 100, 40, 370),
     };
-    private static readonly int[] WallClimbSides = new[] { 1 }; // climbable on right face
-    // Top ledge of wall acts as a platform (added to Platforms would work but let's keep separate)
+    private static readonly int[] WallClimbSides = new[] { 1 };
     private static readonly Rectangle[] WallLedges = new[]
     {
-        new Rectangle(0, 100, 40, 12), // top of left wall
+        new Rectangle(0, 100, 40, 12),
     };
 
-    private static readonly Rectangle[] AllPlatforms; // Platforms + WallLedges combined
+    private static readonly Rectangle[] AllPlatforms;
 
     static Game1()
     {
@@ -62,6 +59,30 @@ public class Game1 : Game
         Platforms.CopyTo(AllPlatforms, 0);
         WallLedges.CopyTo(AllPlatforms, Platforms.Length);
     }
+
+    // --- Settings menu ---
+    private bool _menuOpen;
+    private int _menuCursor;
+
+    private struct SettingEntry
+    {
+        public string Label;
+        public Func<bool> Get;
+        public Action Toggle;
+        public bool IsAction; // true = triggers action on Enter, not a toggle
+    }
+
+    private SettingEntry[] _settings;
+
+    // Toggleable gameplay options
+    private bool _spawnEnemies;
+    private bool _enableSlide = true;
+    private bool _enableCartwheel = true;
+    private bool _enableDash = true;
+    private bool _enableDoubleJump = true;
+    private bool _enableWallClimb = true;
+    private bool _enableRopeClimb = true;
+    private bool _enableDropThrough = true;
 
     public Game1()
     {
@@ -75,6 +96,19 @@ public class Game1 : Game
         _graphics.PreferredBackBufferWidth = 800;
         _graphics.PreferredBackBufferHeight = 600;
         _graphics.ApplyChanges();
+
+        _settings = new SettingEntry[]
+        {
+            new() { Label = "Enemies", Get = () => _spawnEnemies, Toggle = () => _spawnEnemies = !_spawnEnemies },
+            new() { Label = "Slide", Get = () => _enableSlide, Toggle = () => _enableSlide = !_enableSlide },
+            new() { Label = "Cartwheel", Get = () => _enableCartwheel, Toggle = () => _enableCartwheel = !_enableCartwheel },
+            new() { Label = "Dash (run)", Get = () => _enableDash, Toggle = () => _enableDash = !_enableDash },
+            new() { Label = "Double Jump", Get = () => _enableDoubleJump, Toggle = () => _enableDoubleJump = !_enableDoubleJump },
+            new() { Label = "Wall Climb", Get = () => _enableWallClimb, Toggle = () => _enableWallClimb = !_enableWallClimb },
+            new() { Label = "Rope Climb", Get = () => _enableRopeClimb, Toggle = () => _enableRopeClimb = !_enableRopeClimb },
+            new() { Label = "Drop Through", Get = () => _enableDropThrough, Toggle = () => _enableDropThrough = !_enableDropThrough },
+            new() { Label = "Quit Game", Get = () => false, Toggle = () => Exit(), IsAction = true },
+        };
 
         Restart();
         base.Initialize();
@@ -106,11 +140,36 @@ public class Game1 : Game
     protected override void Update(GameTime gameTime)
     {
         var kb = Keyboard.GetState();
-        if (kb.IsKeyDown(Keys.Escape)) Exit();
 
-        // Toggle enemy spawning
-        if (kb.IsKeyDown(Keys.Q) && _prevKb.IsKeyUp(Keys.Q))
-            _spawnEnemies = !_spawnEnemies;
+        // Toggle menu with Escape
+        if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape))
+        {
+            _menuOpen = !_menuOpen;
+            if (_menuOpen) _menuCursor = 0;
+        }
+
+        if (_menuOpen)
+        {
+            // Menu navigation
+            if (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W))
+                _menuCursor = (_menuCursor - 1 + _settings.Length) % _settings.Length;
+            if (kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S))
+                _menuCursor = (_menuCursor + 1) % _settings.Length;
+            if (kb.IsKeyDown(Keys.Up) && _prevKb.IsKeyUp(Keys.Up))
+                _menuCursor = (_menuCursor - 1 + _settings.Length) % _settings.Length;
+            if (kb.IsKeyDown(Keys.Down) && _prevKb.IsKeyUp(Keys.Down))
+                _menuCursor = (_menuCursor + 1) % _settings.Length;
+
+            // Toggle/activate with Enter or Space
+            if ((kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter)) ||
+                (kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space)))
+            {
+                _settings[_menuCursor].Toggle();
+            }
+
+            _prevKb = kb;
+            return; // game is paused while menu is open
+        }
 
         if (_isDead)
         {
@@ -122,9 +181,22 @@ public class Game1 : Game
 
         var dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
 
-        _player.Update(dt, kb, FloorY, AllPlatforms, RopeXPositions, RopeTops, RopeBottoms, Walls, WallClimbSides);
+        // Pass enabled features to player
+        _player.EnableSlide = _enableSlide;
+        _player.EnableCartwheel = _enableCartwheel;
+        _player.EnableDash = _enableDash;
+        _player.EnableDoubleJump = _enableDoubleJump;
+        _player.EnableDropThrough = _enableDropThrough;
 
-        // Shoot bullets (from player attack input)
+        var wallsToPass = _enableWallClimb ? Walls : null;
+        var wallSidesToPass = _enableWallClimb ? WallClimbSides : null;
+        var ropesToPass = _enableRopeClimb ? RopeXPositions : null;
+        var ropeTopsToPass = _enableRopeClimb ? RopeTops : null;
+        var ropeBottomsToPass = _enableRopeClimb ? RopeBottoms : null;
+
+        _player.Update(dt, kb, FloorY, AllPlatforms, ropesToPass, ropeTopsToPass, ropeBottomsToPass, wallsToPass, wallSidesToPass);
+
+        // Shoot bullets
         if (_player.WantsToShoot)
         {
             _bullets.Add(new Bullet(PlayerCenter, _player.ShootDirection));
@@ -134,23 +206,23 @@ public class Game1 : Game
         _bullets.ForEach(b => b.Update(dt));
         _bullets.RemoveAll(b => b.IsDead);
 
-        // Spawn enemies from left and right edges on the ground
+        // Spawn enemies
         if (_spawnEnemies)
         {
-        _spawnTimer += dt;
-        if (_spawnTimer >= _spawnInterval)
-        {
-            _spawnTimer = 0;
-            _spawnInterval = MathF.Max(0.3f, _spawnInterval - 0.03f);
+            _spawnTimer += dt;
+            if (_spawnTimer >= _spawnInterval)
+            {
+                _spawnTimer = 0;
+                _spawnInterval = MathF.Max(0.3f, _spawnInterval - 0.03f);
 
-            var fromLeft = _rng.Next(2) == 0;
-            var pos = new Vector2(
-                fromLeft ? -Enemy.Size : 800,
-                FloorY - Enemy.Size
-            );
-            _enemies.Add(new Enemy(pos));
+                var fromLeft = _rng.Next(2) == 0;
+                var pos = new Vector2(
+                    fromLeft ? -Enemy.Size : 800,
+                    FloorY - Enemy.Size
+                );
+                _enemies.Add(new Enemy(pos));
+            }
         }
-        } // end _spawnEnemies
 
         // Update enemies
         _enemies.ForEach(e => e.Update(dt, PlayerCenter));
@@ -164,12 +236,10 @@ public class Game1 : Game
                 var bRect = new Rectangle((int)b.Position.X, (int)b.Position.Y, Bullet.Size, Bullet.Size);
                 if (bRect.Intersects(eRect)) { e.IsDead = true; b.IsDead = true; }
             }
-            // Melee hit
             if (_player.MeleeTimer > 0 && _player.MeleeHitbox.Intersects(eRect))
             {
                 e.IsDead = true;
             }
-            // Check player collision (skip if sliding — invulnerable)
             var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
             if (!_player.IsSliding && !_player.IsCartwheeling && !_player.IsVaulting && eRect.Intersects(pRect))
             {
@@ -178,7 +248,6 @@ public class Game1 : Game
             }
         }
 
-        // Clean up dead bullets and enemies
         _bullets.RemoveAll(b => b.IsDead);
         _enemies.RemoveAll(e => e.IsDead);
 
@@ -206,8 +275,7 @@ public class Game1 : Game
         // Draw walls
         foreach (var wall in Walls)
         {
-            _spriteBatch.Draw(_pixel, wall, new Color(60, 60, 60));
-            // Highlight the climbable edge
+            _spriteBatch.Draw(_pixel, wall, _enableWallClimb ? new Color(60, 60, 60) : new Color(45, 45, 45));
         }
         foreach (var ledge in WallLedges)
         {
@@ -215,12 +283,15 @@ public class Game1 : Game
         }
 
         // Draw ropes
-        for (int i = 0; i < RopeXPositions.Length; i++)
+        if (_enableRopeClimb)
         {
-            int rx = (int)RopeXPositions[i];
-            int rt = (int)RopeTops[i];
-            int rb = (int)RopeBottoms[i];
-            _spriteBatch.Draw(_pixel, new Rectangle(rx - 1, rt, 3, rb - rt), new Color(120, 80, 40));
+            for (int i = 0; i < RopeXPositions.Length; i++)
+            {
+                int rx = (int)RopeXPositions[i];
+                int rt = (int)RopeTops[i];
+                int rb = (int)RopeBottoms[i];
+                _spriteBatch.Draw(_pixel, new Rectangle(rx - 1, rt, 3, rb - rt), new Color(120, 80, 40));
+            }
         }
 
         // Draw player
@@ -238,9 +309,36 @@ public class Game1 : Game
             _spriteBatch.Draw(_pixel, new Rectangle(0, 0, 800, 600), Color.Black * 0.6f);
         }
 
-        // HUD - debug info
-        var enemyStatus = _spawnEnemies ? "ON" : "OFF";
-        _spriteBatch.DrawString(_font, $"[Q] Enemies: {enemyStatus}", new Vector2(10, 10), Color.Gray * 0.7f);
+        // --- Settings menu overlay ---
+        if (_menuOpen)
+        {
+            // Dim background
+            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, 800, 600), Color.Black * 0.7f);
+
+            float startY = 150f;
+            float lineHeight = 30f;
+            _spriteBatch.DrawString(_font, "SETTINGS  [Esc to close]", new Vector2(280, startY - 40), Color.White);
+
+            for (int i = 0; i < _settings.Length; i++)
+            {
+                var s = _settings[i];
+                bool selected = i == _menuCursor;
+                string prefix = selected ? "> " : "  ";
+                string value = s.IsAction ? "" : (s.Get() ? "  ON" : "  OFF");
+                var color = selected ? Color.Yellow : Color.Gray;
+                if (!s.IsAction && s.Get()) color = selected ? Color.Yellow : Color.LightGreen;
+                if (s.IsAction) color = selected ? Color.Red : Color.DarkGray;
+
+                _spriteBatch.DrawString(_font, $"{prefix}{s.Label}{value}", new Vector2(280, startY + i * lineHeight), color);
+            }
+
+            _spriteBatch.DrawString(_font, "[Space/Enter] Toggle  [W/S] Navigate", new Vector2(230, startY + _settings.Length * lineHeight + 20), Color.Gray * 0.6f);
+        }
+        else if (!_isDead)
+        {
+            // Minimal HUD
+            _spriteBatch.DrawString(_font, "[Esc] Menu", new Vector2(10, 10), Color.Gray * 0.5f);
+        }
 
         _spriteBatch.End();
         base.Draw(gameTime);
