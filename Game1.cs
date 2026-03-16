@@ -57,6 +57,12 @@ public class Game1 : Game
         new Rectangle(1200, 430, 140, 12),
     };
 
+    // Spikes: rectangles on the ground that kill the player
+    private static readonly Rectangle[] Spikes = new[]
+    {
+        new Rectangle(550, FloorY - 12, 80, 12),
+    };
+
     // Ropes: X position, top, bottom
     private static readonly float[] RopeXPositions = new float[] { 100f, 350f, 650f, -300f, 900f };
     private static readonly float[] RopeTops = new float[] { -100f, -100f, -100f, -100f, -100f };
@@ -342,6 +348,20 @@ public class Game1 : Game
         _bullets.RemoveAll(b => b.IsDead);
         _enemies.RemoveAll(e => e.IsDead);
 
+        // Spike collision
+        if (!_isDead)
+        {
+            var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
+            foreach (var spike in Spikes)
+            {
+                if (pRect.Intersects(spike))
+                {
+                    _isDead = true;
+                    break;
+                }
+            }
+        }
+
         _prevKb = kb;
         base.Update(gameTime);
     }
@@ -445,6 +465,20 @@ public class Game1 : Game
         {
             _spriteBatch.Draw(_pixel, plat, new Color(50, 50, 50));
             _spriteBatch.Draw(_pixel, new Rectangle(plat.X, plat.Y, plat.Width, 2), new Color(90, 90, 90));
+        }
+
+        // Draw spikes
+        foreach (var spike in Spikes)
+        {
+            _spriteBatch.Draw(_pixel, spike, Color.Red * 0.8f);
+            // Triangle-ish look: draw smaller rects stacked
+            int teeth = spike.Width / 12;
+            for (int t = 0; t < teeth; t++)
+            {
+                int tx = spike.X + t * 12 + 2;
+                _spriteBatch.Draw(_pixel, new Rectangle(tx, spike.Y - 4, 8, 4), Color.Red * 0.6f);
+                _spriteBatch.Draw(_pixel, new Rectangle(tx + 2, spike.Y - 8, 4, 4), Color.Red * 0.4f);
+            }
         }
 
         // Draw walls
