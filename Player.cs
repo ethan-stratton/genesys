@@ -311,7 +311,8 @@ public class Player
             {
                 var w = walls[i];
                 int side = wallClimbSides[i];
-                // climbSide: 1=right face, -1=left face, 0=both sides
+                // climbSide: 1=right face, -1=left face, 0=both sides, 99=no climb
+                if (side == 99) continue;
                 // Determine effective side based on player position relative to wall
                 int effectiveSide = side;
                 if (side == 0)

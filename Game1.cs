@@ -70,7 +70,7 @@ public class Game1 : Game
     private bool _enableMusic;
 
     // --- Editor state ---
-    private enum EditorTool { Platform = 1, Rope = 2, Wall = 3, Spike = 4, Exit = 5, Spawn = 6, WallSpike = 7 }
+    private enum EditorTool { Platform = 1, Rope = 2, Wall = 3, Spike = 4, Exit = 5, Spawn = 6, WallSpike = 7, OverworldExit = 8 }
     // Wall climbSide values: 0=both, 1=right face, -1=left face, 99=no climb (solid only)
     private EditorTool _editorTool = EditorTool.Platform;
     private Vector2 _editorCursor; // world position
@@ -362,7 +362,15 @@ public class Game1 : Game
             {
                 if (pRect.Intersects(_level.ExitRects[i]) && _level.ExitTargets[i] != "")
                 {
-                    string nextPath = $"Content/levels/{_level.ExitTargets[i]}.json";
+                    string target = _level.ExitTargets[i];
+                    if (target == "__overworld__")
+                    {
+                        // Placeholder: return to title screen (will be overworld later)
+                        _gameState = GameState.Title;
+                        _titleCursor = 0;
+                        break;
+                    }
+                    string nextPath = $"Content/levels/{target}.json";
                     if (System.IO.File.Exists(nextPath))
                     {
                         LoadLevel(nextPath);
@@ -376,6 +384,20 @@ public class Game1 : Game
 
         _prevKb = kb;
         base.Update(gameTime);
+    }
+
+    private string SafeText(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return "";
+        var sb = new System.Text.StringBuilder(text.Length);
+        foreach (var c in text)
+        {
+            if (_font.Characters.Contains(c))
+                sb.Append(c);
+            else
+                sb.Append('?');
+        }
+        return sb.ToString();
     }
 
     // ===================== EDITOR =====================
@@ -429,6 +451,7 @@ public class Game1 : Game
         if (kb.IsKeyDown(Keys.D6) && _prevKb.IsKeyUp(Keys.D6)) _editorTool = EditorTool.Spawn;
 
         if (kb.IsKeyDown(Keys.D7) && _prevKb.IsKeyUp(Keys.D7)) _editorTool = EditorTool.WallSpike;
+        if (kb.IsKeyDown(Keys.D8) && _prevKb.IsKeyUp(Keys.D8)) _editorTool = EditorTool.OverworldExit;
 
         // Grid snap toggle
         if (kb.IsKeyDown(Keys.G) && _prevKb.IsKeyUp(Keys.G))
@@ -548,6 +571,13 @@ public class Game1 : Game
                     {
                         SetEditorStatus("No wall nearby — place closer to a wall");
                     }
+                    break;
+                case EditorTool.OverworldExit:
+                    var owList = new List<ExitData>(_level.Exits);
+                    owList.Add(new ExitData { X = x, Y = y, W = w, H = h, TargetLevel = "__overworld__" });
+                    _level.Exits = owList.ToArray();
+                    _level.Build();
+                    SetEditorStatus("Overworld exit added");
                     break;
             }
         }
@@ -909,9 +939,10 @@ public class Game1 : Game
         // Draw exits (with target labels)
         foreach (var e in _level.Exits)
         {
-            _spriteBatch.Draw(_pixel, new Rectangle(e.X, e.Y, e.W, e.H), Color.LimeGreen * 0.4f);
-            string label = string.IsNullOrEmpty(e.TargetLevel) ? "(?)" : e.TargetLevel;
-            _spriteBatch.DrawString(_font, label, new Vector2(e.X, e.Y - 16), Color.LimeGreen * 0.7f);
+            bool isOw = e.TargetLevel == "__overworld__";
+            _spriteBatch.Draw(_pixel, new Rectangle(e.X, e.Y, e.W, e.H), isOw ? Color.CornflowerBlue * 0.4f : Color.LimeGreen * 0.4f);
+            string label = isOw ? "OVERWORLD" : (string.IsNullOrEmpty(e.TargetLevel) ? "(?)" : e.TargetLevel);
+            _spriteBatch.DrawString(_font, SafeText(label), new Vector2(e.X, e.Y - 16), isOw ? Color.CornflowerBlue * 0.7f : Color.LimeGreen * 0.7f);
         }
 
         // Draw wall spikes
@@ -980,7 +1011,7 @@ public class Game1 : Game
         _spriteBatch.Begin();
 
         // Toolbar
-        string[] toolNames = { "1:Platform", "2:Rope", "3:Wall", "4:Spike", "5:Exit", "6:Spawn", "7:WallSpike" };
+        string[] toolNames = { "1:Platform", "2:Rope", "3:Wall", "4:Spike", "5:Exit", "6:Spawn", "7:WallSpike", "8:Overworld" };
         float tx = 10;
         for (int i = 0; i < toolNames.Length; i++)
         {
@@ -993,14 +1024,14 @@ public class Game1 : Game
         _spriteBatch.DrawString(_font, $"Grid: {(_editorGridSnap ? "ON" : "OFF")} [G]", new Vector2(10, 30), _editorGridSnap ? Color.LightGreen : Color.Gray * 0.5f);
 
         // Level name
-        _spriteBatch.DrawString(_font, $"Level: {_level.Name}", new Vector2(10, 50), Color.White * 0.6f);
+        _spriteBatch.DrawString(_font, SafeText($"Level: {_level.Name}"), new Vector2(10, 50), Color.White * 0.6f);
 
         // Cursor world position
         _spriteBatch.DrawString(_font, $"Pos: {(int)_editorCursor.X}, {(int)_editorCursor.Y}", new Vector2(10, 70), Color.White * 0.4f);
 
         // Status message
         if (_editorStatusTimer > 0)
-            _spriteBatch.DrawString(_font, _editorStatusMsg, new Vector2(10, 570), Color.Yellow);
+            _spriteBatch.DrawString(_font, SafeText(_editorStatusMsg), new Vector2(10, 570), Color.Yellow);
 
         // Controls hint
         _spriteBatch.DrawString(_font, "[=] Play  [Esc] Menu  [Drag] Place  [RClick] Delete  [Tab] Exit target  [F] Wall side", new Vector2(10, 550), Color.Gray * 0.35f);
@@ -1013,7 +1044,7 @@ public class Game1 : Game
             if (_editorMenuMode == EditorMenuMode.SaveAs)
             {
                 _spriteBatch.DrawString(_font, "SAVE AS  [Esc to cancel]", new Vector2(280, 200), Color.White);
-                _spriteBatch.DrawString(_font, "Filename: " + _editorSaveAsName + "_", new Vector2(280, 240), Color.Yellow);
+                _spriteBatch.DrawString(_font, SafeText("Filename: " + _editorSaveAsName + "_"), new Vector2(280, 240), Color.Yellow);
                 _spriteBatch.DrawString(_font, "(a-z, 0-9, dash. Enter to save)", new Vector2(280, 270), Color.Gray * 0.5f);
             }
             else if (_editorMenuMode == EditorMenuMode.LoadBrowser)
@@ -1029,7 +1060,7 @@ public class Game1 : Game
                     {
                         bool sel = i == _editorBrowserCursor;
                         var name = System.IO.Path.GetFileNameWithoutExtension(_editorLevelFiles[i]);
-                        _spriteBatch.DrawString(_font, (sel ? "> " : "  ") + name,
+                        _spriteBatch.DrawString(_font, SafeText((sel ? "> " : "  ") + name),
                             new Vector2(300, 160 + i * 28), sel ? Color.Yellow : Color.Gray);
                     }
                 }
@@ -1243,7 +1274,8 @@ public class Game1 : Game
         // Draw exits
         for (int i = 0; i < _level.ExitRects.Length; i++)
         {
-            _spriteBatch.Draw(_pixel, _level.ExitRects[i], Color.LimeGreen * 0.5f);
+            bool isOverworld = _level.ExitTargets.Length > i && _level.ExitTargets[i] == "__overworld__";
+            _spriteBatch.Draw(_pixel, _level.ExitRects[i], isOverworld ? Color.CornflowerBlue * 0.5f : Color.LimeGreen * 0.5f);
         }
 
         // Draw player
