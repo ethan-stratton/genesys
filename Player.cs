@@ -410,7 +410,7 @@ public class Player
         if (EnableUppercut)
         {
             // Track: pressing S sets the input ready, then W+Space within window triggers it
-            if (inputY > 0 || IsSliding || IsCartwheeling) // pressing down, or already in a down-motion move
+            if (inputY > 0 || IsSliding || IsCartwheeling || IsVaultKicking) // pressing down, or already in a down-motion move
             {
                 _uppercutInputReady = true;
                 _uppercutInputWindow = UppercutInputWindowTime;
@@ -420,14 +420,15 @@ public class Player
                 _uppercutInputWindow -= dt;
                 if (_uppercutInputWindow <= 0) _uppercutInputReady = false;
             }
-            if (_uppercutInputReady && inputY < 0 && spacePressed && !_jumpHeld && !IsUppercutting && !IsVaultKicking)
+            if (_uppercutInputReady && inputY < 0 && spacePressed && !_jumpHeld && !IsUppercutting)
             {
                 _uppercutInputReady = false;
                 IsUppercutting = true;
                 _uppercutTimer = UppercutDuration;
-                // Cancel any active slide/cartwheel
+                // Cancel any active move
                 IsSliding = false;
                 IsCartwheeling = false;
+                IsVaultKicking = false;
                 IsCrouching = false;
                 _jumpHeld = true;
             }
