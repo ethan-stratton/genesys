@@ -629,7 +629,7 @@ public class Player
         {
             _slideTimer -= dt;
             float elapsed = SlideDuration - _slideTimer;
-            // Vault kick: jump during slide (after minimum slide time)
+            // Vault kick: jump during slide (after minimum slide time, requires fresh space press)
             bool spaceSlide = kb.IsKeyDown(Keys.Space);
             if (EnableVaultKick && spaceSlide && !_jumpHeld && elapsed >= VaultKickMinSlideTime)
             {
@@ -646,6 +646,7 @@ public class Player
             }
             else
             {
+                _jumpHeld = spaceSlide; // track space held state during slide
                 // Normal slide deceleration
                 float t = 1f - (_slideTimer / SlideDuration);
                 float speed = MathHelper.Lerp(SlideStartSpeed, SlideEndSpeed, t);
