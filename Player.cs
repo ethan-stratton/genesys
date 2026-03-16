@@ -720,6 +720,7 @@ public class Player
             _vaultKickTimer -= dt;
             vel.X = _vaultKickDir * VaultKickSpeed;
             vel.Y += Gravity * dt;
+            _jumpHeld = kb.IsKeyDown(Keys.Space); // track space so uppercut can trigger
             if (_vaultKickTimer <= 0)
             {
                 IsVaultKicking = false;
