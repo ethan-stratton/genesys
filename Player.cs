@@ -231,9 +231,10 @@ public class Player
         }
         WantsDropThrough = _dropIgnoreTimer > 0f;
 
-        // --- Slide (S + Space while grounded, not already sliding) ---
+        // --- Slide (S + Space while grounded, OR Shift + Space with no direction from crouch) ---
         bool spacePressed = kb.IsKeyDown(Keys.Space);
-        if (inputY > 0 && spacePressed && !_jumpHeld && _wasGrounded && !IsSliding && !IsCrouching && !IsCartwheeling && _slideCooldownTimer <= 0f)
+        bool wantsSlide = (inputY > 0 && !IsCrouching) || (IsCrouching && inputX == 0);
+        if (wantsSlide && spacePressed && !_jumpHeld && _wasGrounded && !IsSliding && !IsCartwheeling && _slideCooldownTimer <= 0f)
         {
             IsSliding = true;
             _slideTimer = SlideDuration;
