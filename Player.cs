@@ -7,6 +7,9 @@ namespace ArenaShooter;
 
 public class Player
 {
+    public static float WorldLeft = 0;
+    public static float WorldRight = 800;
+
     public Vector2 Position { get; set; }
     public Vector2 Velocity { get; set; }
     public const int Width = 32;
@@ -1034,7 +1037,7 @@ public class Player
             }
         }
 
-        pos.X = MathHelper.Clamp(pos.X, 0, 800 - Width);
+        pos.X = MathHelper.Clamp(pos.X, WorldLeft, WorldRight - Width);
 
         Position = pos;
         Velocity = vel;

@@ -11,6 +11,7 @@ public class Game1 : Game
 {
     private GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch;
+    private Camera _camera;
     private Texture2D _pixel;
     private SpriteFont _font;
     private Song _bgm;
@@ -30,27 +31,41 @@ public class Game1 : Game
     private const int FloorY = 550; // ground level
     private const int FloorHeight = 50;
 
+    // World bounds (wider than viewport)
+    private const int WorldLeft = -600;
+    private const int WorldRight = 1400;
+    private const int WorldTop = -200;
+    private const int WorldBottom = 600;
+
     private static readonly Rectangle[] Platforms = new[]
     {
         new Rectangle(150, 430, 160, 12),
         new Rectangle(480, 430, 160, 12),
         new Rectangle(300, 320, 200, 12),
+        // Extended area platforms
+        new Rectangle(-400, 400, 180, 12),
+        new Rectangle(-200, 300, 140, 12),
+        new Rectangle(800, 430, 160, 12),
+        new Rectangle(1000, 350, 180, 12),
+        new Rectangle(1200, 430, 140, 12),
     };
 
     // Ropes: X position, top, bottom
-    private static readonly float[] RopeXPositions = new float[] { 100f, 350f, 650f };
-    private static readonly float[] RopeTops = new float[] { 0f, 0f, 0f };
-    private static readonly float[] RopeBottoms = new float[] { 390f, 320f, 390f };
+    private static readonly float[] RopeXPositions = new float[] { 100f, 350f, 650f, -300f, 900f };
+    private static readonly float[] RopeTops = new float[] { -100f, -100f, -100f, -100f, -100f };
+    private static readonly float[] RopeBottoms = new float[] { 390f, 320f, 390f, 360f, 390f };
 
     // Walls
     private static readonly Rectangle[] Walls = new[]
     {
-        new Rectangle(0, 100, 40, 370),
+        new Rectangle(-600, 100, 40, 370),
+        new Rectangle(1360, 100, 40, 370),
     };
-    private static readonly int[] WallClimbSides = new[] { 1 };
+    private static readonly int[] WallClimbSides = new[] { 1, -1 };
     private static readonly Rectangle[] WallLedges = new[]
     {
-        new Rectangle(0, 100, 40, 12),
+        new Rectangle(-600, 100, 40, 12),
+        new Rectangle(1360, 100, 40, 12),
     };
 
     private static readonly Rectangle[] AllPlatforms;
@@ -97,6 +112,8 @@ public class Game1 : Game
         _graphics = new GraphicsDeviceManager(this);
         Content.RootDirectory = "Content";
         IsMouseVisible = true;
+        Player.WorldLeft = WorldLeft;
+        Player.WorldRight = WorldRight;
     }
 
     protected override void Initialize()
@@ -131,6 +148,7 @@ public class Game1 : Game
     private void Restart()
     {
         _player = new Player(new Vector2(400 - Player.Width / 2, FloorY - Player.Height));
+        _camera?.SnapTo(_player.Position, Player.Width, Player.Height);
         _bullets = new List<Bullet>();
         _enemies = new List<Enemy>();
         _spawnTimer = 0f;
@@ -143,6 +161,7 @@ public class Game1 : Game
     protected override void LoadContent()
     {
         _spriteBatch = new SpriteBatch(GraphicsDevice);
+        _camera = new Camera(800, 600, WorldLeft, WorldRight, WorldTop, WorldBottom);
         _pixel = new Texture2D(GraphicsDevice, 1, 1);
         _pixel.SetData(new[] { Color.White });
         _font = Content.Load<SpriteFont>("DefaultFont");
@@ -216,6 +235,9 @@ public class Game1 : Game
 
         _player.Update(dt, kb, FloorY, AllPlatforms, ropesToPass, ropeTopsToPass, ropeBottomsToPass, wallsToPass, wallSidesToPass, Walls);
 
+        // Update camera
+        _camera.Update(dt, _player.Position, Player.Width, Player.Height, _player.FacingDir, _player.IsGrounded, _player.Velocity.Y);
+
         // Shoot bullets
         if (_player.WantsToShoot)
         {
@@ -237,7 +259,7 @@ public class Game1 : Game
 
                 var fromLeft = _rng.Next(2) == 0;
                 var pos = new Vector2(
-                    fromLeft ? -Enemy.Size : 800,
+                    fromLeft ? WorldLeft - Enemy.Size : WorldRight,
                     FloorY - Enemy.Size
                 );
                 _enemies.Add(new Enemy(pos));
@@ -291,11 +313,12 @@ public class Game1 : Game
     {
         GraphicsDevice.Clear(_isDead ? Color.DarkRed : new Color(20, 20, 20));
 
-        _spriteBatch.Begin();
+        // --- World rendering (camera transform) ---
+        _spriteBatch.Begin(transformMatrix: _camera.TransformMatrix);
 
-        // Draw floor
-        _spriteBatch.Draw(_pixel, new Rectangle(0, FloorY, 800, FloorHeight), new Color(40, 40, 40));
-        _spriteBatch.Draw(_pixel, new Rectangle(0, FloorY, 800, 2), new Color(80, 80, 80));
+        // Draw floor (extended across world)
+        _spriteBatch.Draw(_pixel, new Rectangle(WorldLeft, FloorY, WorldRight - WorldLeft, FloorHeight), new Color(40, 40, 40));
+        _spriteBatch.Draw(_pixel, new Rectangle(WorldLeft, FloorY, WorldRight - WorldLeft, 2), new Color(80, 80, 80));
 
         // Draw platforms
         foreach (var plat in Platforms)
@@ -334,6 +357,11 @@ public class Game1 : Game
 
         // Draw enemies
         _enemies.ForEach(e => e.Draw(_spriteBatch, _pixel));
+
+        _spriteBatch.End();
+
+        // --- UI rendering (no camera transform, screen-space) ---
+        _spriteBatch.Begin();
 
         // Death overlay
         if (_isDead)

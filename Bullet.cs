@@ -23,7 +23,7 @@ public class Bullet
         Position += Direction * Speed * dt;
 
         // Mark as dead if off-screen
-        if (Position.X < -Size || Position.X > 800 || Position.Y < -Size || Position.Y > 600)
+        if (Position.X < -2000 || Position.X > 2000 || Position.Y < -2000 || Position.Y > 2000)
             IsDead = true;
     }
 
