@@ -36,6 +36,11 @@ public class Game1 : Game
         new Rectangle(300, 320, 200, 12),
     };
 
+    // Ropes hang from top of screen to just above ground
+    private static readonly float[] RopeXPositions = new float[] { 100f, 350f, 650f };
+    private const float RopeTop = 0f;
+    private const float RopeBottom = 550f; // FloorY
+
     public Game1()
     {
         _graphics = new GraphicsDeviceManager(this);
@@ -95,7 +100,7 @@ public class Game1 : Game
 
         var dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
 
-        _player.Update(dt, kb, FloorY, Platforms);
+        _player.Update(dt, kb, FloorY, Platforms, RopeXPositions, RopeTop, RopeBottom);
 
         // Shoot bullets (from player attack input)
         if (_player.WantsToShoot)
@@ -174,6 +179,12 @@ public class Game1 : Game
         {
             _spriteBatch.Draw(_pixel, plat, new Color(50, 50, 50));
             _spriteBatch.Draw(_pixel, new Rectangle(plat.X, plat.Y, plat.Width, 2), new Color(90, 90, 90));
+        }
+
+        // Draw ropes
+        foreach (var rx in RopeXPositions)
+        {
+            _spriteBatch.Draw(_pixel, new Rectangle((int)rx - 1, (int)RopeTop, 3, (int)(RopeBottom - RopeTop)), new Color(120, 80, 40));
         }
 
         // Draw player

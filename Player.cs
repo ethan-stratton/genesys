@@ -75,6 +75,15 @@ public class Player
     private float _cartwheelCooldownTimer;
     private int _cartwheelDir;
 
+    // Rope climbing
+    public bool IsOnRope { get; private set; }
+    private float _ropeX; // X position of the rope we're attached to
+    private const float RopeClimbSpeed = 200f;
+    private bool _ropeDropRequested;
+    private float _lastDownTapTime;
+    private bool _downWasUp_rope;
+    private const float RopeDoubleTapWindow = 0.3f;
+
     // Aim direction
     public Vector2 AimDir { get; private set; }
 
@@ -106,7 +115,7 @@ public class Player
         }
     }
 
-    public void Update(float dt, KeyboardState kb, float floorY, Rectangle[] platforms)
+    public void Update(float dt, KeyboardState kb, float floorY, Rectangle[] platforms, float[] ropeXPositions = null, float ropeTop = 0f, float ropeBottom = 550f)
     {
         WantsToShoot = false;
         WantsToMelee = false;
@@ -118,6 +127,39 @@ public class Player
         if (MeleeTimer > 0) MeleeTimer -= dt;
 
         bool shift = kb.IsKeyDown(Keys.LeftShift) || kb.IsKeyDown(Keys.RightShift);
+
+        // --- Rope attachment check ---
+        if (!IsOnRope && ropeXPositions != null)
+        {
+            float playerCenterX = Position.X + Width / 2f;
+            float playerCenterY = Position.Y + Height / 2f;
+            foreach (var rx in ropeXPositions)
+            {
+                if (MathF.Abs(playerCenterX - rx) < 16f && playerCenterY >= ropeTop && playerCenterY <= ropeBottom)
+                {
+                    IsOnRope = true;
+                    _ropeX = rx;
+                    _ropeDropRequested = false;
+                    _downWasUp_rope = true;
+                    break;
+                }
+            }
+        }
+
+        // --- Rope double-tap S to drop ---
+        if (IsOnRope)
+        {
+            bool sDownRope = kb.IsKeyDown(Keys.S);
+            if (!sDownRope) _downWasUp_rope = true;
+            if (sDownRope && _downWasUp_rope)
+            {
+                _downWasUp_rope = false;
+                float now = (float)System.DateTime.UtcNow.TimeOfDay.TotalSeconds;
+                if (now - _lastDownTapTime < RopeDoubleTapWindow)
+                    _ropeDropRequested = true;
+                _lastDownTapTime = now;
+            }
+        }
 
         // --- Raw directional input ---
         int inputX = 0;
@@ -188,6 +230,85 @@ public class Player
         }
 
         var vel = Velocity;
+
+        if (IsOnRope && !_ropeDropRequested)
+        {
+            // On rope: no gravity, free vertical movement, can crouch to stay still
+            vel.Y = 0;
+            vel.X = 0;
+
+            if (IsCrouching)
+            {
+                // Stationary on rope — all normal actions available (shoot, melee, etc.)
+            }
+            else
+            {
+                if (inputY != 0) vel.Y = inputY * RopeClimbSpeed;
+                if (inputX != 0) FacingDir = inputX;
+            }
+
+            // Jump off rope
+            bool spaceRope = kb.IsKeyDown(Keys.Space);
+            if (spaceRope && !_jumpHeld && !IsCrouching)
+            {
+                IsOnRope = false;
+                vel.Y = JumpForce;
+                if (inputX != 0) vel.X = inputX * Speed;
+                _jumpsLeft = MaxJumps - 1;
+                IsGrounded = false;
+                _wasGrounded = false;
+                _jumpHeld = true;
+            }
+
+            // Cartwheel off rope (Shift + direction + Space)
+            if (shift && inputX != 0 && spaceRope && !_jumpHeld && _cartwheelCooldownTimer <= 0f)
+            {
+                IsOnRope = false;
+                IsCartwheeling = true;
+                _cartwheelTimer = CartwheelDuration;
+                _cartwheelCooldownTimer = CartwheelCooldown;
+                _cartwheelDir = inputX;
+                IsCrouching = false;
+                _jumpHeld = true;
+            }
+
+            // Snap X to rope
+            var posRope = Position;
+            posRope.X = _ropeX - Width / 2f;
+            posRope.Y = MathHelper.Clamp(Position.Y + vel.Y * dt, ropeTop, ropeBottom - Height);
+            Position = posRope;
+            Velocity = vel;
+
+            // Ranged/melee still available on rope
+            bool jPressed = kb.IsKeyDown(Keys.J);
+            if (jPressed && !_shootHeld && _shootCooldown <= 0f)
+            {
+                _shootCooldown = ShootRate;
+                WantsToShoot = true;
+                ShootDirection = AimDir;
+            }
+            _shootHeld = jPressed;
+
+            bool kPressed2 = kb.IsKeyDown(Keys.K);
+            if (kPressed2 && !_meleeHeld && _meleeCooldown <= 0f)
+            {
+                _meleeCooldown = MeleeRate;
+                WantsToMelee = true;
+                MeleeDirection = AimDir;
+                MeleeTimer = MeleeActiveTime;
+            }
+            _meleeHeld = kPressed2;
+
+            _prevKb = kb;
+            return; // skip normal physics
+        }
+        else if (IsOnRope && _ropeDropRequested)
+        {
+            IsOnRope = false;
+            _ropeDropRequested = false;
+            vel.Y = 0;
+            _jumpsLeft = MaxJumps;
+        }
 
         if (IsCartwheeling)
         {
@@ -304,7 +425,19 @@ public class Player
 
     public void Draw(SpriteBatch spriteBatch, Texture2D pixel)
     {
-        if (IsCartwheeling)
+        if (IsOnRope)
+        {
+            // Draw player on rope — slightly different color to indicate rope state
+            spriteBatch.Draw(pixel,
+                new Rectangle((int)Position.X, (int)Position.Y, Width, Height),
+                IsCrouching ? Color.DarkGray : new Color(160, 120, 80));
+            // Draw grip indicator
+            int gripY = (int)Position.Y + Height / 2 - 2;
+            spriteBatch.Draw(pixel,
+                new Rectangle((int)Position.X + Width / 2 - 3, gripY, 6, 4),
+                Color.White * 0.7f);
+        }
+        else if (IsCartwheeling)
         {
             // Flash blue like a dash
             spriteBatch.Draw(pixel,
