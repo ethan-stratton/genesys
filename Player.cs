@@ -150,7 +150,7 @@ public class Player
                 if (MathF.Abs(playerCenterX - rx) < 16f && playerCenterY >= ropeTop && playerCenterY <= ropeBottom)
                 {
                     nearAnyRope = true;
-                    if (!_ropeDisengaged)
+                    if (!_ropeDisengaged && !IsSliding && !IsDashing)
                     {
                         IsOnRope = true;
                         _ropeX = rx;
