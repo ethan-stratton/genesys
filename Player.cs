@@ -97,6 +97,20 @@ public class Player
     private const float RopeDoubleTapWindow = 0.3f;
     private bool _ropeDisengaged; // true after dropping — stays true until player leaves rope hitbox
 
+    // Wall climbing
+    public bool IsOnWall { get; private set; }
+    private Rectangle _currentWall;
+    private int _currentWallClimbSide; // 1 = climbable on right, -1 = climbable on left
+    private const float WallClimbSpeed = 180f;
+    private bool _wallDisengaged;
+
+    // Wall vault (smooth climb-over animation)
+    public bool IsVaulting { get; private set; }
+    private float _vaultTimer;
+    private const float VaultDuration = 0.3f;
+    private Vector2 _vaultStart;
+    private Vector2 _vaultEnd;
+
     // Aim direction
     public Vector2 AimDir { get; private set; }
 
@@ -128,7 +142,7 @@ public class Player
         }
     }
 
-    public void Update(float dt, KeyboardState kb, float floorY, Rectangle[] platforms, float[] ropeXPositions = null, float[] ropeTops = null, float[] ropeBottoms = null)
+    public void Update(float dt, KeyboardState kb, float floorY, Rectangle[] platforms, float[] ropeXPositions = null, float[] ropeTops = null, float[] ropeBottoms = null, Rectangle[] walls = null, int[] wallClimbSides = null)
     {
         WantsToShoot = false;
         WantsToMelee = false;
@@ -169,6 +183,47 @@ public class Player
             }
             // Clear disengage flag once player has left ALL rope hitboxes
             if (!nearAnyRope) _ropeDisengaged = false;
+        }
+
+        // --- Wall attachment check ---
+        if (!IsOnWall && !IsOnRope && walls != null && !IsSliding && !IsDashing)
+        {
+            float playerCenterY = Position.Y + Height / 2f;
+            bool nearAnyWall = false;
+            for (int i = 0; i < walls.Length; i++)
+            {
+                var w = walls[i];
+                int side = wallClimbSides[i];
+                // Check if player is against the climbable face
+                float climbX = side == 1 ? w.Right : w.Left;
+                float playerEdge = side == 1 ? Position.X : Position.X + Width;
+                bool xTouch = MathF.Abs(playerEdge - climbX) < 6f;
+                bool yInRange = playerCenterY >= w.Top && playerCenterY <= w.Bottom;
+                if (xTouch && yInRange)
+                {
+                    nearAnyWall = true;
+                    if (!_wallDisengaged)
+                    {
+                        IsOnWall = true;
+                        _currentWall = w;
+                        _currentWallClimbSide = side;
+                        FacingDir = side; // face away from wall
+                        break;
+                    }
+                }
+            }
+            if (!nearAnyWall) _wallDisengaged = false;
+        }
+        else if (IsOnWall)
+        {
+            // Check if still near wall
+            float playerEdge = _currentWallClimbSide == 1 ? Position.X : Position.X + Width;
+            float climbX = _currentWallClimbSide == 1 ? _currentWall.Right : _currentWall.Left;
+            if (MathF.Abs(playerEdge - climbX) > 10f)
+            {
+                IsOnWall = false;
+                _wallDisengaged = false;
+            }
         }
 
         // --- Rope double-tap S to drop ---
@@ -222,7 +277,7 @@ public class Player
         }
 
         // --- Crouch (shift while grounded, not sliding) ---
-        IsCrouching = shift && (_wasGrounded || IsOnRope) && !IsSliding;
+        IsCrouching = shift && (_wasGrounded || IsOnRope || IsOnWall) && !IsSliding;
 
         // --- Drop through platform (double-tap S only) ---
         _dropIgnoreTimer -= dt;
@@ -371,6 +426,147 @@ public class Player
             _jumpsLeft = MaxJumps;
         }
 
+        if (IsVaulting)
+        {
+            _vaultTimer -= dt;
+            float t = 1f - (_vaultTimer / VaultDuration); // 0→1
+            float arcY = -MathF.Sin(t * MathF.PI) * 20f; // arc height
+            var vPos = Vector2.Lerp(_vaultStart, _vaultEnd, t);
+            vPos.Y += arcY;
+            Position = vPos;
+            Velocity = Vector2.Zero;
+
+            if (_vaultTimer <= 0)
+            {
+                IsVaulting = false;
+                Position = _vaultEnd;
+                Velocity = Vector2.Zero;
+                IsGrounded = true;
+                _wasGrounded = true;
+                _jumpsLeft = MaxJumps;
+            }
+            _prevKb = kb;
+            return;
+        }
+
+        if (IsOnWall)
+        {
+            vel.Y = 0;
+            vel.X = 0;
+
+            if (IsCrouching)
+            {
+                // Stationary on wall
+            }
+            else
+            {
+                if (inputY != 0) vel.Y = inputY * WallClimbSpeed;
+            }
+
+            // Drop off bottom of wall (holding S at the bottom edge)
+            if (inputY > 0 && Position.Y + Height >= _currentWall.Bottom - 2)
+            {
+                IsOnWall = false;
+                _wallDisengaged = true;
+                _jumpsLeft = MaxJumps;
+                Velocity = Vector2.Zero;
+            }
+
+            // Vault onto top of wall (press W at the very top edge)
+            if (inputY < 0 && Position.Y <= _currentWall.Top + 5)
+            {
+                IsOnWall = false;
+                IsVaulting = true;
+                _wallDisengaged = true;
+                _vaultTimer = VaultDuration;
+                _vaultStart = Position;
+                // Land on top of the wall, centered
+                _vaultEnd = new Vector2(
+                    MathHelper.Clamp(Position.X, _currentWall.Left, _currentWall.Right - Width),
+                    _currentWall.Top - Height);
+                _prevKb = kb;
+                return;
+            }
+
+            bool spaceWall = kb.IsKeyDown(Keys.Space);
+            bool spaceFreshWall = spaceWall && !_jumpHeld;
+
+            // Cartwheel off wall (Shift + direction + Space)
+            if (shift && inputX != 0 && inputX == _currentWallClimbSide && spaceFreshWall && _cartwheelCooldownTimer <= 0f)
+            {
+                IsOnWall = false;
+                _wallDisengaged = true;
+                IsCartwheeling = true;
+                _cartwheelTimer = CartwheelDuration;
+                _cartwheelCooldownTimer = CartwheelCooldown;
+                _cartwheelDir = inputX;
+                IsCrouching = false;
+                _jumpHeld = true;
+                _jumpsLeft = MaxJumps - 1;
+            }
+            // Jump off wall
+            else if (spaceFreshWall)
+            {
+                IsOnWall = false;
+                _wallDisengaged = true;
+                vel.Y = JumpForce;
+                vel.X = _currentWallClimbSide * Speed; // push away from wall
+                _jumpsLeft = MaxJumps - 1;
+                IsGrounded = false;
+                _wasGrounded = false;
+                _jumpHeld = true;
+            }
+
+            _jumpHeld = spaceWall;
+
+            // Aim: tri-directional away from wall
+            {
+                int awayDir = _currentWallClimbSide;
+                var aim = new Vector2(awayDir, 0);
+                if (inputY != 0 && !IsCrouching) aim.Y = inputY;
+                else if (IsCrouching)
+                {
+                    if (inputY != 0) aim.Y = inputY;
+                    // Can also aim straight away
+                }
+                aim.Normalize();
+                AimDir = aim;
+            }
+
+            // Snap X to wall face
+            var posWall = Position;
+            if (_currentWallClimbSide == 1)
+                posWall.X = _currentWall.Right;
+            else
+                posWall.X = _currentWall.Left - Width;
+            posWall.Y = MathHelper.Clamp(Position.Y + vel.Y * dt, _currentWall.Top, _currentWall.Bottom - Height);
+            Position = posWall;
+            Velocity = vel;
+
+            // Combat on wall
+            bool jOnWall = kb.IsKeyDown(Keys.J);
+            if (jOnWall && !_shootHeld && _shootCooldown <= 0f)
+            {
+                _shootCooldown = ShootRate;
+                WantsToShoot = true;
+                ShootDirection = AimDir;
+            }
+            _shootHeld = jOnWall;
+
+            bool kOnWall = kb.IsKeyDown(Keys.K);
+            if (kOnWall && !_meleeHeld && _meleeCooldown <= 0f)
+            {
+                _meleeCooldown = MeleeRate;
+                WantsToMelee = true;
+                MeleeDirection = AimDir;
+                MeleeTimer = MeleeActiveTime;
+            }
+            _meleeHeld = kOnWall;
+
+            _prevKb = kb;
+            return;
+        }
+
         if (IsCartwheeling)
         {
             _cartwheelTimer -= dt;
@@ -477,6 +673,26 @@ public class Player
         // End slide/cartwheel if airborne (slide only)
         if (!IsGrounded && IsSliding) { IsSliding = false; _ropeDisengaged = true; }
 
+        // --- Wall solid collision (can't walk through walls) ---
+        if (walls != null)
+        {
+            var pRect = new Rectangle((int)pos.X, (int)pos.Y, Width, Height);
+            foreach (var w in walls)
+            {
+                if (pRect.Intersects(w))
+                {
+                    // Push out horizontally
+                    float playerCenter = pos.X + Width / 2f;
+                    float wallCenter = w.X + w.Width / 2f;
+                    if (playerCenter < wallCenter)
+                        pos.X = w.Left - Width;
+                    else
+                        pos.X = w.Right;
+                    vel.X = 0;
+                }
+            }
+        }
+
         pos.X = MathHelper.Clamp(pos.X, 0, 800 - Width);
 
         Position = pos;
@@ -487,7 +703,25 @@ public class Player
 
     public void Draw(SpriteBatch spriteBatch, Texture2D pixel)
     {
-        if (IsOnRope)
+        if (IsVaulting)
+        {
+            int size = (int)(Width * 0.8f);
+            spriteBatch.Draw(pixel,
+                new Rectangle((int)Position.X + (Width - size) / 2, (int)Position.Y + Height - size, size, size),
+                Color.LightGray * 0.9f);
+        }
+        else if (IsOnWall)
+        {
+            spriteBatch.Draw(pixel,
+                new Rectangle((int)Position.X, (int)Position.Y, Width, Height),
+                IsCrouching ? Color.DarkGray : new Color(100, 140, 100));
+            int gripX = _currentWallClimbSide == 1 ? (int)Position.X : (int)Position.X + Width - 4;
+            spriteBatch.Draw(pixel,
+                new Rectangle(gripX, (int)Position.Y + 8, 4, 6), Color.White * 0.5f);
+            spriteBatch.Draw(pixel,
+                new Rectangle(gripX, (int)Position.Y + Height - 14, 4, 6), Color.White * 0.5f);
+        }
+        else if (IsOnRope)
         {
             // Draw player on rope — slightly different color to indicate rope state
             spriteBatch.Draw(pixel,

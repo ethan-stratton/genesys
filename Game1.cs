@@ -41,6 +41,28 @@ public class Game1 : Game
     private static readonly float[] RopeTops = new float[] { 0f, 0f, 0f };
     private static readonly float[] RopeBottoms = new float[] { 390f, 320f, 390f }; // middle to platform (320), sides shorter than floor
 
+    // Walls: rectangle + which side is climbable (1 = right side, -1 = left side)
+    // Left wall: gap at bottom (enemies enter), top is a ledge
+    private static readonly Rectangle[] Walls = new[]
+    {
+        new Rectangle(0, 100, 40, 370), // left wall: top=100, bottom=470, gap below for enemies
+    };
+    private static readonly int[] WallClimbSides = new[] { 1 }; // climbable on right face
+    // Top ledge of wall acts as a platform (added to Platforms would work but let's keep separate)
+    private static readonly Rectangle[] WallLedges = new[]
+    {
+        new Rectangle(0, 100, 40, 12), // top of left wall
+    };
+
+    private static readonly Rectangle[] AllPlatforms; // Platforms + WallLedges combined
+
+    static Game1()
+    {
+        AllPlatforms = new Rectangle[Platforms.Length + WallLedges.Length];
+        Platforms.CopyTo(AllPlatforms, 0);
+        WallLedges.CopyTo(AllPlatforms, Platforms.Length);
+    }
+
     public Game1()
     {
         _graphics = new GraphicsDeviceManager(this);
@@ -100,7 +122,7 @@ public class Game1 : Game
 
         var dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
 
-        _player.Update(dt, kb, FloorY, Platforms, RopeXPositions, RopeTops, RopeBottoms);
+        _player.Update(dt, kb, FloorY, AllPlatforms, RopeXPositions, RopeTops, RopeBottoms, Walls, WallClimbSides);
 
         // Shoot bullets (from player attack input)
         if (_player.WantsToShoot)
@@ -149,7 +171,7 @@ public class Game1 : Game
             }
             // Check player collision (skip if sliding — invulnerable)
             var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
-            if (!_player.IsSliding && !_player.IsCartwheeling && eRect.Intersects(pRect))
+            if (!_player.IsSliding && !_player.IsCartwheeling && !_player.IsVaulting && eRect.Intersects(pRect))
             {
                 _isDead = true;
                 break;
@@ -179,6 +201,17 @@ public class Game1 : Game
         {
             _spriteBatch.Draw(_pixel, plat, new Color(50, 50, 50));
             _spriteBatch.Draw(_pixel, new Rectangle(plat.X, plat.Y, plat.Width, 2), new Color(90, 90, 90));
+        }
+
+        // Draw walls
+        foreach (var wall in Walls)
+        {
+            _spriteBatch.Draw(_pixel, wall, new Color(60, 60, 60));
+            // Highlight the climbable edge
+        }
+        foreach (var ledge in WallLedges)
+        {
+            _spriteBatch.Draw(_pixel, new Rectangle(ledge.X, ledge.Y, ledge.Width, 2), new Color(100, 100, 100));
         }
 
         // Draw ropes
