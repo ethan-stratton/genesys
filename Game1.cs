@@ -144,7 +144,7 @@ public class Game1 : Game
             }
             // Check player collision (skip if sliding — invulnerable)
             var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
-            if (!_player.IsSliding && eRect.Intersects(pRect))
+            if (!_player.IsSliding && !_player.IsCartwheeling && eRect.Intersects(pRect))
             {
                 _isDead = true;
                 break;

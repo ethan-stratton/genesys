@@ -65,6 +65,16 @@ public class Player
     public const int MeleeRange = 40;
     public const int MeleeWidth = 20;
 
+    // Cartwheel/dash flip (Shift + A/D + Space)
+    public bool IsCartwheeling { get; private set; }
+    private float _cartwheelTimer;
+    private const float CartwheelDuration = 0.3f;
+    private const float CartwheelSpeed = 500f;
+    private const float CartwheelJumpForce = -300f;
+    private const float CartwheelCooldown = 0.6f;
+    private float _cartwheelCooldownTimer;
+    private int _cartwheelDir;
+
     // Aim direction
     public Vector2 AimDir { get; private set; }
 
@@ -104,6 +114,7 @@ public class Player
         _shootCooldown -= dt;
         _meleeCooldown -= dt;
         _slideCooldownTimer -= dt;
+        _cartwheelCooldownTimer -= dt;
         if (MeleeTimer > 0) MeleeTimer -= dt;
 
         bool shift = kb.IsKeyDown(Keys.LeftShift) || kb.IsKeyDown(Keys.RightShift);
@@ -135,12 +146,22 @@ public class Player
 
         // --- Slide (S + Space while grounded, not already sliding) ---
         bool spacePressed = kb.IsKeyDown(Keys.Space);
-        if (inputY > 0 && spacePressed && !_jumpHeld && _wasGrounded && !IsSliding && !IsCrouching && _slideCooldownTimer <= 0f)
+        if (inputY > 0 && spacePressed && !_jumpHeld && _wasGrounded && !IsSliding && !IsCrouching && !IsCartwheeling && _slideCooldownTimer <= 0f)
         {
             IsSliding = true;
             _slideTimer = SlideDuration;
             _slideCooldownTimer = SlideCooldown;
             _slideDir = FacingDir;
+        }
+
+        // --- Cartwheel (Shift + A/D + Space while grounded) ---
+        if (shift && inputX != 0 && spacePressed && !_jumpHeld && _wasGrounded && !IsSliding && !IsCartwheeling && _cartwheelCooldownTimer <= 0f)
+        {
+            IsCartwheeling = true;
+            _cartwheelTimer = CartwheelDuration;
+            _cartwheelCooldownTimer = CartwheelCooldown;
+            _cartwheelDir = inputX;
+            IsCrouching = false; // override crouch
         }
 
         // --- Facing direction ---
@@ -168,7 +189,20 @@ public class Player
 
         var vel = Velocity;
 
-        if (IsSliding)
+        if (IsCartwheeling)
+        {
+            _cartwheelTimer -= dt;
+            float t = 1f - (_cartwheelTimer / CartwheelDuration);
+            vel.X = _cartwheelDir * CartwheelSpeed;
+            if (t < 0.15f) vel.Y = CartwheelJumpForce; // initial pop
+            else vel.Y += Gravity * dt;
+            if (_cartwheelTimer <= 0)
+            {
+                IsCartwheeling = false;
+                vel.X = _cartwheelDir * Speed;
+            }
+        }
+        else if (IsSliding)
         {
             _slideTimer -= dt;
             // Decelerate from start speed to end speed over duration
@@ -257,7 +291,7 @@ public class Player
             }
         }
 
-        // End slide if airborne
+        // End slide/cartwheel if airborne (slide only)
         if (!IsGrounded && IsSliding) IsSliding = false;
 
         pos.X = MathHelper.Clamp(pos.X, 0, 800 - Width);
@@ -270,7 +304,14 @@ public class Player
 
     public void Draw(SpriteBatch spriteBatch, Texture2D pixel)
     {
-        if (IsSliding)
+        if (IsCartwheeling)
+        {
+            // Flash blue like a dash
+            spriteBatch.Draw(pixel,
+                new Rectangle((int)Position.X, (int)Position.Y, Width, Height),
+                Color.CornflowerBlue * 0.8f);
+        }
+        else if (IsSliding)
         {
             int drawY = (int)Position.Y + Height - SlideHeight;
             spriteBatch.Draw(pixel,
