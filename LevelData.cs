@@ -10,7 +10,7 @@ public class LevelData
 {
     [JsonPropertyName("name")] public string Name { get; set; } = "Untitled";
     [JsonPropertyName("author")] public string Author { get; set; } = "";
-    [JsonPropertyName("playerSpawn")] public PointData PlayerSpawn { get; set; } = new();
+    [JsonPropertyName("playerSpawn")] public PointData PlayerSpawn { get; set; } = new() { X = 400, Y = 500 };
     [JsonPropertyName("bounds")] public BoundsData Bounds { get; set; } = new();
     [JsonPropertyName("floor")] public FloorData Floor { get; set; } = new();
     [JsonPropertyName("platforms")] public RectData[] Platforms { get; set; } = Array.Empty<RectData>();

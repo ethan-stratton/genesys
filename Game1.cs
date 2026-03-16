@@ -139,13 +139,22 @@ public class Game1 : Game
                 LoadLevel(DefaultLevel);
             else
             {
-                // Generate empty level if none exist
-                _level = new LevelData { Name = "empty" };
-                _level.Build();
+                // Find any level file
                 if (!System.IO.Directory.Exists("Content/levels"))
                     System.IO.Directory.CreateDirectory("Content/levels");
-                _editorSaveFile = DefaultLevel;
-                SaveLevel();
+                var files = System.IO.Directory.GetFiles("Content/levels", "*.json");
+                if (files.Length > 0)
+                {
+                    LoadLevel(files[0]);
+                    _editorSaveFile = files[0];
+                }
+                else
+                {
+                    _level = new LevelData { Name = "untitled" };
+                    _level.Build();
+                    _editorSaveFile = "Content/levels/untitled.json";
+                    SaveLevel();
+                }
             }
         }
         var spawn = _level.PlayerSpawn;
@@ -482,11 +491,20 @@ public class Game1 : Game
         // Back to play mode with =
         if (kb.IsKeyDown(Keys.OemPlus) && _prevKb.IsKeyUp(Keys.OemPlus))
         {
+            SaveLevel(); // auto-save on exit editor
             _gameState = GameState.Playing;
             // Rebuild level arrays
             _level.Build();
             _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
             Restart();
+            // Update save data
+            if (_saveData != null)
+            {
+                _saveData.CurrentLevel = System.IO.Path.GetFileNameWithoutExtension(_editorSaveFile);
+                _saveData.SpawnX = _player.Position.X;
+                _saveData.SpawnY = _player.Position.Y;
+                _saveData.Save();
+            }
             return;
         }
 
@@ -903,9 +921,9 @@ public class Game1 : Game
                     }
                     else
                     {
-                        _level = new LevelData { Name = "empty" };
+                        _level = new LevelData { Name = "untitled" };
                         _level.Build();
-                        _editorSaveFile = "Content/levels/empty.json";
+                        _editorSaveFile = "Content/levels/untitled.json";
                         SaveLevel();
                     }
                     _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
@@ -913,10 +931,19 @@ public class Game1 : Game
                     _editorMenuOpen = false;
                     break;
                 case 5: // Back to game
+                    SaveLevel(); // auto-save level edits
                     _gameState = GameState.Playing;
                     _level.Build();
                     _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
                     Restart();
+                    // Update save data with current level
+                    if (_saveData != null)
+                    {
+                        _saveData.CurrentLevel = System.IO.Path.GetFileNameWithoutExtension(_editorSaveFile);
+                        _saveData.SpawnX = _player.Position.X;
+                        _saveData.SpawnY = _player.Position.Y;
+                        _saveData.Save();
+                    }
                     _editorMenuOpen = false;
                     break;
                 case 6: // Help
