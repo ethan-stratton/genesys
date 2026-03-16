@@ -89,6 +89,7 @@ public class Game1 : Game
     private bool _enableUppercut = true;
     private bool _enableSpinMelee = true;
     private bool _enableFlip = true;
+    private bool _enableBladeDash = true;
     private bool _enableMusic;
 
     public Game1()
@@ -118,6 +119,7 @@ public class Game1 : Game
             new() { Label = "Uppercut", Get = () => _enableUppercut, Toggle = () => _enableUppercut = !_enableUppercut },
             new() { Label = "Spin Melee", Get = () => _enableSpinMelee, Toggle = () => _enableSpinMelee = !_enableSpinMelee },
             new() { Label = "Flip", Get = () => _enableFlip, Toggle = () => _enableFlip = !_enableFlip },
+            new() { Label = "Blade Dash", Get = () => _enableBladeDash, Toggle = () => _enableBladeDash = !_enableBladeDash },
             new() { Label = "Music", Get = () => _enableMusic, Toggle = () => { _enableMusic = !_enableMusic; if (_enableMusic) { MediaPlayer.IsRepeating = true; MediaPlayer.Play(_bgm); } else { MediaPlayer.Stop(); } } },
             new() { Label = "Quit Game", Get = () => false, Toggle = () => Exit(), IsAction = true },
         };
@@ -204,6 +206,7 @@ public class Game1 : Game
         _player.EnableUppercut = _enableUppercut;
         _player.EnableSpinMelee = _enableSpinMelee;
         _player.EnableFlip = _enableFlip;
+        _player.EnableBladeDash = _enableBladeDash;
 
         var wallsToPass = _enableWallClimb ? Walls : null;
         var wallSidesToPass = _enableWallClimb ? WallClimbSides : null;
@@ -265,8 +268,12 @@ public class Game1 : Game
             {
                 e.IsDead = true;
             }
+            if (_player.IsBladeDashing && _player.BladeDashHitbox.Intersects(eRect))
+            {
+                e.IsDead = true;
+            }
             var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
-            if (!_player.IsSliding && !_player.IsCartwheeling && !_player.IsVaulting && !_player.IsVaultKicking && !_player.IsUppercutting && !_player.IsFlipping && eRect.Intersects(pRect))
+            if (!_player.IsSliding && !_player.IsCartwheeling && !_player.IsVaulting && !_player.IsVaultKicking && !_player.IsUppercutting && !_player.IsFlipping && !_player.IsBladeDashing && eRect.Intersects(pRect))
             {
                 _isDead = true;
                 break;

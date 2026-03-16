@@ -85,6 +85,20 @@ public class Player
     private int _flipDir; // +1 = frontflip (facing dir), -1 = backflip
     private float _firstJumpTime; // timestamp of first jump for flip window
     private const float FlipInputWindow = 0.15f;
+
+    // Blade dash (quarter circle forward + K: ↓↘→+K)
+    public bool IsBladeDashing { get; private set; }
+    private float _bladeDashTimer;
+    private const float BladeDashDuration = 0.35f;
+    private const float BladeDashSpeed = 700f;
+    private const float BladeDashJumpForce = -100f; // slight lift
+    private int _bladeDashDir;
+    public const int BladeDashHitboxW = 36;
+    public const int BladeDashHitboxH = 24;
+    // QCF input tracking: 0=waiting for ↓, 1=got ↓ waiting for ↘, 2=got ↘ waiting for →+K
+    private int _qcfStage;
+    private float _qcfTimer;
+    private const float QcfInputWindow = 0.4f; // total window for the motion
     public const int MeleeWidth = 20;
 
     // Cartwheel/dash flip (Shift + A/D + Space)
@@ -171,6 +185,7 @@ public class Player
     public bool EnableUppercut { get; set; } = true;
     public bool EnableSpinMelee { get; set; } = true;
     public bool EnableFlip { get; set; } = true;
+    public bool EnableBladeDash { get; set; } = true;
 
     private KeyboardState _prevKb;
 
@@ -204,6 +219,16 @@ public class Player
             int hbX = (int)Position.X + (Width - UppercutHitboxW) / 2;
             int hbY = (int)Position.Y - UppercutHitboxH;
             return new Rectangle(hbX, hbY, UppercutHitboxW, UppercutHitboxH);
+        }
+    }
+
+    public Rectangle BladeDashHitbox
+    {
+        get
+        {
+            int hbX = _bladeDashDir == 1 ? (int)Position.X + Width : (int)Position.X - BladeDashHitboxW;
+            int hbY = (int)Position.Y + (Height - BladeDashHitboxH) / 2;
+            return new Rectangle(hbX, hbY, BladeDashHitboxW, BladeDashHitboxH);
         }
     }
 
@@ -431,6 +456,49 @@ public class Player
                 IsCrouching = false;
                 _jumpHeld = true;
             }
+        }
+
+        // --- Blade dash QCF detection (↓↘→+K, mirrored when facing left) ---
+        if (EnableBladeDash && !IsBladeDashing)
+        {
+            bool kDown = kb.IsKeyDown(Keys.K);
+            int fwd = FacingDir; // +1 right, -1 left
+            bool pressingDown = inputY > 0;
+            bool pressingFwd = inputX == fwd;
+            bool pressingDiag = pressingDown && pressingFwd;
+
+            if (_qcfStage > 0)
+            {
+                _qcfTimer -= dt;
+                if (_qcfTimer <= 0) _qcfStage = 0; // timed out
+            }
+
+            if (_qcfStage == 0 && pressingDown && !pressingFwd)
+            {
+                _qcfStage = 1;
+                _qcfTimer = QcfInputWindow;
+            }
+            else if (_qcfStage == 1 && pressingDiag)
+            {
+                _qcfStage = 2;
+            }
+            else if (_qcfStage == 2 && pressingFwd && !pressingDown && kDown)
+            {
+                // QCF + K complete!
+                _qcfStage = 0;
+                IsBladeDashing = true;
+                _bladeDashTimer = BladeDashDuration;
+                _bladeDashDir = fwd;
+                // Cancel other states
+                IsSliding = false;
+                IsCartwheeling = false;
+                IsVaultKicking = false;
+                IsCrouching = false;
+            }
+        }
+        else if (IsBladeDashing)
+        {
+            _qcfStage = 0;
         }
 
         // --- Facing direction ---
@@ -759,6 +827,20 @@ public class Player
                 vel.X = inputX * Speed; // return to normal
             }
         }
+        else if (IsBladeDashing)
+        {
+            _bladeDashTimer -= dt;
+            vel.X = _bladeDashDir * BladeDashSpeed;
+            vel.Y = BladeDashJumpForce; // slight hover
+            if (_bladeDashTimer <= 0)
+            {
+                IsBladeDashing = false;
+                // Chain into dash automatically
+                IsDashing = true;
+                _dashDir = _bladeDashDir;
+                vel.X = _bladeDashDir * DashSpeed;
+            }
+        }
         else if (IsSliding)
         {
             _slideTimer -= dt;
@@ -1026,6 +1108,15 @@ public class Player
             spriteBatch.Draw(pixel,
                 new Rectangle(cx, cy, size, size),
                 Color.Magenta * 0.85f);
+        }
+        else if (IsBladeDashing)
+        {
+            // White/purple flash with wide hurtbox
+            spriteBatch.Draw(pixel,
+                new Rectangle((int)Position.X, (int)Position.Y, Width, Height),
+                Color.White * 0.9f);
+            var bdBox = BladeDashHitbox;
+            spriteBatch.Draw(pixel, bdBox, Color.Purple * 0.7f);
         }
         else if (IsSliding)
         {
