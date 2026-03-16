@@ -194,7 +194,7 @@ public class Game1 : Game
         var ropeTopsToPass = _enableRopeClimb ? RopeTops : null;
         var ropeBottomsToPass = _enableRopeClimb ? RopeBottoms : null;
 
-        _player.Update(dt, kb, FloorY, AllPlatforms, ropesToPass, ropeTopsToPass, ropeBottomsToPass, wallsToPass, wallSidesToPass);
+        _player.Update(dt, kb, FloorY, AllPlatforms, ropesToPass, ropeTopsToPass, ropeBottomsToPass, wallsToPass, wallSidesToPass, Walls);
 
         // Shoot bullets
         if (_player.WantsToShoot)

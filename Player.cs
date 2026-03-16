@@ -149,7 +149,7 @@ public class Player
         }
     }
 
-    public void Update(float dt, KeyboardState kb, float floorY, Rectangle[] platforms, float[] ropeXPositions = null, float[] ropeTops = null, float[] ropeBottoms = null, Rectangle[] walls = null, int[] wallClimbSides = null)
+    public void Update(float dt, KeyboardState kb, float floorY, Rectangle[] platforms, float[] ropeXPositions = null, float[] ropeTops = null, float[] ropeBottoms = null, Rectangle[] walls = null, int[] wallClimbSides = null, Rectangle[] solidWalls = null)
     {
         WantsToShoot = false;
         WantsToMelee = false;
@@ -686,10 +686,10 @@ public class Player
         if (!IsGrounded && IsSliding) { IsSliding = false; _ropeDisengaged = true; }
 
         // --- Wall solid collision (can't walk through walls) ---
-        if (walls != null)
+        if (solidWalls != null)
         {
             var pRect = new Rectangle((int)pos.X, (int)pos.Y, Width, Height);
-            foreach (var w in walls)
+            foreach (var w in solidWalls)
             {
                 if (pRect.Intersects(w))
                 {
