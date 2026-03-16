@@ -83,6 +83,7 @@ public class Player
     private float _lastDownTapTime;
     private bool _downWasUp_rope;
     private const float RopeDoubleTapWindow = 0.3f;
+    private bool _ropeDisengaged; // true after dropping — stays true until player leaves rope hitbox
 
     // Aim direction
     public Vector2 AimDir { get; private set; }
@@ -133,17 +134,24 @@ public class Player
         {
             float playerCenterX = Position.X + Width / 2f;
             float playerCenterY = Position.Y + Height / 2f;
+            bool nearAnyRope = false;
             foreach (var rx in ropeXPositions)
             {
                 if (MathF.Abs(playerCenterX - rx) < 16f && playerCenterY >= ropeTop && playerCenterY <= ropeBottom)
                 {
-                    IsOnRope = true;
-                    _ropeX = rx;
-                    _ropeDropRequested = false;
-                    _downWasUp_rope = true;
-                    break;
+                    nearAnyRope = true;
+                    if (!_ropeDisengaged)
+                    {
+                        IsOnRope = true;
+                        _ropeX = rx;
+                        _ropeDropRequested = false;
+                        _downWasUp_rope = true;
+                        break;
+                    }
                 }
             }
+            // Clear disengage flag once player has left ALL rope hitboxes
+            if (!nearAnyRope) _ropeDisengaged = false;
         }
 
         // --- Rope double-tap S to drop ---
@@ -247,11 +255,26 @@ public class Player
                 if (inputX != 0) FacingDir = inputX;
             }
 
-            // Jump off rope
             bool spaceRope = kb.IsKeyDown(Keys.Space);
-            if (spaceRope && !_jumpHeld && !IsCrouching)
+            bool spaceFresh = spaceRope && !_jumpHeld; // only on new press
+
+            // Cartwheel off rope (Shift + direction + Space) — check first since it's more specific
+            if (shift && inputX != 0 && spaceFresh && _cartwheelCooldownTimer <= 0f)
             {
                 IsOnRope = false;
+                _ropeDisengaged = true;
+                IsCartwheeling = true;
+                _cartwheelTimer = CartwheelDuration;
+                _cartwheelCooldownTimer = CartwheelCooldown;
+                _cartwheelDir = inputX;
+                IsCrouching = false;
+                _jumpHeld = true;
+            }
+            // Jump off rope
+            else if (spaceFresh)
+            {
+                IsOnRope = false;
+                _ropeDisengaged = true;
                 vel.Y = JumpForce;
                 if (inputX != 0) vel.X = inputX * Speed;
                 _jumpsLeft = MaxJumps - 1;
@@ -260,17 +283,8 @@ public class Player
                 _jumpHeld = true;
             }
 
-            // Cartwheel off rope (Shift + direction + Space)
-            if (shift && inputX != 0 && spaceRope && !_jumpHeld && _cartwheelCooldownTimer <= 0f)
-            {
-                IsOnRope = false;
-                IsCartwheeling = true;
-                _cartwheelTimer = CartwheelDuration;
-                _cartwheelCooldownTimer = CartwheelCooldown;
-                _cartwheelDir = inputX;
-                IsCrouching = false;
-                _jumpHeld = true;
-            }
+            // Track space held state even if we didn't jump
+            _jumpHeld = spaceRope;
 
             // Snap X to rope
             var posRope = Position;
@@ -306,6 +320,7 @@ public class Player
         {
             IsOnRope = false;
             _ropeDropRequested = false;
+            _ropeDisengaged = true;
             vel.Y = 0;
             _jumpsLeft = MaxJumps;
         }
