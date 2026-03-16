@@ -7,8 +7,14 @@ using Microsoft.Xna.Framework.Media;
 
 namespace ArenaShooter;
 
+public enum GameState { Title, Playing }
+
 public class Game1 : Game
 {
+    private GameState _gameState = GameState.Title;
+    private int _titleCursor;
+    private readonly string[] _titleOptions = { "Play", "Settings", "Quit" };
+
     private GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch;
     private Camera _camera;
@@ -175,6 +181,38 @@ public class Game1 : Game
     {
         var kb = Keyboard.GetState();
 
+        if (_gameState == GameState.Title)
+        {
+            if (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W))
+                _titleCursor = (_titleCursor - 1 + _titleOptions.Length) % _titleOptions.Length;
+            if (kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S))
+                _titleCursor = (_titleCursor + 1) % _titleOptions.Length;
+            
+            bool confirm = (kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space)) ||
+                           (kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter));
+            if (confirm)
+            {
+                switch (_titleOptions[_titleCursor])
+                {
+                    case "Play":
+                        _gameState = GameState.Playing;
+                        break;
+                    case "Settings":
+                        _menuOpen = true;
+                        _menuCursor = 0;
+                        _gameState = GameState.Playing; // go to playing with menu open
+                        break;
+                    case "Quit":
+                        Exit();
+                        break;
+                }
+            }
+
+            _prevKb = kb;
+            base.Update(gameTime);
+            return;
+        }
+
         // Toggle menu with Escape
         if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape))
         {
@@ -311,7 +349,43 @@ public class Game1 : Game
 
     protected override void Draw(GameTime gameTime)
     {
-        GraphicsDevice.Clear(_isDead ? Color.DarkRed : new Color(20, 20, 20));
+        GraphicsDevice.Clear(new Color(20, 20, 20));
+
+        if (_gameState == GameState.Title)
+        {
+            _spriteBatch.Begin();
+
+            // Title
+            string title = "GENESIS";
+            var titleSize = _font.MeasureString(title);
+            _spriteBatch.DrawString(_font, title, new Vector2(400 - titleSize.X / 2, 180), Color.White);
+
+            // Subtitle
+            string sub = "Arena Prototype";
+            var subSize = _font.MeasureString(sub);
+            _spriteBatch.DrawString(_font, sub, new Vector2(400 - subSize.X / 2, 210), Color.Gray * 0.6f);
+
+            // Menu options
+            float startY = 300;
+            float lineH = 35;
+            for (int i = 0; i < _titleOptions.Length; i++)
+            {
+                bool selected = i == _titleCursor;
+                string prefix = selected ? "> " : "  ";
+                var color = selected ? Color.Yellow : Color.Gray;
+                var text = $"{prefix}{_titleOptions[i]}";
+                var size = _font.MeasureString(text);
+                _spriteBatch.DrawString(_font, text, new Vector2(400 - size.X / 2, startY + i * lineH), color);
+            }
+
+            _spriteBatch.DrawString(_font, "[W/S] Navigate  [Space/Enter] Select", new Vector2(200, 480), Color.Gray * 0.4f);
+
+            _spriteBatch.End();
+            base.Draw(gameTime);
+            return;
+        }
+
+        if (_isDead) GraphicsDevice.Clear(Color.DarkRed);
 
         // --- World rendering (camera transform) ---
         _spriteBatch.Begin(transformMatrix: _camera.TransformMatrix);
