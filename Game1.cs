@@ -4,6 +4,8 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using Microsoft.Xna.Framework.Media;
+using System.IO;
+using FontStashSharp;
 
 namespace ArenaShooter;
 
@@ -38,7 +40,10 @@ public class Game1 : Game
     private SpriteBatch _spriteBatch;
     private Camera _camera;
     private Texture2D _pixel;
-    private SpriteFont _font;
+    private FontSystem _fontSystem;
+    private SpriteFontBase _font;
+    private SpriteFontBase _fontSmall;
+    private SpriteFontBase _fontLarge;
     private Song _bgm;
     private Player _player;
 
@@ -292,7 +297,11 @@ public class Game1 : Game
         _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
         _pixel = new Texture2D(GraphicsDevice, 1, 1);
         _pixel.SetData(new[] { Color.White });
-        _font = Content.Load<SpriteFont>("DefaultFont");
+        _fontSystem = new FontSystem();
+        _fontSystem.AddFont(File.ReadAllBytes("Content/Fonts/main.ttf"));
+        _font = _fontSystem.GetFont(16);
+        _fontSmall = _fontSystem.GetFont(12);
+        _fontLarge = _fontSystem.GetFont(28);
         _bgm = Content.Load<Song>("bgm");
     }
 
@@ -952,15 +961,7 @@ public class Game1 : Game
     private string SafeText(string text)
     {
         if (string.IsNullOrEmpty(text)) return "";
-        var sb = new System.Text.StringBuilder(text.Length);
-        foreach (var c in text)
-        {
-            if (_font.Characters.Contains(c))
-                sb.Append(c);
-            else
-                sb.Append('?');
-        }
-        return sb.ToString();
+        return text;
     }
 
     // ===================== EDITOR =====================
