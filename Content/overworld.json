@@ -1,0 +1,48 @@
+{
+  "nodes": [
+    {
+      "id": "test-arena",
+      "name": "The Garden",
+      "x": 200,
+      "y": 350,
+      "level": "test-arena",
+      "discovered": true,
+      "cleared": false,
+      "connections": ["the-descent"]
+    },
+    {
+      "id": "the-descent",
+      "name": "???",
+      "displayName": "The Descent",
+      "x": 350,
+      "y": 250,
+      "level": "the-descent",
+      "discovered": false,
+      "cleared": false,
+      "connections": ["test-arena", "the-gauntlet"]
+    },
+    {
+      "id": "the-gauntlet",
+      "name": "???",
+      "displayName": "The Gauntlet",
+      "x": 500,
+      "y": 350,
+      "level": "the-gauntlet",
+      "discovered": false,
+      "cleared": false,
+      "connections": ["the-descent", "the-summit"]
+    },
+    {
+      "id": "the-summit",
+      "name": "???",
+      "displayName": "The Summit",
+      "x": 650,
+      "y": 200,
+      "level": "the-summit",
+      "discovered": false,
+      "cleared": false,
+      "connections": ["the-gauntlet"]
+    }
+  ],
+  "startNode": "test-arena"
+}

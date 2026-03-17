@@ -7,7 +7,7 @@ using Microsoft.Xna.Framework.Media;
 
 namespace ArenaShooter;
 
-public enum GameState { Title, Playing, Editing }
+public enum GameState { Title, Playing, Editing, Overworld }
 
 public class Game1 : Game
 {
@@ -15,8 +15,13 @@ public class Game1 : Game
     private int _titleCursor;
     private bool _settingsFromTitle;
     private string[] _titleOptions => SaveData.Exists()
-        ? new[] { "Continue", "New Game", "Settings", "Quit" }
-        : new[] { "New Game", "Settings", "Quit" };
+        ? new[] { "Continue", "New Game", "Map", "Settings", "Quit" }
+        : new[] { "New Game", "Map", "Settings", "Quit" };
+
+    private OverworldData _overworld;
+    private int _overworldCursor;
+    private string _currentNodeId;
+    private const string OverworldPath = "Content/overworld.json";
 
     private GraphicsDeviceManager _graphics;
     private SaveData _saveData;
@@ -137,6 +142,13 @@ public class Game1 : Game
         };
 
         Restart();
+
+        if (System.IO.File.Exists(OverworldPath))
+            _overworld = OverworldData.Load(OverworldPath);
+        else
+            _overworld = new OverworldData();
+        _currentNodeId = _overworld.StartNode;
+
         base.Initialize();
     }
 
@@ -204,6 +216,14 @@ public class Game1 : Game
     {
         var kb = Keyboard.GetState();
 
+        if (_gameState == GameState.Overworld)
+        {
+            UpdateOverworld(kb);
+            _prevKb = kb;
+            base.Update(gameTime);
+            return;
+        }
+
         if (_gameState == GameState.Title)
         {
             if (_titleCursor >= _titleOptions.Length) _titleCursor = 0;
@@ -252,6 +272,17 @@ public class Game1 : Game
                         _saveData.SpawnX = _player.Position.X;
                         _saveData.SpawnY = _player.Position.Y;
                         _saveData.Save();
+                        // Reset overworld
+                        if (System.IO.File.Exists(OverworldPath))
+                            _overworld = OverworldData.Load(OverworldPath);
+                        else
+                            _overworld = new OverworldData();
+                        _currentNodeId = _overworld.StartNode;
+                        break;
+                    case "Map":
+                        _gameState = GameState.Overworld;
+                        _overworldCursor = Array.IndexOf(_overworld.Nodes, _overworld.FindNode(_currentNodeId));
+                        if (_overworldCursor < 0) _overworldCursor = 0;
                         break;
                     case "Settings":
                         _menuOpen = true;
@@ -512,8 +543,26 @@ public class Game1 : Game
                     string targetExitId = _level.ExitTargetExitIds[i];
                     if (target == "__overworld__")
                     {
-                        _gameState = GameState.Title;
-                        _titleCursor = 0;
+                        // Mark current level's node as cleared and discover connected nodes
+                        if (_overworld != null)
+                        {
+                            var node = _overworld.FindNode(System.IO.Path.GetFileNameWithoutExtension(_editorSaveFile));
+                            if (node != null)
+                            {
+                                node.Cleared = true;
+                                node.Discovered = true;
+                                _currentNodeId = node.Id;
+                                foreach (var connId in node.Connections)
+                                {
+                                    var conn = _overworld.FindNode(connId);
+                                    if (conn != null) conn.Discovered = true;
+                                }
+                            }
+                            _overworldCursor = Array.IndexOf(_overworld.Nodes, _overworld.FindNode(_currentNodeId));
+                            if (_overworldCursor < 0) _overworldCursor = 0;
+                            _overworld.Save(OverworldPath);
+                        }
+                        _gameState = GameState.Overworld;
                         break;
                     }
                     string nextPath = $"Content/levels/{target}.json";
@@ -553,6 +602,15 @@ public class Game1 : Game
                             _saveData.SpawnX = _player.Position.X;
                             _saveData.SpawnY = _player.Position.Y;
                             _saveData.Save();
+                        }
+                        if (_overworld != null)
+                        {
+                            var destNode = _overworld.FindNode(target);
+                            if (destNode != null)
+                            {
+                                destNode.Discovered = true;
+                                _overworld.Save(OverworldPath);
+                            }
                         }
                     }
                     break;
@@ -1808,6 +1866,171 @@ public class Game1 : Game
         }
     }
 
+    private void UpdateOverworld(KeyboardState kb)
+    {
+        if (_overworld == null || _overworld.Nodes.Length == 0) return;
+
+        var currentNode = _overworld.Nodes[_overworldCursor];
+
+        if ((kb.IsKeyDown(Keys.D) && _prevKb.IsKeyUp(Keys.D)) ||
+            (kb.IsKeyDown(Keys.Right) && _prevKb.IsKeyUp(Keys.Right)))
+            MoveOverworldCursor(currentNode, 1, 0);
+        if ((kb.IsKeyDown(Keys.A) && _prevKb.IsKeyUp(Keys.A)) ||
+            (kb.IsKeyDown(Keys.Left) && _prevKb.IsKeyUp(Keys.Left)))
+            MoveOverworldCursor(currentNode, -1, 0);
+        if ((kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W)) ||
+            (kb.IsKeyDown(Keys.Up) && _prevKb.IsKeyUp(Keys.Up)))
+            MoveOverworldCursor(currentNode, 0, -1);
+        if ((kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S)) ||
+            (kb.IsKeyDown(Keys.Down) && _prevKb.IsKeyUp(Keys.Down)))
+            MoveOverworldCursor(currentNode, 0, 1);
+
+        if ((kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space)) ||
+            (kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter)))
+        {
+            var node = _overworld.Nodes[_overworldCursor];
+            if (node.Discovered && !string.IsNullOrEmpty(node.Level))
+            {
+                string path = $"Content/levels/{node.Level}.json";
+                if (System.IO.File.Exists(path))
+                {
+                    node.Discovered = true;
+                    _overworld.Save(OverworldPath);
+                    LoadLevel(path);
+                    _editorSaveFile = path;
+                    _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
+                    _gameState = GameState.Playing;
+                    Restart();
+                    _prevInExit = new bool[_level.ExitRects.Length];
+                    for (int k = 0; k < _prevInExit.Length; k++)
+                        _prevInExit[k] = true;
+                }
+            }
+        }
+
+        if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape))
+        {
+            _gameState = GameState.Title;
+            _titleCursor = 0;
+        }
+    }
+
+    private void MoveOverworldCursor(OverworldNode current, int dirX, int dirY)
+    {
+        OverworldNode best = null;
+        int bestIdx = -1;
+        float bestDist = float.MaxValue;
+
+        foreach (var connId in current.Connections)
+        {
+            var conn = _overworld.FindNode(connId);
+            if (conn == null || !conn.Discovered) continue;
+
+            int dx = conn.X - current.X;
+            int dy = conn.Y - current.Y;
+
+            bool valid = false;
+            if (dirX > 0 && dx > 0) valid = true;
+            if (dirX < 0 && dx < 0) valid = true;
+            if (dirY > 0 && dy > 0) valid = true;
+            if (dirY < 0 && dy < 0) valid = true;
+
+            if (!valid) continue;
+
+            float dist = dx * dx + dy * dy;
+            if (dist < bestDist)
+            {
+                bestDist = dist;
+                best = conn;
+                bestIdx = Array.IndexOf(_overworld.Nodes, conn);
+            }
+        }
+
+        if (best != null && bestIdx >= 0)
+        {
+            _overworldCursor = bestIdx;
+            _currentNodeId = best.Id;
+        }
+    }
+
+    private void DrawOverworld()
+    {
+        GraphicsDevice.Clear(new Color(8, 8, 16));
+
+        _spriteBatch.Begin();
+
+        _spriteBatch.DrawString(_font, SafeText("OVERWORLD"), new Vector2(340, 30), Color.White);
+
+        // Draw connections
+        foreach (var node in _overworld.Nodes)
+        {
+            if (!node.Discovered) continue;
+            foreach (var connId in node.Connections)
+            {
+                var conn = _overworld.FindNode(connId);
+                if (conn == null || !conn.Discovered) continue;
+                DrawLine(node.X, node.Y, conn.X, conn.Y, node.Cleared && conn.Cleared ? Color.White * 0.6f : Color.Gray * 0.3f);
+            }
+        }
+
+        // Draw nodes
+        for (int i = 0; i < _overworld.Nodes.Length; i++)
+        {
+            var node = _overworld.Nodes[i];
+            bool selected = i == _overworldCursor;
+
+            if (!node.Discovered)
+            {
+                _spriteBatch.Draw(_pixel, new Rectangle(node.X - 4, node.Y - 4, 8, 8), Color.DarkGray * 0.3f);
+                continue;
+            }
+
+            Color nodeColor = node.Cleared ? Color.LimeGreen : Color.Gold;
+            int nodeSize = selected ? 14 : 10;
+
+            if (selected)
+                _spriteBatch.Draw(_pixel, new Rectangle(node.X - nodeSize, node.Y - nodeSize, nodeSize * 2, nodeSize * 2), Color.White * 0.15f);
+
+            _spriteBatch.Draw(_pixel, new Rectangle(node.X - nodeSize / 2, node.Y - nodeSize / 2, nodeSize, nodeSize), nodeColor);
+
+            string name = SafeText(node.ShownName);
+            var nameSize = _font.MeasureString(name);
+            float nameX = node.X - nameSize.X / 2f;
+            float nameY = node.Y - nodeSize / 2f - 20;
+            _spriteBatch.DrawString(_font, name, new Vector2(nameX, nameY), selected ? Color.White : Color.Gray * 0.8f);
+
+            if (node.Cleared)
+            {
+                string cleared = SafeText("CLEARED");
+                var clearedSize = _font.MeasureString(cleared);
+                _spriteBatch.DrawString(_font, cleared, new Vector2(node.X - clearedSize.X / 2f, node.Y + nodeSize / 2f + 5), Color.LimeGreen * 0.6f);
+            }
+        }
+
+        if (_overworldCursor >= 0 && _overworldCursor < _overworld.Nodes.Length)
+        {
+            var sel = _overworld.Nodes[_overworldCursor];
+            if (sel.Discovered)
+            {
+                string info = SafeText($"[Space/Enter] Enter  |  {sel.ShownName}");
+                _spriteBatch.DrawString(_font, info, new Vector2(200, 540), Color.White * 0.7f);
+            }
+        }
+
+        _spriteBatch.DrawString(_font, SafeText("[Esc] Back to Title  [WASD] Navigate"), new Vector2(220, 570), Color.Gray * 0.4f);
+
+        _spriteBatch.End();
+    }
+
+    private void DrawLine(int x1, int y1, int x2, int y2, Color color)
+    {
+        float dx = x2 - x1;
+        float dy = y2 - y1;
+        float length = MathF.Sqrt(dx * dx + dy * dy);
+        float angle = MathF.Atan2(dy, dx);
+        _spriteBatch.Draw(_pixel, new Rectangle(x1, y1, (int)length, 2), null, color, angle, Vector2.Zero, Microsoft.Xna.Framework.Graphics.SpriteEffects.None, 0);
+    }
+
     protected override void Draw(GameTime gameTime)
     {
         GraphicsDevice.Clear(new Color(20, 20, 20));
@@ -1816,6 +2039,13 @@ public class Game1 : Game
         if (_gameState == GameState.Editing)
         {
             DrawEditor();
+            base.Draw(gameTime);
+            return;
+        }
+
+        if (_gameState == GameState.Overworld)
+        {
+            DrawOverworld();
             base.Draw(gameTime);
             return;
         }
