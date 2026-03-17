@@ -2300,12 +2300,12 @@ public class Game1 : Game
 
         // Toolbar
         string[] toolNames = { "0:Floor", "1:Plat", "2:Rope", "3:Wall", "4:Spike", "5:Exit", "6:Spawn", "7:WSpike", "8:Overworld", "9:Ceiling", "T:Tile" };
-        float tx = 10;
+        float toolX = 10;
         for (int i = 0; i < toolNames.Length; i++)
         {
             bool active = (int)_editorTool == i;
-            _spriteBatch.DrawString(_font, toolNames[i], new Vector2(tx, 10), active ? Color.Yellow : Color.Gray * 0.6f);
-            tx += _font.MeasureString(toolNames[i]).X + 15;
+            _spriteBatch.DrawString(_font, toolNames[i], new Vector2(toolX, 10), active ? Color.Yellow : Color.Gray * 0.6f);
+            toolX += _font.MeasureString(toolNames[i]).X + 15;
         }
 
         // Grid snap indicator
