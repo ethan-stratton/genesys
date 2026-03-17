@@ -968,6 +968,32 @@ public class Game1 : Game
         return text;
     }
 
+    private void DrawWrappedText(SpriteFontBase font, string text, Vector2 position, Color color, float maxWidth)
+    {
+        if (string.IsNullOrEmpty(text)) return;
+        var words = text.Split(' ');
+        string currentLine = "";
+        float lineHeight = font.MeasureString("A").Y + 4;
+        float y = position.Y;
+
+        foreach (var word in words)
+        {
+            string testLine = currentLine.Length == 0 ? word : currentLine + " " + word;
+            if (font.MeasureString(testLine).X > maxWidth && currentLine.Length > 0)
+            {
+                _spriteBatch.DrawString(font, SafeText(currentLine), new Vector2(position.X, y), color);
+                y += lineHeight;
+                currentLine = word;
+            }
+            else
+            {
+                currentLine = testLine;
+            }
+        }
+        if (currentLine.Length > 0)
+            _spriteBatch.DrawString(font, SafeText(currentLine), new Vector2(position.X, y), color);
+    }
+
     // ===================== EDITOR =====================
 
     private void UpdateEditor(GameTime gameTime, KeyboardState kb)
@@ -3036,12 +3062,53 @@ public class Game1 : Game
         int floorH = _level.Floor.Height;
         int bL = _level.Bounds.Left;
         int bR = _level.Bounds.Right;
+
+        // Draw background tiles BEFORE floor/platforms so they appear behind everything
+        if (_level.TileGridInstance != null)
+        {
+            var tg = _level.TileGridInstance;
+            var camInvBg = Matrix.Invert(_camera.TransformMatrix);
+            var tlBg = Vector2.Transform(Vector2.Zero, camInvBg);
+            var brBg = Vector2.Transform(new Vector2(800, 600), camInvBg);
+            int stxBg = Math.Max(0, ((int)tlBg.X - tg.OriginX) / tg.TileSize - 1);
+            int styBg = Math.Max(0, ((int)tlBg.Y - tg.OriginY) / tg.TileSize - 1);
+            int etxBg = Math.Min(tg.Width, ((int)brBg.X - tg.OriginX) / tg.TileSize + 2);
+            int etyBg = Math.Min(tg.Height, ((int)brBg.Y - tg.OriginY) / tg.TileSize + 2);
+
+            for (int ty = styBg; ty < etyBg; ty++)
+            {
+                for (int tx = stxBg; tx < etxBg; tx++)
+                {
+                    var tile = tg.Tiles[tx, ty];
+                    if (tile == TileType.Empty || !TileProperties.IsBackground(tile)) continue;
+                    int wx = tg.OriginX + tx * tg.TileSize;
+                    int wy = tg.OriginY + ty * tg.TileSize;
+                    var color = TileProperties.GetColor(tile);
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, tg.TileSize), color);
+                    var accent = TileProperties.GetAccentColor(tile);
+                    if (accent != Color.Transparent)
+                    {
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx + 2, wy + 2, tg.TileSize - 4, 3), accent);
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx + 4, wy + tg.TileSize - 6, tg.TileSize - 8, 3), accent);
+                    }
+                }
+            }
+        }
+
         _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, floorH), new Color(40, 40, 40));
         _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, 2), new Color(80, 80, 80));
 
         // Draw platforms
         foreach (var plat in _level.PlatformRects)
         {
+            // Skip platforms covered by tiles
+            if (_level.TileGridInstance != null)
+            {
+                var tg = _level.TileGridInstance;
+                var (ttx, tty) = tg.WorldToTile(plat.X, plat.Y);
+                if (ttx >= 0 && tty >= 0 && tg.GetTileAt(ttx, tty) != TileType.Empty)
+                    continue;
+            }
             _spriteBatch.Draw(_pixel, plat, new Color(50, 50, 50));
             _spriteBatch.Draw(_pixel, new Rectangle(plat.X, plat.Y, plat.Width, 2), new Color(90, 90, 90));
         }
@@ -3070,6 +3137,14 @@ public class Game1 : Game
         // Draw solid floors
         foreach (var sf in _level.SolidFloorRects)
         {
+            // Skip solid floors covered by tiles
+            if (_level.TileGridInstance != null)
+            {
+                var tg = _level.TileGridInstance;
+                var (ttx, tty) = tg.WorldToTile(sf.X, sf.Y);
+                if (ttx >= 0 && tty >= 0 && tg.GetTileAt(ttx, tty) != TileType.Empty)
+                    continue;
+            }
             _spriteBatch.Draw(_pixel, sf, new Color(70, 50, 30));
             _spriteBatch.Draw(_pixel, new Rectangle(sf.X, sf.Y, sf.Width, 2), new Color(110, 80, 50));
         }
@@ -3118,6 +3193,7 @@ public class Game1 : Game
                 {
                     var tile = tg.Tiles[tx, ty];
                     if (tile == TileType.Empty) continue;
+                    if (TileProperties.IsBackground(tile)) continue;
                     int wx = tg.OriginX + tx * tg.TileSize;
                     int wy = tg.OriginY + ty * tg.TileSize;
                     var color = TileProperties.GetColor(tile);
@@ -3369,7 +3445,7 @@ public class Game1 : Game
 
             if (_dialogueLine < npc.Dialogue.Length)
             {
-                _spriteBatch.DrawString(_font, SafeText(npc.Dialogue[_dialogueLine]), new Vector2(70, 490), Color.White);
+                DrawWrappedText(_font, npc.Dialogue[_dialogueLine], new Vector2(70, 490), Color.White, 660f);
                 if (_dialogueLine < npc.Dialogue.Length - 1)
                     _spriteBatch.DrawString(_font, "[W/Space]", new Vector2(670, 548), Color.Gray * 0.6f);
                 else

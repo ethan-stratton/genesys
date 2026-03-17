@@ -1,12 +1,12 @@
 {
-  "currentLevel": "the-gauntlet",
-  "spawnX": 96,
-  "spawnY": 512,
+  "currentLevel": "test-arena",
+  "spawnX": 480,
+  "spawnY": 224,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 97.22296,
+  "playTime": 263.97968,
   "meleeInventory": [
     "Stick"
   ],

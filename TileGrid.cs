@@ -27,6 +27,11 @@ public enum TileType : byte
     // 50-59: Slope tiles
     // 60-69: Special (ladder, water, etc.)
     // 100+: Decorative/background tiles
+    DirtBg = 101,
+    StoneBg = 102,
+    GrassBg = 103,
+    WoodBg = 104,
+    SandBg = 105,
 }
 
 public static class TileProperties
@@ -34,6 +39,7 @@ public static class TileProperties
     public static bool IsSolid(TileType t) => t >= TileType.Dirt && t <= TileType.Sand;
     public static bool IsPlatform(TileType t) => t >= TileType.PlatformWood && t <= TileType.PlatformStone;
     public static bool IsHazard(TileType t) => t == TileType.Spikes;
+    public static bool IsBackground(TileType t) => (int)t >= 100;
 
     public static Color GetColor(TileType t) => t switch
     {
@@ -45,6 +51,11 @@ public static class TileProperties
         TileType.PlatformWood => new Color(139, 90, 43),
         TileType.PlatformStone => new Color(100, 100, 100),
         TileType.Spikes => new Color(200, 30, 30),
+        TileType.DirtBg => new Color(50, 33, 16),
+        TileType.StoneBg => new Color(60, 60, 60),
+        TileType.GrassBg => new Color(38, 76, 0),
+        TileType.WoodBg => new Color(69, 45, 21),
+        TileType.SandBg => new Color(97, 89, 64),
         _ => Color.Transparent,
     };
 
@@ -56,6 +67,11 @@ public static class TileProperties
         TileType.Stone => new Color(90, 90, 90),
         TileType.Wood => new Color(110, 70, 33),
         TileType.Sand => new Color(170, 155, 110),
+        TileType.DirtBg => new Color(40, 25, 12),
+        TileType.StoneBg => new Color(45, 45, 45),
+        TileType.GrassBg => new Color(25, 60, 10),
+        TileType.WoodBg => new Color(55, 35, 16),
+        TileType.SandBg => new Color(85, 77, 55),
         _ => Color.Transparent,
     };
 
@@ -70,6 +86,11 @@ public static class TileProperties
         TileType.PlatformWood,
         TileType.PlatformStone,
         TileType.Spikes,
+        TileType.DirtBg,
+        TileType.StoneBg,
+        TileType.GrassBg,
+        TileType.WoodBg,
+        TileType.SandBg,
     };
 }
 
