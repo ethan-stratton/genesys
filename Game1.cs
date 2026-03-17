@@ -2073,10 +2073,9 @@ public class Game1 : Game
         bool meleeSelected = _inventorySection == 1;
         _spriteBatch.DrawString(_font, SafeText("MELEE [2]"), new Vector2(colX1, startY),
             meleeSelected ? Color.Yellow : Color.Gray);
-        _spriteBatch.DrawString(_font, SafeText("  Fists (always)"), new Vector2(colX1, startY + 30), Color.Gray * 0.5f);
         if (_meleeInventory.Length == 0)
         {
-            _spriteBatch.DrawString(_font, SafeText("(no weapons)"), new Vector2(colX1, startY + 54), Color.Gray * 0.5f);
+            _spriteBatch.DrawString(_font, SafeText("(empty)"), new Vector2(colX1, startY + 30), Color.Gray * 0.5f);
         }
         for (int i = 0; i < _meleeInventory.Length; i++)
         {
@@ -2085,8 +2084,8 @@ public class Game1 : Game
             string prefix = isCurrent ? "> " : "  ";
             Color c = isHover ? Color.Yellow : (isCurrent ? Color.White : Color.Gray * 0.7f);
             if (isHover)
-                _spriteBatch.Draw(_pixel, new Rectangle((int)colX1 - 4, (int)(startY + 54 + i * 24), 160, 22), Color.Yellow * 0.1f);
-            _spriteBatch.DrawString(_font, SafeText($"{prefix}{_meleeInventory[i]}"), new Vector2(colX1, startY + 54 + i * 24), c);
+                _spriteBatch.Draw(_pixel, new Rectangle((int)colX1 - 4, (int)(startY + 30 + i * 24), 160, 22), Color.Yellow * 0.1f);
+            _spriteBatch.DrawString(_font, SafeText($"{prefix}{_meleeInventory[i]}"), new Vector2(colX1, startY + 30 + i * 24), c);
         }
     }
 
