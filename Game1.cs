@@ -1029,7 +1029,7 @@ public class Game1 : Game
             if (kb.IsKeyDown(Keys.D7) && _prevKb.IsKeyUp(Keys.D7)) { _editorTool = EditorTool.WallSpike; _toolPaletteOpen = false; }
             if (kb.IsKeyDown(Keys.D8) && _prevKb.IsKeyUp(Keys.D8)) { _editorTool = EditorTool.OverworldExit; _toolPaletteOpen = false; }
             if (kb.IsKeyDown(Keys.D9) && _prevKb.IsKeyUp(Keys.D9)) { _editorTool = EditorTool.Ceiling; _toolPaletteOpen = false; }
-            if (kb.IsKeyDown(Keys.T) && _prevKb.IsKeyUp(Keys.T)) { _editorTool = EditorTool.TilePaint; _toolPaletteOpen = false; }
+            // TilePaint: select via Q palette only (T key is grab/move)
 
             // Space/Enter confirm and close
             if ((kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space)) ||
@@ -2299,7 +2299,7 @@ public class Game1 : Game
         _spriteBatch.Begin();
 
         // Toolbar
-        string[] toolNames = { "0:Floor", "1:Plat", "2:Rope", "3:Wall", "4:Spike", "5:Exit", "6:Spawn", "7:WSpike", "8:Overworld", "9:Ceiling", "T:Tile" };
+        string[] toolNames = { "0:Floor", "1:Plat", "2:Rope", "3:Wall", "4:Spike", "5:Exit", "6:Spawn", "7:WSpike", "8:Overworld", "9:Ceiling", "Tile" };
         float toolX = 10;
         for (int i = 0; i < toolNames.Length; i++)
         {

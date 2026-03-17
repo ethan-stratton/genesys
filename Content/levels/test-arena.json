@@ -2,7 +2,7 @@
   "name": "test-arena",
   "author": "Dantalion",
   "playerSpawn": {
-    "x": 512,
+    "x": 528,
     "y": 240
   },
   "bounds": {
@@ -29,8 +29,8 @@
       "h": 12
     },
     {
-      "x": 650,
-      "y": 400,
+      "x": 644,
+      "y": 408,
       "w": 150,
       "h": 12
     },
@@ -73,9 +73,9 @@
   ],
   "ropes": [
     {
-      "x": 701,
-      "top": -38,
-      "bottom": 262
+      "x": 703.50085,
+      "top": -36,
+      "bottom": 264
     },
     {
       "x": -50,
@@ -144,7 +144,14 @@
       "h": 12
     }
   ],
-  "solidFloors": [],
+  "solidFloors": [
+    {
+      "x": 300,
+      "y": 459,
+      "w": 256,
+      "h": 16
+    }
+  ],
   "wallSpikes": [],
   "exits": [
     {
@@ -170,8 +177,8 @@
     {
       "id": "eve",
       "name": "EVE",
-      "x": 380,
-      "y": 252,
+      "x": 372,
+      "y": 262,
       "w": 24,
       "h": 48,
       "color": "Cyan",
@@ -193,8 +200,8 @@
     {
       "id": "native-1",
       "name": "The Native",
-      "x": 600,
-      "y": 502,
+      "x": 605,
+      "y": 498,
       "w": 24,
       "h": 48,
       "color": "SaddleBrown",
@@ -257,5 +264,6 @@
       "y": 295,
       "count": 1
     }
-  ]
+  ],
+  "tileGrid": null
 }
