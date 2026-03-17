@@ -82,7 +82,9 @@ public class Game1 : Game
     // --- EVE orb ---
     private float _totalTime;
     private bool _eveOrbActive;
-    private bool _eveDialogueExhausted;
+    #pragma warning disable CS0414
+    private bool _eveDialogueExhausted; // used later for quest tracking
+    #pragma warning restore CS0414
 
     // --- Editor state ---
     private enum EditorTool { SolidFloor = 0, Platform = 1, Rope = 2, Wall = 3, Spike = 4, Exit = 5, Spawn = 6, WallSpike = 7, OverworldExit = 8, Ceiling = 9 }
