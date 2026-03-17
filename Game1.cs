@@ -489,7 +489,10 @@ public class Game1 : Game
                     break;
                 }
             }
-            _prevInExit = curInExit;
+            // Only update prevInExit if we didn't just transition
+            // (transition sets _prevInExit to all-true for the new level)
+            if (_prevInExit.Length == curInExit.Length)
+                _prevInExit = curInExit;
         }
 
         _prevKb = kb;
