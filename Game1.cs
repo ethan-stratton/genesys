@@ -37,6 +37,7 @@ public class Game1 : Game
 
     private bool _isDead;
     private float _spawnInvincibility;
+    private float _exitCooldown;
     private KeyboardState _prevKb;
 
     // Level data (loaded from JSON)
@@ -310,6 +311,10 @@ public class Game1 : Game
         if (_spawnInvincibility > 0f)
             _spawnInvincibility -= dt;
 
+        // Exit re-entry cooldown
+        if (_exitCooldown > 0f)
+            _exitCooldown -= dt;
+
         // Pass enabled features to player
         _player.EnableSlide = _enableSlide;
         _player.EnableCartwheel = _enableCartwheel;
@@ -418,7 +423,7 @@ public class Game1 : Game
         }
 
         // Exit collision — load next level
-        if (!_isDead)
+        if (!_isDead && _exitCooldown <= 0f)
         {
             var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
             for (int i = 0; i < _level.ExitRects.Length; i++)
@@ -426,6 +431,7 @@ public class Game1 : Game
                 if (pRect.Intersects(_level.ExitRects[i]) && _level.ExitTargets[i] != "")
                 {
                     string target = _level.ExitTargets[i];
+                    string targetExitId = _level.ExitTargetExitIds[i];
                     if (target == "__overworld__")
                     {
                         // Placeholder: return to title screen (will be overworld later)
@@ -440,6 +446,53 @@ public class Game1 : Game
                         _editorSaveFile = nextPath;
                         _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
                         Restart();
+
+                        // Tunnel: reposition at target exit
+                        if (!string.IsNullOrEmpty(targetExitId))
+                        {
+                            for (int j = 0; j < _level.ExitIds.Length; j++)
+                            {
+                                if (_level.ExitIds[j] == targetExitId)
+                                {
+                                    var exitRect = _level.ExitRects[j];
+                                    float px, py;
+                                    int boundsW = _level.Bounds.Right - _level.Bounds.Left;
+                                    int boundsH = _level.Bounds.Bottom - _level.Bounds.Top;
+
+                                    if (exitRect.X < _level.Bounds.Left + boundsW * 0.2f)
+                                    {
+                                        // Exit on left edge — arrive from left
+                                        px = exitRect.X + exitRect.Width + 5;
+                                        py = exitRect.Y + exitRect.Height - Player.Height;
+                                    }
+                                    else if (exitRect.X + exitRect.Width > _level.Bounds.Right - boundsW * 0.2f)
+                                    {
+                                        // Exit on right edge — arrive from right
+                                        px = exitRect.X - Player.Width - 5;
+                                        py = exitRect.Y + exitRect.Height - Player.Height;
+                                    }
+                                    else if (exitRect.Y < _level.Bounds.Top + boundsH * 0.2f)
+                                    {
+                                        // Exit near top — arrive from above
+                                        px = exitRect.X + (exitRect.Width - Player.Width) / 2f;
+                                        py = exitRect.Y + exitRect.Height + 5;
+                                    }
+                                    else
+                                    {
+                                        // Bottom or ambiguous — place above
+                                        px = exitRect.X + (exitRect.Width - Player.Width) / 2f;
+                                        py = exitRect.Y - Player.Height - 5;
+                                    }
+
+                                    _player.Position = new Vector2(px, py);
+                                    _camera.SnapTo(_player.Position, Player.Width, Player.Height);
+                                    break;
+                                }
+                            }
+                        }
+
+                        _exitCooldown = 0.3f;
+
                         // Auto-save on level transition
                         if (_saveData != null)
                         {
@@ -636,11 +689,12 @@ public class Game1 : Game
                     SetEditorStatus(ceilingSpike ? "Ceiling spike added" : "Spike added");
                     break;
                 case EditorTool.Exit:
+                    var exitId = GenerateExitId(x, y);
                     var eList = new List<ExitData>(_level.Exits);
-                    eList.Add(new ExitData { X = x, Y = y, W = w, H = h, TargetLevel = "" });
+                    eList.Add(new ExitData { X = x, Y = y, W = w, H = h, TargetLevel = "", Id = exitId });
                     _level.Exits = eList.ToArray();
                     _level.Build();
-                    SetEditorStatus("Exit added (Tab over exit to set target)");
+                    SetEditorStatus($"Exit added (ID: {exitId}, Tab to set target)");
                     break;
                 case EditorTool.WallSpike:
                     // Find nearest wall to snap to
@@ -676,11 +730,12 @@ public class Game1 : Game
                     }
                     break;
                 case EditorTool.OverworldExit:
+                    var owExitId = GenerateExitId(x, y);
                     var owList = new List<ExitData>(_level.Exits);
-                    owList.Add(new ExitData { X = x, Y = y, W = w, H = h, TargetLevel = "__overworld__" });
+                    owList.Add(new ExitData { X = x, Y = y, W = w, H = h, TargetLevel = "__overworld__", Id = owExitId });
                     _level.Exits = owList.ToArray();
                     _level.Build();
-                    SetEditorStatus("Overworld exit added");
+                    SetEditorStatus($"Overworld exit added (ID: {owExitId})");
                     break;
                 case EditorTool.Ceiling:
                     var cList = new List<RectData>(_level.Ceilings);
@@ -712,28 +767,88 @@ public class Game1 : Game
         }
 
         // Tab — cycle exit target (hover mouse over an exit)
+        // Shift+Tab — cycle targetExitId
+        // Ctrl+Tab — cycle exit's own id
         if (kb.IsKeyDown(Keys.Tab) && _prevKb.IsKeyUp(Keys.Tab))
         {
             var worldMouse2 = Vector2.Transform(new Vector2(mouse.X, mouse.Y), Matrix.Invert(_camera.TransformMatrix));
             var mp = new Point((int)worldMouse2.X, (int)worldMouse2.Y);
+            bool shift = kb.IsKeyDown(Keys.LeftShift) || kb.IsKeyDown(Keys.RightShift);
+            bool ctrl = kb.IsKeyDown(Keys.LeftControl) || kb.IsKeyDown(Keys.RightControl);
+
             for (int i = 0; i < _level.Exits.Length; i++)
             {
                 var e = _level.Exits[i];
                 if (new Rectangle(e.X, e.Y, e.W, e.H).Contains(mp))
                 {
-                    // Get available level files
-                    var levelsDir = "Content/levels";
-                    var files = System.IO.Directory.Exists(levelsDir)
-                        ? System.IO.Directory.GetFiles(levelsDir, "*.json")
-                        : Array.Empty<string>();
-                    var names = new List<string> { "" }; // empty = no target
-                    foreach (var f in files)
-                        names.Add(System.IO.Path.GetFileNameWithoutExtension(f));
-                    int idx = names.IndexOf(e.TargetLevel);
-                    idx = (idx + 1) % names.Count;
-                    _level.Exits[i].TargetLevel = names[idx];
-                    _level.Build();
-                    SetEditorStatus($"Exit target: {(names[idx] == "" ? "(none)" : names[idx])}");
+                    if (ctrl)
+                    {
+                        // Cycle exit's own id
+                        string[] suggestions = { "exit-left", "exit-right", "exit-top", "exit-bottom", "exit-overworld",
+                            $"exit-{i}", $"exit-{i + 1}" };
+                        var options = new List<string>(suggestions);
+                        if (!options.Contains(e.Id) && !string.IsNullOrEmpty(e.Id))
+                            options.Insert(0, e.Id);
+                        int idx = options.IndexOf(e.Id);
+                        idx = (idx + 1) % options.Count;
+                        _level.Exits[i].Id = options[idx];
+                        _level.Build();
+                        SetEditorStatus($"Exit ID: {options[idx]}");
+                    }
+                    else if (shift)
+                    {
+                        // Cycle targetExitId from target level's exits
+                        if (!string.IsNullOrEmpty(e.TargetLevel) && e.TargetLevel != "__overworld__")
+                        {
+                            string targetPath = $"Content/levels/{e.TargetLevel}.json";
+                            if (System.IO.File.Exists(targetPath))
+                            {
+                                try
+                                {
+                                    var targetLevel = LevelData.Load(targetPath);
+                                    var exitIds = new List<string> { "" }; // "" = none
+                                    foreach (var te in targetLevel.Exits)
+                                    {
+                                        if (!string.IsNullOrEmpty(te.Id))
+                                            exitIds.Add(te.Id);
+                                    }
+                                    int idx = exitIds.IndexOf(e.TargetExitId);
+                                    idx = (idx + 1) % exitIds.Count;
+                                    _level.Exits[i].TargetExitId = exitIds[idx];
+                                    _level.Build();
+                                    SetEditorStatus($"Target exit: {(exitIds[idx] == "" ? "(none)" : exitIds[idx])}");
+                                }
+                                catch
+                                {
+                                    SetEditorStatus("Failed to read target level");
+                                }
+                            }
+                            else
+                            {
+                                SetEditorStatus("Target level file not found");
+                            }
+                        }
+                        else
+                        {
+                            SetEditorStatus("Set a target level first (Tab)");
+                        }
+                    }
+                    else
+                    {
+                        // Cycle target level
+                        var levelsDir = "Content/levels";
+                        var files = System.IO.Directory.Exists(levelsDir)
+                            ? System.IO.Directory.GetFiles(levelsDir, "*.json")
+                            : Array.Empty<string>();
+                        var names = new List<string> { "" };
+                        foreach (var f in files)
+                            names.Add(System.IO.Path.GetFileNameWithoutExtension(f));
+                        int idx = names.IndexOf(e.TargetLevel);
+                        idx = (idx + 1) % names.Count;
+                        _level.Exits[i].TargetLevel = names[idx];
+                        _level.Build();
+                        SetEditorStatus($"Exit target: {(names[idx] == "" ? "(none)" : names[idx])}");
+                    }
                     break;
                 }
             }
@@ -853,6 +968,31 @@ public class Game1 : Game
     {
         _editorStatusMsg = msg;
         _editorStatusTimer = 2f;
+    }
+
+    private string GenerateExitId(int x, int y)
+    {
+        int boundsW = _level.Bounds.Right - _level.Bounds.Left;
+        int boundsH = _level.Bounds.Bottom - _level.Bounds.Top;
+        string baseName;
+        if (x < _level.Bounds.Left + boundsW * 0.2f)
+            baseName = "exit-left";
+        else if (x > _level.Bounds.Right - boundsW * 0.2f)
+            baseName = "exit-right";
+        else if (y < _level.Bounds.Top + boundsH * 0.2f)
+            baseName = "exit-top";
+        else
+            baseName = $"exit-{_level.Exits.Length}";
+
+        // Deduplicate
+        var existing = new HashSet<string>();
+        foreach (var e in _level.Exits) existing.Add(e.Id);
+        if (!existing.Contains(baseName)) return baseName;
+        for (int n = 2; ; n++)
+        {
+            string candidate = $"{baseName}-{n}";
+            if (!existing.Contains(candidate)) return candidate;
+        }
     }
 
     // Editor menu sub-state
@@ -1121,13 +1261,42 @@ public class Game1 : Game
         foreach (var r in _level.Ropes)
             _spriteBatch.Draw(_pixel, new Rectangle((int)r.X - 1, (int)r.Top, 3, (int)(r.Bottom - r.Top)), new Color(120, 80, 40));
 
-        // Draw exits (with target labels)
+        // Draw exits (with target labels and ids)
         foreach (var e in _level.Exits)
         {
             bool isOw = e.TargetLevel == "__overworld__";
-            _spriteBatch.Draw(_pixel, new Rectangle(e.X, e.Y, e.W, e.H), isOw ? Color.CornflowerBlue * 0.4f : Color.LimeGreen * 0.4f);
+            Color exitColor;
+            if (isOw)
+            {
+                exitColor = Color.CornflowerBlue;
+            }
+            else if (!string.IsNullOrEmpty(e.TargetLevel) && !string.IsNullOrEmpty(e.TargetExitId)
+                     && System.IO.File.Exists($"Content/levels/{e.TargetLevel}.json"))
+            {
+                exitColor = Color.LimeGreen;
+            }
+            else if (!string.IsNullOrEmpty(e.TargetLevel))
+            {
+                exitColor = Color.Yellow;
+            }
+            else
+            {
+                exitColor = Color.OrangeRed;
+            }
+
+            _spriteBatch.Draw(_pixel, new Rectangle(e.X, e.Y, e.W, e.H), exitColor * 0.4f);
+
+            // Exit's own ID above
+            if (!string.IsNullOrEmpty(e.Id))
+                _spriteBatch.DrawString(_font, SafeText(e.Id), new Vector2(e.X, e.Y - 30), exitColor * 0.6f);
+
+            // Target level name
             string label = isOw ? "OVERWORLD" : (string.IsNullOrEmpty(e.TargetLevel) ? "(?)" : e.TargetLevel);
-            _spriteBatch.DrawString(_font, SafeText(label), new Vector2(e.X, e.Y - 16), isOw ? Color.CornflowerBlue * 0.7f : Color.LimeGreen * 0.7f);
+            _spriteBatch.DrawString(_font, SafeText(label), new Vector2(e.X, e.Y - 16), exitColor * 0.7f);
+
+            // Target exit id below target level name
+            if (!string.IsNullOrEmpty(e.TargetExitId) && !isOw)
+                _spriteBatch.DrawString(_font, SafeText($"-> {e.TargetExitId}"), new Vector2(e.X, e.Y + e.H + 2), exitColor * 0.5f);
         }
 
         // Draw wall spikes
@@ -1221,7 +1390,7 @@ public class Game1 : Game
             _spriteBatch.DrawString(_font, SafeText(_editorStatusMsg), new Vector2(10, 570), Color.Yellow);
 
         // Controls hint
-        _spriteBatch.DrawString(_font, "[=] Play  [Esc] Menu  [Drag] Place  [RClick] Delete  [Tab] Exit target  [F] Wall side", new Vector2(10, 550), Color.Gray * 0.35f);
+        _spriteBatch.DrawString(_font, "[=] Play  [Esc] Menu  [Drag] Place  [RClick] Delete  [Tab] Target  [Shift+Tab] TargetExit  [Ctrl+Tab] ExitID", new Vector2(10, 550), Color.Gray * 0.35f);
 
         // Editor menu overlay
         if (_editorMenuOpen)

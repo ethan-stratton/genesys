@@ -35,6 +35,8 @@ public class LevelData
     [JsonIgnore] public Rectangle[] AllSpikeRects { get; private set; } = Array.Empty<Rectangle>();
     [JsonIgnore] public Rectangle[] ExitRects { get; private set; } = Array.Empty<Rectangle>();
     [JsonIgnore] public string[] ExitTargets { get; private set; } = Array.Empty<string>();
+    [JsonIgnore] public string[] ExitIds { get; private set; } = Array.Empty<string>();
+    [JsonIgnore] public string[] ExitTargetExitIds { get; private set; } = Array.Empty<string>();
     [JsonIgnore] public float[] RopeXPositions { get; private set; } = Array.Empty<float>();
     [JsonIgnore] public float[] RopeTops { get; private set; } = Array.Empty<float>();
     [JsonIgnore] public float[] RopeBottoms { get; private set; } = Array.Empty<float>();
@@ -106,11 +108,15 @@ public class LevelData
         // Exits
         ExitRects = new Rectangle[Exits.Length];
         ExitTargets = new string[Exits.Length];
+        ExitIds = new string[Exits.Length];
+        ExitTargetExitIds = new string[Exits.Length];
         for (int i = 0; i < Exits.Length; i++)
         {
             var e = Exits[i];
             ExitRects[i] = new Rectangle(e.X, e.Y, e.W, e.H);
             ExitTargets[i] = e.TargetLevel;
+            ExitIds[i] = e.Id;
+            ExitTargetExitIds[i] = e.TargetExitId;
         }
 
         // Ropes
@@ -195,4 +201,6 @@ public class ExitData
     [JsonPropertyName("w")] public int W { get; set; } = 20;
     [JsonPropertyName("h")] public int H { get; set; } = 48;
     [JsonPropertyName("targetLevel")] public string TargetLevel { get; set; } = "";
+    [JsonPropertyName("id")] public string Id { get; set; } = "";
+    [JsonPropertyName("targetExitId")] public string TargetExitId { get; set; } = "";
 }

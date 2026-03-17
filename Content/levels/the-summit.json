@@ -284,14 +284,18 @@
       "y": 500,
       "w": 30,
       "h": 48,
-      "targetLevel": "the-gauntlet"
+      "targetLevel": "the-gauntlet",
+      "id": "exit-left",
+      "targetExitId": "exit-right"
     },
     {
       "x": 500,
       "y": -748,
       "w": 80,
       "h": 48,
-      "targetLevel": "__overworld__"
+      "targetLevel": "__overworld__",
+      "id": "exit-overworld",
+      "targetExitId": ""
     }
   ]
 }

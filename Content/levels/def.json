@@ -74,7 +74,9 @@
       "y": 512,
       "w": 32,
       "h": 32,
-      "targetLevel": "test-arena"
+      "targetLevel": "test-arena",
+      "id": "exit-right",
+      "targetExitId": "exit-left"
     }
   ]
 }
