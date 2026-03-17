@@ -60,7 +60,6 @@ public class Game1 : Game
 
     // --- Settings menu ---
     private bool _menuOpen;
-    private int _menuCursor;
 
     private struct SettingEntry
     {
@@ -70,7 +69,13 @@ public class Game1 : Game
         public bool IsAction; // true = triggers action on Enter, not a toggle
     }
 
-    private SettingEntry[] _settings;
+    private SettingEntry[] _audioSettings;
+    private SettingEntry[] _debugSettings;
+
+    private enum SettingsCategory { Audio, Graphics, Debug }
+    private int _settingsCategoryCursor;
+    private SettingsCategory? _settingsActiveCategory; // null = top level
+    private int _settingsItemCursor;
 
     // Toggleable gameplay options
     private bool _enemiesEnabled = true;
@@ -155,7 +160,12 @@ public class Game1 : Game
         _graphics.PreferredBackBufferHeight = 600;
         _graphics.ApplyChanges();
 
-        _settings = new SettingEntry[]
+        _audioSettings = new SettingEntry[]
+        {
+            new() { Label = "Music", Get = () => _enableMusic, Toggle = () => { _enableMusic = !_enableMusic; if (_enableMusic) { MediaPlayer.IsRepeating = true; MediaPlayer.Play(_bgm); } else { MediaPlayer.Stop(); } } },
+        };
+
+        _debugSettings = new SettingEntry[]
         {
             new() { Label = "Enemies", Get = () => _enemiesEnabled, Toggle = () => _enemiesEnabled = !_enemiesEnabled },
             new() { Label = "Slide", Get = () => _enableSlide, Toggle = () => _enableSlide = !_enableSlide },
@@ -181,8 +191,6 @@ public class Game1 : Game
                 else UnequipRanged(WeaponType.Gun);
             }},
             new() { Label = "EVE Orb", Get = () => _eveOrbActive, Toggle = () => _eveOrbActive = !_eveOrbActive },
-            new() { Label = "Music", Get = () => _enableMusic, Toggle = () => { _enableMusic = !_enableMusic; if (_enableMusic) { MediaPlayer.IsRepeating = true; MediaPlayer.Play(_bgm); } else { MediaPlayer.Stop(); } } },
-            new() { Label = "Quit Game", Get = () => false, Toggle = () => Exit(), IsAction = true },
         };
 
         Restart();
@@ -384,7 +392,9 @@ public class Game1 : Game
                         break;
                     case "Settings":
                         _menuOpen = true;
-                        _menuCursor = 0;
+                        _settingsCategoryCursor = 0;
+                        _settingsActiveCategory = null;
+                        _settingsItemCursor = 0;
                         _settingsFromTitle = true;
                         break;
                     case "Quit":
@@ -396,15 +406,7 @@ public class Game1 : Game
             // Handle settings menu while on title screen
             if (_menuOpen && _settingsFromTitle)
             {
-                if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape))
-                {
-                    _menuOpen = false;
-                    _settingsFromTitle = false;
-                }
-                else
-                {
-                    UpdateMenu(kb);
-                }
+                UpdateMenu(kb);
             }
 
             _prevKb = kb;
@@ -433,11 +435,13 @@ public class Game1 : Game
             return;
         }
 
-        // Toggle menu with Escape
-        if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape))
+        // Toggle menu with Escape (only open — closing is handled inside UpdateMenu)
+        if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape) && !_menuOpen)
         {
-            _menuOpen = !_menuOpen;
-            if (_menuOpen) _menuCursor = 0;
+            _menuOpen = true;
+            _settingsCategoryCursor = 0;
+            _settingsActiveCategory = null;
+            _settingsItemCursor = 0;
         }
 
         // M key — open overworld map
@@ -2340,39 +2344,80 @@ public class Game1 : Game
     {
         float startY = 150f;
         float lineHeight = 30f;
-        _spriteBatch.DrawString(_font, "SETTINGS  [Esc to close]", new Vector2(280, startY - 40), Color.White);
 
-        int itemCount = _settings.Length - 1; // exclude Quit
-        int half = (itemCount + 1) / 2;
-        for (int i = 0; i < itemCount; i++)
+        if (_settingsActiveCategory == null)
         {
-            var s = _settings[i];
-            bool selected = i == _menuCursor;
-            string prefix = selected ? "> " : "  ";
-            string value = s.IsAction ? "" : (s.Get() ? "  ON" : "  OFF");
-            var color = selected ? Color.Yellow : Color.Gray;
-            if (!s.IsAction && s.Get()) color = selected ? Color.Yellow : Color.LightGreen;
+            // Top-level category menu
+            _spriteBatch.DrawString(_font, SafeText("SETTINGS  [Esc to close]"), new Vector2(280, startY - 40), Color.White);
 
-            int col = i < half ? 0 : 1;
-            int row = i < half ? i : i - half;
-            float x = col == 0 ? 180f : 450f;
-            float y = startY + row * lineHeight;
+            string[] categories = { "Audio", "Graphics", "Debug", "Quit Game" };
+            for (int i = 0; i < categories.Length; i++)
+            {
+                bool selected = i == _settingsCategoryCursor;
+                string prefix = selected ? "> " : "  ";
+                Color color;
+                if (i == 3) // Quit Game
+                    color = selected ? Color.Red : Color.DarkGray;
+                else
+                    color = selected ? Color.Yellow : Color.Gray;
+                _spriteBatch.DrawString(_font, SafeText($"{prefix}{categories[i]}"), new Vector2(340f, startY + i * lineHeight), color);
+            }
 
-            _spriteBatch.DrawString(_font, $"{prefix}{s.Label}{value}", new Vector2(x, y), color);
+            _spriteBatch.DrawString(_font, SafeText("[W/S] Navigate  [Enter/Space] Select"), new Vector2(240, startY + 4 * lineHeight + 20), Color.Gray * 0.6f);
         }
-
-        // Draw Quit centered below both columns
+        else
         {
-            int quitIdx = _settings.Length - 1;
-            var s = _settings[quitIdx];
-            bool selected = _menuCursor == quitIdx;
-            string prefix = selected ? "> " : "  ";
-            var color = selected ? Color.Red : Color.DarkGray;
-            float quitY = startY + half * lineHeight + 10;
-            _spriteBatch.DrawString(_font, $"{prefix}{s.Label}", new Vector2(315f, quitY), color);
-        }
+            // Submenu
+            string catName = _settingsActiveCategory.Value.ToString().ToUpper();
+            _spriteBatch.DrawString(_font, SafeText($"{catName}  [Esc to go back]"), new Vector2(280, startY - 40), Color.White);
 
-        _spriteBatch.DrawString(_font, "[Space/Enter] Toggle  [W/S] Navigate  [A/D] Column", new Vector2(180, startY + half * lineHeight + 50), Color.Gray * 0.6f);
+            if (_settingsActiveCategory == SettingsCategory.Graphics)
+            {
+                _spriteBatch.DrawString(_font, SafeText("Coming soon"), new Vector2(340f, startY), Color.Gray * 0.6f);
+            }
+            else
+            {
+                var items = _settingsActiveCategory == SettingsCategory.Audio ? _audioSettings : _debugSettings;
+                int itemCount = items.Length;
+
+                if (itemCount <= 4)
+                {
+                    // Single column
+                    for (int i = 0; i < itemCount; i++)
+                    {
+                        var s = items[i];
+                        bool selected = i == _settingsItemCursor;
+                        string prefix = selected ? "> " : "  ";
+                        string value = s.IsAction ? "" : (s.Get() ? "  ON" : "  OFF");
+                        var color = selected ? Color.Yellow : Color.Gray;
+                        if (!s.IsAction && s.Get()) color = selected ? Color.Yellow : Color.LightGreen;
+                        _spriteBatch.DrawString(_font, SafeText($"{prefix}{s.Label}{value}"), new Vector2(280f, startY + i * lineHeight), color);
+                    }
+                }
+                else
+                {
+                    // Two-column layout
+                    int half = (itemCount + 1) / 2;
+                    for (int i = 0; i < itemCount; i++)
+                    {
+                        var s = items[i];
+                        bool selected = i == _settingsItemCursor;
+                        string prefix = selected ? "> " : "  ";
+                        string value = s.IsAction ? "" : (s.Get() ? "  ON" : "  OFF");
+                        var color = selected ? Color.Yellow : Color.Gray;
+                        if (!s.IsAction && s.Get()) color = selected ? Color.Yellow : Color.LightGreen;
+
+                        int col = i < half ? 0 : 1;
+                        int row = i < half ? i : i - half;
+                        float x = col == 0 ? 180f : 450f;
+                        float y = startY + row * lineHeight;
+                        _spriteBatch.DrawString(_font, SafeText($"{prefix}{s.Label}{value}"), new Vector2(x, y), color);
+                    }
+                }
+            }
+
+            _spriteBatch.DrawString(_font, SafeText("[Space/Enter] Toggle  [W/S] Navigate  [A/D] Column  [Esc] Back"), new Vector2(140, 540), Color.Gray * 0.6f);
+        }
     }
 
     private void UpdateInventory(KeyboardState kb)
@@ -2482,119 +2527,101 @@ public class Game1 : Game
 
     private void UpdateMenu(KeyboardState kb)
     {
-        int quitIdx = _settings.Length - 1;
-        int itemCount = _settings.Length - 1; // exclude Quit from columns
-        int half = (itemCount + 1) / 2;
-        int rightCount = itemCount - half;
+        bool up = (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W)) || (kb.IsKeyDown(Keys.Up) && _prevKb.IsKeyUp(Keys.Up));
+        bool down = (kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S)) || (kb.IsKeyDown(Keys.Down) && _prevKb.IsKeyUp(Keys.Down));
+        bool confirm = (kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter)) || (kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space));
+        bool esc = kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape);
 
-        bool onQuit = _menuCursor == quitIdx;
-
-        if (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W))
+        if (_settingsActiveCategory == null)
         {
-            if (onQuit)
+            // Top-level: 4 items (Audio, Graphics, Debug, Quit)
+            if (up) _settingsCategoryCursor = (_settingsCategoryCursor - 1 + 4) % 4;
+            if (down) _settingsCategoryCursor = (_settingsCategoryCursor + 1) % 4;
+
+            if (confirm)
             {
-                // Go to last item of left column
-                _menuCursor = half - 1;
+                switch (_settingsCategoryCursor)
+                {
+                    case 0: _settingsActiveCategory = SettingsCategory.Audio; _settingsItemCursor = 0; break;
+                    case 1: _settingsActiveCategory = SettingsCategory.Graphics; _settingsItemCursor = 0; break;
+                    case 2: _settingsActiveCategory = SettingsCategory.Debug; _settingsItemCursor = 0; break;
+                    case 3: Exit(); break;
+                }
+            }
+
+            if (esc)
+            {
+                _menuOpen = false;
+                if (_settingsFromTitle) _settingsFromTitle = false;
+            }
+        }
+        else
+        {
+            // In a submenu
+            if (_settingsActiveCategory == SettingsCategory.Graphics)
+            {
+                // Nothing to navigate — just go back on Esc
+                if (esc) _settingsActiveCategory = null;
+                return;
+            }
+
+            var items = _settingsActiveCategory == SettingsCategory.Audio ? _audioSettings : _debugSettings;
+            int itemCount = items.Length;
+
+            if (itemCount <= 4)
+            {
+                // Single column navigation
+                if (up) _settingsItemCursor = (_settingsItemCursor - 1 + itemCount) % itemCount;
+                if (down) _settingsItemCursor = (_settingsItemCursor + 1) % itemCount;
             }
             else
             {
-                int col = _menuCursor < half ? 0 : 1;
-                int row = col == 0 ? _menuCursor : _menuCursor - half;
-                if (row == 0)
-                {
-                    // Wrap up to Quit
-                    _menuCursor = quitIdx;
-                }
-                else
-                {
-                    row--;
-                    _menuCursor = col == 0 ? row : row + half;
-                }
-            }
-        }
-        if (kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S))
-        {
-            if (onQuit)
-            {
-                _menuCursor = 0;
-            }
-            else
-            {
-                int col = _menuCursor < half ? 0 : 1;
-                int row = col == 0 ? _menuCursor : _menuCursor - half;
-                int colSize = col == 0 ? half : rightCount;
-                if (row == colSize - 1)
-                {
-                    _menuCursor = quitIdx;
-                }
-                else
-                {
-                    row++;
-                    _menuCursor = col == 0 ? row : row + half;
-                }
-            }
-        }
-        if (kb.IsKeyDown(Keys.Up) && _prevKb.IsKeyUp(Keys.Up))
-        {
-            if (onQuit)
-            {
-                _menuCursor = half - 1;
-            }
-            else
-            {
-                int col = _menuCursor < half ? 0 : 1;
-                int row = col == 0 ? _menuCursor : _menuCursor - half;
-                if (row == 0)
-                    _menuCursor = quitIdx;
-                else
-                {
-                    row--;
-                    _menuCursor = col == 0 ? row : row + half;
-                }
-            }
-        }
-        if (kb.IsKeyDown(Keys.Down) && _prevKb.IsKeyUp(Keys.Down))
-        {
-            if (onQuit)
-            {
-                _menuCursor = 0;
-            }
-            else
-            {
-                int col = _menuCursor < half ? 0 : 1;
-                int row = col == 0 ? _menuCursor : _menuCursor - half;
-                int colSize = col == 0 ? half : rightCount;
-                if (row == colSize - 1)
-                    _menuCursor = quitIdx;
-                else
-                {
-                    row++;
-                    _menuCursor = col == 0 ? row : row + half;
-                }
-            }
-        }
+                // Two-column navigation (same as old layout)
+                int half = (itemCount + 1) / 2;
+                int rightCount = itemCount - half;
 
-        // A/D or Left/Right to switch columns (no-op on Quit)
-        if (!onQuit)
-        {
-            if ((kb.IsKeyDown(Keys.D) && _prevKb.IsKeyUp(Keys.D)) ||
-                (kb.IsKeyDown(Keys.Right) && _prevKb.IsKeyUp(Keys.Right)))
-            {
-                if (_menuCursor < half && _menuCursor + half < itemCount)
-                    _menuCursor += half;
-            }
-            if ((kb.IsKeyDown(Keys.A) && _prevKb.IsKeyUp(Keys.A)) ||
-                (kb.IsKeyDown(Keys.Left) && _prevKb.IsKeyUp(Keys.Left)))
-            {
-                if (_menuCursor >= half)
-                    _menuCursor -= half;
-            }
-        }
+                if (up)
+                {
+                    int col = _settingsItemCursor < half ? 0 : 1;
+                    int row = col == 0 ? _settingsItemCursor : _settingsItemCursor - half;
+                    if (row == 0)
+                    {
+                        int colSize = col == 0 ? half : rightCount;
+                        _settingsItemCursor = col == 0 ? half - 1 : half + rightCount - 1; // wrap to bottom
+                    }
+                    else
+                    {
+                        row--;
+                        _settingsItemCursor = col == 0 ? row : row + half;
+                    }
+                }
+                if (down)
+                {
+                    int col = _settingsItemCursor < half ? 0 : 1;
+                    int row = col == 0 ? _settingsItemCursor : _settingsItemCursor - half;
+                    int colSize = col == 0 ? half : rightCount;
+                    if (row == colSize - 1)
+                    {
+                        _settingsItemCursor = col == 0 ? 0 : half; // wrap to top
+                    }
+                    else
+                    {
+                        row++;
+                        _settingsItemCursor = col == 0 ? row : row + half;
+                    }
+                }
 
-        if ((kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter)) ||
-            (kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space)))
-        {
-            _settings[_menuCursor].Toggle();
+                // A/D column switching
+                bool right = (kb.IsKeyDown(Keys.D) && _prevKb.IsKeyUp(Keys.D)) || (kb.IsKeyDown(Keys.Right) && _prevKb.IsKeyUp(Keys.Right));
+                bool left = (kb.IsKeyDown(Keys.A) && _prevKb.IsKeyUp(Keys.A)) || (kb.IsKeyDown(Keys.Left) && _prevKb.IsKeyUp(Keys.Left));
+                if (right && _settingsItemCursor < half && _settingsItemCursor + half < itemCount)
+                    _settingsItemCursor += half;
+                if (left && _settingsItemCursor >= half)
+                    _settingsItemCursor -= half;
+            }
+
+            if (confirm) items[_settingsItemCursor].Toggle();
+            if (esc) _settingsActiveCategory = null;
         }
     }
 
