@@ -1948,7 +1948,12 @@ public class Game1 : Game
             if (node.Discovered && !string.IsNullOrEmpty(node.Level))
             {
                 string path = $"Content/levels/{node.Level}.json";
-                if (System.IO.File.Exists(path))
+                // If re-entering the same level, just resume without resetting
+                if (path == _editorSaveFile && _level != null)
+                {
+                    _gameState = GameState.Playing;
+                }
+                else if (System.IO.File.Exists(path))
                 {
                     node.Discovered = true;
                     _overworld.Save(OverworldPath);

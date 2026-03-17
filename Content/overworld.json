@@ -8,7 +8,7 @@
       "y": 350,
       "level": "test-arena",
       "discovered": true,
-      "cleared": true,
+      "cleared": false,
       "connections": [
         "the-descent"
       ],
@@ -21,13 +21,13 @@
       "x": 350,
       "y": 250,
       "level": "the-descent",
-      "discovered": true,
+      "discovered": false,
       "cleared": false,
       "connections": [
         "test-arena",
         "the-gauntlet"
       ],
-      "ShownName": "The Descent"
+      "ShownName": "???"
     },
     {
       "id": "the-gauntlet",
@@ -36,13 +36,13 @@
       "x": 500,
       "y": 350,
       "level": "the-gauntlet",
-      "discovered": true,
+      "discovered": false,
       "cleared": false,
       "connections": [
         "the-descent",
         "the-summit"
       ],
-      "ShownName": "The Gauntlet"
+      "ShownName": "???"
     },
     {
       "id": "the-summit",
@@ -51,12 +51,12 @@
       "x": 650,
       "y": 200,
       "level": "the-summit",
-      "discovered": true,
-      "cleared": true,
+      "discovered": false,
+      "cleared": false,
       "connections": [
         "the-gauntlet"
       ],
-      "ShownName": "The Summit"
+      "ShownName": "???"
     }
   ],
   "startNode": "test-arena"
