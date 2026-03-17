@@ -1,8 +1,8 @@
 {
-  "currentLevel": "the-summit",
-  "spawnX": -59,
-  "spawnY": 500,
+  "currentLevel": "the-descent",
+  "spawnX": 174,
+  "spawnY": -748,
   "unlockedAbilities": [],
   "flags": {},
-  "playTime": 6.066694
+  "playTime": 28.249744
 }
