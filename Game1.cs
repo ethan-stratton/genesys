@@ -36,6 +36,7 @@ public class Game1 : Game
     private Random _rng;
 
     private bool _isDead;
+    private float _spawnInvincibility;
     private KeyboardState _prevKb;
 
     // Level data (loaded from JSON)
@@ -167,6 +168,7 @@ public class Game1 : Game
         _rng = new Random();
 
         _isDead = false;
+        _spawnInvincibility = 1.0f;
     }
 
     protected override void LoadContent()
@@ -304,6 +306,10 @@ public class Game1 : Game
 
         var dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
 
+        // Spawn invincibility countdown
+        if (_spawnInvincibility > 0f)
+            _spawnInvincibility -= dt;
+
         // Pass enabled features to player
         _player.EnableSlide = _enableSlide;
         _player.EnableCartwheel = _enableCartwheel;
@@ -388,7 +394,8 @@ public class Game1 : Game
             var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
             if (!_player.IsSliding && !_player.IsCartwheeling && !_player.IsVaulting && !_player.IsVaultKicking && !_player.IsUppercutting && !_player.IsFlipping && !_player.IsBladeDashing && eRect.Intersects(pRect))
             {
-                _isDead = true;
+                if (_spawnInvincibility <= 0f)
+                    _isDead = true;
                 break;
             }
         }
@@ -403,7 +410,8 @@ public class Game1 : Game
             foreach (var spike in _level.AllSpikeRects)            {
                 if (pRect.Intersects(spike))
                 {
-                    _isDead = true;
+                    if (_spawnInvincibility <= 0f)
+                        _isDead = true;
                     break;
                 }
             }
@@ -1472,7 +1480,12 @@ public class Game1 : Game
         }
 
         // Draw player
-        if (!_isDead) _player.Draw(_spriteBatch, _pixel);
+        if (!_isDead)
+        {
+            bool visible = _spawnInvincibility <= 0f || MathF.Sin(_spawnInvincibility * 20f) > 0;
+            if (visible)
+                _player.Draw(_spriteBatch, _pixel);
+        }
 
         // Draw bullets
         _bullets.ForEach(b => b.Draw(_spriteBatch, _pixel));

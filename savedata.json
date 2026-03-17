@@ -1,8 +1,8 @@
 {
-  "currentLevel": "test-arena",
-  "spawnX": 352,
-  "spawnY": 240,
+  "currentLevel": "the-summit",
+  "spawnX": 100,
+  "spawnY": 500,
   "unlockedAbilities": [],
   "flags": {},
-  "playTime": 95.60595
+  "playTime": 53.76602
 }
