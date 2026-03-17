@@ -11,6 +11,7 @@ public class Crawler
     public int Hp = 3;
     public const int Width = 16, Height = 10;
     public float PatrolLeft, PatrolRight;
+    public float SurfaceLeft, SurfaceRight; // hard edges — crawler won't walk off
     public int Dir = 1;
     public bool Aggroed;
     public float AggroRange = 200f;
@@ -18,11 +19,13 @@ public class Crawler
     public float ChaseSpeed = 100f;
     public float DamageCooldown;
 
-    public Crawler(Vector2 pos, float patrolLeft, float patrolRight)
+    public Crawler(Vector2 pos, float patrolLeft, float patrolRight, float surfaceLeft, float surfaceRight)
     {
         Position = pos;
         PatrolLeft = patrolLeft;
         PatrolRight = patrolRight;
+        SurfaceLeft = surfaceLeft;
+        SurfaceRight = surfaceRight;
     }
 
     public Rectangle Rect => new((int)Position.X, (int)Position.Y, Width, Height);
@@ -46,6 +49,18 @@ public class Crawler
             Position.X += Dir * Speed * dt;
             if (Position.X <= PatrolLeft) { Position.X = PatrolLeft; Dir = 1; }
             if (Position.X + Width >= PatrolRight) { Position.X = PatrolRight - Width; Dir = -1; }
+        }
+
+        // Clamp to surface edges — never walk off platforms
+        if (Position.X < SurfaceLeft)
+        {
+            Position.X = SurfaceLeft;
+            if (!Aggroed) Dir = 1;
+        }
+        if (Position.X + Width > SurfaceRight)
+        {
+            Position.X = SurfaceRight - Width;
+            if (!Aggroed) Dir = -1;
         }
     }
 

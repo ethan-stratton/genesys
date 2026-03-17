@@ -270,7 +270,8 @@ public class Game1 : Game
                     break;
                 case "crawler":
                     float snapY = SnapToSurface(e.X, e.Y, Crawler.Width, Crawler.Height);
-                    _crawlers.Add(new Crawler(new Vector2(e.X, snapY), e.X - 100, e.X + 100));
+                    var surfaceEdges = FindSurfaceEdges(e.X, snapY + Crawler.Height);
+                    _crawlers.Add(new Crawler(new Vector2(e.X, snapY), e.X - 100, e.X + 100, surfaceEdges.Item1, surfaceEdges.Item2));
                     break;
                 case "thornback":
                     float tSnapY = SnapToSurface(e.X, e.Y, Thornback.Width, Thornback.Height);
@@ -1203,7 +1204,7 @@ public class Game1 : Game
             : worldMouse;
 
         // Left click — place / start drag (not when G is held for grab)
-        if (mouse.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released && !kb.IsKeyDown(Keys.G))
+        if (mouse.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released && !kb.IsKeyDown(Keys.T))
         {
             if (_editorTool == EditorTool.Spawn)
             {
@@ -1351,7 +1352,7 @@ public class Game1 : Game
         }
 
         // G + Left click — grab and drag entities/objects
-        if (kb.IsKeyDown(Keys.G) && mouse.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released)
+        if (kb.IsKeyDown(Keys.T) && mouse.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released)
         {
             _editorMovingEntity = null;
             var mp = new Point((int)worldMouse.X, (int)worldMouse.Y);
@@ -1421,7 +1422,7 @@ public class Game1 : Game
                     { _editorMovingEntity = it; _editorMoveOffset = new Vector2(worldMouse.X - it.X, worldMouse.Y - it.Y); SetEditorStatus($"Grabbed item {it.Type}"); break; }
         }
         // G held + drag — move entity
-        if (kb.IsKeyDown(Keys.G) && mouse.LeftButton == ButtonState.Pressed && _editorMovingEntity != null)
+        if (kb.IsKeyDown(Keys.T) && mouse.LeftButton == ButtonState.Pressed && _editorMovingEntity != null)
         {
             float nx = snapped.X - _editorMoveOffset.X;
             float ny = snapped.Y - _editorMoveOffset.Y;
@@ -1436,7 +1437,7 @@ public class Game1 : Game
             else if (_editorMovingEntity is ItemData itd) { itd.X = nx; itd.Y = ny; }
         }
         // Release — drop entity and rebuild
-        if ((mouse.LeftButton == ButtonState.Released || !kb.IsKeyDown(Keys.G)) && _editorMovingEntity != null)
+        if ((mouse.LeftButton == ButtonState.Released || !kb.IsKeyDown(Keys.T)) && _editorMovingEntity != null)
         {
             _level.Build();
             SetEditorStatus("Placed");
@@ -1706,6 +1707,25 @@ public class Game1 : Game
         }
         
         return bestY;
+    }
+
+    /// <summary>Find the left/right edges of the surface at the given foot position.</summary>
+    private (float, float) FindSurfaceEdges(float x, float footY)
+    {
+        // Check platforms — find the one the entity is standing on
+        foreach (var p in _level.Platforms)
+        {
+            if (MathF.Abs(footY - p.Y) < 4 && x + Crawler.Width > p.X && x < p.X + p.W)
+                return (p.X, p.X + p.W);
+        }
+        // Check solid floors
+        foreach (var sf in _level.SolidFloors)
+        {
+            if (MathF.Abs(footY - sf.Y) < 4 && x + Crawler.Width > sf.X && x < sf.X + sf.W)
+                return (sf.X, sf.X + sf.W);
+        }
+        // Default: main floor spans the full level bounds
+        return (_level.Bounds.Left, _level.Bounds.Right);
     }
 
     private string GenerateExitId(int x, int y)
