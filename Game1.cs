@@ -1202,8 +1202,8 @@ public class Game1 : Game
                 MathF.Round(worldMouse.Y / _editorGridSize) * _editorGridSize)
             : worldMouse;
 
-        // Left click — place / start drag
-        if (mouse.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released)
+        // Left click — place / start drag (not when G is held for grab)
+        if (mouse.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released && !kb.IsKeyDown(Keys.G))
         {
             if (_editorTool == EditorTool.Spawn)
             {
@@ -1350,8 +1350,8 @@ public class Game1 : Game
                 SetEditorStatus("Deleted");
         }
 
-        // Middle click — grab and drag entities/objects
-        if (mouse.MiddleButton == ButtonState.Pressed && _prevMouse.MiddleButton == ButtonState.Released)
+        // G + Left click — grab and drag entities/objects
+        if (kb.IsKeyDown(Keys.G) && mouse.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released)
         {
             _editorMovingEntity = null;
             var mp = new Point((int)worldMouse.X, (int)worldMouse.Y);
@@ -1411,8 +1411,8 @@ public class Game1 : Game
                 }
             }
         }
-        // Middle drag — move entity
-        if (mouse.MiddleButton == ButtonState.Pressed && _editorMovingEntity != null)
+        // G held + drag — move entity
+        if (kb.IsKeyDown(Keys.G) && mouse.LeftButton == ButtonState.Pressed && _editorMovingEntity != null)
         {
             float nx = snapped.X - _editorMoveOffset.X;
             float ny = snapped.Y - _editorMoveOffset.Y;
@@ -1421,8 +1421,8 @@ public class Game1 : Game
             else if (_editorMovingEntity is NpcData npc) { npc.X = (int)nx; npc.Y = (int)ny; }
             else if (_editorMovingEntity is ItemData itd) { itd.X = nx; itd.Y = ny; }
         }
-        // Middle release — drop entity
-        if (mouse.MiddleButton == ButtonState.Released && _prevMouse.MiddleButton == ButtonState.Pressed && _editorMovingEntity != null)
+        // Release — drop entity
+        if ((mouse.LeftButton == ButtonState.Released || !kb.IsKeyDown(Keys.G)) && _editorMovingEntity != null)
         {
             SetEditorStatus("Placed");
             _editorMovingEntity = null;
