@@ -1355,75 +1355,90 @@ public class Game1 : Game
         {
             _editorMovingEntity = null;
             var mp = new Point((int)worldMouse.X, (int)worldMouse.Y);
+            // Check platforms
+            if (_editorMovingEntity == null)
+                foreach (var p in _level.Platforms)
+                    if (new Rectangle(p.X, p.Y, p.W, p.H).Contains(mp))
+                    { _editorMovingEntity = p; _editorMoveOffset = new Vector2(worldMouse.X - p.X, worldMouse.Y - p.Y); SetEditorStatus("Grabbed platform"); break; }
+            // Check walls
+            if (_editorMovingEntity == null)
+                foreach (var w in _level.Walls)
+                    if (new Rectangle(w.X, w.Y, w.W, w.H).Contains(mp))
+                    { _editorMovingEntity = w; _editorMoveOffset = new Vector2(worldMouse.X - w.X, worldMouse.Y - w.Y); SetEditorStatus("Grabbed wall"); break; }
+            // Check spikes
+            if (_editorMovingEntity == null)
+                foreach (var s in _level.Spikes)
+                    if (new Rectangle(s.X, s.Y, s.W, s.H).Contains(mp))
+                    { _editorMovingEntity = s; _editorMoveOffset = new Vector2(worldMouse.X - s.X, worldMouse.Y - s.Y); SetEditorStatus("Grabbed spike"); break; }
+            // Check solid floors
+            if (_editorMovingEntity == null)
+                foreach (var sf in _level.SolidFloors)
+                    if (new Rectangle(sf.X, sf.Y, sf.W, sf.H).Contains(mp))
+                    { _editorMovingEntity = sf; _editorMoveOffset = new Vector2(worldMouse.X - sf.X, worldMouse.Y - sf.Y); SetEditorStatus("Grabbed solid floor"); break; }
+            // Check ceilings
+            if (_editorMovingEntity == null)
+                foreach (var c in _level.Ceilings)
+                    if (new Rectangle(c.X, c.Y, c.W, c.H).Contains(mp))
+                    { _editorMovingEntity = c; _editorMoveOffset = new Vector2(worldMouse.X - c.X, worldMouse.Y - c.Y); SetEditorStatus("Grabbed ceiling"); break; }
+            // Check ropes (10px tolerance)
+            if (_editorMovingEntity == null)
+                foreach (var r in _level.Ropes)
+                    if (MathF.Abs(mp.X - r.X) < 10 && mp.Y >= r.Top && mp.Y <= r.Bottom)
+                    { _editorMovingEntity = r; _editorMoveOffset = new Vector2(worldMouse.X - r.X, worldMouse.Y - r.Top); SetEditorStatus("Grabbed rope"); break; }
+            // Check exits
+            if (_editorMovingEntity == null)
+                foreach (var e in _level.Exits)
+                    if (new Rectangle(e.X, e.Y, e.W, e.H).Contains(mp))
+                    { _editorMovingEntity = e; _editorMoveOffset = new Vector2(worldMouse.X - e.X, worldMouse.Y - e.Y); SetEditorStatus($"Grabbed exit {e.Id}"); break; }
+            // Check wall spikes
+            if (_editorMovingEntity == null)
+                foreach (var ws in _level.WallSpikes)
+                    if (new Rectangle(ws.X, ws.Y, ws.W, ws.H).Contains(mp))
+                    { _editorMovingEntity = ws; _editorMoveOffset = new Vector2(worldMouse.X - ws.X, worldMouse.Y - ws.Y); SetEditorStatus("Grabbed wall spike"); break; }
             // Check enemies
-            foreach (var e in _level.Enemies)
-            {
-                int sz = e.Type == "thornback" ? 32 : (e.Type == "swarm" ? 20 : 16);
-                int h = e.Type == "thornback" ? 28 : (e.Type == "swarm" ? 20 : 10);
-                if (new Rectangle((int)e.X, (int)e.Y, sz, h).Contains(mp))
+            if (_editorMovingEntity == null)
+                foreach (var e in _level.Enemies)
                 {
-                    _editorMovingEntity = e;
-                    _editorMoveOffset = new Vector2(worldMouse.X - e.X, worldMouse.Y - e.Y);
-                    SetEditorStatus($"Grabbed {e.Type}");
-                    break;
+                    int sz = e.Type == "thornback" ? 32 : (e.Type == "swarm" ? 20 : 16);
+                    int h = e.Type == "thornback" ? 28 : (e.Type == "swarm" ? 20 : 10);
+                    if (new Rectangle((int)e.X, (int)e.Y, sz, h).Contains(mp))
+                    { _editorMovingEntity = e; _editorMoveOffset = new Vector2(worldMouse.X - e.X, worldMouse.Y - e.Y); SetEditorStatus($"Grabbed {e.Type}"); break; }
                 }
-            }
             // Check env objects
             if (_editorMovingEntity == null)
-            {
                 foreach (var o in _level.Objects)
-                {
                     if (new Rectangle((int)o.X, (int)o.Y, o.W, o.H).Contains(mp))
-                    {
-                        _editorMovingEntity = o;
-                        _editorMoveOffset = new Vector2(worldMouse.X - o.X, worldMouse.Y - o.Y);
-                        SetEditorStatus($"Grabbed {o.Type}");
-                        break;
-                    }
-                }
-            }
+                    { _editorMovingEntity = o; _editorMoveOffset = new Vector2(worldMouse.X - o.X, worldMouse.Y - o.Y); SetEditorStatus($"Grabbed {o.Type}"); break; }
             // Check NPCs
             if (_editorMovingEntity == null)
-            {
                 foreach (var n in _level.Npcs)
-                {
                     if (new Rectangle(n.X, n.Y, n.W, n.H).Contains(mp))
-                    {
-                        _editorMovingEntity = n;
-                        _editorMoveOffset = new Vector2(worldMouse.X - n.X, worldMouse.Y - n.Y);
-                        SetEditorStatus($"Grabbed NPC {n.Name}");
-                        break;
-                    }
-                }
-            }
+                    { _editorMovingEntity = n; _editorMoveOffset = new Vector2(worldMouse.X - n.X, worldMouse.Y - n.Y); SetEditorStatus($"Grabbed NPC {n.Name}"); break; }
             // Check items
             if (_editorMovingEntity == null)
-            {
                 foreach (var it in _level.Items)
-                {
                     if (new Rectangle((int)it.X, (int)it.Y, it.W, it.H).Contains(mp))
-                    {
-                        _editorMovingEntity = it;
-                        _editorMoveOffset = new Vector2(worldMouse.X - it.X, worldMouse.Y - it.Y);
-                        SetEditorStatus($"Grabbed item {it.Type}");
-                        break;
-                    }
-                }
-            }
+                    { _editorMovingEntity = it; _editorMoveOffset = new Vector2(worldMouse.X - it.X, worldMouse.Y - it.Y); SetEditorStatus($"Grabbed item {it.Type}"); break; }
         }
         // G held + drag — move entity
         if (kb.IsKeyDown(Keys.G) && mouse.LeftButton == ButtonState.Pressed && _editorMovingEntity != null)
         {
             float nx = snapped.X - _editorMoveOffset.X;
             float ny = snapped.Y - _editorMoveOffset.Y;
-            if (_editorMovingEntity is EnemySpawnData esd) { esd.X = nx; esd.Y = ny; }
+            if (_editorMovingEntity is RectData rd) { rd.X = (int)nx; rd.Y = (int)ny; }
+            else if (_editorMovingEntity is WallData wd) { wd.X = (int)nx; wd.Y = (int)ny; }
+            else if (_editorMovingEntity is WallSpikeData wsd) { wsd.X = (int)nx; wsd.Y = (int)ny; }
+            else if (_editorMovingEntity is ExitData exd) { exd.X = (int)nx; exd.Y = (int)ny; }
+            else if (_editorMovingEntity is RopeData rpd) { float dy = ny - rpd.Top; rpd.X = nx; rpd.Top += dy; rpd.Bottom += dy; }
+            else if (_editorMovingEntity is EnemySpawnData esd) { esd.X = nx; esd.Y = ny; }
             else if (_editorMovingEntity is EnvObjectData eod) { eod.X = nx; eod.Y = ny; }
             else if (_editorMovingEntity is NpcData npc) { npc.X = (int)nx; npc.Y = (int)ny; }
             else if (_editorMovingEntity is ItemData itd) { itd.X = nx; itd.Y = ny; }
         }
-        // Release — drop entity
+        // Release — drop entity and rebuild
         if ((mouse.LeftButton == ButtonState.Released || !kb.IsKeyDown(Keys.G)) && _editorMovingEntity != null)
         {
+            _level.Build();
             SetEditorStatus("Placed");
             _editorMovingEntity = null;
         }
