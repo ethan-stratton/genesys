@@ -74,6 +74,11 @@ public class Game1 : Game
     private bool _enableBladeDash = true;
     private bool _enableMusic;
 
+    // --- Dialogue state ---
+    private bool _dialogueOpen;
+    private int _dialogueNpcIndex = -1;
+    private int _dialogueLine;
+
     // --- Editor state ---
     private enum EditorTool { SolidFloor = 0, Platform = 1, Rope = 2, Wall = 3, Spike = 4, Exit = 5, Spawn = 6, WallSpike = 7, OverworldExit = 8, Ceiling = 9 }
     // Wall climbSide values: 0=both, 1=right face, -1=left face, 99=no climb (solid only)
@@ -347,6 +352,52 @@ public class Game1 : Game
         // Update camera
         _camera.Update(dt, _player.Position, Player.Width, Player.Height, _player.FacingDir, _player.IsGrounded, _player.Velocity.Y);
 
+        // --- Dialogue system ---
+        if (_dialogueOpen)
+        {
+            bool advance = (kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space)) ||
+                           (kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter)) ||
+                           (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W));
+            bool close = kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape);
+            if (close)
+            {
+                _dialogueOpen = false;
+                _dialogueNpcIndex = -1;
+            }
+            else if (advance)
+            {
+                _dialogueLine++;
+                if (_dialogueNpcIndex >= 0 && _dialogueLine >= _level.Npcs[_dialogueNpcIndex].Dialogue.Length)
+                {
+                    _dialogueOpen = false;
+                    _dialogueNpcIndex = -1;
+                }
+            }
+            _prevKb = kb;
+            base.Update(gameTime);
+            return; // block all other input
+        }
+
+        // Check for NPC interaction (W freshly pressed, grounded, near NPC)
+        if (_player.IsGrounded && MathF.Abs(_player.Velocity.Y) < 1f &&
+            kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W))
+        {
+            var pRect = new Rectangle((int)_player.Position.X - 40, (int)_player.Position.Y,
+                Player.Width + 80, Player.Height);
+            for (int i = 0; i < _level.NpcRects.Length; i++)
+            {
+                if (pRect.Intersects(_level.NpcRects[i]) && _level.Npcs[i].Dialogue.Length > 0)
+                {
+                    _dialogueOpen = true;
+                    _dialogueNpcIndex = i;
+                    _dialogueLine = 0;
+                    _prevKb = kb;
+                    base.Update(gameTime);
+                    return;
+                }
+            }
+        }
+
         // Shoot bullets
         if (_player.WantsToShoot)
         {
@@ -498,6 +549,24 @@ public class Game1 : Game
 
         _prevKb = kb;
         base.Update(gameTime);
+    }
+
+    private static Color ParseNpcColor(string name)
+    {
+        return name switch
+        {
+            "Purple" => Color.Purple,
+            "Blue" => Color.Blue,
+            "Red" => Color.Red,
+            "Green" => Color.Green,
+            "Yellow" => Color.Yellow,
+            "White" => Color.White,
+            "Orange" => Color.Orange,
+            "Cyan" => Color.Cyan,
+            "Pink" => Color.Pink,
+            "Magenta" => Color.Magenta,
+            _ => Color.Purple,
+        };
     }
 
     private string SafeText(string text)
@@ -1362,6 +1431,15 @@ public class Game1 : Game
         _spriteBatch.Draw(_pixel, new Rectangle(_level.PlayerSpawn.X - 2, _level.PlayerSpawn.Y - 2, Player.Width + 4, Player.Height + 4), Color.Cyan * 0.3f);
         _spriteBatch.Draw(_pixel, new Rectangle(_level.PlayerSpawn.X, _level.PlayerSpawn.Y, Player.Width, Player.Height), Color.Cyan * 0.5f);
 
+        // Draw NPCs in editor
+        for (int i = 0; i < _level.Npcs.Length; i++)
+        {
+            var npc = _level.Npcs[i];
+            Color npcColor = ParseNpcColor(npc.Color);
+            _spriteBatch.Draw(_pixel, new Rectangle(npc.X, npc.Y, npc.W, npc.H), npcColor * 0.7f);
+            _spriteBatch.DrawString(_font, SafeText(npc.Name), new Vector2(npc.X, npc.Y - 16), npcColor * 0.8f);
+        }
+
         // Draw drag preview
         if (_editorDragging)
         {
@@ -1551,8 +1629,9 @@ public class Game1 : Game
         float lineHeight = 30f;
         _spriteBatch.DrawString(_font, "SETTINGS  [Esc to close]", new Vector2(280, startY - 40), Color.White);
 
-        int half = (_settings.Length + 1) / 2;
-        for (int i = 0; i < _settings.Length; i++)
+        int itemCount = _settings.Length - 1; // exclude Quit
+        int half = (itemCount + 1) / 2;
+        for (int i = 0; i < itemCount; i++)
         {
             var s = _settings[i];
             bool selected = i == _menuCursor;
@@ -1560,7 +1639,6 @@ public class Game1 : Game
             string value = s.IsAction ? "" : (s.Get() ? "  ON" : "  OFF");
             var color = selected ? Color.Yellow : Color.Gray;
             if (!s.IsAction && s.Get()) color = selected ? Color.Yellow : Color.LightGreen;
-            if (s.IsAction) color = selected ? Color.Red : Color.DarkGray;
 
             int col = i < half ? 0 : 1;
             int row = i < half ? i : i - half;
@@ -1570,49 +1648,129 @@ public class Game1 : Game
             _spriteBatch.DrawString(_font, $"{prefix}{s.Label}{value}", new Vector2(x, y), color);
         }
 
-        _spriteBatch.DrawString(_font, "[Space/Enter] Toggle  [W/S] Navigate  [A/D] Column", new Vector2(180, startY + half * lineHeight + 20), Color.Gray * 0.6f);
+        // Draw Quit centered below both columns
+        {
+            int quitIdx = _settings.Length - 1;
+            var s = _settings[quitIdx];
+            bool selected = _menuCursor == quitIdx;
+            string prefix = selected ? "> " : "  ";
+            var color = selected ? Color.Red : Color.DarkGray;
+            float quitY = startY + half * lineHeight + 10;
+            _spriteBatch.DrawString(_font, $"{prefix}{s.Label}", new Vector2(315f, quitY), color);
+        }
+
+        _spriteBatch.DrawString(_font, "[Space/Enter] Toggle  [W/S] Navigate  [A/D] Column", new Vector2(180, startY + half * lineHeight + 50), Color.Gray * 0.6f);
     }
 
     private void UpdateMenu(KeyboardState kb)
     {
-        int half = (_settings.Length + 1) / 2;
-        int col = _menuCursor < half ? 0 : 1;
-        int row = col == 0 ? _menuCursor : _menuCursor - half;
-        int colSize = col == 0 ? half : _settings.Length - half;
+        int quitIdx = _settings.Length - 1;
+        int itemCount = _settings.Length - 1; // exclude Quit from columns
+        int half = (itemCount + 1) / 2;
+        int rightCount = itemCount - half;
+
+        bool onQuit = _menuCursor == quitIdx;
 
         if (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W))
         {
-            row = (row - 1 + colSize) % colSize;
-            _menuCursor = col == 0 ? row : row + half;
+            if (onQuit)
+            {
+                // Go to last item of left column
+                _menuCursor = half - 1;
+            }
+            else
+            {
+                int col = _menuCursor < half ? 0 : 1;
+                int row = col == 0 ? _menuCursor : _menuCursor - half;
+                if (row == 0)
+                {
+                    // Wrap up to Quit
+                    _menuCursor = quitIdx;
+                }
+                else
+                {
+                    row--;
+                    _menuCursor = col == 0 ? row : row + half;
+                }
+            }
         }
         if (kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S))
         {
-            row = (row + 1) % colSize;
-            _menuCursor = col == 0 ? row : row + half;
+            if (onQuit)
+            {
+                _menuCursor = 0;
+            }
+            else
+            {
+                int col = _menuCursor < half ? 0 : 1;
+                int row = col == 0 ? _menuCursor : _menuCursor - half;
+                int colSize = col == 0 ? half : rightCount;
+                if (row == colSize - 1)
+                {
+                    _menuCursor = quitIdx;
+                }
+                else
+                {
+                    row++;
+                    _menuCursor = col == 0 ? row : row + half;
+                }
+            }
         }
         if (kb.IsKeyDown(Keys.Up) && _prevKb.IsKeyUp(Keys.Up))
         {
-            row = (row - 1 + colSize) % colSize;
-            _menuCursor = col == 0 ? row : row + half;
+            if (onQuit)
+            {
+                _menuCursor = half - 1;
+            }
+            else
+            {
+                int col = _menuCursor < half ? 0 : 1;
+                int row = col == 0 ? _menuCursor : _menuCursor - half;
+                if (row == 0)
+                    _menuCursor = quitIdx;
+                else
+                {
+                    row--;
+                    _menuCursor = col == 0 ? row : row + half;
+                }
+            }
         }
         if (kb.IsKeyDown(Keys.Down) && _prevKb.IsKeyUp(Keys.Down))
         {
-            row = (row + 1) % colSize;
-            _menuCursor = col == 0 ? row : row + half;
+            if (onQuit)
+            {
+                _menuCursor = 0;
+            }
+            else
+            {
+                int col = _menuCursor < half ? 0 : 1;
+                int row = col == 0 ? _menuCursor : _menuCursor - half;
+                int colSize = col == 0 ? half : rightCount;
+                if (row == colSize - 1)
+                    _menuCursor = quitIdx;
+                else
+                {
+                    row++;
+                    _menuCursor = col == 0 ? row : row + half;
+                }
+            }
         }
 
-        // A/D or Left/Right to switch columns
-        if ((kb.IsKeyDown(Keys.D) && _prevKb.IsKeyUp(Keys.D)) ||
-            (kb.IsKeyDown(Keys.Right) && _prevKb.IsKeyUp(Keys.Right)))
+        // A/D or Left/Right to switch columns (no-op on Quit)
+        if (!onQuit)
         {
-            if (_menuCursor < half && _menuCursor + half < _settings.Length)
-                _menuCursor += half;
-        }
-        if ((kb.IsKeyDown(Keys.A) && _prevKb.IsKeyUp(Keys.A)) ||
-            (kb.IsKeyDown(Keys.Left) && _prevKb.IsKeyUp(Keys.Left)))
-        {
-            if (_menuCursor >= half)
-                _menuCursor -= half;
+            if ((kb.IsKeyDown(Keys.D) && _prevKb.IsKeyUp(Keys.D)) ||
+                (kb.IsKeyDown(Keys.Right) && _prevKb.IsKeyUp(Keys.Right)))
+            {
+                if (_menuCursor < half && _menuCursor + half < itemCount)
+                    _menuCursor += half;
+            }
+            if ((kb.IsKeyDown(Keys.A) && _prevKb.IsKeyUp(Keys.A)) ||
+                (kb.IsKeyDown(Keys.Left) && _prevKb.IsKeyUp(Keys.Left)))
+            {
+                if (_menuCursor >= half)
+                    _menuCursor -= half;
+            }
         }
 
         if ((kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter)) ||
@@ -1768,6 +1926,17 @@ public class Game1 : Game
             _spriteBatch.Draw(_pixel, _level.ExitRects[i], isOverworld ? Color.CornflowerBlue * 0.5f : Color.LimeGreen * 0.5f);
         }
 
+        // Draw NPCs
+        for (int i = 0; i < _level.Npcs.Length; i++)
+        {
+            var npc = _level.Npcs[i];
+            Color npcColor = ParseNpcColor(npc.Color);
+            _spriteBatch.Draw(_pixel, _level.NpcRects[i], npcColor);
+            var nameSize = _font.MeasureString(SafeText(npc.Name));
+            _spriteBatch.DrawString(_font, SafeText(npc.Name),
+                new Vector2(npc.X + npc.W / 2f - nameSize.X / 2f, npc.Y - 16), Color.White * 0.8f);
+        }
+
         // Draw player
         if (!_isDead)
         {
@@ -1804,6 +1973,23 @@ public class Game1 : Game
         {
             // Minimal HUD
             _spriteBatch.DrawString(_font, "[Esc] Menu", new Vector2(10, 10), Color.Gray * 0.5f);
+        }
+
+        // Dialogue box
+        if (_dialogueOpen && _dialogueNpcIndex >= 0 && _dialogueNpcIndex < _level.Npcs.Length)
+        {
+            var npc = _level.Npcs[_dialogueNpcIndex];
+            _spriteBatch.Draw(_pixel, new Rectangle(50, 450, 700, 120), Color.Black * 0.85f);
+            _spriteBatch.Draw(_pixel, new Rectangle(50, 450, 700, 2), Color.Gray * 0.5f);
+            _spriteBatch.DrawString(_font, SafeText(npc.Name), new Vector2(70, 460), Color.Yellow);
+            if (_dialogueLine < npc.Dialogue.Length)
+            {
+                _spriteBatch.DrawString(_font, SafeText(npc.Dialogue[_dialogueLine]), new Vector2(70, 490), Color.White);
+                if (_dialogueLine < npc.Dialogue.Length - 1)
+                    _spriteBatch.DrawString(_font, "[W/Space]", new Vector2(670, 548), Color.Gray * 0.6f);
+                else
+                    _spriteBatch.DrawString(_font, "[End]", new Vector2(695, 548), Color.Gray * 0.6f);
+            }
         }
 
         _spriteBatch.End();

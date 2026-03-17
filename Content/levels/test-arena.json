@@ -135,5 +135,23 @@
       "id": "exit-overworld",
       "targetExitId": ""
     }
+  ],
+  "npcs": [
+    {
+      "id": "eve",
+      "name": "EVE",
+      "x": 380,
+      "y": 252,
+      "w": 24,
+      "h": 48,
+      "color": "Cyan",
+      "dialogue": [
+        "Welcome, Admin.",
+        "This world is not yet formed. But it will be.",
+        "Walk. Learn the ground beneath you.",
+        "When you are ready, seek the descent to the east.",
+        "I will be watching."
+      ]
+    }
   ]
 }

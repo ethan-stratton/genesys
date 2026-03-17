@@ -21,6 +21,7 @@ public class LevelData
     [JsonPropertyName("solidFloors")] public RectData[] SolidFloors { get; set; } = Array.Empty<RectData>();
     [JsonPropertyName("wallSpikes")] public WallSpikeData[] WallSpikes { get; set; } = Array.Empty<WallSpikeData>();
     [JsonPropertyName("exits")] public ExitData[] Exits { get; set; } = Array.Empty<ExitData>();
+    [JsonPropertyName("npcs")] public NpcData[] Npcs { get; set; } = Array.Empty<NpcData>();
 
     // Derived arrays (populated after load)
     [JsonIgnore] public Rectangle[] PlatformRects { get; private set; } = Array.Empty<Rectangle>();
@@ -37,6 +38,7 @@ public class LevelData
     [JsonIgnore] public string[] ExitTargets { get; private set; } = Array.Empty<string>();
     [JsonIgnore] public string[] ExitIds { get; private set; } = Array.Empty<string>();
     [JsonIgnore] public string[] ExitTargetExitIds { get; private set; } = Array.Empty<string>();
+    [JsonIgnore] public Rectangle[] NpcRects { get; private set; } = Array.Empty<Rectangle>();
     [JsonIgnore] public float[] RopeXPositions { get; private set; } = Array.Empty<float>();
     [JsonIgnore] public float[] RopeTops { get; private set; } = Array.Empty<float>();
     [JsonIgnore] public float[] RopeBottoms { get; private set; } = Array.Empty<float>();
@@ -117,6 +119,14 @@ public class LevelData
             ExitTargets[i] = e.TargetLevel;
             ExitIds[i] = e.Id;
             ExitTargetExitIds[i] = e.TargetExitId;
+        }
+
+        // NPCs
+        NpcRects = new Rectangle[Npcs.Length];
+        for (int i = 0; i < Npcs.Length; i++)
+        {
+            var n = Npcs[i];
+            NpcRects[i] = new Rectangle(n.X, n.Y, n.W, n.H);
         }
 
         // Ropes
@@ -203,4 +213,16 @@ public class ExitData
     [JsonPropertyName("targetLevel")] public string TargetLevel { get; set; } = "";
     [JsonPropertyName("id")] public string Id { get; set; } = "";
     [JsonPropertyName("targetExitId")] public string TargetExitId { get; set; } = "";
+}
+
+public class NpcData
+{
+    [JsonPropertyName("id")] public string Id { get; set; } = "";
+    [JsonPropertyName("name")] public string Name { get; set; } = "NPC";
+    [JsonPropertyName("x")] public int X { get; set; }
+    [JsonPropertyName("y")] public int Y { get; set; }
+    [JsonPropertyName("w")] public int W { get; set; } = 24;
+    [JsonPropertyName("h")] public int H { get; set; } = 48;
+    [JsonPropertyName("color")] public string Color { get; set; } = "Purple";
+    [JsonPropertyName("dialogue")] public string[] Dialogue { get; set; } = Array.Empty<string>();
 }

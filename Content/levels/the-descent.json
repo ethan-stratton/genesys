@@ -465,5 +465,6 @@
       "id": "exit-top",
       "targetExitId": "exit-left"
     }
-  ]
+  ],
+  "npcs": []
 }

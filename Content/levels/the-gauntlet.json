@@ -303,5 +303,6 @@
       "id": "exit-right",
       "targetExitId": "exit-left"
     }
-  ]
+  ],
+  "npcs": []
 }
