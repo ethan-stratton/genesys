@@ -219,6 +219,9 @@ public class Game1 : Game
                             _camera.SnapTo(_player.Position, Player.Width, Player.Height);
                             _bullets = new List<Bullet>();
                             _enemies = new List<Enemy>();
+                            _prevInExit = new bool[_level.ExitRects.Length];
+                            for (int k = 0; k < _prevInExit.Length; k++)
+                                _prevInExit[k] = true;
                         }
                         break;
                     case "New Game":
@@ -228,6 +231,9 @@ public class Game1 : Game
                         _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
                         _gameState = GameState.Playing;
                         Restart();
+                        _prevInExit = new bool[_level.ExitRects.Length];
+                        for (int k = 0; k < _prevInExit.Length; k++)
+                            _prevInExit[k] = true;
                         _saveData.CurrentLevel = System.IO.Path.GetFileNameWithoutExtension(DefaultLevel);
                         _saveData.SpawnX = _player.Position.X;
                         _saveData.SpawnY = _player.Position.Y;
@@ -540,6 +546,10 @@ public class Game1 : Game
             _level.Build();
             _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
             Restart();
+            // Suppress exit triggers so spawning on a loading zone doesn't teleport you
+            _prevInExit = new bool[_level.ExitRects.Length];
+            for (int k = 0; k < _prevInExit.Length; k++)
+                _prevInExit[k] = true;
             // Update save data
             if (_saveData != null)
             {
@@ -1066,6 +1076,10 @@ public class Game1 : Game
                     _level.Build();
                     _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
                     Restart();
+                    // Suppress exit triggers so spawning on a loading zone doesn't teleport you
+                    _prevInExit = new bool[_level.ExitRects.Length];
+                    for (int k = 0; k < _prevInExit.Length; k++)
+                        _prevInExit[k] = true;
                     // Update save data with current level
                     if (_saveData != null)
                     {
