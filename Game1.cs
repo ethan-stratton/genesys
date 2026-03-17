@@ -78,6 +78,7 @@ public class Game1 : Game
     private enum EditorTool { SolidFloor = 0, Platform = 1, Rope = 2, Wall = 3, Spike = 4, Exit = 5, Spawn = 6, WallSpike = 7, OverworldExit = 8, Ceiling = 9 }
     // Wall climbSide values: 0=both, 1=right face, -1=left face, 99=no climb (solid only)
     private EditorTool _editorTool = EditorTool.Platform;
+    private bool _toolPaletteOpen;
     private Vector2 _editorCursor; // world position
     private bool _editorGridSnap = true;
     private int _editorGridSize = 16;
@@ -523,17 +524,63 @@ public class Game1 : Game
         // Status message countdown
         if (_editorStatusTimer > 0) _editorStatusTimer -= dt;
 
-        // Editor menu (Esc)
+        // Editor menu (Esc) — if palette is open, close palette instead
         if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape))
         {
-            _editorMenuOpen = !_editorMenuOpen;
-            _editorMenuCursor = 0;
-            _editorMenuMode = EditorMenuMode.Main;
+            if (_toolPaletteOpen)
+            {
+                _toolPaletteOpen = false;
+            }
+            else
+            {
+                _editorMenuOpen = !_editorMenuOpen;
+                _editorMenuCursor = 0;
+                _editorMenuMode = EditorMenuMode.Main;
+            }
         }
 
         if (_editorMenuOpen)
         {
             UpdateEditorMenu(kb);
+            return;
+        }
+
+        // Tool palette toggle with Q (only when not hovering an exit)
+        if (kb.IsKeyDown(Keys.Q) && _prevKb.IsKeyUp(Keys.Q))
+        {
+            _toolPaletteOpen = !_toolPaletteOpen;
+        }
+
+        // Tool palette input
+        if (_toolPaletteOpen)
+        {
+            int toolCount = Enum.GetValues<EditorTool>().Length;
+            if (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W))
+                _editorTool = (EditorTool)(((int)_editorTool - 1 + toolCount) % toolCount);
+            if (kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S))
+                _editorTool = (EditorTool)(((int)_editorTool + 1) % toolCount);
+
+            // Number keys select and close
+            if (kb.IsKeyDown(Keys.D0) && _prevKb.IsKeyUp(Keys.D0)) { _editorTool = EditorTool.SolidFloor; _toolPaletteOpen = false; }
+            if (kb.IsKeyDown(Keys.D1) && _prevKb.IsKeyUp(Keys.D1)) { _editorTool = EditorTool.Platform; _toolPaletteOpen = false; }
+            if (kb.IsKeyDown(Keys.D2) && _prevKb.IsKeyUp(Keys.D2)) { _editorTool = EditorTool.Rope; _toolPaletteOpen = false; }
+            if (kb.IsKeyDown(Keys.D3) && _prevKb.IsKeyUp(Keys.D3)) { _editorTool = EditorTool.Wall; _toolPaletteOpen = false; }
+            if (kb.IsKeyDown(Keys.D4) && _prevKb.IsKeyUp(Keys.D4)) { _editorTool = EditorTool.Spike; _toolPaletteOpen = false; }
+            if (kb.IsKeyDown(Keys.D5) && _prevKb.IsKeyUp(Keys.D5)) { _editorTool = EditorTool.Exit; _toolPaletteOpen = false; }
+            if (kb.IsKeyDown(Keys.D6) && _prevKb.IsKeyUp(Keys.D6)) { _editorTool = EditorTool.Spawn; _toolPaletteOpen = false; }
+            if (kb.IsKeyDown(Keys.D7) && _prevKb.IsKeyUp(Keys.D7)) { _editorTool = EditorTool.WallSpike; _toolPaletteOpen = false; }
+            if (kb.IsKeyDown(Keys.D8) && _prevKb.IsKeyUp(Keys.D8)) { _editorTool = EditorTool.OverworldExit; _toolPaletteOpen = false; }
+            if (kb.IsKeyDown(Keys.D9) && _prevKb.IsKeyUp(Keys.D9)) { _editorTool = EditorTool.Ceiling; _toolPaletteOpen = false; }
+
+            // Space/Enter confirm and close
+            if ((kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space)) ||
+                (kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter)))
+                _toolPaletteOpen = false;
+
+            // Esc closes without changing (but Esc is already handled above for editor menu, so only if menu didn't open)
+            // Actually Esc was handled above and would toggle editor menu. We handle it here as a special close.
+            // Since Esc above toggles _editorMenuOpen, we need to undo that if palette was open.
+            // Simpler: just return here to skip all other input.
             return;
         }
 
@@ -1386,7 +1433,47 @@ public class Game1 : Game
             _spriteBatch.DrawString(_font, SafeText(_editorStatusMsg), new Vector2(10, 570), Color.Yellow);
 
         // Controls hint
-        _spriteBatch.DrawString(_font, "[=] Play  [Esc] Menu  [Drag] Place  [RClick] Delete  [Tab] Target  [Shift+Tab] TargetExit  [Ctrl+Tab] ExitID", new Vector2(10, 550), Color.Gray * 0.35f);
+        _spriteBatch.DrawString(_font, "[=] Play  [Esc] Menu  [Q] Tools  [Drag] Place  [RClick] Delete  [Tab] Target", new Vector2(10, 550), Color.Gray * 0.35f);
+
+        // Tool palette overlay
+        if (_toolPaletteOpen)
+        {
+            // Semi-transparent background
+            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, 800, 600), Color.Black * 0.7f);
+
+            string[] paletteNames = { "Solid Floor", "Platform", "Rope", "Wall", "Spike", "Exit", "Spawn", "Wall Spike", "Overworld Exit", "Ceiling" };
+            int paletteCount = paletteNames.Length;
+            float palW = 260f;
+            float palLineH = 24f;
+            float palH = paletteCount * palLineH + 60f;
+            float palX = (800 - palW) / 2f;
+            float palY = (600 - palH) / 2f;
+
+            // Background box
+            _spriteBatch.Draw(_pixel, new Rectangle((int)palX, (int)palY, (int)palW, (int)palH), new Color(30, 30, 30) * 0.95f);
+            // Border
+            _spriteBatch.Draw(_pixel, new Rectangle((int)palX, (int)palY, (int)palW, 2), Color.Gray * 0.6f);
+            _spriteBatch.Draw(_pixel, new Rectangle((int)palX, (int)(palY + palH - 2), (int)palW, 2), Color.Gray * 0.6f);
+            _spriteBatch.Draw(_pixel, new Rectangle((int)palX, (int)palY, 2, (int)palH), Color.Gray * 0.6f);
+            _spriteBatch.Draw(_pixel, new Rectangle((int)(palX + palW - 2), (int)palY, 2, (int)palH), Color.Gray * 0.6f);
+
+            // Title
+            _spriteBatch.DrawString(_font, "TOOL PALETTE", new Vector2(palX + 10, palY + 8), Color.White);
+
+            // Tool list
+            for (int i = 0; i < paletteCount; i++)
+            {
+                bool active = (int)_editorTool == i;
+                float itemY = palY + 32 + i * palLineH;
+                if (active)
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)(palX + 4), (int)itemY, (int)(palW - 8), (int)palLineH), Color.Yellow * 0.15f);
+                string label = $"[{i}] {paletteNames[i]}";
+                _spriteBatch.DrawString(_font, label, new Vector2(palX + 14, itemY + 3), active ? Color.Yellow : Color.Gray);
+            }
+
+            // Footer
+            _spriteBatch.DrawString(_font, "Q to close  W/S navigate", new Vector2(palX + 10, palY + palH - 24), Color.Gray * 0.5f);
+        }
 
         // Editor menu overlay
         if (_editorMenuOpen)
@@ -1464,6 +1551,7 @@ public class Game1 : Game
         float lineHeight = 30f;
         _spriteBatch.DrawString(_font, "SETTINGS  [Esc to close]", new Vector2(280, startY - 40), Color.White);
 
+        int half = (_settings.Length + 1) / 2;
         for (int i = 0; i < _settings.Length; i++)
         {
             var s = _settings[i];
@@ -1474,22 +1562,58 @@ public class Game1 : Game
             if (!s.IsAction && s.Get()) color = selected ? Color.Yellow : Color.LightGreen;
             if (s.IsAction) color = selected ? Color.Red : Color.DarkGray;
 
-            _spriteBatch.DrawString(_font, $"{prefix}{s.Label}{value}", new Vector2(280, startY + i * lineHeight), color);
+            int col = i < half ? 0 : 1;
+            int row = i < half ? i : i - half;
+            float x = col == 0 ? 180f : 450f;
+            float y = startY + row * lineHeight;
+
+            _spriteBatch.DrawString(_font, $"{prefix}{s.Label}{value}", new Vector2(x, y), color);
         }
 
-        _spriteBatch.DrawString(_font, "[Space/Enter] Toggle  [W/S] Navigate", new Vector2(230, startY + _settings.Length * lineHeight + 20), Color.Gray * 0.6f);
+        _spriteBatch.DrawString(_font, "[Space/Enter] Toggle  [W/S] Navigate  [A/D] Column", new Vector2(180, startY + half * lineHeight + 20), Color.Gray * 0.6f);
     }
 
     private void UpdateMenu(KeyboardState kb)
     {
+        int half = (_settings.Length + 1) / 2;
+        int col = _menuCursor < half ? 0 : 1;
+        int row = col == 0 ? _menuCursor : _menuCursor - half;
+        int colSize = col == 0 ? half : _settings.Length - half;
+
         if (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W))
-            _menuCursor = (_menuCursor - 1 + _settings.Length) % _settings.Length;
+        {
+            row = (row - 1 + colSize) % colSize;
+            _menuCursor = col == 0 ? row : row + half;
+        }
         if (kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S))
-            _menuCursor = (_menuCursor + 1) % _settings.Length;
+        {
+            row = (row + 1) % colSize;
+            _menuCursor = col == 0 ? row : row + half;
+        }
         if (kb.IsKeyDown(Keys.Up) && _prevKb.IsKeyUp(Keys.Up))
-            _menuCursor = (_menuCursor - 1 + _settings.Length) % _settings.Length;
+        {
+            row = (row - 1 + colSize) % colSize;
+            _menuCursor = col == 0 ? row : row + half;
+        }
         if (kb.IsKeyDown(Keys.Down) && _prevKb.IsKeyUp(Keys.Down))
-            _menuCursor = (_menuCursor + 1) % _settings.Length;
+        {
+            row = (row + 1) % colSize;
+            _menuCursor = col == 0 ? row : row + half;
+        }
+
+        // A/D or Left/Right to switch columns
+        if ((kb.IsKeyDown(Keys.D) && _prevKb.IsKeyUp(Keys.D)) ||
+            (kb.IsKeyDown(Keys.Right) && _prevKb.IsKeyUp(Keys.Right)))
+        {
+            if (_menuCursor < half && _menuCursor + half < _settings.Length)
+                _menuCursor += half;
+        }
+        if ((kb.IsKeyDown(Keys.A) && _prevKb.IsKeyUp(Keys.A)) ||
+            (kb.IsKeyDown(Keys.Left) && _prevKb.IsKeyUp(Keys.Left)))
+        {
+            if (_menuCursor >= half)
+                _menuCursor -= half;
+        }
 
         if ((kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter)) ||
             (kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space)))
