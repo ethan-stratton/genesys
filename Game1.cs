@@ -207,29 +207,7 @@ public class Game1 : Game
         foreach (var item in _level.Items)
             _itemPickups.Add(new ItemPickup { X = item.X, Y = item.Y, W = item.W, H = item.H, ItemType = item.Type });
 
-        // Create insect swarms and enemies from enemies array
-        _swarms.Clear();
-        _crawlers.Clear();
-        _thornbacks.Clear();
-        if (_rng == null) _rng = new Random();
-        foreach (var e in _level.Enemies)
-        {
-            switch (e.Type)
-            {
-                case "swarm":
-                    _swarms.Add(new InsectSwarm(new Vector2(e.X, e.Y), e.Count > 0 ? e.Count : 10, _rng));
-                    break;
-                case "crawler":
-                    // Snap to nearest surface below spawn point
-                    float snapY = SnapToSurface(e.X, e.Y, Crawler.Width, Crawler.Height);
-                    _crawlers.Add(new Crawler(new Vector2(e.X, snapY), e.X - 100, e.X + 100));
-                    break;
-                case "thornback":
-                    float tSnapY = SnapToSurface(e.X, e.Y, Thornback.Width, Thornback.Height);
-                    _thornbacks.Add(new Thornback(new Vector2(e.X, tSnapY)));
-                    break;
-            }
-        }
+        // Enemies are spawned in SpawnEnemiesFromLevel(), called by Restart()
     }
 
     private void Restart()
@@ -271,6 +249,32 @@ public class Game1 : Game
         _spawnInvincibility = 1.0f;
         _prevInExit = Array.Empty<bool>();
         if (_player != null) _player.Hp = _player.MaxHp;
+        SpawnEnemiesFromLevel();
+    }
+
+    private void SpawnEnemiesFromLevel()
+    {
+        _swarms.Clear();
+        _crawlers.Clear();
+        _thornbacks.Clear();
+        if (_rng == null) _rng = new Random();
+        foreach (var e in _level.Enemies)
+        {
+            switch (e.Type)
+            {
+                case "swarm":
+                    _swarms.Add(new InsectSwarm(new Vector2(e.X, e.Y), e.Count > 0 ? e.Count : 10, _rng));
+                    break;
+                case "crawler":
+                    float snapY = SnapToSurface(e.X, e.Y, Crawler.Width, Crawler.Height);
+                    _crawlers.Add(new Crawler(new Vector2(e.X, snapY), e.X - 100, e.X + 100));
+                    break;
+                case "thornback":
+                    float tSnapY = SnapToSurface(e.X, e.Y, Thornback.Width, Thornback.Height);
+                    _thornbacks.Add(new Thornback(new Vector2(e.X, tSnapY)));
+                    break;
+            }
+        }
     }
 
     protected override void LoadContent()
