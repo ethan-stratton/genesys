@@ -151,7 +151,29 @@
         "Walk. Learn the ground beneath you.",
         "When you are ready, seek the descent to the east.",
         "I will be watching."
-      ]
+      ],
+      "dialogueSpeakers": ["EVE", "EVE", "EVE", "EVE", "EVE"]
+    },
+    {
+      "id": "native-1",
+      "name": "The Native",
+      "x": 600,
+      "y": 502,
+      "w": 24,
+      "h": 48,
+      "color": "SaddleBrown",
+      "dialogue": [
+        "Even the iron-men bleed if their heads be taken.",
+        "Dost thou bleed, Star-Walker?",
+        "...",
+        "I bleed red, just as you do.",
+        "But my blood is laced with the nanites of a hundred medical protocols.",
+        "To kill me, you would have to unmake me.",
+        "My life is a resource of the state, and I am not permitted to die until my log is uploaded to the hive.",
+        "Stand aside; my blades are hungry for the path, not for your life.",
+        "..."
+      ],
+      "dialogueSpeakers": ["The Native", "The Native", "", "Admin", "Admin", "Admin", "Admin", "Admin", ""]
     }
   ]
 }

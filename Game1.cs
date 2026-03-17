@@ -79,6 +79,11 @@ public class Game1 : Game
     private int _dialogueNpcIndex = -1;
     private int _dialogueLine;
 
+    // --- EVE orb ---
+    private float _totalTime;
+    private bool _eveOrbActive;
+    private bool _eveDialogueExhausted;
+
     // --- Editor state ---
     private enum EditorTool { SolidFloor = 0, Platform = 1, Rope = 2, Wall = 3, Spike = 4, Exit = 5, Spawn = 6, WallSpike = 7, OverworldExit = 8, Ceiling = 9 }
     // Wall climbSide values: 0=both, 1=right face, -1=left face, 99=no climb (solid only)
@@ -124,6 +129,7 @@ public class Game1 : Game
             new() { Label = "Spin Melee", Get = () => _enableSpinMelee, Toggle = () => _enableSpinMelee = !_enableSpinMelee },
             new() { Label = "Flip", Get = () => _enableFlip, Toggle = () => _enableFlip = !_enableFlip },
             new() { Label = "Blade Dash", Get = () => _enableBladeDash, Toggle = () => _enableBladeDash = !_enableBladeDash },
+            new() { Label = "EVE Orb", Get = () => _eveOrbActive, Toggle = () => _eveOrbActive = !_eveOrbActive },
             new() { Label = "Music", Get = () => _enableMusic, Toggle = () => { _enableMusic = !_enableMusic; if (_enableMusic) { MediaPlayer.IsRepeating = true; MediaPlayer.Play(_bgm); } else { MediaPlayer.Stop(); } } },
             new() { Label = "Quit Game", Get = () => false, Toggle = () => Exit(), IsAction = true },
         };
@@ -319,6 +325,7 @@ public class Game1 : Game
         }
 
         var dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
+        _totalTime += dt;
 
         // Spawn invincibility countdown
         if (_spawnInvincibility > 0f)
@@ -369,6 +376,12 @@ public class Game1 : Game
                 _dialogueLine++;
                 if (_dialogueNpcIndex >= 0 && _dialogueLine >= _level.Npcs[_dialogueNpcIndex].Dialogue.Length)
                 {
+                    // Check if EVE dialogue exhausted
+                    if (_level.Npcs[_dialogueNpcIndex].Id == "eve")
+                    {
+                        _eveDialogueExhausted = true;
+                        _eveOrbActive = true;
+                    }
                     _dialogueOpen = false;
                     _dialogueNpcIndex = -1;
                 }
@@ -565,6 +578,7 @@ public class Game1 : Game
             "Cyan" => Color.Cyan,
             "Pink" => Color.Pink,
             "Magenta" => Color.Magenta,
+            "SaddleBrown" => new Color(139, 69, 19),
             _ => Color.Purple,
         };
     }
@@ -1435,9 +1449,21 @@ public class Game1 : Game
         for (int i = 0; i < _level.Npcs.Length; i++)
         {
             var npc = _level.Npcs[i];
-            Color npcColor = ParseNpcColor(npc.Color);
-            _spriteBatch.Draw(_pixel, new Rectangle(npc.X, npc.Y, npc.W, npc.H), npcColor * 0.7f);
-            _spriteBatch.DrawString(_font, SafeText(npc.Name), new Vector2(npc.X, npc.Y - 16), npcColor * 0.8f);
+            if (npc.Id == "eve")
+            {
+                float cx = npc.X + npc.W / 2f;
+                float cy = npc.Y + npc.H / 2f;
+                _spriteBatch.Draw(_pixel, new Rectangle((int)(cx - 11), (int)(cy - 11), 22, 22), Color.Cyan * 0.1f);
+                _spriteBatch.Draw(_pixel, new Rectangle((int)(cx - 8), (int)(cy - 8), 16, 16), Color.Cyan * 0.25f);
+                _spriteBatch.Draw(_pixel, new Rectangle((int)(cx - 6), (int)(cy - 6), 12, 12), Color.Cyan * 0.7f);
+                _spriteBatch.DrawString(_font, SafeText(npc.Name), new Vector2(npc.X, npc.Y - 16), Color.Cyan * 0.8f);
+            }
+            else
+            {
+                Color npcColor = ParseNpcColor(npc.Color);
+                _spriteBatch.Draw(_pixel, new Rectangle(npc.X, npc.Y, npc.W, npc.H), npcColor * 0.7f);
+                _spriteBatch.DrawString(_font, SafeText(npc.Name), new Vector2(npc.X, npc.Y - 16), npcColor * 0.8f);
+            }
         }
 
         // Draw drag preview
@@ -1930,11 +1956,34 @@ public class Game1 : Game
         for (int i = 0; i < _level.Npcs.Length; i++)
         {
             var npc = _level.Npcs[i];
-            Color npcColor = ParseNpcColor(npc.Color);
-            _spriteBatch.Draw(_pixel, _level.NpcRects[i], npcColor);
-            var nameSize = _font.MeasureString(SafeText(npc.Name));
-            _spriteBatch.DrawString(_font, SafeText(npc.Name),
-                new Vector2(npc.X + npc.W / 2f - nameSize.X / 2f, npc.Y - 16), Color.White * 0.8f);
+            // Hide EVE from NPC spot if orb is active
+            if (npc.Id == "eve" && _eveOrbActive) continue;
+
+            if (npc.Id == "eve")
+            {
+                // EVE floating orb: layered squares with bob
+                float bobY = MathF.Sin(_totalTime * 2.5f) * 6f;
+                float cx = npc.X + npc.W / 2f;
+                float cy = npc.Y + npc.H / 2f + bobY;
+                // Outer glow
+                _spriteBatch.Draw(_pixel, new Rectangle((int)(cx - 11), (int)(cy - 11), 22, 22), Color.Cyan * 0.15f);
+                // Mid glow
+                _spriteBatch.Draw(_pixel, new Rectangle((int)(cx - 8), (int)(cy - 8), 16, 16), Color.Cyan * 0.35f);
+                // Core
+                _spriteBatch.Draw(_pixel, new Rectangle((int)(cx - 6), (int)(cy - 6), 12, 12), Color.Cyan);
+                // Name above
+                var nameSize = _font.MeasureString("EVE");
+                _spriteBatch.DrawString(_font, "EVE",
+                    new Vector2(cx - nameSize.X / 2f, cy - 24), Color.Cyan * 0.9f);
+            }
+            else
+            {
+                Color npcColor = ParseNpcColor(npc.Color);
+                _spriteBatch.Draw(_pixel, _level.NpcRects[i], npcColor);
+                var nameSize = _font.MeasureString(SafeText(npc.Name));
+                _spriteBatch.DrawString(_font, SafeText(npc.Name),
+                    new Vector2(npc.X + npc.W / 2f - nameSize.X / 2f, npc.Y - 16), Color.White * 0.8f);
+            }
         }
 
         // Draw player
@@ -1943,6 +1992,20 @@ public class Game1 : Game
             bool visible = _spawnInvincibility <= 0f || MathF.Sin(_spawnInvincibility * 20f) > 0;
             if (visible)
                 _player.Draw(_spriteBatch, _pixel);
+        }
+
+        // Draw EVE orbiting companion
+        if (_eveOrbActive && !_isDead)
+        {
+            float angle = _totalTime * 2f;
+            float orbRadius = 30f;
+            var playerCenter = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
+            float orbX = playerCenter.X + MathF.Cos(angle) * orbRadius;
+            float orbY = playerCenter.Y + MathF.Sin(angle) * orbRadius;
+            // Outer glow
+            _spriteBatch.Draw(_pixel, new Rectangle((int)(orbX - 6), (int)(orbY - 6), 12, 12), Color.CornflowerBlue * 0.4f);
+            // Core
+            _spriteBatch.Draw(_pixel, new Rectangle((int)(orbX - 4), (int)(orbY - 4), 8, 8), Color.Cyan);
         }
 
         // Draw bullets
@@ -1981,7 +2044,26 @@ public class Game1 : Game
             var npc = _level.Npcs[_dialogueNpcIndex];
             _spriteBatch.Draw(_pixel, new Rectangle(50, 450, 700, 120), Color.Black * 0.85f);
             _spriteBatch.Draw(_pixel, new Rectangle(50, 450, 700, 2), Color.Gray * 0.5f);
-            _spriteBatch.DrawString(_font, SafeText(npc.Name), new Vector2(70, 460), Color.Yellow);
+
+            // Speaker attribution
+            string speaker = "";
+            Color speakerColor = Color.Yellow;
+            if (_dialogueLine < npc.DialogueSpeakers.Length && _dialogueLine < npc.Dialogue.Length)
+                speaker = npc.DialogueSpeakers[_dialogueLine];
+            else if (_dialogueLine < npc.Dialogue.Length)
+                speaker = npc.Name;
+
+            if (!string.IsNullOrEmpty(speaker))
+            {
+                speakerColor = speaker switch
+                {
+                    "Admin" => Color.LightGreen,
+                    "EVE" => Color.Cyan,
+                    _ => Color.Yellow,
+                };
+                _spriteBatch.DrawString(_font, SafeText(speaker), new Vector2(70, 460), speakerColor);
+            }
+
             if (_dialogueLine < npc.Dialogue.Length)
             {
                 _spriteBatch.DrawString(_font, SafeText(npc.Dialogue[_dialogueLine]), new Vector2(70, 490), Color.White);

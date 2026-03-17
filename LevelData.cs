@@ -225,4 +225,5 @@ public class NpcData
     [JsonPropertyName("h")] public int H { get; set; } = 48;
     [JsonPropertyName("color")] public string Color { get; set; } = "Purple";
     [JsonPropertyName("dialogue")] public string[] Dialogue { get; set; } = Array.Empty<string>();
+    [JsonPropertyName("dialogueSpeakers")] public string[] DialogueSpeakers { get; set; } = Array.Empty<string>();
 }
