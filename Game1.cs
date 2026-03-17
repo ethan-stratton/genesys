@@ -37,7 +37,7 @@ public class Game1 : Game
 
     private bool _isDead;
     private float _spawnInvincibility;
-    private float _exitCooldown;
+    private bool[] _prevInExit = Array.Empty<bool>();
     private KeyboardState _prevKb;
 
     // Level data (loaded from JSON)
@@ -170,6 +170,7 @@ public class Game1 : Game
 
         _isDead = false;
         _spawnInvincibility = 1.0f;
+        _prevInExit = Array.Empty<bool>();
     }
 
     protected override void LoadContent()
@@ -312,8 +313,7 @@ public class Game1 : Game
             _spawnInvincibility -= dt;
 
         // Exit re-entry cooldown
-        if (_exitCooldown > 0f)
-            _exitCooldown -= dt;
+        // (exit enter-trigger tracking happens in exit collision section below)
 
         // Pass enabled features to player
         _player.EnableSlide = _enableSlide;
@@ -422,13 +422,17 @@ public class Game1 : Game
             }
         }
 
-        // Exit collision — load next level
-        if (!_isDead && _exitCooldown <= 0f)
+        // Exit collision — enter-trigger (only fires on transition from outside → inside)
+        if (!_isDead)
         {
             var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
+            if (_prevInExit.Length != _level.ExitRects.Length)
+                _prevInExit = new bool[_level.ExitRects.Length];
+            bool[] curInExit = new bool[_level.ExitRects.Length];
             for (int i = 0; i < _level.ExitRects.Length; i++)
             {
-                if (pRect.Intersects(_level.ExitRects[i]) && _level.ExitTargets[i] != "")
+                curInExit[i] = pRect.Intersects(_level.ExitRects[i]);
+                if (curInExit[i] && !_prevInExit[i] && _level.ExitTargets[i] != "")
                 {
                     string target = _level.ExitTargets[i];
                     string targetExitId = _level.ExitTargetExitIds[i];
@@ -491,7 +495,10 @@ public class Game1 : Game
                             }
                         }
 
-                        _exitCooldown = 0.3f;
+                        // Mark all exits as "already inside" so enter-trigger doesn't re-fire
+                        _prevInExit = new bool[_level.ExitRects.Length];
+                        for (int k = 0; k < _prevInExit.Length; k++)
+                            _prevInExit[k] = true;
 
                         // Auto-save on level transition
                         if (_saveData != null)
@@ -505,6 +512,7 @@ public class Game1 : Game
                     break;
                 }
             }
+            _prevInExit = curInExit;
         }
 
         _prevKb = kb;
