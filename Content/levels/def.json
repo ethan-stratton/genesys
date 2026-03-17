@@ -74,7 +74,7 @@
       "y": 512,
       "w": 32,
       "h": 32,
-      "targetLevel": ""
+      "targetLevel": "test-arena"
     }
   ]
 }
