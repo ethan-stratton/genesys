@@ -24,6 +24,7 @@ public class LevelData
     [JsonPropertyName("npcs")] public NpcData[] Npcs { get; set; } = Array.Empty<NpcData>();
     [JsonPropertyName("items")] public ItemData[] Items { get; set; } = Array.Empty<ItemData>();
     [JsonPropertyName("objects")] public EnvObjectData[] Objects { get; set; } = Array.Empty<EnvObjectData>();
+    [JsonPropertyName("enemies")] public EnemySpawnData[] Enemies { get; set; } = Array.Empty<EnemySpawnData>();
 
     // Derived arrays (populated after load)
     [JsonIgnore] public Rectangle[] PlatformRects { get; private set; } = Array.Empty<Rectangle>();
@@ -257,4 +258,13 @@ public class EnvObjectData
     [JsonPropertyName("y")] public float Y { get; set; }
     [JsonPropertyName("w")] public int W { get; set; } = 40;
     [JsonPropertyName("h")] public int H { get; set; } = 80;
+}
+
+public class EnemySpawnData
+{
+    [JsonPropertyName("id")] public string Id { get; set; } = "";
+    [JsonPropertyName("type")] public string Type { get; set; } = "";
+    [JsonPropertyName("x")] public float X { get; set; }
+    [JsonPropertyName("y")] public float Y { get; set; }
+    [JsonPropertyName("count")] public int Count { get; set; } = 1;
 }

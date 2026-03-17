@@ -468,5 +468,31 @@
   ],
   "npcs": [],
   "items": [],
-  "objects": []
+  "objects": [],
+  "enemies": [
+    {
+      "id": "thornback-1",
+      "type": "thornback",
+      "x": 300,
+      "y": 522
+    },
+    {
+      "id": "crawler-1",
+      "type": "crawler",
+      "x": 100,
+      "y": 540
+    },
+    {
+      "id": "crawler-2",
+      "type": "crawler",
+      "x": 500,
+      "y": 308
+    },
+    {
+      "id": "crawler-3",
+      "type": "crawler",
+      "x": 200,
+      "y": 228
+    }
+  ]
 }

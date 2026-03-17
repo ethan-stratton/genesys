@@ -44,6 +44,8 @@ public class Game1 : Game
     private List<Bullet> _bullets;
     private List<Enemy> _enemies;
     private List<InsectSwarm> _swarms = new();
+    private List<Crawler> _crawlers = new();
+    private List<Thornback> _thornbacks = new();
 
     private float _spawnTimer;
     private const float InitialSpawnInterval = 1.5f;
@@ -136,6 +138,9 @@ public class Game1 : Game
     private string _editorSaveFile = "Content/levels/test-arena.json";
     private string _editorStatusMsg = "";
     private float _editorStatusTimer;
+    private bool _entityPaletteOpen;
+    private int _entityPaletteCursor;
+    private enum EntityType { Swarm, Crawler, Thornback, Tree }
 
     public Game1()
     {
@@ -202,15 +207,24 @@ public class Game1 : Game
         foreach (var item in _level.Items)
             _itemPickups.Add(new ItemPickup { X = item.X, Y = item.Y, W = item.W, H = item.H, ItemType = item.Type });
 
-        // Create insect swarms from tree objects
+        // Create insect swarms and enemies from enemies array
         _swarms.Clear();
+        _crawlers.Clear();
+        _thornbacks.Clear();
         if (_rng == null) _rng = new Random();
-        foreach (var obj in _level.Objects)
+        foreach (var e in _level.Enemies)
         {
-            if (obj.Type == "tree")
+            switch (e.Type)
             {
-                var treeCenter = new Vector2(obj.X + obj.W / 2f, obj.Y + obj.H * 0.3f);
-                _swarms.Add(new InsectSwarm(treeCenter, 10, _rng));
+                case "swarm":
+                    _swarms.Add(new InsectSwarm(new Vector2(e.X, e.Y), e.Count > 0 ? e.Count : 10, _rng));
+                    break;
+                case "crawler":
+                    _crawlers.Add(new Crawler(new Vector2(e.X, e.Y), e.X - 100, e.X + 100));
+                    break;
+                case "thornback":
+                    _thornbacks.Add(new Thornback(new Vector2(e.X, e.Y)));
+                    break;
             }
         }
     }
@@ -697,6 +711,56 @@ public class Game1 : Game
             }
         }
 
+        // Update crawlers
+        foreach (var c in _crawlers)
+        {
+            c.Update(dt, playerCenter2);
+            if (_spawnInvincibility <= 0 && !_isDead)
+            {
+                int dmg = c.CheckPlayerDamage(playerRect2);
+                if (dmg > 0) _player.TakeDamage(dmg);
+            }
+            if (_player.MeleeTimer > 0 && c.Alive)
+            {
+                if (_player.MeleeHitbox.Intersects(c.Rect))
+                    c.TakeHit(1);
+            }
+        }
+
+        // Update thornbacks
+        foreach (var t in _thornbacks)
+        {
+            t.Update(dt);
+            if (_spawnInvincibility <= 0 && !_isDead)
+            {
+                int dmg = t.CheckPlayerDamage(playerRect2);
+                if (dmg > 0) _player.TakeDamage(dmg);
+            }
+            if (_player.MeleeTimer > 0 && t.Alive)
+            {
+                if (_player.MeleeHitbox.Intersects(t.Rect))
+                    t.TakeHit(1);
+            }
+        }
+
+        // Bullets vs crawlers and thornbacks
+        foreach (var b in _bullets)
+        {
+            if (b.IsDead) continue;
+            var bRect = new Rectangle((int)b.Position.X, (int)b.Position.Y, Bullet.Size, Bullet.Size);
+            foreach (var c in _crawlers)
+            {
+                if (c.Alive && bRect.Intersects(c.Rect))
+                { c.TakeHit(2); b.IsDead = true; break; }
+            }
+            if (b.IsDead) continue;
+            foreach (var t in _thornbacks)
+            {
+                if (t.Alive && bRect.Intersects(t.Rect))
+                { t.TakeHit(1); b.IsDead = true; break; }
+            }
+        }
+
         // Check HP death
         if (_player.Hp <= 0 && !_isDead)
         {
@@ -949,6 +1013,10 @@ public class Game1 : Game
             {
                 _toolPaletteOpen = false;
             }
+            else if (_entityPaletteOpen)
+            {
+                _entityPaletteOpen = false;
+            }
             else
             {
                 _editorMenuOpen = !_editorMenuOpen;
@@ -999,6 +1067,65 @@ public class Game1 : Game
             // Actually Esc was handled above and would toggle editor menu. We handle it here as a special close.
             // Since Esc above toggles _editorMenuOpen, we need to undo that if palette was open.
             // Simpler: just return here to skip all other input.
+            return;
+        }
+
+        // Entity palette toggle with E
+        if (kb.IsKeyDown(Keys.E) && _prevKb.IsKeyUp(Keys.E) && !_editorMenuOpen)
+        {
+            _entityPaletteOpen = !_entityPaletteOpen;
+            _entityPaletteCursor = 0;
+        }
+
+        // Entity palette input
+        if (_entityPaletteOpen)
+        {
+            var entityTypes = Enum.GetValues<EntityType>();
+            if (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W))
+                _entityPaletteCursor = (_entityPaletteCursor - 1 + entityTypes.Length) % entityTypes.Length;
+            if (kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S))
+                _entityPaletteCursor = (_entityPaletteCursor + 1) % entityTypes.Length;
+
+            bool place = (kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter)) ||
+                         (kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space));
+            if (place)
+            {
+                var selectedType = entityTypes[_entityPaletteCursor];
+                float cx = _editorGridSnap ? MathF.Round(_editorCursor.X / 20) * 20 : _editorCursor.X;
+                float cy = _editorGridSnap ? MathF.Round(_editorCursor.Y / 20) * 20 : _editorCursor.Y;
+
+                switch (selectedType)
+                {
+                    case EntityType.Swarm:
+                        var enemyList = new List<EnemySpawnData>(_level.Enemies);
+                        enemyList.Add(new EnemySpawnData { Id = $"swarm-{enemyList.Count}", Type = "swarm", X = cx, Y = cy, Count = 10 });
+                        _level.Enemies = enemyList.ToArray();
+                        SetEditorStatus($"Placed swarm at ({(int)cx}, {(int)cy})");
+                        break;
+                    case EntityType.Crawler:
+                        var cList = new List<EnemySpawnData>(_level.Enemies);
+                        cList.Add(new EnemySpawnData { Id = $"crawler-{cList.Count}", Type = "crawler", X = cx, Y = cy });
+                        _level.Enemies = cList.ToArray();
+                        SetEditorStatus($"Placed crawler at ({(int)cx}, {(int)cy})");
+                        break;
+                    case EntityType.Thornback:
+                        var tList = new List<EnemySpawnData>(_level.Enemies);
+                        tList.Add(new EnemySpawnData { Id = $"thornback-{tList.Count}", Type = "thornback", X = cx, Y = cy });
+                        _level.Enemies = tList.ToArray();
+                        SetEditorStatus($"Placed thornback at ({(int)cx}, {(int)cy})");
+                        break;
+                    case EntityType.Tree:
+                        var oList = new List<EnvObjectData>(_level.Objects);
+                        oList.Add(new EnvObjectData { Id = $"tree-{oList.Count}", Type = "tree", X = cx, Y = cy, W = 40, H = 80 });
+                        _level.Objects = oList.ToArray();
+                        SetEditorStatus($"Placed tree at ({(int)cx}, {(int)cy})");
+                        break;
+                }
+            }
+
+            if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape))
+                _entityPaletteOpen = false;
+
             return;
         }
 
@@ -1821,6 +1948,21 @@ public class Game1 : Game
             }
         }
 
+        // Draw enemy spawns in editor
+        foreach (var e in _level.Enemies)
+        {
+            Color ec = e.Type switch
+            {
+                "swarm" => Color.OrangeRed,
+                "crawler" => new Color(120, 60, 20),
+                "thornback" => new Color(60, 100, 30),
+                _ => Color.White
+            };
+            int size = e.Type == "thornback" ? 32 : (e.Type == "swarm" ? 20 : 16);
+            _spriteBatch.Draw(_pixel, new Rectangle((int)e.X, (int)e.Y, size, size), ec * 0.6f);
+            _spriteBatch.DrawString(_font, SafeText(e.Type), new Vector2(e.X, e.Y - 14), ec * 0.8f);
+        }
+
         // Draw drag preview
         if (_editorDragging)
         {
@@ -1892,7 +2034,7 @@ public class Game1 : Game
             _spriteBatch.DrawString(_font, SafeText(_editorStatusMsg), new Vector2(10, 570), Color.Yellow);
 
         // Controls hint
-        _spriteBatch.DrawString(_font, "[=] Play  [Esc] Menu  [Q] Tools  [Drag] Place  [RClick] Delete  [Tab] Target", new Vector2(10, 550), Color.Gray * 0.35f);
+        _spriteBatch.DrawString(_font, "[=] Play  [Esc] Menu  [Q] Tools  [E] Entities  [Drag] Place  [RClick] Delete  [Tab] Target", new Vector2(10, 550), Color.Gray * 0.35f);
 
         // Tool palette overlay
         if (_toolPaletteOpen)
@@ -1932,6 +2074,36 @@ public class Game1 : Game
 
             // Footer
             _spriteBatch.DrawString(_font, "Q to close  W/S navigate", new Vector2(palX + 10, palY + palH - 24), Color.Gray * 0.5f);
+        }
+
+        // Entity palette overlay
+        if (_entityPaletteOpen)
+        {
+            var entityTypes = Enum.GetValues<EntityType>();
+            float epalW = 180, epalH = entityTypes.Length * 28 + 20;
+            float epalX = 400 - epalW / 2f, epalY = 300 - epalH / 2f;
+            _spriteBatch.Draw(_pixel, new Rectangle((int)epalX, (int)epalY, (int)epalW, (int)epalH), Color.Black * 0.85f);
+            _spriteBatch.DrawString(_font, SafeText("ENTITIES [E]"), new Vector2(epalX + 30, epalY + 4), Color.White);
+
+            for (int i = 0; i < entityTypes.Length; i++)
+            {
+                float itemY = epalY + 24 + i * 28;
+                bool selected = i == _entityPaletteCursor;
+                if (selected)
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)epalX + 4, (int)itemY, (int)epalW - 8, 26), Color.Yellow * 0.15f);
+
+                string label = entityTypes[i].ToString();
+                Color iconColor = entityTypes[i] switch
+                {
+                    EntityType.Swarm => Color.OrangeRed,
+                    EntityType.Crawler => new Color(120, 60, 20),
+                    EntityType.Thornback => new Color(60, 100, 30),
+                    EntityType.Tree => Color.ForestGreen,
+                    _ => Color.White
+                };
+                _spriteBatch.Draw(_pixel, new Rectangle((int)epalX + 10, (int)itemY + 8, 10, 10), iconColor);
+                _spriteBatch.DrawString(_font, SafeText(label), new Vector2(epalX + 26, itemY + 4), selected ? Color.Yellow : Color.Gray);
+            }
         }
 
         // Editor menu overlay
@@ -2695,6 +2867,10 @@ public class Game1 : Game
         {
             swarm.Draw(_spriteBatch, _pixel);
         }
+
+        // Draw crawlers and thornbacks
+        foreach (var c in _crawlers) c.Draw(_spriteBatch, _pixel);
+        foreach (var t in _thornbacks) t.Draw(_spriteBatch, _pixel);
 
         // Draw player
         if (!_isDead)
