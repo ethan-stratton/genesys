@@ -3,6 +3,8 @@
   "spawnX": 352,
   "spawnY": 240,
   "unlockedAbilities": [],
-  "flags": {},
-  "playTime": 0
+  "flags": {
+    "eveOrbActive": true
+  },
+  "playTime": 90.77158
 }

@@ -446,12 +446,13 @@ public class Game1 : Game
         _player.EnableBladeDash = _enableBladeDash;
 
         // Weapon system: set weapon availability and melee range
-        _player.HasMeleeWeapon = CurrentMelee != WeaponType.None;
+        _player.HasMeleeWeapon = true; // always have fists at minimum
         _player.HasRangedWeapon = CurrentRanged != WeaponType.None;
         _player.MeleeRangeOverride = CurrentMelee switch
         {
             WeaponType.Sword => 60,
             WeaponType.Stick => 30,
+            WeaponType.None => 18, // fists: fast but tiny range
             _ => Player.MeleeRange
         };
 
@@ -625,9 +626,10 @@ public class Game1 : Game
         _bullets.RemoveAll(b => b.IsDead);
         _enemies.RemoveAll(e => e.IsDead);
 
-        // Item pickups
+        // Item pickups (W key, near item, grounded)
+        if (_player.IsGrounded && kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W) && !_dialogueOpen)
         {
-            var playerRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
+            var playerRect = new Rectangle((int)_player.Position.X - 20, (int)_player.Position.Y, Player.Width + 40, Player.Height);
             for (int i = 0; i < _itemPickups.Count; i++)
             {
                 var item = _itemPickups[i];
@@ -643,6 +645,7 @@ public class Game1 : Game
                         case "bow": EquipRanged(WeaponType.Bow); break;
                         case "gun": EquipRanged(WeaponType.Gun); break;
                     }
+                    break; // pick up one at a time
                 }
             }
         }
@@ -2407,6 +2410,37 @@ public class Game1 : Game
             _spriteBatch.Draw(_pixel, _level.ExitRects[i], isOverworld ? Color.CornflowerBlue * 0.5f : Color.LimeGreen * 0.5f);
         }
 
+        // Draw item pickups (gameplay)
+        for (int i = 0; i < _itemPickups.Count; i++)
+        {
+            var item = _itemPickups[i];
+            if (!item.Collected)
+            {
+                var itemColor = item.ItemType switch
+                {
+                    "stick" => new Color(139, 90, 43),
+                    "sling" => Color.DarkKhaki,
+                    "sword" => Color.Silver,
+                    "axe" => Color.DarkGray,
+                    "bow" => new Color(160, 120, 60),
+                    "gun" => Color.SlateGray,
+                    _ => Color.White
+                };
+                // Draw with glow so it's visible
+                _spriteBatch.Draw(_pixel, new Rectangle(item.Rect.X - 2, item.Rect.Y - 2, item.Rect.Width + 4, item.Rect.Height + 4), Color.White * 0.25f);
+                _spriteBatch.Draw(_pixel, item.Rect, itemColor);
+                // Draw "[W]" prompt above when player is near
+                var pCenter = _player.Position.X + Player.Width / 2f;
+                var iCenter = item.X + item.W / 2f;
+                if (MathF.Abs(pCenter - iCenter) < 60f)
+                {
+                    string prompt = SafeText("[W] Pick up");
+                    var promptSize = _font.MeasureString(prompt);
+                    _spriteBatch.DrawString(_font, prompt, new Vector2(iCenter - promptSize.X / 2f, item.Y - 20), Color.White * 0.8f);
+                }
+            }
+        }
+
         // Draw NPCs
         for (int i = 0; i < _level.Npcs.Length; i++)
         {
@@ -2495,7 +2529,7 @@ public class Game1 : Game
             // Weapon HUD
             {
                 string rangedName = CurrentRanged != WeaponType.None ? CurrentRanged.ToString() : "---";
-                string meleeName = CurrentMelee != WeaponType.None ? CurrentMelee.ToString() : "---";
+                string meleeName = CurrentMelee != WeaponType.None ? CurrentMelee.ToString() : "Fists";
                 _spriteBatch.DrawString(_font, SafeText($"[1] {rangedName}"), new Vector2(10, 570), Color.White * 0.7f);
                 _spriteBatch.DrawString(_font, SafeText($"[2] {meleeName}"), new Vector2(130, 570), Color.White * 0.7f);
             }
