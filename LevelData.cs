@@ -23,6 +23,7 @@ public class LevelData
     [JsonPropertyName("exits")] public ExitData[] Exits { get; set; } = Array.Empty<ExitData>();
     [JsonPropertyName("npcs")] public NpcData[] Npcs { get; set; } = Array.Empty<NpcData>();
     [JsonPropertyName("items")] public ItemData[] Items { get; set; } = Array.Empty<ItemData>();
+    [JsonPropertyName("objects")] public EnvObjectData[] Objects { get; set; } = Array.Empty<EnvObjectData>();
 
     // Derived arrays (populated after load)
     [JsonIgnore] public Rectangle[] PlatformRects { get; private set; } = Array.Empty<Rectangle>();
@@ -246,4 +247,14 @@ public class NpcData
     [JsonPropertyName("color")] public string Color { get; set; } = "Purple";
     [JsonPropertyName("dialogue")] public string[] Dialogue { get; set; } = Array.Empty<string>();
     [JsonPropertyName("dialogueSpeakers")] public string[] DialogueSpeakers { get; set; } = Array.Empty<string>();
+}
+
+public class EnvObjectData
+{
+    [JsonPropertyName("id")] public string Id { get; set; } = "";
+    [JsonPropertyName("type")] public string Type { get; set; } = "";
+    [JsonPropertyName("x")] public float X { get; set; }
+    [JsonPropertyName("y")] public float Y { get; set; }
+    [JsonPropertyName("w")] public int W { get; set; } = 40;
+    [JsonPropertyName("h")] public int H { get; set; } = 80;
 }

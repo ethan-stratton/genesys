@@ -43,6 +43,7 @@ public class Game1 : Game
 
     private List<Bullet> _bullets;
     private List<Enemy> _enemies;
+    private List<InsectSwarm> _swarms = new();
 
     private float _spawnTimer;
     private const float InitialSpawnInterval = 1.5f;
@@ -200,6 +201,18 @@ public class Game1 : Game
         _itemPickups.Clear();
         foreach (var item in _level.Items)
             _itemPickups.Add(new ItemPickup { X = item.X, Y = item.Y, W = item.W, H = item.H, ItemType = item.Type });
+
+        // Create insect swarms from tree objects
+        _swarms.Clear();
+        if (_rng == null) _rng = new Random();
+        foreach (var obj in _level.Objects)
+        {
+            if (obj.Type == "tree")
+            {
+                var treeCenter = new Vector2(obj.X + obj.W / 2f, obj.Y + obj.H * 0.3f);
+                _swarms.Add(new InsectSwarm(treeCenter, 10, _rng));
+            }
+        }
     }
 
     private void Restart()
@@ -240,6 +253,7 @@ public class Game1 : Game
         _isDead = false;
         _spawnInvincibility = 1.0f;
         _prevInExit = Array.Empty<bool>();
+        if (_player != null) _player.Hp = _player.MaxHp;
     }
 
     protected override void LoadContent()
@@ -645,6 +659,45 @@ public class Game1 : Game
 
         _bullets.RemoveAll(b => b.IsDead);
         _enemies.RemoveAll(e => e.IsDead);
+
+        // Update insect swarms
+        var playerCenter2 = new Vector2(_player.Position.X + Player.Width / 2f, _player.Position.Y + Player.Height / 2f);
+        var playerRect2 = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
+        foreach (var swarm in _swarms)
+        {
+            swarm.Update(dt, playerCenter2, _rng);
+
+            if (_spawnInvincibility <= 0 && !_isDead)
+            {
+                int dmg = swarm.CheckPlayerDamage(playerRect2);
+                if (dmg > 0) _player.TakeDamage(dmg);
+            }
+
+            if (_player.MeleeTimer > 0)
+            {
+                swarm.CheckMeleeHit(_player.MeleeHitbox);
+            }
+        }
+
+        // Bullets vs swarms
+        foreach (var b in _bullets)
+        {
+            var bRect = new Rectangle((int)b.Position.X, (int)b.Position.Y, Bullet.Size, Bullet.Size);
+            foreach (var swarm in _swarms)
+            {
+                if (swarm.CheckBulletHit(bRect))
+                {
+                    b.IsDead = true;
+                    break;
+                }
+            }
+        }
+
+        // Check HP death
+        if (_player.Hp <= 0 && !_isDead)
+        {
+            _isDead = true;
+        }
 
         // Item pickups (W key, near item, grounded)
         if (_player.IsGrounded && kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W) && !_dialogueOpen)
@@ -2382,6 +2435,14 @@ public class Game1 : Game
         _spriteBatch.Draw(_pixel, new Rectangle(x1, y1, (int)length, 2), null, color, angle, Vector2.Zero, Microsoft.Xna.Framework.Graphics.SpriteEffects.None, 0);
     }
 
+    private void DrawHollowRect(int x, int y, int w, int h, Color c)
+    {
+        _spriteBatch.Draw(_pixel, new Rectangle(x, y, w, 1), c);
+        _spriteBatch.Draw(_pixel, new Rectangle(x, y + h - 1, w, 1), c);
+        _spriteBatch.Draw(_pixel, new Rectangle(x, y, 1, h), c);
+        _spriteBatch.Draw(_pixel, new Rectangle(x + w - 1, y, 1, h), c);
+    }
+
     protected override void Draw(GameTime gameTime)
     {
         GraphicsDevice.Clear(new Color(20, 20, 20));
@@ -2602,6 +2663,32 @@ public class Game1 : Game
             }
         }
 
+        // Draw environment objects (trees etc)
+        foreach (var obj in _level.Objects)
+        {
+            if (obj.Type == "tree")
+            {
+                int trunkW = obj.W / 3;
+                int trunkH = obj.H / 2;
+                int trunkX = (int)(obj.X + obj.W / 2f - trunkW / 2f);
+                int trunkY = (int)(obj.Y + obj.H - trunkH);
+                _spriteBatch.Draw(_pixel, new Rectangle(trunkX, trunkY, trunkW, trunkH), new Color(101, 67, 33));
+
+                int canopySize = obj.W;
+                int canopyX = (int)obj.X;
+                int canopyY = (int)obj.Y;
+                _spriteBatch.Draw(_pixel, new Rectangle(canopyX - 8, canopyY + 4, canopySize + 16, canopySize - 8), Color.DarkGreen * 0.6f);
+                _spriteBatch.Draw(_pixel, new Rectangle(canopyX - 4, canopyY, canopySize + 8, canopySize), Color.ForestGreen * 0.8f);
+                _spriteBatch.Draw(_pixel, new Rectangle(canopyX, canopyY + 4, canopySize, canopySize - 8), Color.Green * 0.7f);
+            }
+        }
+
+        // Draw insect swarms
+        foreach (var swarm in _swarms)
+        {
+            swarm.Draw(_spriteBatch, _pixel);
+        }
+
         // Draw player
         if (!_isDead)
         {
@@ -2656,6 +2743,16 @@ public class Game1 : Game
         {
             // Minimal HUD
             _spriteBatch.DrawString(_font, "[Esc] Menu", new Vector2(10, 10), Color.Gray * 0.5f);
+
+            // Health bar (top-left)
+            int hpBarW = 200, hpBarH = 12;
+            int hpBarX = 10, hpBarY = 30;
+            float hpPct = _player.Hp / (float)_player.MaxHp;
+            _spriteBatch.Draw(_pixel, new Rectangle(hpBarX, hpBarY, hpBarW, hpBarH), Color.DarkRed * 0.6f);
+            _spriteBatch.Draw(_pixel, new Rectangle(hpBarX, hpBarY, (int)(hpBarW * hpPct), hpBarH),
+                hpPct > 0.5f ? Color.LimeGreen : (hpPct > 0.25f ? Color.Yellow : Color.Red));
+            DrawHollowRect(hpBarX, hpBarY, hpBarW, hpBarH, Color.White * 0.3f);
+            _spriteBatch.DrawString(_font, SafeText($"HP {_player.Hp}/{_player.MaxHp}"), new Vector2(hpBarX + hpBarW + 8, hpBarY - 2), Color.White * 0.7f);
 
             // Weapon HUD
             {

@@ -178,6 +178,20 @@ public class Player
     // Aim direction
     public Vector2 AimDir { get; private set; }
 
+    // Health
+    public int MaxHp { get; set; } = 100;
+    public int Hp { get; set; } = 100;
+    public float DamageCooldown { get; set; }
+    private const float DamageCooldownTime = 0.3f;
+
+    public void TakeDamage(int amount)
+    {
+        if (DamageCooldown > 0) return;
+        Hp -= amount;
+        DamageCooldown = DamageCooldownTime;
+        if (Hp <= 0) Hp = 0;
+    }
+
     // Feature toggles (set by Game1 from settings menu)
     public bool EnableSlide { get; set; } = true;
     public bool EnableCartwheel { get; set; } = true;
@@ -262,6 +276,7 @@ public class Player
         WantsDropThrough = false;
         _shootCooldown -= dt;
         _meleeCooldown -= dt;
+        if (DamageCooldown > 0) DamageCooldown -= dt;
         _slideCooldownTimer -= dt;
         _cartwheelCooldownTimer -= dt;
         if (MeleeTimer > 0) MeleeTimer -= dt;

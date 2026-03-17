@@ -1,8 +1,10 @@
 {
   "currentLevel": "test-arena",
-  "spawnX": 352,
-  "spawnY": 240,
+  "spawnX": 1159,
+  "spawnY": 500,
   "unlockedAbilities": [],
-  "flags": {},
-  "playTime": 5.916692
+  "flags": {
+    "eveOrbActive": true
+  },
+  "playTime": 40.082897
 }
