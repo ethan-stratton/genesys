@@ -2843,14 +2843,12 @@ public class Game1 : Game
             _spriteBatch.Begin();
 
             // Title
-            string title = "GENESYS";
+            string title = "Genesys";
             var titleSize = _fontLarge.MeasureString(title);
             _spriteBatch.DrawString(_fontLarge, title, new Vector2(400 - titleSize.X / 2, 170), Color.White);
 
             // Subtitle
-            string sub = "Admin & Eve";
-            var subSize = _font.MeasureString(sub);
-            _spriteBatch.DrawString(_font, sub, new Vector2(400 - subSize.X / 2, 205), Color.Gray * 0.6f);
+            // No subtitle for now
 
             // Menu options
             float startY = 300;
