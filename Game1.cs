@@ -1217,8 +1217,10 @@ public class Game1 : Game
             }
 
             // Skip normal drag placement when in tile paint mode
-            return; // tile paint handles its own input
         }
+
+        if (_editorTool == EditorTool.TilePaint)
+            goto editorEnd;
 
         // Left click — place / start drag (not when G is held for grab)
         if (mouse.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released && !kb.IsKeyDown(Keys.T))
@@ -1559,6 +1561,7 @@ public class Game1 : Game
                 }
             }
         }
+        editorEnd:;
     }
 
     private bool TryDeleteAt(Point p)
@@ -2051,9 +2054,14 @@ public class Game1 : Game
                             _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 4), TileProperties.GetAccentColor(tile));
                     }
 
-                    // Subtle grid border
-                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 1), Color.Black * 0.15f);
-                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, tg.TileSize), Color.Black * 0.15f);
+                    // Outline — slightly darker border on all 4 sides
+                    var dark = new Color(
+                        (int)(color.R * 0.5f), (int)(color.G * 0.5f), (int)(color.B * 0.5f));
+                    int ts = tg.TileSize;
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), dark);           // top
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), dark);  // bottom
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts), dark);            // left
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts), dark);  // right
                 }
             }
 
@@ -3084,6 +3092,17 @@ public class Game1 : Game
                         // Top edge highlight for solid
                         _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 1), Color.White * 0.1f);
                     }
+
+                    // Outline — slightly darker border on all 4 sides
+                    var dark = new Color(
+                        (int)(TileProperties.GetColor(tile).R * 0.5f),
+                        (int)(TileProperties.GetColor(tile).G * 0.5f),
+                        (int)(TileProperties.GetColor(tile).B * 0.5f));
+                    int ts = tg.TileSize;
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), dark);
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), dark);
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts), dark);
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts), dark);
                 }
             }
         }
