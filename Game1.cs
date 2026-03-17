@@ -3046,67 +3046,6 @@ public class Game1 : Game
             _spriteBatch.Draw(_pixel, new Rectangle(plat.X, plat.Y, plat.Width, 2), new Color(90, 90, 90));
         }
 
-        // Draw tile grid (gameplay)
-        if (_level.TileGridInstance != null)
-        {
-            var tg = _level.TileGridInstance;
-            var camInvG = Matrix.Invert(_camera.TransformMatrix);
-            var tlG = Vector2.Transform(Vector2.Zero, camInvG);
-            var brG = Vector2.Transform(new Vector2(800, 600), camInvG);
-            int stx = Math.Max(0, ((int)tlG.X - tg.OriginX) / tg.TileSize - 1);
-            int sty = Math.Max(0, ((int)tlG.Y - tg.OriginY) / tg.TileSize - 1);
-            int etx = Math.Min(tg.Width, ((int)brG.X - tg.OriginX) / tg.TileSize + 2);
-            int ety = Math.Min(tg.Height, ((int)brG.Y - tg.OriginY) / tg.TileSize + 2);
-
-            for (int ty = sty; ty < ety; ty++)
-            {
-                for (int tx = stx; tx < etx; tx++)
-                {
-                    var tile = tg.Tiles[tx, ty];
-                    if (tile == TileType.Empty) continue;
-                    int wx = tg.OriginX + tx * tg.TileSize;
-                    int wy = tg.OriginY + ty * tg.TileSize;
-                    var color = TileProperties.GetColor(tile);
-
-                    if (TileProperties.IsPlatform(tile))
-                    {
-                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 4), color);
-                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 2), new Color(90, 90, 90));
-                    }
-                    else if (TileProperties.IsHazard(tile))
-                    {
-                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, tg.TileSize), color * 0.8f);
-                        int teeth = tg.TileSize / 12;
-                        for (int t = 0; t < teeth; t++)
-                        {
-                            int ttx = wx + t * 12 + 2;
-                            _spriteBatch.Draw(_pixel, new Rectangle(ttx, wy - 4, 8, 4), Color.Red * 0.6f);
-                            _spriteBatch.Draw(_pixel, new Rectangle(ttx + 2, wy - 8, 4, 4), Color.Red * 0.4f);
-                        }
-                    }
-                    else
-                    {
-                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, tg.TileSize), color);
-                        if (tile == TileType.Grass)
-                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 4), TileProperties.GetAccentColor(tile));
-                        // Top edge highlight for solid
-                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 1), Color.White * 0.1f);
-                    }
-
-                    // Outline — slightly darker border on all 4 sides
-                    var dark = new Color(
-                        (int)(TileProperties.GetColor(tile).R * 0.5f),
-                        (int)(TileProperties.GetColor(tile).G * 0.5f),
-                        (int)(TileProperties.GetColor(tile).B * 0.5f));
-                    int ts = tg.TileSize;
-                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), dark);
-                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), dark);
-                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts), dark);
-                    _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts), dark);
-                }
-            }
-        }
-
         // Draw spikes
         foreach (var spike in _level.SpikeRects)
         {
@@ -3161,7 +3100,64 @@ public class Game1 : Game
             _spriteBatch.Draw(_pixel, new Rectangle(ledge.X, ledge.Y, ledge.Width, 2), new Color(100, 100, 100));
         }
 
-        // Draw ropes
+        // Draw tile grid (gameplay) — after all legacy geometry so tile colors aren't covered
+        if (_level.TileGridInstance != null)
+        {
+            var tg = _level.TileGridInstance;
+            var camInvG = Matrix.Invert(_camera.TransformMatrix);
+            var tlG = Vector2.Transform(Vector2.Zero, camInvG);
+            var brG = Vector2.Transform(new Vector2(800, 600), camInvG);
+            int stx = Math.Max(0, ((int)tlG.X - tg.OriginX) / tg.TileSize - 1);
+            int sty = Math.Max(0, ((int)tlG.Y - tg.OriginY) / tg.TileSize - 1);
+            int etx = Math.Min(tg.Width, ((int)brG.X - tg.OriginX) / tg.TileSize + 2);
+            int ety = Math.Min(tg.Height, ((int)brG.Y - tg.OriginY) / tg.TileSize + 2);
+
+            for (int ty = sty; ty < ety; ty++)
+            {
+                for (int tx = stx; tx < etx; tx++)
+                {
+                    var tile = tg.Tiles[tx, ty];
+                    if (tile == TileType.Empty) continue;
+                    int wx = tg.OriginX + tx * tg.TileSize;
+                    int wy = tg.OriginY + ty * tg.TileSize;
+                    var color = TileProperties.GetColor(tile);
+
+                    if (TileProperties.IsPlatform(tile))
+                    {
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 4), color);
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 2), new Color(90, 90, 90));
+                    }
+                    else if (TileProperties.IsHazard(tile))
+                    {
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, tg.TileSize), color * 0.8f);
+                        int teeth = tg.TileSize / 12;
+                        for (int t = 0; t < teeth; t++)
+                        {
+                            int ttx = wx + t * 12 + 2;
+                            _spriteBatch.Draw(_pixel, new Rectangle(ttx, wy - 4, 8, 4), Color.Red * 0.6f);
+                            _spriteBatch.Draw(_pixel, new Rectangle(ttx + 2, wy - 8, 4, 4), Color.Red * 0.4f);
+                        }
+                    }
+                    else
+                    {
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, tg.TileSize), color);
+                        if (tile == TileType.Grass)
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 4), TileProperties.GetAccentColor(tile));
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 1), Color.White * 0.1f);
+                    }
+
+                    var dark = new Color(
+                        (int)(color.R * 0.5f), (int)(color.G * 0.5f), (int)(color.B * 0.5f));
+                    int ts = tg.TileSize;
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), dark);
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), dark);
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts), dark);
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts), dark);
+                }
+            }
+        }
+
+        // Draw ropes (gameplay)
         if (_enableRopeClimb)
         {
             for (int i = 0; i < _level.RopeXPositions.Length; i++)

@@ -3,7 +3,7 @@
   "author": "Dantalion",
   "playerSpawn": {
     "x": 96,
-    "y": 512
+    "y": 496
   },
   "bounds": {
     "left": -96,
@@ -449,7 +449,7 @@
   "exits": [
     {
       "x": 0,
-      "y": 512,
+      "y": 496,
       "w": 40,
       "h": 48,
       "targetLevel": "test-arena",
@@ -480,7 +480,7 @@
       "id": "crawler-1",
       "type": "crawler",
       "x": 96,
-      "y": 544
+      "y": 534
     },
     {
       "id": "crawler-2",
