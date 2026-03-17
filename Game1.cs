@@ -460,33 +460,10 @@ public class Game1 : Game
                                 {
                                     var exitRect = _level.ExitRects[j];
                                     float px, py;
-                                    int boundsW = _level.Bounds.Right - _level.Bounds.Left;
-                                    int boundsH = _level.Bounds.Bottom - _level.Bounds.Top;
 
-                                    if (exitRect.X < _level.Bounds.Left + boundsW * 0.2f)
-                                    {
-                                        // Exit on left edge — arrive from left
-                                        px = exitRect.X + exitRect.Width + 5;
-                                        py = exitRect.Y + exitRect.Height - Player.Height;
-                                    }
-                                    else if (exitRect.X + exitRect.Width > _level.Bounds.Right - boundsW * 0.2f)
-                                    {
-                                        // Exit on right edge — arrive from right
-                                        px = exitRect.X - Player.Width - 5;
-                                        py = exitRect.Y + exitRect.Height - Player.Height;
-                                    }
-                                    else if (exitRect.Y < _level.Bounds.Top + boundsH * 0.2f)
-                                    {
-                                        // Exit near top — arrive from above
-                                        px = exitRect.X + (exitRect.Width - Player.Width) / 2f;
-                                        py = exitRect.Y + exitRect.Height + 5;
-                                    }
-                                    else
-                                    {
-                                        // Bottom or ambiguous — place above
-                                        px = exitRect.X + (exitRect.Width - Player.Width) / 2f;
-                                        py = exitRect.Y - Player.Height - 5;
-                                    }
+                                    // Spawn inside the exit zone (enter-trigger prevents re-fire)
+                                    px = exitRect.X + (exitRect.Width - Player.Width) / 2f;
+                                    py = exitRect.Y + exitRect.Height - Player.Height;
 
                                     _player.Position = new Vector2(px, py);
                                     _camera.SnapTo(_player.Position, Player.Width, Player.Height);
