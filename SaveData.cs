@@ -16,6 +16,11 @@ public class SaveData
     [JsonPropertyName("unlockedAbilities")] public HashSet<string> UnlockedAbilities { get; set; } = new();
     [JsonPropertyName("flags")] public Dictionary<string, bool> Flags { get; set; } = new();
     [JsonPropertyName("playTime")] public float PlayTime { get; set; } = 0f;
+    [JsonPropertyName("meleeInventory")] public List<string> MeleeInventory { get; set; } = new();
+    [JsonPropertyName("rangedInventory")] public List<string> RangedInventory { get; set; } = new();
+    [JsonPropertyName("meleeIndex")] public int MeleeIndex { get; set; } = 0;
+    [JsonPropertyName("rangedIndex")] public int RangedIndex { get; set; } = 0;
+    [JsonPropertyName("collectedItems")] public HashSet<string> CollectedItems { get; set; } = new(); // item IDs picked up
 
     public void Save()
     {

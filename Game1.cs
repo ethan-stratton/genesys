@@ -9,6 +9,7 @@ namespace ArenaShooter;
 
 public class ItemPickup
 {
+    public string Id;
     public float X, Y;
     public int W = 20, H = 20;
     public string ItemType;
@@ -208,7 +209,10 @@ public class Game1 : Game
         // Load item pickups
         _itemPickups.Clear();
         foreach (var item in _level.Items)
-            _itemPickups.Add(new ItemPickup { X = item.X, Y = item.Y, W = item.W, H = item.H, ItemType = item.Type });
+        {
+            bool alreadyCollected = _saveData?.CollectedItems?.Contains(item.Id) == true;
+            _itemPickups.Add(new ItemPickup { Id = item.Id, X = item.X, Y = item.Y, W = item.W, H = item.H, ItemType = item.Type, Collected = alreadyCollected });
+        }
 
         // Enemies are spawned in SpawnEnemiesFromLevel(), called by Restart()
     }
@@ -341,6 +345,13 @@ public class Game1 : Game
                             // Restore EVE orb state
                             if (_saveData.Flags.ContainsKey("eveOrbActive"))
                                 _eveOrbActive = _saveData.Flags["eveOrbActive"];
+                            // Restore inventory
+                            _meleeInventory = _saveData.MeleeInventory.ConvertAll(s => Enum.Parse<WeaponType>(s)).ToArray();
+                            _meleeIndex = _saveData.MeleeIndex;
+                            _rangedInventory = _saveData.RangedInventory.ConvertAll(s => Enum.Parse<WeaponType>(s)).ToArray();
+                            _rangedIndex = _saveData.RangedIndex;
+                            if (_meleeIndex >= _meleeInventory.Length) _meleeIndex = _meleeInventory.Length > 0 ? 0 : -1;
+                            if (_rangedIndex >= _rangedInventory.Length) _rangedIndex = _rangedInventory.Length > 0 ? 0 : -1;
                         }
                         break;
                     case "New Game":
@@ -364,7 +375,7 @@ public class Game1 : Game
                         _saveData.CurrentLevel = System.IO.Path.GetFileNameWithoutExtension(DefaultLevel);
                         _saveData.SpawnX = _player.Position.X;
                         _saveData.SpawnY = _player.Position.Y;
-                        _saveData.Save();
+                        SyncInventoryToSave(); _saveData.Save();
                         // Reset overworld to fresh state
                         if (System.IO.File.Exists(OverworldPath))
                             _overworld = OverworldData.Load(OverworldPath);
@@ -580,7 +591,7 @@ public class Game1 : Game
                     if (_saveData != null)
                     {
                         _saveData.Flags["eveOrbActive"] = _eveOrbActive;
-                        _saveData.Save();
+                        SyncInventoryToSave(); _saveData.Save();
                     }
                     _dialogueOpen = false;
                     _dialogueNpcIndex = -1;
@@ -791,6 +802,8 @@ public class Game1 : Game
                 if (!item.Collected && playerRect.Intersects(item.Rect))
                 {
                     item.Collected = true;
+                    if (_saveData != null && !string.IsNullOrEmpty(item.Id))
+                        _saveData.CollectedItems.Add(item.Id);
                     switch (item.ItemType)
                     {
                         case "stick": EquipMelee(WeaponType.Stick); break;
@@ -898,7 +911,7 @@ public class Game1 : Game
                             _saveData.CurrentLevel = target;
                             _saveData.SpawnX = _player.Position.X;
                             _saveData.SpawnY = _player.Position.Y;
-                            _saveData.Save();
+                            SyncInventoryToSave(); _saveData.Save();
                         }
                         if (_overworld != null)
                         {
@@ -1163,7 +1176,7 @@ public class Game1 : Game
                 _saveData.CurrentLevel = System.IO.Path.GetFileNameWithoutExtension(_editorSaveFile);
                 _saveData.SpawnX = _player.Position.X;
                 _saveData.SpawnY = _player.Position.Y;
-                _saveData.Save();
+                SyncInventoryToSave(); _saveData.Save();
             }
             return;
         }
@@ -1861,7 +1874,7 @@ public class Game1 : Game
                         _saveData.CurrentLevel = System.IO.Path.GetFileNameWithoutExtension(_editorSaveFile);
                         _saveData.SpawnX = _player.Position.X;
                         _saveData.SpawnY = _player.Position.Y;
-                        _saveData.Save();
+                        SyncInventoryToSave(); _saveData.Save();
                     }
                     _editorMenuOpen = false;
                     break;
@@ -1941,6 +1954,15 @@ public class Game1 : Game
             _editorMenuMode = EditorMenuMode.Main;
             _editorMenuOpen = false;
         }
+    }
+
+    private void SyncInventoryToSave()
+    {
+        if (_saveData == null) return;
+        _saveData.MeleeInventory = new List<string>(Array.ConvertAll(_meleeInventory, w => w.ToString()));
+        _saveData.RangedInventory = new List<string>(Array.ConvertAll(_rangedInventory, w => w.ToString()));
+        _saveData.MeleeIndex = _meleeIndex;
+        _saveData.RangedIndex = _rangedIndex;
     }
 
     private void SaveLevel()
