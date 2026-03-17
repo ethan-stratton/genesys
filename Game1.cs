@@ -256,11 +256,16 @@ public class Game1 : Game
                             _prevInExit = new bool[_level.ExitRects.Length];
                             for (int k = 0; k < _prevInExit.Length; k++)
                                 _prevInExit[k] = true;
+                            // Restore EVE orb state
+                            if (_saveData.Flags.ContainsKey("eveOrbActive"))
+                                _eveOrbActive = _saveData.Flags["eveOrbActive"];
                         }
                         break;
                     case "New Game":
                         SaveData.Delete();
                         _saveData = new SaveData();
+                        _eveOrbActive = false;
+                        _eveDialogueExhausted = false;
                         LoadLevel(DefaultLevel);
                         _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
                         _gameState = GameState.Playing;
@@ -442,6 +447,12 @@ public class Game1 : Game
                     {
                         _eveDialogueExhausted = true;
                         _eveOrbActive = true;
+                    }
+                    // Save EVE orb state
+                    if (_saveData != null)
+                    {
+                        _saveData.Flags["eveOrbActive"] = _eveOrbActive;
+                        _saveData.Save();
                     }
                     _dialogueOpen = false;
                     _dialogueNpcIndex = -1;
@@ -1973,6 +1984,12 @@ public class Game1 : Game
         {
             _gameState = GameState.Title;
             _titleCursor = 0;
+        }
+
+        // M key returns to current level without resetting
+        if (kb.IsKeyDown(Keys.M) && _prevKb.IsKeyUp(Keys.M) && _level != null)
+        {
+            _gameState = GameState.Playing;
         }
     }
 
