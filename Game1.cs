@@ -272,11 +272,18 @@ public class Game1 : Game
                         _saveData.SpawnX = _player.Position.X;
                         _saveData.SpawnY = _player.Position.Y;
                         _saveData.Save();
-                        // Reset overworld
+                        // Reset overworld to fresh state
                         if (System.IO.File.Exists(OverworldPath))
                             _overworld = OverworldData.Load(OverworldPath);
                         else
                             _overworld = new OverworldData();
+                        // Reset all nodes: only start node discovered, nothing cleared
+                        foreach (var n in _overworld.Nodes)
+                        {
+                            n.Discovered = n.Id == _overworld.StartNode;
+                            n.Cleared = false;
+                        }
+                        _overworld.Save(OverworldPath);
                         _currentNodeId = _overworld.StartNode;
                         break;
                     case "Settings":
@@ -405,6 +412,17 @@ public class Game1 : Game
         // --- Dialogue system ---
         if (_dialogueOpen)
         {
+            // Close dialogue if player walks too far from NPC (120px range)
+            if (_dialogueNpcIndex >= 0 && _dialogueNpcIndex < _level.NpcRects.Length)
+            {
+                var pCenter = _player.Position.X + Player.Width / 2f;
+                var npcCenter = _level.NpcRects[_dialogueNpcIndex].X + _level.NpcRects[_dialogueNpcIndex].Width / 2f;
+                if (MathF.Abs(pCenter - npcCenter) > 120f)
+                {
+                    _dialogueOpen = false;
+                    // Keep _dialogueNpcIndex and _dialogueLine so it resumes where you left off
+                }
+            }
             bool advance = (kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space)) ||
                            (kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter)) ||
                            (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W));
@@ -445,8 +463,15 @@ public class Game1 : Game
                 if (pRect.Intersects(_level.NpcRects[i]) && _level.Npcs[i].Dialogue.Length > 0)
                 {
                     _dialogueOpen = true;
-                    _dialogueNpcIndex = i;
-                    _dialogueLine = 0;
+                    // Resume if same NPC, otherwise start fresh
+                    if (_dialogueNpcIndex != i)
+                    {
+                        _dialogueNpcIndex = i;
+                        _dialogueLine = 0;
+                    }
+                    // If we already exhausted this NPC's dialogue, restart from beginning
+                    if (_dialogueLine >= _level.Npcs[i].Dialogue.Length)
+                        _dialogueLine = 0;
                     _prevKb = kb;
                     base.Update(gameTime);
                     return;
