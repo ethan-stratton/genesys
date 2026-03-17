@@ -138,6 +138,9 @@ public class Game1 : Game
     private string _editorSaveFile = "Content/levels/test-arena.json";
     private string _editorStatusMsg = "";
     private float _editorStatusTimer;
+    // Entity drag-move state
+    private object _editorMovingEntity; // reference to the entity being moved (EnemySpawnData, EnvObjectData, NpcData, ItemData)
+    private Vector2 _editorMoveOffset; // offset from entity origin to grab point
     private bool _entityPaletteOpen;
     private int _entityPaletteCursor;
     private enum EntityType { Swarm, Crawler, Thornback, Tree }
@@ -1123,9 +1126,10 @@ public class Game1 : Game
                         break;
                     case EntityType.Tree:
                         var oList = new List<EnvObjectData>(_level.Objects);
-                        oList.Add(new EnvObjectData { Id = $"tree-{oList.Count}", Type = "tree", X = cx, Y = cy, W = 40, H = 80 });
+                        float treeSnapY = SnapToSurface(cx, cy, 40, 80);
+                        oList.Add(new EnvObjectData { Id = $"tree-{oList.Count}", Type = "tree", X = cx, Y = treeSnapY, W = 40, H = 80 });
                         _level.Objects = oList.ToArray();
-                        SetEditorStatus($"Placed tree at ({(int)cx}, {(int)cy})");
+                        SetEditorStatus($"Placed tree at ({(int)cx}, {(int)treeSnapY})");
                         break;
                 }
             }
@@ -1344,6 +1348,84 @@ public class Game1 : Game
             var wp = new Point((int)worldMouse.X, (int)worldMouse.Y);
             if (TryDeleteAt(wp))
                 SetEditorStatus("Deleted");
+        }
+
+        // Middle click — grab and drag entities/objects
+        if (mouse.MiddleButton == ButtonState.Pressed && _prevMouse.MiddleButton == ButtonState.Released)
+        {
+            _editorMovingEntity = null;
+            var mp = new Point((int)worldMouse.X, (int)worldMouse.Y);
+            // Check enemies
+            foreach (var e in _level.Enemies)
+            {
+                int sz = e.Type == "thornback" ? 32 : (e.Type == "swarm" ? 20 : 16);
+                int h = e.Type == "thornback" ? 28 : (e.Type == "swarm" ? 20 : 10);
+                if (new Rectangle((int)e.X, (int)e.Y, sz, h).Contains(mp))
+                {
+                    _editorMovingEntity = e;
+                    _editorMoveOffset = new Vector2(worldMouse.X - e.X, worldMouse.Y - e.Y);
+                    SetEditorStatus($"Grabbed {e.Type}");
+                    break;
+                }
+            }
+            // Check env objects
+            if (_editorMovingEntity == null)
+            {
+                foreach (var o in _level.Objects)
+                {
+                    if (new Rectangle((int)o.X, (int)o.Y, o.W, o.H).Contains(mp))
+                    {
+                        _editorMovingEntity = o;
+                        _editorMoveOffset = new Vector2(worldMouse.X - o.X, worldMouse.Y - o.Y);
+                        SetEditorStatus($"Grabbed {o.Type}");
+                        break;
+                    }
+                }
+            }
+            // Check NPCs
+            if (_editorMovingEntity == null)
+            {
+                foreach (var n in _level.Npcs)
+                {
+                    if (new Rectangle(n.X, n.Y, n.W, n.H).Contains(mp))
+                    {
+                        _editorMovingEntity = n;
+                        _editorMoveOffset = new Vector2(worldMouse.X - n.X, worldMouse.Y - n.Y);
+                        SetEditorStatus($"Grabbed NPC {n.Name}");
+                        break;
+                    }
+                }
+            }
+            // Check items
+            if (_editorMovingEntity == null)
+            {
+                foreach (var it in _level.Items)
+                {
+                    if (new Rectangle((int)it.X, (int)it.Y, it.W, it.H).Contains(mp))
+                    {
+                        _editorMovingEntity = it;
+                        _editorMoveOffset = new Vector2(worldMouse.X - it.X, worldMouse.Y - it.Y);
+                        SetEditorStatus($"Grabbed item {it.Type}");
+                        break;
+                    }
+                }
+            }
+        }
+        // Middle drag — move entity
+        if (mouse.MiddleButton == ButtonState.Pressed && _editorMovingEntity != null)
+        {
+            float nx = snapped.X - _editorMoveOffset.X;
+            float ny = snapped.Y - _editorMoveOffset.Y;
+            if (_editorMovingEntity is EnemySpawnData esd) { esd.X = nx; esd.Y = ny; }
+            else if (_editorMovingEntity is EnvObjectData eod) { eod.X = nx; eod.Y = ny; }
+            else if (_editorMovingEntity is NpcData npc) { npc.X = (int)nx; npc.Y = (int)ny; }
+            else if (_editorMovingEntity is ItemData itd) { itd.X = nx; itd.Y = ny; }
+        }
+        // Middle release — drop entity
+        if (mouse.MiddleButton == ButtonState.Released && _prevMouse.MiddleButton == ButtonState.Pressed && _editorMovingEntity != null)
+        {
+            SetEditorStatus("Placed");
+            _editorMovingEntity = null;
         }
 
         // F — cycle last wall's climb side: 0 (both) → 1 (right) → -1 (left)
@@ -2018,6 +2100,27 @@ public class Game1 : Game
             int size = e.Type == "thornback" ? 32 : (e.Type == "swarm" ? 20 : 16);
             _spriteBatch.Draw(_pixel, new Rectangle((int)e.X, (int)e.Y, size, size), ec * 0.6f);
             _spriteBatch.DrawString(_font, SafeText(e.Type), new Vector2(e.X, e.Y - 14), ec * 0.8f);
+        }
+
+        // Draw env objects (trees etc) in editor
+        foreach (var obj in _level.Objects)
+        {
+            if (obj.Type == "tree")
+            {
+                int trunkW = obj.W / 3;
+                int trunkH = obj.H / 2;
+                int trunkX = (int)(obj.X + obj.W / 2f - trunkW / 2f);
+                int trunkY = (int)(obj.Y + obj.H - trunkH);
+                _spriteBatch.Draw(_pixel, new Rectangle(trunkX, trunkY, trunkW, trunkH), new Color(101, 67, 33) * 0.6f);
+                int canopySize = obj.W;
+                _spriteBatch.Draw(_pixel, new Rectangle((int)obj.X - 4, (int)obj.Y, canopySize + 8, canopySize), Color.ForestGreen * 0.5f);
+                _spriteBatch.DrawString(_font, SafeText("tree"), new Vector2(obj.X, obj.Y - 14), Color.ForestGreen * 0.8f);
+            }
+            else
+            {
+                _spriteBatch.Draw(_pixel, new Rectangle((int)obj.X, (int)obj.Y, obj.W, obj.H), Color.Gray * 0.4f);
+                _spriteBatch.DrawString(_font, SafeText(obj.Type), new Vector2(obj.X, obj.Y - 14), Color.Gray);
+            }
         }
 
         // Draw drag preview
