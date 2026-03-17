@@ -396,6 +396,7 @@ public class Game1 : Game
                         _settingsActiveCategory = null;
                         _settingsItemCursor = 0;
                         _settingsFromTitle = true;
+                        _prevKb = kb; // consume the Enter press so UpdateMenu doesn't see it
                         break;
                     case "Quit":
                         Exit();
@@ -442,6 +443,7 @@ public class Game1 : Game
             _settingsCategoryCursor = 0;
             _settingsActiveCategory = null;
             _settingsItemCursor = 0;
+            _prevKb = kb; // consume the Escape press so UpdateMenu doesn't immediately close
         }
 
         // M key — open overworld map
@@ -3096,8 +3098,7 @@ public class Game1 : Game
         // --- Settings menu overlay ---
         if (_menuOpen)
         {
-            // Semi-transparent dim when in-game (gameplay visible behind)
-            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, 800, 600), Color.Black * 0.7f);
+            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, 800, 600), new Color(20, 20, 20));
             DrawSettingsMenu();
         }
         else if (_inventoryOpen)
