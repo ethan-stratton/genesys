@@ -1,8 +1,8 @@
 {
-  "currentLevel": "the-gauntlet",
-  "spawnX": -45,
+  "currentLevel": "the-summit",
+  "spawnX": -59,
   "spawnY": 500,
   "unlockedAbilities": [],
   "flags": {},
-  "playTime": 26.983097
+  "playTime": 6.066694
 }
