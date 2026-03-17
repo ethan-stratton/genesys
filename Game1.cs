@@ -90,7 +90,6 @@ public class Game1 : Game
 
     // --- Inventory state ---
     private bool _inventoryOpen;
-    private int _inventoryCursor; // 0=ranged section, 1+=melee section
     private int _inventorySection; // 0=ranged, 1=melee
     private int _inventoryIndex; // index within current section
 
