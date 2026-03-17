@@ -220,10 +220,13 @@ public class Game1 : Game
                     _swarms.Add(new InsectSwarm(new Vector2(e.X, e.Y), e.Count > 0 ? e.Count : 10, _rng));
                     break;
                 case "crawler":
-                    _crawlers.Add(new Crawler(new Vector2(e.X, e.Y), e.X - 100, e.X + 100));
+                    // Snap to nearest surface below spawn point
+                    float snapY = SnapToSurface(e.X, e.Y, Crawler.Width, Crawler.Height);
+                    _crawlers.Add(new Crawler(new Vector2(e.X, snapY), e.X - 100, e.X + 100));
                     break;
                 case "thornback":
-                    _thornbacks.Add(new Thornback(new Vector2(e.X, e.Y)));
+                    float tSnapY = SnapToSurface(e.X, e.Y, Thornback.Width, Thornback.Height);
+                    _thornbacks.Add(new Thornback(new Vector2(e.X, tSnapY)));
                     break;
             }
         }
@@ -1545,6 +1548,32 @@ public class Game1 : Game
                 return true;
             }
         }
+        // Check enemies
+        for (int i = _level.Enemies.Length - 1; i >= 0; i--)
+        {
+            var e = _level.Enemies[i];
+            int size = e.Type == "thornback" ? 32 : (e.Type == "swarm" ? 20 : 16);
+            int h = e.Type == "thornback" ? 28 : (e.Type == "swarm" ? 20 : 10);
+            if (new Rectangle((int)e.X, (int)e.Y, size, h).Contains(p))
+            {
+                var list = new List<EnemySpawnData>(_level.Enemies);
+                list.RemoveAt(i);
+                _level.Enemies = list.ToArray();
+                return true;
+            }
+        }
+        // Check env objects (trees etc)
+        for (int i = _level.Objects.Length - 1; i >= 0; i--)
+        {
+            var o = _level.Objects[i];
+            if (new Rectangle((int)o.X, (int)o.Y, o.W, o.H).Contains(p))
+            {
+                var list = new List<EnvObjectData>(_level.Objects);
+                list.RemoveAt(i);
+                _level.Objects = list.ToArray();
+                return true;
+            }
+        }
         return false;
     }
 
@@ -1552,6 +1581,30 @@ public class Game1 : Game
     {
         _editorStatusMsg = msg;
         _editorStatusTimer = 2f;
+    }
+
+    /// <summary>Find the nearest surface (platform/solid floor/main floor) below a point and return Y so entity sits on it.</summary>
+    private float SnapToSurface(float x, float y, int entityW, int entityH)
+    {
+        float bestY = _level.Floor.Y - entityH; // default: main floor
+        
+        // Check platforms
+        foreach (var p in _level.Platforms)
+        {
+            float surfaceY = p.Y - entityH;
+            // Entity overlaps platform horizontally?
+            if (x + entityW > p.X && x < p.X + p.W && surfaceY >= y - 20 && surfaceY < bestY)
+                bestY = surfaceY;
+        }
+        // Check solid floors
+        foreach (var sf in _level.SolidFloors)
+        {
+            float surfaceY = sf.Y - entityH;
+            if (x + entityW > sf.X && x < sf.X + sf.W && surfaceY >= y - 20 && surfaceY < bestY)
+                bestY = surfaceY;
+        }
+        
+        return bestY;
     }
 
     private string GenerateExitId(int x, int y)

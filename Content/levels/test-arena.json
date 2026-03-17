@@ -2,7 +2,7 @@
   "name": "test-arena",
   "author": "Dantalion",
   "playerSpawn": {
-    "x": 352,
+    "x": 512,
     "y": 240
   },
   "bounds": {
@@ -212,5 +212,20 @@
       "h": 80
     }
   ],
-  "enemies": []
+  "enemies": [
+    {
+      "id": "swarm-0",
+      "type": "swarm",
+      "x": 360,
+      "y": 260,
+      "count": 10
+    },
+    {
+      "id": "swarm-1",
+      "type": "swarm",
+      "x": 720,
+      "y": 340,
+      "count": 10
+    }
+  ]
 }
