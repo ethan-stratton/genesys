@@ -15,8 +15,8 @@ public class Game1 : Game
     private int _titleCursor;
     private bool _settingsFromTitle;
     private string[] _titleOptions => SaveData.Exists()
-        ? new[] { "Continue", "New Game", "Map", "Settings", "Quit" }
-        : new[] { "New Game", "Map", "Settings", "Quit" };
+        ? new[] { "Continue", "New Game", "Settings", "Quit" }
+        : new[] { "New Game", "Settings", "Quit" };
 
     private OverworldData _overworld;
     private int _overworldCursor;
@@ -279,11 +279,6 @@ public class Game1 : Game
                             _overworld = new OverworldData();
                         _currentNodeId = _overworld.StartNode;
                         break;
-                    case "Map":
-                        _gameState = GameState.Overworld;
-                        _overworldCursor = Array.IndexOf(_overworld.Nodes, _overworld.FindNode(_currentNodeId));
-                        if (_overworldCursor < 0) _overworldCursor = 0;
-                        break;
                     case "Settings":
                         _menuOpen = true;
                         _menuCursor = 0;
@@ -340,6 +335,21 @@ public class Game1 : Game
         {
             _menuOpen = !_menuOpen;
             if (_menuOpen) _menuCursor = 0;
+        }
+
+        // M key — open overworld map
+        if (kb.IsKeyDown(Keys.M) && _prevKb.IsKeyUp(Keys.M) && !_menuOpen && !_dialogueOpen)
+        {
+            if (_overworld != null)
+            {
+                _overworldCursor = Array.IndexOf(_overworld.Nodes, _overworld.FindNode(
+                    System.IO.Path.GetFileNameWithoutExtension(_editorSaveFile)));
+                if (_overworldCursor < 0) _overworldCursor = 0;
+                _currentNodeId = _overworld.Nodes[_overworldCursor].Id;
+                _gameState = GameState.Overworld;
+                _prevKb = kb;
+                return;
+            }
         }
 
         if (_menuOpen)
@@ -566,6 +576,7 @@ public class Game1 : Game
                         break;
                     }
                     string nextPath = $"Content/levels/{target}.json";
+                    string _sourceLevel = System.IO.Path.GetFileNameWithoutExtension(_editorSaveFile);
                     if (System.IO.File.Exists(nextPath))
                     {
                         LoadLevel(nextPath);
@@ -605,12 +616,32 @@ public class Game1 : Game
                         }
                         if (_overworld != null)
                         {
+                            // Mark the level we just LEFT as cleared
+                            var srcNode = _overworld.FindNode(System.IO.Path.GetFileNameWithoutExtension(
+                                _editorSaveFile.Replace($"Content/levels/{target}.json", "")));
+                            // Actually, _editorSaveFile is already updated. Use the source level name.
+                            // We need to track it before LoadLevel overwrites _editorSaveFile.
+                            // (handled by _sourceLevel below)
+                            if (_sourceLevel != null)
+                            {
+                                var srcN = _overworld.FindNode(_sourceLevel);
+                                if (srcN != null)
+                                {
+                                    srcN.Cleared = true;
+                                    srcN.Discovered = true;
+                                    foreach (var connId in srcN.Connections)
+                                    {
+                                        var conn = _overworld.FindNode(connId);
+                                        if (conn != null) conn.Discovered = true;
+                                    }
+                                }
+                            }
                             var destNode = _overworld.FindNode(target);
                             if (destNode != null)
                             {
                                 destNode.Discovered = true;
-                                _overworld.Save(OverworldPath);
                             }
+                            _overworld.Save(OverworldPath);
                         }
                     }
                     break;
