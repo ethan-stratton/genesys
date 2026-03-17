@@ -429,6 +429,7 @@ public class Game1 : Game
             if (_prevInExit.Length != _level.ExitRects.Length)
                 _prevInExit = new bool[_level.ExitRects.Length];
             bool[] curInExit = new bool[_level.ExitRects.Length];
+            bool transitioned = false;
             for (int i = 0; i < _level.ExitRects.Length; i++)
             {
                 curInExit[i] = pRect.Intersects(_level.ExitRects[i]);
@@ -438,7 +439,6 @@ public class Game1 : Game
                     string targetExitId = _level.ExitTargetExitIds[i];
                     if (target == "__overworld__")
                     {
-                        // Placeholder: return to title screen (will be overworld later)
                         _gameState = GameState.Title;
                         _titleCursor = 0;
                         break;
@@ -459,12 +459,8 @@ public class Game1 : Game
                                 if (_level.ExitIds[j] == targetExitId)
                                 {
                                     var exitRect = _level.ExitRects[j];
-                                    float px, py;
-
-                                    // Spawn inside the exit zone (enter-trigger prevents re-fire)
-                                    px = exitRect.X + (exitRect.Width - Player.Width) / 2f;
-                                    py = exitRect.Y + exitRect.Height - Player.Height;
-
+                                    float px = exitRect.X + (exitRect.Width - Player.Width) / 2f;
+                                    float py = exitRect.Y + exitRect.Height - Player.Height;
                                     _player.Position = new Vector2(px, py);
                                     _camera.SnapTo(_player.Position, Player.Width, Player.Height);
                                     break;
@@ -472,12 +468,12 @@ public class Game1 : Game
                             }
                         }
 
-                        // Mark all exits as "already inside" so enter-trigger doesn't re-fire
+                        // Mark all exits in NEW level as "already inside" so enter-trigger doesn't re-fire
                         _prevInExit = new bool[_level.ExitRects.Length];
                         for (int k = 0; k < _prevInExit.Length; k++)
                             _prevInExit[k] = true;
+                        transitioned = true;
 
-                        // Auto-save on level transition
                         if (_saveData != null)
                         {
                             _saveData.CurrentLevel = target;
@@ -489,9 +485,7 @@ public class Game1 : Game
                     break;
                 }
             }
-            // Only update prevInExit if we didn't just transition
-            // (transition sets _prevInExit to all-true for the new level)
-            if (_prevInExit.Length == curInExit.Length)
+            if (!transitioned)
                 _prevInExit = curInExit;
         }
 
