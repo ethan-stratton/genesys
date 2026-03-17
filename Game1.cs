@@ -88,6 +88,12 @@ public class Game1 : Game
     private bool _enableBladeDash = true;
     private bool _enableMusic;
 
+    // --- Inventory state ---
+    private bool _inventoryOpen;
+    private int _inventoryCursor; // 0=ranged section, 1+=melee section
+    private int _inventorySection; // 0=ranged, 1=melee
+    private int _inventoryIndex; // index within current section
+
     // --- Dialogue state ---
     private bool _dialogueOpen;
     private int _dialogueNpcIndex = -1;
@@ -415,6 +421,21 @@ public class Game1 : Game
             return; // game is paused while menu is open
         }
 
+        // Toggle inventory with Tab
+        if (kb.IsKeyDown(Keys.Tab) && _prevKb.IsKeyUp(Keys.Tab) && !_dialogueOpen)
+        {
+            _inventoryOpen = !_inventoryOpen;
+            if (_inventoryOpen) { _inventorySection = 0; _inventoryIndex = 0; }
+        }
+
+        if (_inventoryOpen)
+        {
+            UpdateInventory(kb);
+            _prevKb = kb;
+            base.Update(gameTime);
+            return; // game is paused while inventory is open
+        }
+
         if (_isDead)
         {
             if (kb.IsKeyDown(Keys.R) && _prevKb.IsKeyUp(Keys.R))
@@ -452,7 +473,7 @@ public class Game1 : Game
         {
             WeaponType.Sword => 60,
             WeaponType.Stick => 30,
-            WeaponType.None => 18, // fists: fast but tiny range
+            WeaponType.None => 28, // fists: fast but short range
             _ => Player.MeleeRange
         };
 
@@ -1963,6 +1984,112 @@ public class Game1 : Game
         _spriteBatch.DrawString(_font, "[Space/Enter] Toggle  [W/S] Navigate  [A/D] Column", new Vector2(180, startY + half * lineHeight + 50), Color.Gray * 0.6f);
     }
 
+    private void UpdateInventory(KeyboardState kb)
+    {
+        // Sections: 0=Ranged, 1=Melee
+        // Navigate sections with A/D, items with W/S
+        if (kb.IsKeyDown(Keys.A) && _prevKb.IsKeyUp(Keys.A))
+        { _inventorySection = 0; _inventoryIndex = 0; }
+        if (kb.IsKeyDown(Keys.D) && _prevKb.IsKeyUp(Keys.D))
+        { _inventorySection = 1; _inventoryIndex = 0; }
+
+        var inv = _inventorySection == 0 ? _rangedInventory : _meleeInventory;
+        if (inv.Length > 0)
+        {
+            if (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W))
+                _inventoryIndex = (_inventoryIndex - 1 + inv.Length) % inv.Length;
+            if (kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S))
+                _inventoryIndex = (_inventoryIndex + 1) % inv.Length;
+
+            // Space/Enter = equip (set as active)
+            if ((kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space)) ||
+                (kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter)))
+            {
+                if (_inventorySection == 0)
+                    _rangedIndex = _inventoryIndex;
+                else
+                    _meleeIndex = _inventoryIndex;
+            }
+
+            // X = discard selected weapon
+            if (kb.IsKeyDown(Keys.X) && _prevKb.IsKeyUp(Keys.X))
+            {
+                var w = inv[_inventoryIndex];
+                if (_inventorySection == 0)
+                    UnequipRanged(w);
+                else
+                    UnequipMelee(w);
+                // Drop item back into world at player position
+                _itemPickups.Add(new ItemPickup
+                {
+                    X = _player.Position.X,
+                    Y = _player.Position.Y + Player.Height - 12,
+                    W = 24, H = 12,
+                    ItemType = w.ToString().ToLower()
+                });
+                inv = _inventorySection == 0 ? _rangedInventory : _meleeInventory;
+                if (_inventoryIndex >= inv.Length) _inventoryIndex = Math.Max(0, inv.Length - 1);
+            }
+        }
+
+        // Tab or Esc closes
+        if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape))
+            _inventoryOpen = false;
+    }
+
+    private void DrawInventory()
+    {
+        // Semi-transparent overlay
+        _spriteBatch.Draw(_pixel, new Rectangle(0, 0, 800, 600), Color.Black * 0.75f);
+
+        _spriteBatch.DrawString(_font, SafeText("INVENTORY"), new Vector2(340, 40), Color.White);
+        _spriteBatch.DrawString(_font, SafeText("[A/D] Section  [W/S] Navigate  [Enter] Equip  [X] Discard  [Tab/Esc] Close"),
+            new Vector2(100, 560), Color.Gray * 0.5f);
+
+        // Two columns
+        float colX0 = 200, colX1 = 450;
+        float startY = 100;
+
+        // Ranged column
+        bool rangedSelected = _inventorySection == 0;
+        _spriteBatch.DrawString(_font, SafeText("RANGED [1]"), new Vector2(colX0, startY),
+            rangedSelected ? Color.Yellow : Color.Gray);
+        if (_rangedInventory.Length == 0)
+        {
+            _spriteBatch.DrawString(_font, SafeText("(empty)"), new Vector2(colX0, startY + 30), Color.Gray * 0.5f);
+        }
+        for (int i = 0; i < _rangedInventory.Length; i++)
+        {
+            bool isCurrent = i == _rangedIndex;
+            bool isHover = rangedSelected && i == _inventoryIndex;
+            string prefix = isCurrent ? "> " : "  ";
+            Color c = isHover ? Color.Yellow : (isCurrent ? Color.White : Color.Gray * 0.7f);
+            if (isHover)
+                _spriteBatch.Draw(_pixel, new Rectangle((int)colX0 - 4, (int)(startY + 30 + i * 24), 160, 22), Color.Yellow * 0.1f);
+            _spriteBatch.DrawString(_font, SafeText($"{prefix}{_rangedInventory[i]}"), new Vector2(colX0, startY + 30 + i * 24), c);
+        }
+
+        // Melee column
+        bool meleeSelected = _inventorySection == 1;
+        _spriteBatch.DrawString(_font, SafeText("MELEE [2]"), new Vector2(colX1, startY),
+            meleeSelected ? Color.Yellow : Color.Gray);
+        _spriteBatch.DrawString(_font, SafeText("  Fists (always)"), new Vector2(colX1, startY + 30), Color.Gray * 0.5f);
+        if (_meleeInventory.Length == 0)
+        {
+            _spriteBatch.DrawString(_font, SafeText("(no weapons)"), new Vector2(colX1, startY + 54), Color.Gray * 0.5f);
+        }
+        for (int i = 0; i < _meleeInventory.Length; i++)
+        {
+            bool isCurrent = i == _meleeIndex;
+            bool isHover = meleeSelected && i == _inventoryIndex;
+            string prefix = isCurrent ? "> " : "  ";
+            Color c = isHover ? Color.Yellow : (isCurrent ? Color.White : Color.Gray * 0.7f);
+            if (isHover)
+                _spriteBatch.Draw(_pixel, new Rectangle((int)colX1 - 4, (int)(startY + 54 + i * 24), 160, 22), Color.Yellow * 0.1f);
+            _spriteBatch.DrawString(_font, SafeText($"{prefix}{_meleeInventory[i]}"), new Vector2(colX1, startY + 54 + i * 24), c);
+        }
+    }
+
     private void UpdateMenu(KeyboardState kb)
     {
         int quitIdx = _settings.Length - 1;
@@ -2429,10 +2556,12 @@ public class Game1 : Game
                 // Draw with glow so it's visible
                 _spriteBatch.Draw(_pixel, new Rectangle(item.Rect.X - 2, item.Rect.Y - 2, item.Rect.Width + 4, item.Rect.Height + 4), Color.White * 0.25f);
                 _spriteBatch.Draw(_pixel, item.Rect, itemColor);
-                // Draw "[W]" prompt above when player is near
+                // Draw "[W]" prompt above when player is near (X and Y)
                 var pCenter = _player.Position.X + Player.Width / 2f;
+                var pCenterY = _player.Position.Y + Player.Height / 2f;
                 var iCenter = item.X + item.W / 2f;
-                if (MathF.Abs(pCenter - iCenter) < 60f)
+                var iCenterY = item.Y + item.H / 2f;
+                if (MathF.Abs(pCenter - iCenter) < 60f && MathF.Abs(pCenterY - iCenterY) < 60f)
                 {
                     string prompt = SafeText("[W] Pick up");
                     var promptSize = _font.MeasureString(prompt);
@@ -2520,6 +2649,10 @@ public class Game1 : Game
             // Semi-transparent dim when in-game (gameplay visible behind)
             _spriteBatch.Draw(_pixel, new Rectangle(0, 0, 800, 600), Color.Black * 0.7f);
             DrawSettingsMenu();
+        }
+        else if (_inventoryOpen)
+        {
+            DrawInventory();
         }
         else if (!_isDead)
         {
