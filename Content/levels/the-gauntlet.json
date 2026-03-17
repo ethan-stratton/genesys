@@ -286,9 +286,9 @@
   ],
   "exits": [
     {
-      "x": -28,
+      "x": 400,
       "y": 500,
-      "w": 40,
+      "w": 60,
       "h": 48,
       "targetLevel": "the-descent",
       "id": "exit-left",
