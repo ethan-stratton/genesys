@@ -2547,7 +2547,12 @@ public class Game1 : Game
                     case 0: _settingsActiveCategory = SettingsCategory.Audio; _settingsItemCursor = 0; break;
                     case 1: _settingsActiveCategory = SettingsCategory.Graphics; _settingsItemCursor = 0; break;
                     case 2: _settingsActiveCategory = SettingsCategory.Debug; _settingsItemCursor = 0; break;
-                    case 3: Exit(); break;
+                    case 3:
+                        _menuOpen = false;
+                        _settingsFromTitle = false;
+                        _settingsActiveCategory = null;
+                        _gameState = GameState.Title;
+                        break;
                 }
             }
 

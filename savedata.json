@@ -6,10 +6,14 @@
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 31.699692,
-  "meleeInventory": [],
+  "playTime": 15.799933,
+  "meleeInventory": [
+    "Stick"
+  ],
   "rangedInventory": [],
-  "meleeIndex": -1,
+  "meleeIndex": 0,
   "rangedIndex": -1,
-  "collectedItems": []
+  "collectedItems": [
+    "stick-1"
+  ]
 }
