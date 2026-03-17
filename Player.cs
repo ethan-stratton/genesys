@@ -190,6 +190,11 @@ public class Player
     public bool EnableFlip { get; set; } = true;
     public bool EnableBladeDash { get; set; } = true;
 
+    // Weapon gating (set by Game1)
+    public bool HasMeleeWeapon { get; set; }
+    public bool HasRangedWeapon { get; set; }
+    public int MeleeRangeOverride { get; set; } = MeleeRange;
+
     private KeyboardState _prevKb;
 
     public Player(Vector2 startPos)
@@ -242,7 +247,7 @@ public class Player
             var center = Position + new Vector2(Width / 2f, Height / 2f);
             var dir = MeleeDirection;
             // Offset the hitbox center along the aim direction
-            var hbCenter = center + dir * (MeleeRange * 0.6f);
+            var hbCenter = center + dir * (MeleeRangeOverride * 0.6f);
             return new Rectangle(
                 (int)(hbCenter.X - MeleeWidth / 2f),
                 (int)(hbCenter.Y - MeleeWidth / 2f),
@@ -598,7 +603,7 @@ public class Player
 
             // Ranged/melee still available on rope
             bool jOnRope = kb.IsKeyDown(Keys.J);
-            if (jOnRope && !_shootHeld && _shootCooldown <= 0f)
+            if (HasRangedWeapon && jOnRope && !_shootHeld && _shootCooldown <= 0f)
             {
                 _shootCooldown = ShootRate;
                 WantsToShoot = true;
@@ -607,7 +612,7 @@ public class Player
             _shootHeld = jOnRope;
 
             bool kOnRope = kb.IsKeyDown(Keys.K);
-            if (kOnRope && !_meleeHeld && _meleeCooldown <= 0f)
+            if (HasMeleeWeapon && kOnRope && !_meleeHeld && _meleeCooldown <= 0f)
             {
                 _meleeCooldown = MeleeRate;
                 WantsToMelee = true;
@@ -767,7 +772,7 @@ public class Player
 
             // Combat on wall
             bool jOnWall = kb.IsKeyDown(Keys.J);
-            if (jOnWall && !_shootHeld && _shootCooldown <= 0f)
+            if (HasRangedWeapon && jOnWall && !_shootHeld && _shootCooldown <= 0f)
             {
                 _shootCooldown = ShootRate;
                 WantsToShoot = true;
@@ -776,7 +781,7 @@ public class Player
             _shootHeld = jOnWall;
 
             bool kOnWall = kb.IsKeyDown(Keys.K);
-            if (kOnWall && !_meleeHeld && _meleeCooldown <= 0f)
+            if (HasMeleeWeapon && kOnWall && !_meleeHeld && _meleeCooldown <= 0f)
             {
                 _meleeCooldown = MeleeRate;
                 WantsToMelee = true;
@@ -947,7 +952,7 @@ public class Player
 
         // --- Right hand / Ranged (J) ---
         bool jPressed = kb.IsKeyDown(Keys.J);
-        if (jPressed && !_shootHeld && _shootCooldown <= 0f)
+        if (HasRangedWeapon && jPressed && !_shootHeld && _shootCooldown <= 0f)
         {
             _shootCooldown = ShootRate;
             WantsToShoot = true;
@@ -959,7 +964,7 @@ public class Player
         bool kPressed = kb.IsKeyDown(Keys.K);
 
         // Spinning melee: hold K while grounded
-        if (EnableSpinMelee && kPressed && _wasGrounded)
+        if (HasMeleeWeapon && EnableSpinMelee && kPressed && _wasGrounded)
         {
             _meleeHoldTimer += dt;
             if (_meleeHoldTimer >= SpinMeleeActivateTime)
@@ -991,7 +996,7 @@ public class Player
             }
         }
 
-        if (!IsSpinningMelee && kPressed && !_meleeHeld && _meleeCooldown <= 0f)
+        if (HasMeleeWeapon && !IsSpinningMelee && kPressed && !_meleeHeld && _meleeCooldown <= 0f)
         {
             _meleeCooldown = MeleeRate;
             WantsToMelee = true;

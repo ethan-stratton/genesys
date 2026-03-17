@@ -7,6 +7,15 @@ using Microsoft.Xna.Framework.Media;
 
 namespace ArenaShooter;
 
+public class ItemPickup
+{
+    public float X, Y;
+    public int W = 20, H = 20;
+    public string ItemType;
+    public bool Collected;
+    public Rectangle Rect => new((int)X, (int)Y, W, H);
+}
+
 public enum GameState { Title, Playing, Editing, Overworld }
 
 public class Game1 : Game
@@ -91,6 +100,20 @@ public class Game1 : Game
     private bool _eveDialogueExhausted; // used later for quest tracking
     #pragma warning restore CS0414
 
+    // --- Weapon system ---
+    private enum WeaponType { None, Stick, Sword, Axe, Sling, Bow, Gun }
+
+    private WeaponType[] _meleeInventory = Array.Empty<WeaponType>();
+    private int _meleeIndex = -1;
+
+    private WeaponType[] _rangedInventory = Array.Empty<WeaponType>();
+    private int _rangedIndex = -1;
+
+    private bool _debugSword;
+    private bool _debugGun;
+
+    private List<ItemPickup> _itemPickups = new();
+
     // --- Editor state ---
     private enum EditorTool { SolidFloor = 0, Platform = 1, Rope = 2, Wall = 3, Spike = 4, Exit = 5, Spawn = 6, WallSpike = 7, OverworldExit = 8, Ceiling = 9 }
     // Wall climbSide values: 0=both, 1=right face, -1=left face, 99=no climb (solid only)
@@ -136,6 +159,16 @@ public class Game1 : Game
             new() { Label = "Spin Melee", Get = () => _enableSpinMelee, Toggle = () => _enableSpinMelee = !_enableSpinMelee },
             new() { Label = "Flip", Get = () => _enableFlip, Toggle = () => _enableFlip = !_enableFlip },
             new() { Label = "Blade Dash", Get = () => _enableBladeDash, Toggle = () => _enableBladeDash = !_enableBladeDash },
+            new() { Label = "Debug Sword", Get = () => _debugSword, Toggle = () => {
+                _debugSword = !_debugSword;
+                if (_debugSword) EquipMelee(WeaponType.Sword);
+                else UnequipMelee(WeaponType.Sword);
+            }},
+            new() { Label = "Debug Gun", Get = () => _debugGun, Toggle = () => {
+                _debugGun = !_debugGun;
+                if (_debugGun) EquipRanged(WeaponType.Gun);
+                else UnequipRanged(WeaponType.Gun);
+            }},
             new() { Label = "EVE Orb", Get = () => _eveOrbActive, Toggle = () => _eveOrbActive = !_eveOrbActive },
             new() { Label = "Music", Get = () => _enableMusic, Toggle = () => { _enableMusic = !_enableMusic; if (_enableMusic) { MediaPlayer.IsRepeating = true; MediaPlayer.Play(_bgm); } else { MediaPlayer.Stop(); } } },
             new() { Label = "Quit Game", Get = () => false, Toggle = () => Exit(), IsAction = true },
@@ -157,6 +190,11 @@ public class Game1 : Game
         _level = LevelData.Load(path);
         Player.WorldLeft = _level.Bounds.Left;
         Player.WorldRight = _level.Bounds.Right;
+
+        // Load item pickups
+        _itemPickups.Clear();
+        foreach (var item in _level.Items)
+            _itemPickups.Add(new ItemPickup { X = item.X, Y = item.Y, W = item.W, H = item.H, ItemType = item.Type });
     }
 
     private void Restart()
@@ -266,6 +304,12 @@ public class Game1 : Game
                         _saveData = new SaveData();
                         _eveOrbActive = false;
                         _eveDialogueExhausted = false;
+                        _meleeInventory = Array.Empty<WeaponType>();
+                        _meleeIndex = -1;
+                        _rangedInventory = Array.Empty<WeaponType>();
+                        _rangedIndex = -1;
+                        _debugSword = false;
+                        _debugGun = false;
                         LoadLevel(DefaultLevel);
                         _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
                         _gameState = GameState.Playing;
@@ -400,6 +444,29 @@ public class Game1 : Game
         _player.EnableSpinMelee = _enableSpinMelee;
         _player.EnableFlip = _enableFlip;
         _player.EnableBladeDash = _enableBladeDash;
+
+        // Weapon system: set weapon availability and melee range
+        _player.HasMeleeWeapon = CurrentMelee != WeaponType.None;
+        _player.HasRangedWeapon = CurrentRanged != WeaponType.None;
+        _player.MeleeRangeOverride = CurrentMelee switch
+        {
+            WeaponType.Sword => 60,
+            WeaponType.Stick => 30,
+            _ => Player.MeleeRange
+        };
+
+        // Weapon cycling (only during gameplay, not editor)
+        if (!_menuOpen && !_dialogueOpen && _gameState == GameState.Playing)
+        {
+            if (kb.IsKeyDown(Keys.D1) && _prevKb.IsKeyUp(Keys.D1) && _rangedInventory.Length > 0)
+            {
+                _rangedIndex = (_rangedIndex + 1) % _rangedInventory.Length;
+            }
+            if (kb.IsKeyDown(Keys.D2) && _prevKb.IsKeyUp(Keys.D2) && _meleeInventory.Length > 0)
+            {
+                _meleeIndex = (_meleeIndex + 1) % _meleeInventory.Length;
+            }
+        }
 
         var wallsToPass = _enableWallClimb ? _level.WallRects : null;
         var wallSidesToPass = _enableWallClimb ? _level.WallClimbSides : null;
@@ -558,6 +625,28 @@ public class Game1 : Game
         _bullets.RemoveAll(b => b.IsDead);
         _enemies.RemoveAll(e => e.IsDead);
 
+        // Item pickups
+        {
+            var playerRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
+            for (int i = 0; i < _itemPickups.Count; i++)
+            {
+                var item = _itemPickups[i];
+                if (!item.Collected && playerRect.Intersects(item.Rect))
+                {
+                    item.Collected = true;
+                    switch (item.ItemType)
+                    {
+                        case "stick": EquipMelee(WeaponType.Stick); break;
+                        case "sword": EquipMelee(WeaponType.Sword); break;
+                        case "axe": EquipMelee(WeaponType.Axe); break;
+                        case "sling": EquipRanged(WeaponType.Sling); break;
+                        case "bow": EquipRanged(WeaponType.Bow); break;
+                        case "gun": EquipRanged(WeaponType.Gun); break;
+                    }
+                }
+            }
+        }
+
         // Spike collision
         if (!_isDead)
         {
@@ -690,6 +779,42 @@ public class Game1 : Game
         _prevKb = kb;
         base.Update(gameTime);
     }
+
+    // --- Weapon helpers ---
+    private void EquipMelee(WeaponType w)
+    {
+        var list = new List<WeaponType>(_meleeInventory);
+        if (!list.Contains(w)) list.Add(w);
+        _meleeInventory = list.ToArray();
+        _meleeIndex = Array.IndexOf(_meleeInventory, w);
+    }
+
+    private void UnequipMelee(WeaponType w)
+    {
+        var list = new List<WeaponType>(_meleeInventory);
+        list.Remove(w);
+        _meleeInventory = list.ToArray();
+        _meleeIndex = _meleeInventory.Length > 0 ? 0 : -1;
+    }
+
+    private void EquipRanged(WeaponType w)
+    {
+        var list = new List<WeaponType>(_rangedInventory);
+        if (!list.Contains(w)) list.Add(w);
+        _rangedInventory = list.ToArray();
+        _rangedIndex = Array.IndexOf(_rangedInventory, w);
+    }
+
+    private void UnequipRanged(WeaponType w)
+    {
+        var list = new List<WeaponType>(_rangedInventory);
+        list.Remove(w);
+        _rangedInventory = list.ToArray();
+        _rangedIndex = _rangedInventory.Length > 0 ? 0 : -1;
+    }
+
+    private WeaponType CurrentMelee => _meleeIndex >= 0 && _meleeIndex < _meleeInventory.Length ? _meleeInventory[_meleeIndex] : WeaponType.None;
+    private WeaponType CurrentRanged => _rangedIndex >= 0 && _rangedIndex < _rangedInventory.Length ? _rangedInventory[_rangedIndex] : WeaponType.None;
 
     private static Color ParseNpcColor(string name)
     {
@@ -1572,6 +1697,26 @@ public class Game1 : Game
         _spriteBatch.Draw(_pixel, new Rectangle(_level.PlayerSpawn.X - 2, _level.PlayerSpawn.Y - 2, Player.Width + 4, Player.Height + 4), Color.Cyan * 0.3f);
         _spriteBatch.Draw(_pixel, new Rectangle(_level.PlayerSpawn.X, _level.PlayerSpawn.Y, Player.Width, Player.Height), Color.Cyan * 0.5f);
 
+        // Draw item pickups
+        for (int i = 0; i < _itemPickups.Count; i++)
+        {
+            var item = _itemPickups[i];
+            if (!item.Collected)
+            {
+                var itemColor = item.ItemType switch
+                {
+                    "stick" => new Color(139, 90, 43),
+                    "sling" => Color.DarkKhaki,
+                    "sword" => Color.Silver,
+                    "axe" => Color.DarkGray,
+                    "bow" => new Color(160, 120, 60),
+                    "gun" => Color.SlateGray,
+                    _ => Color.White
+                };
+                _spriteBatch.Draw(_pixel, item.Rect, itemColor);
+            }
+        }
+
         // Draw NPCs in editor
         for (int i = 0; i < _level.Npcs.Length; i++)
         {
@@ -2346,6 +2491,14 @@ public class Game1 : Game
         {
             // Minimal HUD
             _spriteBatch.DrawString(_font, "[Esc] Menu", new Vector2(10, 10), Color.Gray * 0.5f);
+
+            // Weapon HUD
+            {
+                string rangedName = CurrentRanged != WeaponType.None ? CurrentRanged.ToString() : "---";
+                string meleeName = CurrentMelee != WeaponType.None ? CurrentMelee.ToString() : "---";
+                _spriteBatch.DrawString(_font, SafeText($"[1] {rangedName}"), new Vector2(10, 570), Color.White * 0.7f);
+                _spriteBatch.DrawString(_font, SafeText($"[2] {meleeName}"), new Vector2(130, 570), Color.White * 0.7f);
+            }
         }
 
         // Dialogue box

@@ -22,6 +22,7 @@ public class LevelData
     [JsonPropertyName("wallSpikes")] public WallSpikeData[] WallSpikes { get; set; } = Array.Empty<WallSpikeData>();
     [JsonPropertyName("exits")] public ExitData[] Exits { get; set; } = Array.Empty<ExitData>();
     [JsonPropertyName("npcs")] public NpcData[] Npcs { get; set; } = Array.Empty<NpcData>();
+    [JsonPropertyName("items")] public ItemData[] Items { get; set; } = Array.Empty<ItemData>();
 
     // Derived arrays (populated after load)
     [JsonIgnore] public Rectangle[] PlatformRects { get; private set; } = Array.Empty<Rectangle>();
@@ -39,6 +40,7 @@ public class LevelData
     [JsonIgnore] public string[] ExitIds { get; private set; } = Array.Empty<string>();
     [JsonIgnore] public string[] ExitTargetExitIds { get; private set; } = Array.Empty<string>();
     [JsonIgnore] public Rectangle[] NpcRects { get; private set; } = Array.Empty<Rectangle>();
+    [JsonIgnore] public Rectangle[] ItemRects { get; private set; } = Array.Empty<Rectangle>();
     [JsonIgnore] public float[] RopeXPositions { get; private set; } = Array.Empty<float>();
     [JsonIgnore] public float[] RopeTops { get; private set; } = Array.Empty<float>();
     [JsonIgnore] public float[] RopeBottoms { get; private set; } = Array.Empty<float>();
@@ -139,6 +141,14 @@ public class LevelData
             RopeTops[i] = Ropes[i].Top;
             RopeBottoms[i] = Ropes[i].Bottom;
         }
+
+        // Items
+        ItemRects = new Rectangle[Items.Length];
+        for (int i = 0; i < Items.Length; i++)
+        {
+            var item = Items[i];
+            ItemRects[i] = new Rectangle((int)item.X, (int)item.Y, item.W, item.H);
+        }
     }
 
     public static LevelData Load(string path)
@@ -213,6 +223,16 @@ public class ExitData
     [JsonPropertyName("targetLevel")] public string TargetLevel { get; set; } = "";
     [JsonPropertyName("id")] public string Id { get; set; } = "";
     [JsonPropertyName("targetExitId")] public string TargetExitId { get; set; } = "";
+}
+
+public class ItemData
+{
+    [JsonPropertyName("id")] public string Id { get; set; } = "";
+    [JsonPropertyName("type")] public string Type { get; set; } = "";
+    [JsonPropertyName("x")] public float X { get; set; }
+    [JsonPropertyName("y")] public float Y { get; set; }
+    [JsonPropertyName("w")] public int W { get; set; } = 20;
+    [JsonPropertyName("h")] public int H { get; set; } = 20;
 }
 
 public class NpcData

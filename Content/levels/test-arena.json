@@ -152,7 +152,13 @@
         "When you are ready, seek the descent to the east.",
         "I will be watching."
       ],
-      "dialogueSpeakers": ["EVE", "EVE", "EVE", "EVE", "EVE"]
+      "dialogueSpeakers": [
+        "EVE",
+        "EVE",
+        "EVE",
+        "EVE",
+        "EVE"
+      ]
     },
     {
       "id": "native-1",
@@ -173,7 +179,27 @@
         "Stand aside; my blades are hungry for the path, not for your life.",
         "..."
       ],
-      "dialogueSpeakers": ["The Native", "The Native", "", "Admin", "Admin", "Admin", "Admin", "Admin", ""]
+      "dialogueSpeakers": [
+        "The Native",
+        "The Native",
+        "",
+        "Admin",
+        "Admin",
+        "Admin",
+        "Admin",
+        "Admin",
+        ""
+      ]
+    }
+  ],
+  "items": [
+    {
+      "id": "stick-1",
+      "type": "stick",
+      "x": 200,
+      "y": 280,
+      "w": 24,
+      "h": 8
     }
   ]
 }
