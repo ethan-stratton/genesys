@@ -43,14 +43,10 @@ public class Game1 : Game
     private Player _player;
 
     private List<Bullet> _bullets;
-    private List<Enemy> _enemies;
     private List<InsectSwarm> _swarms = new();
     private List<Crawler> _crawlers = new();
     private List<Thornback> _thornbacks = new();
 
-    private float _spawnTimer;
-    private const float InitialSpawnInterval = 1.5f;
-    private float _spawnInterval;
     private Random _rng;
 
     private bool _isDead;
@@ -77,7 +73,7 @@ public class Game1 : Game
     private SettingEntry[] _settings;
 
     // Toggleable gameplay options
-    private bool _spawnEnemies;
+    private bool _enemiesEnabled = true;
     private bool _enableSlide = true;
     private bool _enableCartwheel = true;
     private bool _enableDash = true;
@@ -161,7 +157,7 @@ public class Game1 : Game
 
         _settings = new SettingEntry[]
         {
-            new() { Label = "Enemies", Get = () => _spawnEnemies, Toggle = () => _spawnEnemies = !_spawnEnemies },
+            new() { Label = "Enemies", Get = () => _enemiesEnabled, Toggle = () => _enemiesEnabled = !_enemiesEnabled },
             new() { Label = "Slide", Get = () => _enableSlide, Toggle = () => _enableSlide = !_enableSlide },
             new() { Label = "Cartwheel", Get = () => _enableCartwheel, Toggle = () => _enableCartwheel = !_enableCartwheel },
             new() { Label = "Dash (run)", Get = () => _enableDash, Toggle = () => _enableDash = !_enableDash },
@@ -247,9 +243,6 @@ public class Game1 : Game
         _player = new Player(new Vector2(spawn.X, spawn.Y));
         _camera?.SnapTo(_player.Position, Player.Width, Player.Height);
         _bullets = new List<Bullet>();
-        _enemies = new List<Enemy>();
-        _spawnTimer = 0f;
-        _spawnInterval = InitialSpawnInterval;
         _rng = new Random();
 
         _isDead = false;
@@ -338,7 +331,6 @@ public class Game1 : Game
                             _player = new Player(new Microsoft.Xna.Framework.Vector2(_saveData.SpawnX, _saveData.SpawnY));
                             _camera.SnapTo(_player.Position, Player.Width, Player.Height);
                             _bullets = new List<Bullet>();
-                            _enemies = new List<Enemy>();
                             _prevInExit = new bool[_level.ExitRects.Length];
                             for (int k = 0; k < _prevInExit.Length; k++)
                                 _prevInExit[k] = true;
@@ -642,68 +634,9 @@ public class Game1 : Game
         _bullets.ForEach(b => b.Update(dt));
         _bullets.RemoveAll(b => b.IsDead);
 
-        // Spawn enemies
-        if (_spawnEnemies)
+        // Update all enemies (swarms, crawlers, thornbacks)
+        if (_enemiesEnabled)
         {
-            _spawnTimer += dt;
-            if (_spawnTimer >= _spawnInterval)
-            {
-                _spawnTimer = 0;
-                _spawnInterval = MathF.Max(0.3f, _spawnInterval - 0.03f);
-
-                var fromLeft = _rng.Next(2) == 0;
-                var pos = new Vector2(
-                    fromLeft ? _level.Bounds.Left - Enemy.Size : _level.Bounds.Right,
-                    _level.Floor.Y - Enemy.Size
-                );
-                _enemies.Add(new Enemy(pos));
-            }
-        }
-
-        // Update enemies
-        _enemies.ForEach(e => e.Update(dt, PlayerCenter));
-
-        // Check collisions
-        foreach (var e in _enemies)
-        {
-            var eRect = new Rectangle((int)e.Position.X, (int)e.Position.Y, Enemy.Size, Enemy.Size);
-            foreach (var b in _bullets)
-            {
-                var bRect = new Rectangle((int)b.Position.X, (int)b.Position.Y, Bullet.Size, Bullet.Size);
-                if (bRect.Intersects(eRect)) { e.IsDead = true; b.IsDead = true; }
-            }
-            if (_player.MeleeTimer > 0 && _player.MeleeHitbox.Intersects(eRect))
-            {
-                e.IsDead = true;
-            }
-            if (_player.IsVaultKicking && _player.VaultKickHitbox.Intersects(eRect))
-            {
-                e.IsDead = true;
-            }
-            if (_player.IsUppercutting && _player.UppercutHitbox.Intersects(eRect))
-            {
-                e.IsDead = true;
-            }
-            if (_player.IsBladeDashing && _player.BladeDashHitbox.Intersects(eRect))
-            {
-                e.IsDead = true;
-            }
-            var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
-            if (!_player.IsSliding && !_player.IsCartwheeling && !_player.IsVaulting && !_player.IsVaultKicking && !_player.IsUppercutting && !_player.IsFlipping && !_player.IsBladeDashing && eRect.Intersects(pRect))
-            {
-                if (_spawnInvincibility <= 0f)
-                {
-                    _player.TakeDamage(33);
-                    if (_player.Hp <= 0) _isDead = true;
-                }
-                break;
-            }
-        }
-
-        _bullets.RemoveAll(b => b.IsDead);
-        _enemies.RemoveAll(e => e.IsDead);
-
-        // Update insect swarms
         var playerCenter2 = new Vector2(_player.Position.X + Player.Width / 2f, _player.Position.Y + Player.Height / 2f);
         var playerRect2 = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
         foreach (var swarm in _swarms)
@@ -785,6 +718,7 @@ public class Game1 : Game
                 { t.TakeHit(1); b.IsDead = true; break; }
             }
         }
+        } // end _enemiesEnabled
 
         // Check HP death
         if (_player.Hp <= 0 && !_isDead)
@@ -3088,15 +3022,13 @@ public class Game1 : Game
             }
         }
 
-        // Draw insect swarms
-        foreach (var swarm in _swarms)
+        // Draw enemies (swarms, crawlers, thornbacks)
+        if (_enemiesEnabled)
         {
-            swarm.Draw(_spriteBatch, _pixel);
+            foreach (var swarm in _swarms) swarm.Draw(_spriteBatch, _pixel);
+            foreach (var c in _crawlers) c.Draw(_spriteBatch, _pixel);
+            foreach (var t in _thornbacks) t.Draw(_spriteBatch, _pixel);
         }
-
-        // Draw crawlers and thornbacks
-        foreach (var c in _crawlers) c.Draw(_spriteBatch, _pixel);
-        foreach (var t in _thornbacks) t.Draw(_spriteBatch, _pixel);
 
         // Draw player
         if (!_isDead)
@@ -3122,9 +3054,6 @@ public class Game1 : Game
 
         // Draw bullets
         _bullets.ForEach(b => b.Draw(_spriteBatch, _pixel));
-
-        // Draw enemies
-        _enemies.ForEach(e => e.Draw(_spriteBatch, _pixel));
 
         _spriteBatch.End();
 

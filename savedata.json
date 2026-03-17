@@ -1,10 +1,19 @@
 {
-  "currentLevel": "the-descent",
-  "spawnX": 14,
+  "currentLevel": "test-arena",
+  "spawnX": 1159,
   "spawnY": 500,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 303.33673
+  "playTime": 342.62714,
+  "meleeInventory": [
+    "Stick"
+  ],
+  "rangedInventory": [],
+  "meleeIndex": 0,
+  "rangedIndex": -1,
+  "collectedItems": [
+    "stick-1"
+  ]
 }
