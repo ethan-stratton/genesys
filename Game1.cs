@@ -601,6 +601,9 @@ public class Game1 : Game
             {
                 if (pRect.Intersects(_level.NpcRects[i]) && _level.Npcs[i].Dialogue.Length > 0)
                 {
+                    // Skip EVE's NPC spot once she's become the companion orb
+                    if (_level.Npcs[i].Id == "eve" && _eveOrbActive) continue;
+
                     _dialogueOpen = true;
                     // Resume if same NPC, otherwise start fresh
                     if (_dialogueNpcIndex != i)
@@ -1694,7 +1697,6 @@ public class Game1 : Game
         foreach (var p in _level.Platforms)
         {
             float surfaceY = p.Y - entityH;
-            // Entity overlaps platform horizontally?
             if (x + entityW > p.X && x < p.X + p.W && surfaceY >= y - 20 && surfaceY < bestY)
                 bestY = surfaceY;
         }
@@ -1703,6 +1705,13 @@ public class Game1 : Game
         {
             float surfaceY = sf.Y - entityH;
             if (x + entityW > sf.X && x < sf.X + sf.W && surfaceY >= y - 20 && surfaceY < bestY)
+                bestY = surfaceY;
+        }
+        // Check wall tops (walls can be stood on)
+        foreach (var w in _level.Walls)
+        {
+            float surfaceY = w.Y - entityH;
+            if (x + entityW > w.X && x < w.X + w.W && surfaceY >= y - 20 && surfaceY < bestY)
                 bestY = surfaceY;
         }
         
