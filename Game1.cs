@@ -130,7 +130,7 @@ public class Game1 : Game
     private List<ItemPickup> _itemPickups = new();
 
     // --- Editor state ---
-    private enum EditorTool { SolidFloor = 0, Platform = 1, Rope = 2, Wall = 3, Spike = 4, Exit = 5, Spawn = 6, WallSpike = 7, OverworldExit = 8, Ceiling = 9 }
+    private enum EditorTool { SolidFloor = 0, Platform = 1, Rope = 2, Wall = 3, Spike = 4, Exit = 5, Spawn = 6, WallSpike = 7, OverworldExit = 8, Ceiling = 9, TilePaint = 10 }
     // Wall climbSide values: 0=both, 1=right face, -1=left face, 99=no climb (solid only)
     private EditorTool _editorTool = EditorTool.Platform;
     private bool _toolPaletteOpen;
@@ -151,6 +151,10 @@ public class Game1 : Game
     private bool _entityPaletteOpen;
     private int _entityPaletteCursor;
     private enum EntityType { Swarm, Crawler, Thornback, Tree }
+
+    // Tile paint state
+    private int _tilePaletteCursor;
+    private TileType _selectedTileType = TileType.Dirt;
 
     public Game1()
     {
@@ -1025,6 +1029,7 @@ public class Game1 : Game
             if (kb.IsKeyDown(Keys.D7) && _prevKb.IsKeyUp(Keys.D7)) { _editorTool = EditorTool.WallSpike; _toolPaletteOpen = false; }
             if (kb.IsKeyDown(Keys.D8) && _prevKb.IsKeyUp(Keys.D8)) { _editorTool = EditorTool.OverworldExit; _toolPaletteOpen = false; }
             if (kb.IsKeyDown(Keys.D9) && _prevKb.IsKeyUp(Keys.D9)) { _editorTool = EditorTool.Ceiling; _toolPaletteOpen = false; }
+            if (kb.IsKeyDown(Keys.T) && _prevKb.IsKeyUp(Keys.T)) { _editorTool = EditorTool.TilePaint; _toolPaletteOpen = false; }
 
             // Space/Enter confirm and close
             if ((kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space)) ||
@@ -1103,7 +1108,9 @@ public class Game1 : Game
         {
             SaveLevel(); // auto-save on exit editor
             _gameState = GameState.Playing;
-            // Rebuild level arrays
+            // Rebuild level arrays (sync tile grid data)
+            if (_level.TileGridInstance != null)
+                _level.TileGrid = _level.TileGridInstance.ToData();
             _level.Build();
             _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
             Restart();
@@ -1159,6 +1166,59 @@ public class Game1 : Game
                 MathF.Round(worldMouse.X / _editorGridSize) * _editorGridSize,
                 MathF.Round(worldMouse.Y / _editorGridSize) * _editorGridSize)
             : worldMouse;
+
+        // Initialize tile grid if needed when entering tile paint mode
+        if (_editorTool == EditorTool.TilePaint && _level.TileGridInstance == null)
+        {
+            int gridW = (_level.Bounds.Right - _level.Bounds.Left) / 32 + 2;
+            int gridH = (_level.Bounds.Bottom - _level.Bounds.Top) / 32 + 2;
+            _level.TileGridInstance = new TileGrid(gridW, gridH, 32, _level.Bounds.Left, _level.Bounds.Top);
+        }
+
+        // Tile paint mode — continuous paint/erase with mouse
+        if (_editorTool == EditorTool.TilePaint && _level.TileGridInstance != null)
+        {
+            var tg = _level.TileGridInstance;
+            // Snap to 32x32 tile grid
+            int tileSnappedX = (int)MathF.Floor(worldMouse.X / 32f) * 32;
+            int tileSnappedY = (int)MathF.Floor(worldMouse.Y / 32f) * 32;
+
+            // Left click/hold = paint
+            if (mouse.LeftButton == ButtonState.Pressed && !kb.IsKeyDown(Keys.T))
+            {
+                var (tx, ty) = tg.WorldToTile(tileSnappedX, tileSnappedY);
+                if (tx >= 0 && ty >= 0)
+                {
+                    tg.SetTileAt(tx, ty, _selectedTileType);
+                }
+            }
+            // Right click/hold = erase
+            if (mouse.RightButton == ButtonState.Pressed)
+            {
+                var (tx, ty) = tg.WorldToTile(tileSnappedX, tileSnappedY);
+                if (tx >= 0 && ty >= 0)
+                {
+                    tg.SetTileAt(tx, ty, TileType.Empty);
+                }
+            }
+
+            // Cycle tile type with [ and ]
+            if (kb.IsKeyDown(Keys.OemOpenBrackets) && _prevKb.IsKeyUp(Keys.OemOpenBrackets))
+            {
+                _tilePaletteCursor = (_tilePaletteCursor - 1 + TileProperties.PaletteTiles.Length) % TileProperties.PaletteTiles.Length;
+                _selectedTileType = TileProperties.PaletteTiles[_tilePaletteCursor];
+                SetEditorStatus($"Tile: {_selectedTileType}");
+            }
+            if (kb.IsKeyDown(Keys.OemCloseBrackets) && _prevKb.IsKeyUp(Keys.OemCloseBrackets))
+            {
+                _tilePaletteCursor = (_tilePaletteCursor + 1) % TileProperties.PaletteTiles.Length;
+                _selectedTileType = TileProperties.PaletteTiles[_tilePaletteCursor];
+                SetEditorStatus($"Tile: {_selectedTileType}");
+            }
+
+            // Skip normal drag placement when in tile paint mode
+            return; // tile paint handles its own input
+        }
 
         // Left click — place / start drag (not when G is held for grab)
         if (mouse.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released && !kb.IsKeyDown(Keys.T))
@@ -1912,6 +1972,10 @@ public class Game1 : Game
         if (!string.IsNullOrEmpty(dir) && !System.IO.Directory.Exists(dir))
             System.IO.Directory.CreateDirectory(dir);
 
+        // Sync tile grid instance to serializable data
+        if (_level.TileGridInstance != null)
+            _level.TileGrid = _level.TileGridInstance.ToData();
+
         var opts = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
         var json = System.Text.Json.JsonSerializer.Serialize(_level, opts);
         System.IO.File.WriteAllText(_editorSaveFile, json);
@@ -1945,6 +2009,63 @@ public class Game1 : Game
                 _spriteBatch.Draw(_pixel, new Rectangle(gx, (int)topLeft.Y, 1, (int)(botRight.Y - topLeft.Y)), Color.White * 0.04f);
             for (int gy = startY; gy < (int)botRight.Y; gy += gs)
                 _spriteBatch.Draw(_pixel, new Rectangle((int)topLeft.X, gy, (int)(botRight.X - topLeft.X), 1), Color.White * 0.04f);
+        }
+
+        // Draw tile grid
+        if (_level.TileGridInstance != null)
+        {
+            var tg = _level.TileGridInstance;
+            var camInv2 = Matrix.Invert(_camera.TransformMatrix);
+            var tl = Vector2.Transform(Vector2.Zero, camInv2);
+            var br = Vector2.Transform(new Vector2(800, 600), camInv2);
+            int startTX = Math.Max(0, ((int)tl.X - tg.OriginX) / tg.TileSize - 1);
+            int startTY = Math.Max(0, ((int)tl.Y - tg.OriginY) / tg.TileSize - 1);
+            int endTX = Math.Min(tg.Width, ((int)br.X - tg.OriginX) / tg.TileSize + 2);
+            int endTY = Math.Min(tg.Height, ((int)br.Y - tg.OriginY) / tg.TileSize + 2);
+
+            for (int ty = startTY; ty < endTY; ty++)
+            {
+                for (int tx = startTX; tx < endTX; tx++)
+                {
+                    var tile = tg.Tiles[tx, ty];
+                    if (tile == TileType.Empty) continue;
+                    int wx = tg.OriginX + tx * tg.TileSize;
+                    int wy = tg.OriginY + ty * tg.TileSize;
+                    var rect = new Rectangle(wx, wy, tg.TileSize, tg.TileSize);
+                    var color = TileProperties.GetColor(tile);
+
+                    if (TileProperties.IsPlatform(tile))
+                    {
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 4), color);
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 2), Color.White * 0.3f);
+                    }
+                    else if (TileProperties.IsHazard(tile))
+                    {
+                        _spriteBatch.Draw(_pixel, rect, color * 0.7f);
+                    }
+                    else
+                    {
+                        _spriteBatch.Draw(_pixel, rect, color);
+                        // Accent on top edge for grass
+                        if (tile == TileType.Grass)
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 4), TileProperties.GetAccentColor(tile));
+                    }
+
+                    // Subtle grid border
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 1), Color.Black * 0.15f);
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, tg.TileSize), Color.Black * 0.15f);
+                }
+            }
+
+            // Ghost preview at cursor for tile paint mode
+            if (_editorTool == EditorTool.TilePaint)
+            {
+                var wm = Vector2.Transform(new Vector2(mouse.X, mouse.Y), Matrix.Invert(_camera.TransformMatrix));
+                int gx = (int)MathF.Floor(wm.X / 32f) * 32;
+                int gy = (int)MathF.Floor(wm.Y / 32f) * 32;
+                _spriteBatch.Draw(_pixel, new Rectangle(gx, gy, 32, 32), TileProperties.GetColor(_selectedTileType) * 0.4f);
+                DrawHollowRect(gx, gy, 32, 32, Color.White * 0.5f);
+            }
         }
 
         // Draw platforms
@@ -2178,7 +2299,7 @@ public class Game1 : Game
         _spriteBatch.Begin();
 
         // Toolbar
-        string[] toolNames = { "0:Floor", "1:Plat", "2:Rope", "3:Wall", "4:Spike", "5:Exit", "6:Spawn", "7:WSpike", "8:Overworld", "9:Ceiling" };
+        string[] toolNames = { "0:Floor", "1:Plat", "2:Rope", "3:Wall", "4:Spike", "5:Exit", "6:Spawn", "7:WSpike", "8:Overworld", "9:Ceiling", "T:Tile" };
         float tx = 10;
         for (int i = 0; i < toolNames.Length; i++)
         {
@@ -2201,7 +2322,27 @@ public class Game1 : Game
             _spriteBatch.DrawString(_font, SafeText(_editorStatusMsg), new Vector2(10, 570), Color.Yellow);
 
         // Controls hint
-        _spriteBatch.DrawString(_font, "[=] Play  [Esc] Menu  [Q] Tools  [E] Entities  [Drag] Place  [RClick] Delete  [Tab] Target", new Vector2(10, 550), Color.Gray * 0.35f);
+        string controlsHint = _editorTool == EditorTool.TilePaint
+            ? "[=] Play  [Esc] Menu  [Q] Tools  [LClick] Paint  [RClick] Erase  [[ ]] Tile Type"
+            : "[=] Play  [Esc] Menu  [Q] Tools  [E] Entities  [Drag] Place  [RClick] Delete  [Tab] Target";
+        _spriteBatch.DrawString(_font, controlsHint, new Vector2(10, 550), Color.Gray * 0.35f);
+
+        // Tile type indicator when in tile paint mode
+        if (_editorTool == EditorTool.TilePaint)
+        {
+            string tileInfo = $"Tile: {_selectedTileType}  [{_tilePaletteCursor + 1}/{TileProperties.PaletteTiles.Length}]";
+            _spriteBatch.DrawString(_font, SafeText(tileInfo), new Vector2(400, 30), Color.Yellow);
+            // Mini palette
+            for (int i = 0; i < TileProperties.PaletteTiles.Length; i++)
+            {
+                var tt = TileProperties.PaletteTiles[i];
+                bool sel = i == _tilePaletteCursor;
+                int px = 400 + i * 20;
+                _spriteBatch.Draw(_pixel, new Rectangle(px, 50, 16, 16), TileProperties.GetColor(tt));
+                if (sel)
+                    DrawHollowRect(px - 1, 49, 18, 18, Color.White);
+            }
+        }
 
         // Tool palette overlay
         if (_toolPaletteOpen)
@@ -2209,7 +2350,7 @@ public class Game1 : Game
             // Semi-transparent background
             _spriteBatch.Draw(_pixel, new Rectangle(0, 0, 800, 600), Color.Black * 0.7f);
 
-            string[] paletteNames = { "Solid Floor", "Platform", "Rope", "Wall", "Spike", "Exit", "Spawn", "Wall Spike", "Overworld Exit", "Ceiling" };
+            string[] paletteNames = { "Solid Floor", "Platform", "Rope", "Wall", "Spike", "Exit", "Spawn", "Wall Spike", "Overworld Exit", "Ceiling", "Tile Paint" };
             int paletteCount = paletteNames.Length;
             float palW = 260f;
             float palLineH = 24f;
@@ -2895,6 +3036,56 @@ public class Game1 : Game
         {
             _spriteBatch.Draw(_pixel, plat, new Color(50, 50, 50));
             _spriteBatch.Draw(_pixel, new Rectangle(plat.X, plat.Y, plat.Width, 2), new Color(90, 90, 90));
+        }
+
+        // Draw tile grid (gameplay)
+        if (_level.TileGridInstance != null)
+        {
+            var tg = _level.TileGridInstance;
+            var camInvG = Matrix.Invert(_camera.TransformMatrix);
+            var tlG = Vector2.Transform(Vector2.Zero, camInvG);
+            var brG = Vector2.Transform(new Vector2(800, 600), camInvG);
+            int stx = Math.Max(0, ((int)tlG.X - tg.OriginX) / tg.TileSize - 1);
+            int sty = Math.Max(0, ((int)tlG.Y - tg.OriginY) / tg.TileSize - 1);
+            int etx = Math.Min(tg.Width, ((int)brG.X - tg.OriginX) / tg.TileSize + 2);
+            int ety = Math.Min(tg.Height, ((int)brG.Y - tg.OriginY) / tg.TileSize + 2);
+
+            for (int ty = sty; ty < ety; ty++)
+            {
+                for (int tx = stx; tx < etx; tx++)
+                {
+                    var tile = tg.Tiles[tx, ty];
+                    if (tile == TileType.Empty) continue;
+                    int wx = tg.OriginX + tx * tg.TileSize;
+                    int wy = tg.OriginY + ty * tg.TileSize;
+                    var color = TileProperties.GetColor(tile);
+
+                    if (TileProperties.IsPlatform(tile))
+                    {
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 4), color);
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 2), new Color(90, 90, 90));
+                    }
+                    else if (TileProperties.IsHazard(tile))
+                    {
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, tg.TileSize), color * 0.8f);
+                        int teeth = tg.TileSize / 12;
+                        for (int t = 0; t < teeth; t++)
+                        {
+                            int ttx = wx + t * 12 + 2;
+                            _spriteBatch.Draw(_pixel, new Rectangle(ttx, wy - 4, 8, 4), Color.Red * 0.6f);
+                            _spriteBatch.Draw(_pixel, new Rectangle(ttx + 2, wy - 8, 4, 4), Color.Red * 0.4f);
+                        }
+                    }
+                    else
+                    {
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, tg.TileSize), color);
+                        if (tile == TileType.Grass)
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 4), TileProperties.GetAccentColor(tile));
+                        // Top edge highlight for solid
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 1), Color.White * 0.1f);
+                    }
+                }
+            }
         }
 
         // Draw spikes
