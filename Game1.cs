@@ -510,6 +510,7 @@ public class Game1 : Game
         var ropeBottomsToPass = _enableRopeClimb ? _level.RopeBottoms : null;
 
         _player.Update(dt, kb, _level.Floor.Y, _level.AllPlatforms, ropesToPass, ropeTopsToPass, ropeBottomsToPass, wallsToPass, wallSidesToPass, _level.WallRects, _level.CeilingRects, _level.SolidFloorRects);
+        _player.UpdateRegen(dt);
 
         // Track play time
         if (_saveData != null) _saveData.PlayTime += dt;
@@ -652,7 +653,10 @@ public class Game1 : Game
             if (!_player.IsSliding && !_player.IsCartwheeling && !_player.IsVaulting && !_player.IsVaultKicking && !_player.IsUppercutting && !_player.IsFlipping && !_player.IsBladeDashing && eRect.Intersects(pRect))
             {
                 if (_spawnInvincibility <= 0f)
-                    _isDead = true;
+                {
+                    _player.TakeDamage(33);
+                    if (_player.Hp <= 0) _isDead = true;
+                }
                 break;
             }
         }
@@ -731,7 +735,10 @@ public class Game1 : Game
                 if (pRect.Intersects(spike))
                 {
                     if (_spawnInvincibility <= 0f)
-                        _isDead = true;
+                    {
+                        _player.TakeDamage(33);
+                        if (_player.Hp <= 0) _isDead = true;
+                    }
                     break;
                 }
             }

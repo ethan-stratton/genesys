@@ -183,13 +183,35 @@ public class Player
     public int Hp { get; set; } = 100;
     public float DamageCooldown { get; set; }
     private const float DamageCooldownTime = 0.3f;
+    private float _regenDelay; // time since last damage
+    private const float RegenStartDelay = 2.0f; // 2s before regen kicks in
+    private float _regenAccum; // fractional HP accumulator
+    private const float RegenRate = 5f; // HP per second (slow)
 
     public void TakeDamage(int amount)
     {
         if (DamageCooldown > 0) return;
         Hp -= amount;
         DamageCooldown = DamageCooldownTime;
+        _regenDelay = 0f;
+        _regenAccum = 0f;
         if (Hp <= 0) Hp = 0;
+    }
+
+    public void UpdateRegen(float dt)
+    {
+        if (Hp >= MaxHp || Hp <= 0) return;
+        _regenDelay += dt;
+        if (_regenDelay >= RegenStartDelay)
+        {
+            _regenAccum += RegenRate * dt;
+            if (_regenAccum >= 1f)
+            {
+                int heal = (int)_regenAccum;
+                Hp = Math.Min(Hp + heal, MaxHp);
+                _regenAccum -= heal;
+            }
+        }
     }
 
     // Feature toggles (set by Game1 from settings menu)
