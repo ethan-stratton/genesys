@@ -51,7 +51,7 @@ public class Hopper
 
     public Rectangle Rect => new((int)Position.X, (int)Position.Y, Width, Height);
 
-    public void Update(float dt, Vector2 playerCenter, Rectangle[] solidFloors, Rectangle[] platforms)
+    public void Update(float dt, Vector2 playerCenter, Rectangle[] solidFloors, Rectangle[] platforms, float floorY)
     {
         if (!Alive) return;
         if (DamageCooldown > 0) DamageCooldown -= dt;
@@ -125,6 +125,11 @@ public class Hopper
                                 break;
                             }
                         }
+                    }
+                    // Check main floor
+                    if (!_onGround && Position.Y + Height >= floorY)
+                    {
+                        Land(floorY - Height);
                     }
                 }
                 return; // skip position clamping below

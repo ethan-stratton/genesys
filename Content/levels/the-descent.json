@@ -516,6 +516,13 @@
       "x": 192,
       "y": 224,
       "count": 1
+    },
+    {
+      "id": "hopper-3",
+      "type": "hopper",
+      "x": 380,
+      "y": 373,
+      "count": 1
     }
   ],
   "tileGrid": {

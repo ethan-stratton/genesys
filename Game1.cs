@@ -731,7 +731,7 @@ public class Game1 : Game
         // Update hoppers
         foreach (var h in _hoppers)
         {
-            h.Update(dt, playerCenter2, _level.SolidFloorRects, _level.AllPlatforms);
+            h.Update(dt, playerCenter2, _level.SolidFloorRects, _level.AllPlatforms, _level.Floor.Y);
             if (_spawnInvincibility <= 0 && !_isDead)
             {
                 int dmg = h.CheckPlayerDamage(playerRect2);
