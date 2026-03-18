@@ -60,6 +60,12 @@ public class Game1 : Game
     private bool[] _prevInExit = Array.Empty<bool>();
     private KeyboardState _prevKb;
 
+    // Room transition effect
+    private float _transitionTimer;
+    private float _transitionDuration = 0.5f; // total fade time (fade out + fade in)
+    private bool _transitionActive;
+    private float _transitionAlpha; // 0 = clear, 1 = black
+
     // Level data (loaded from JSON)
     private LevelData _level;
     private const string DefaultLevel = "Content/levels/test-arena.json";
@@ -515,6 +521,21 @@ public class Game1 : Game
         var dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
         _totalTime += dt;
 
+        // Room transition fade
+        if (_transitionActive)
+        {
+            _transitionTimer -= dt;
+            if (_transitionTimer > _transitionDuration * 0.5f)
+                _transitionAlpha = 1f - (_transitionTimer - _transitionDuration * 0.5f) / (_transitionDuration * 0.5f);
+            else if (_transitionTimer > 0)
+                _transitionAlpha = _transitionTimer / (_transitionDuration * 0.5f);
+            else
+            {
+                _transitionActive = false;
+                _transitionAlpha = 0f;
+            }
+        }
+
         // Spawn invincibility countdown
         if (_spawnInvincibility > 0f)
             _spawnInvincibility -= dt;
@@ -888,6 +909,8 @@ public class Game1 : Game
                         for (int k = 0; k < _prevInExit.Length; k++)
                             _prevInExit[k] = true;
                         transitioned = true;
+                        _transitionActive = true;
+                        _transitionTimer = _transitionDuration;
 
                         if (_saveData != null)
                         {
@@ -3076,44 +3099,39 @@ public class Game1 : Game
                     lineW = row + 1;
                     break;
                 case TileType.GentleUpRight:
-                    // Gentle rise to right: 16px rise over 32px run
-                    // At row=0 (top), nothing. Surface starts at row=ts/2.
+                    // Rises right: surface from (0,ts) to (ts,ts/2)
+                    // At row r, fill from the surface X to the right edge
+                    // Surface X at row r: x where the line y=r intersects
+                    // Line: y = ts - (x/ts)*(ts/2) → x = (ts - y) * 2
                     {
-                        float surfaceRow = ts - (float)(ts - row) * 0.5f; // surface at this row
-                        // Fill from surface down
-                        int fillStart = (int)(ts / 2f + (float)row / ts * (ts / 2f));
-                        if (row < fillStart) continue;
-                        // Surface X: at row, how much of the width is filled?
-                        // Bottom row (row=ts-1): full width. Half-height row: nothing.
-                        float frac = (float)(row - ts / 2) / (ts / 2f);
-                        if (frac < 0) continue;
-                        lineW = ts;
-                        lineX = wx + (int)((1f - frac) * ts);
-                        lineW = ts - (lineX - wx);
-                        if (lineW <= 0) continue;
+                        if (row < ts / 2) continue; // above the highest point
+                        int surfX = (int)((ts - row) * 2f);
+                        if (surfX >= ts) continue;
+                        lineX = wx + surfX;
+                        lineW = ts - surfX;
                     }
                     break;
                 case TileType.GentleUpLeft:
+                    // Rises left: surface from (0,ts/2) to (ts,ts)
                     {
-                        float frac = (float)(row - ts / 2) / (ts / 2f);
-                        if (frac < 0) continue;
+                        if (row < ts / 2) continue;
+                        int fillW = (int)((row - ts / 2) * 2f) + 1;
+                        if (fillW > ts) fillW = ts;
                         lineX = wx;
-                        lineW = (int)(frac * ts) + 1;
-                        if (lineW <= 0) continue;
+                        lineW = fillW;
                     }
                     break;
                 case TileType.ShavedRight:
-                    // Full block with top-right corner shaved off by gentle slope
-                    // At row=0: full width minus the shave. At row=ts/2: full width.
-                    // Below ts/2: full width.
+                    // Full block with gentle slope shaved off top-right
+                    // Surface: from (0,0) flat to (ts, ts/2) — the shave is a triangle cut from top-right
+                    // At row r < ts/2: fill from left edge to the shave line
+                    // Shave line at row r: x = r * 2 (from top-right corner)
                     {
                         lineX = wx;
                         if (row < ts / 2)
                         {
-                            // Shaved region: how much is cut from the right
-                            float cutFrac = 1f - (float)row / (ts / 2f);
-                            lineW = ts - (int)(cutFrac * ts);
-                            if (lineW <= 0) continue;
+                            lineW = (int)(row * 2f) + 1;
+                            if (lineW > ts) lineW = ts;
                         }
                         else
                         {
@@ -3122,14 +3140,14 @@ public class Game1 : Game
                     }
                     break;
                 case TileType.ShavedLeft:
+                    // Full block with gentle slope shaved off top-left
                     {
                         if (row < ts / 2)
                         {
-                            float cutFrac = 1f - (float)row / (ts / 2f);
-                            int cut = (int)(cutFrac * ts);
+                            int cut = ts - (int)(row * 2f) - 1;
+                            if (cut < 0) cut = 0;
                             lineX = wx + cut;
                             lineW = ts - cut;
-                            if (lineW <= 0) continue;
                         }
                         else
                         {
@@ -3614,6 +3632,15 @@ public class Game1 : Game
         }
 
         _spriteBatch.End();
+
+        // Room transition overlay
+        if (_transitionActive && _transitionAlpha > 0f)
+        {
+            _spriteBatch.Begin();
+            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, 800, 600), Color.Black * _transitionAlpha);
+            _spriteBatch.End();
+        }
+
         base.Draw(gameTime);
     }
 }
