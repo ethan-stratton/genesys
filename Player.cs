@@ -191,6 +191,8 @@ public class Player
     private const float DamageCooldownTime = 1.0f;
     private const float KnockbackSpeed = 200f;
     private const float KnockbackUpSpeed = -180f;
+    private const float KnockbackDuration = 0.25f;
+    private float _knockbackTimer;
     private float _regenDelay; // time since last damage
     private const float RegenStartDelay = 2.0f; // 2s before regen kicks in
     private float _regenAccum; // fractional HP accumulator
@@ -205,12 +207,22 @@ public class Player
         _regenAccum = 0f;
         if (Hp <= 0) Hp = 0;
         
-        // Knockback: push away from damage source + small upward pop
+        // Knockback
         float kbX = knockbackDirX != 0f ? Math.Sign(knockbackDirX) * KnockbackSpeed : -FacingDir * KnockbackSpeed;
         var vel = Velocity;
         vel.X = kbX;
         vel.Y = KnockbackUpSpeed;
         Velocity = vel;
+        _knockbackTimer = KnockbackDuration;
+        
+        // Cancel any active special states
+        IsSliding = false;
+        IsUppercutting = false;
+        IsFlipping = false;
+        IsBladeDashing = false;
+        IsCartwheeling = false;
+        IsVaultKicking = false;
+        IsDashing = false;
     }
 
     /// <summary>True if currently in i-frames (use for flashing/transparency).</summary>
@@ -971,6 +983,12 @@ public class Player
             vel.X = _ceilDeflectVelX + inputX * Speed * 0.3f;
             vel.Y += Gravity * dt;
             if (IsGrounded) _ceilDeflectTimer = 0; // landing cancels deflect state
+        }
+        else if (_knockbackTimer > 0)
+        {
+            _knockbackTimer -= dt;
+            // Don't override vel.X — let knockback velocity play out
+            vel.Y += Gravity * dt;
         }
         else
         {

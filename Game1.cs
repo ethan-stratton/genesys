@@ -851,10 +851,11 @@ public class Game1 : Game
             var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
             var tgi = _level.TileGridInstance;
             int ts = tgi.TileSize;
-            int startCol = Math.Max(0, pRect.Left / ts);
-            int endCol = Math.Min(tgi.Width - 1, pRect.Right / ts);
-            int startRow = Math.Max(0, pRect.Top / ts);
-            int endRow = Math.Min(tgi.Height - 1, pRect.Bottom / ts);
+            int ox = tgi.OriginX, oy = tgi.OriginY;
+            int startCol = Math.Max(0, (pRect.Left - ox) / ts);
+            int endCol = Math.Min(tgi.Width - 1, (pRect.Right - ox) / ts);
+            int startRow = Math.Max(0, (pRect.Top - oy) / ts);
+            int endRow = Math.Min(tgi.Height - 1, (pRect.Bottom - oy) / ts);
             bool hit = false;
             for (int row = startRow; row <= endRow && !hit; row++)
             {
@@ -864,7 +865,7 @@ public class Game1 : Game
                     if (!TileProperties.IsHazard(tile)) continue;
                     
                     // Build hitbox based on tile type
-                    int twx = col * ts, twy = row * ts;
+                    int twx = ox + col * ts, twy = oy + row * ts;
                     Rectangle spikeRect;
                     switch (tile)
                     {
