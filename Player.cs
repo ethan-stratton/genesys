@@ -188,13 +188,15 @@ public class Player
     public int MaxHp { get; set; } = 100;
     public int Hp { get; set; } = 100;
     public float DamageCooldown { get; set; }
-    private const float DamageCooldownTime = 0.3f;
+    private const float DamageCooldownTime = 1.0f;
+    private const float KnockbackSpeed = 200f;
+    private const float KnockbackUpSpeed = -180f;
     private float _regenDelay; // time since last damage
     private const float RegenStartDelay = 2.0f; // 2s before regen kicks in
     private float _regenAccum; // fractional HP accumulator
     private const float RegenRate = 5f; // HP per second (slow)
 
-    public void TakeDamage(int amount)
+    public void TakeDamage(int amount, float knockbackDirX = 0f)
     {
         if (DamageCooldown > 0) return;
         Hp -= amount;
@@ -202,7 +204,17 @@ public class Player
         _regenDelay = 0f;
         _regenAccum = 0f;
         if (Hp <= 0) Hp = 0;
+        
+        // Knockback: push away from damage source + small upward pop
+        float kbX = knockbackDirX != 0f ? Math.Sign(knockbackDirX) * KnockbackSpeed : -FacingDir * KnockbackSpeed;
+        var vel = Velocity;
+        vel.X = kbX;
+        vel.Y = KnockbackUpSpeed;
+        Velocity = vel;
     }
+
+    /// <summary>True if currently in i-frames (use for flashing/transparency).</summary>
+    public bool IsInvincible => DamageCooldown > 0;
 
     public void UpdateRegen(float dt)
     {
@@ -1283,6 +1295,13 @@ public class Player
 
     public void Draw(SpriteBatch spriteBatch, Texture2D pixel)
     {
+        // Flash during i-frames: skip drawing every other 4-frame chunk
+        if (IsInvincible)
+        {
+            int frame = (int)(DamageCooldown * 60f); // approx frame count
+            if ((frame / 4) % 2 == 0) return; // invisible for 4 frames, visible for 4
+        }
+        
         if (IsVaulting)
         {
             int size = (int)(Width * 0.8f);

@@ -700,7 +700,7 @@ public class Game1 : Game
             if (_spawnInvincibility <= 0 && !_isDead)
             {
                 int dmg = swarm.CheckPlayerDamage(playerRect2);
-                if (dmg > 0) _player.TakeDamage(dmg);
+                if (dmg > 0) _player.TakeDamage(dmg, _player.Position.X - swarm.HomePosition.X);
             }
 
             if (_player.MeleeTimer > 0)
@@ -730,7 +730,7 @@ public class Game1 : Game
             if (_spawnInvincibility <= 0 && !_isDead)
             {
                 int dmg = c.CheckPlayerDamage(playerRect2);
-                if (dmg > 0) _player.TakeDamage(dmg);
+                if (dmg > 0) _player.TakeDamage(dmg, _player.Position.X - c.Position.X);
             }
             if (_player.MeleeTimer > 0 && c.Alive)
             {
@@ -746,7 +746,7 @@ public class Game1 : Game
             if (_spawnInvincibility <= 0 && !_isDead)
             {
                 int dmg = t.CheckPlayerDamage(playerRect2);
-                if (dmg > 0) _player.TakeDamage(dmg);
+                if (dmg > 0) _player.TakeDamage(dmg, _player.Position.X - t.Position.X);
             }
             if (_player.MeleeTimer > 0 && t.Alive)
             {
@@ -762,7 +762,7 @@ public class Game1 : Game
             if (_spawnInvincibility <= 0 && !_isDead)
             {
                 int dmg = h.CheckPlayerDamage(playerRect2);
-                if (dmg > 0) _player.TakeDamage(dmg);
+                if (dmg > 0) _player.TakeDamage(dmg, _player.Position.X - h.Position.X);
             }
             if (_player.MeleeTimer > 0 && h.Alive)
             {
@@ -837,7 +837,7 @@ public class Game1 : Game
                 {
                     if (_spawnInvincibility <= 0f)
                     {
-                        _player.TakeDamage(33);
+                        _player.TakeDamage(33, _player.Position.X - spike.Center.X);
                         if (_player.Hp <= 0) _isDead = true;
                     }
                     break;
@@ -881,7 +881,7 @@ public class Game1 : Game
                     
                     if (pRect.Intersects(spikeRect))
                     {
-                        _player.TakeDamage(33);
+                        _player.TakeDamage(33, _player.Position.X - spikeRect.Center.X);
                         if (_player.Hp <= 0) _isDead = true;
                         hit = true;
                     }
