@@ -19,6 +19,7 @@ public class Player
     private const float JumpForce = -420f;
     public bool IsGrounded { get; set; }
     private bool _wasGrounded;
+    private bool _wasOnSlope;
     public int FacingDir { get; private set; } = 1;
 
     // Jump
@@ -47,6 +48,7 @@ public class Player
     private const float SlideCooldown = 0.5f;
     private float _slideCooldownTimer;
     private int _slideDir;
+    private int _slideAirFrames;
     public const int SlideHeight = 24;
     public bool SlideInvulnerable => IsSliding; // for future use
 
@@ -1062,7 +1064,7 @@ public class Player
         if (tileGrid != null)
         {
             float slopeY = tileGrid.GetSlopeFloorY(pos.X, pos.Y, Width, Height);
-            if (slopeY < float.MaxValue && pos.Y + Height >= slopeY - 2)
+            if (slopeY < float.MaxValue && pos.Y + Height >= slopeY - 6)
             {
                 pos.Y = slopeY - Height;
                 vel.Y = 0;
@@ -1070,6 +1072,23 @@ public class Player
                 _jumpsLeft = MaxJumps;
                 _onSlope = true;
                 _slopeFloorY = slopeY;
+            }
+            // Slope sticking: when was grounded and moving, probe below for slope/ground continuity
+            else if (_wasGrounded && vel.Y >= 0)
+            {
+                // Probe further below based on horizontal speed (faster = bigger gap to bridge)
+                float probeDepth = MathHelper.Clamp(MathF.Abs(vel.X) * 0.06f, 4f, 24f);
+                float stickCheckY = pos.Y + probeDepth;
+                float stickSlopeY = tileGrid.GetSlopeFloorY(pos.X, stickCheckY, Width, Height);
+                if (stickSlopeY < float.MaxValue && stickSlopeY - (pos.Y + Height) < probeDepth + 4f)
+                {
+                    pos.Y = stickSlopeY - Height;
+                    vel.Y = 0;
+                    IsGrounded = true;
+                    _jumpsLeft = MaxJumps;
+                    _onSlope = true;
+                    _slopeFloorY = stickSlopeY;
+                }
             }
         }
 
@@ -1090,7 +1109,7 @@ public class Player
             }
         }
 
-        // Ceiling collision (bonk head)
+        // Ceiling collision (bonk head) — skip if near ceiling slope tiles
         if (ceilings != null && vel.Y < 0)
         {
             foreach (var ceil in ceilings)
@@ -1100,8 +1119,28 @@ public class Player
                 if (prevTop >= ceil.Bottom - 2 && newTop < ceil.Bottom &&
                     pos.X + Width > ceil.X && pos.X < ceil.X + ceil.Width)
                 {
-                    pos.Y = ceil.Bottom;
-                    vel.Y = 0;
+                    // Check if there's a ceiling slope tile near the player's head
+                    bool nearCeilSlope = false;
+                    if (tileGrid != null)
+                    {
+                        // Check a wide area: player center ± 2 tiles, at and above the ceiling
+                        for (int dx = -2; dx <= 2 && !nearCeilSlope; dx++)
+                        {
+                            int checkX = (int)(pos.X + Width / 2f) + dx * 32;
+                            for (int dy = 0; dy <= 1 && !nearCeilSlope; dy++)
+                            {
+                                int checkY = ceil.Y + dy * 32;
+                                var t = tileGrid.GetTile(checkX, checkY);
+                                if (TileProperties.IsSlopeCeiling(t))
+                                    nearCeilSlope = true;
+                            }
+                        }
+                    }
+                    if (!nearCeilSlope)
+                    {
+                        pos.Y = ceil.Bottom;
+                        vel.Y = 0;
+                    }
                 }
             }
         }
@@ -1110,7 +1149,7 @@ public class Player
         if (tileGrid != null)
         {
             float slopeCeilY = tileGrid.GetSlopeCeilY(pos.X, pos.Y, Width, Height);
-            if (slopeCeilY > float.MinValue && pos.Y <= slopeCeilY)
+            if (slopeCeilY > float.MinValue && pos.Y <= slopeCeilY + 2)
             {
                 pos.Y = slopeCeilY;
                 if (vel.Y < 0) vel.Y = 0;
@@ -1130,7 +1169,9 @@ public class Player
                     {
                         float prevBottom = Position.Y + Height;
                         float newBottom = pos.Y + Height;
-                        if (prevBottom <= sf.Y + 2 && newBottom >= sf.Y)
+                        // When coming from a slope or was just grounded, use generous landing threshold
+                        float landThreshold = (_onSlope || _wasOnSlope) ? 12f : 2f;
+                        if (prevBottom <= sf.Y + landThreshold && newBottom >= sf.Y)
                         {
                             pos.Y = sf.Y - Height;
                             vel.Y = 0;
@@ -1149,10 +1190,24 @@ public class Player
                             vel.Y = 0;
                         }
                     }
-                    // Push out horizontally if inside (skip if player is on a slope near this block)
+                    // Push out horizontally if inside
+                    // Skip push-out only if a slope tile is actually adjacent to this solid block's edge
                     float playerBottom = pos.Y + Height;
                     float playerTop = pos.Y;
-                    bool slopeAdjacent = _onSlope && sf.Y >= _slopeFloorY - Height;
+                    bool slopeAdjacent = false;
+                    if (tileGrid != null)
+                    {
+                        float playerCenterX = pos.X + Width / 2f;
+                        float sfCenterX = sf.X + sf.Width / 2f;
+                        int checkX = playerCenterX < sfCenterX ? sf.X - 1 : sf.X + sf.Width + 1;
+                        // Check multiple heights along the edge for adjacent slope tiles
+                        for (int checkY = (int)(playerBottom - 1); checkY >= (int)playerTop && checkY >= sf.Y; checkY -= 16)
+                        {
+                            var adjTile = tileGrid.GetTile(checkX, checkY);
+                            if (TileProperties.IsSlopeFloor(adjTile))
+                            { slopeAdjacent = true; break; }
+                        }
+                    }
                     if (!slopeAdjacent && playerBottom > sf.Y + 4 && playerTop < sf.Bottom - 4)
                     {
                         float playerCenterX = pos.X + Width / 2f;
@@ -1167,8 +1222,13 @@ public class Player
             }
         }
 
-        // End slide/cartwheel if airborne (slide only)
-        if (!IsGrounded && IsSliding) { IsSliding = false; _ropeDisengaged = true; }
+        // End slide/cartwheel if airborne for more than a few frames (grace period for slope transitions)
+        if (!IsGrounded && IsSliding)
+        {
+            _slideAirFrames++;
+            if (_slideAirFrames > 6) { IsSliding = false; _ropeDisengaged = true; }
+        }
+        else if (IsGrounded && IsSliding) { _slideAirFrames = 0; }
 
         // --- Wall solid collision (can't walk through walls) ---
         if (solidWalls != null)
@@ -1195,6 +1255,7 @@ public class Player
         Position = pos;
         Velocity = vel;
         _wasGrounded = IsGrounded;
+        _wasOnSlope = _onSlope;
         _prevKb = kb;
     }
 

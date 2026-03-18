@@ -255,6 +255,10 @@ public class TileGrid
     {
         float bestY = float.MaxValue;
         float centerX = worldX + playerWidth / 2f;
+        float leftX = worldX + 2f;             // left foot sensor
+        float rightX = worldX + playerWidth - 2f; // right foot sensor
+        float[] checkXs = new float[] { centerX, leftX, rightX };
+        
         for (int y = 0; y < Height; y++)
         {
             for (int x = 0; x < Width; x++)
@@ -263,42 +267,40 @@ public class TileGrid
                 if (!TileProperties.IsSlopeFloor(t)) continue;
                 int wx = OriginX + x * TileSize;
                 int wy = OriginY + y * TileSize;
-                if (centerX < wx || centerX > wx + TileSize) continue;
-                // Only check if player is vertically near this tile
-                if (worldY + playerHeight < wy - 4 || worldY > wy + TileSize) continue;
-                float localX = MathHelper.Clamp(centerX - wx, 0, TileSize);
-                float slopeY;
-                switch (t)
+                
+                // Check each sensor point
+                foreach (float sensorX in checkXs)
                 {
-                    case TileType.SlopeUpRight:
-                        // 45°: bottom-left to top-right
-                        slopeY = wy + TileSize - localX;
-                        break;
-                    case TileType.SlopeUpLeft:
-                        // 45°: bottom-right to top-left
-                        slopeY = wy + localX;
-                        break;
-                    case TileType.GentleUpRight:
-                        // Gentle: rises half a tile (16px) from left to right
-                        slopeY = wy + TileSize - (localX / TileSize) * (TileSize / 2f);
-                        break;
-                    case TileType.GentleUpLeft:
-                        // Gentle: rises half a tile from right to left
-                        slopeY = wy + TileSize / 2f + (localX / TileSize) * (TileSize / 2f);
-                        break;
-                    case TileType.ShavedRight:
-                        // Full block with gentle slope shaved off top-right
-                        // Surface: flat at wy from left, then slopes up from wy to wy + TileSize/2 on right
-                        slopeY = wy + (localX / TileSize) * (TileSize / 2f);
-                        break;
-                    case TileType.ShavedLeft:
-                        // Full block with gentle slope shaved off top-left
-                        slopeY = wy + (TileSize / 2f) - (localX / TileSize) * (TileSize / 2f);
-                        break;
-                    default:
-                        continue;
+                    if (sensorX < wx || sensorX > wx + TileSize) continue;
+                    // Only check if player is vertically near this tile
+                    if (worldY + playerHeight < wy - 8 || worldY > wy + TileSize + 4) continue;
+                    float localX = MathHelper.Clamp(sensorX - wx, 0, TileSize);
+                    float slopeY;
+                    switch (t)
+                    {
+                        case TileType.SlopeUpRight:
+                            slopeY = wy + TileSize - localX;
+                            break;
+                        case TileType.SlopeUpLeft:
+                            slopeY = wy + localX;
+                            break;
+                        case TileType.GentleUpRight:
+                            slopeY = wy + TileSize - (localX / TileSize) * (TileSize / 2f);
+                            break;
+                        case TileType.GentleUpLeft:
+                            slopeY = wy + TileSize / 2f + (localX / TileSize) * (TileSize / 2f);
+                            break;
+                        case TileType.ShavedRight:
+                            slopeY = wy + (localX / TileSize) * (TileSize / 2f);
+                            break;
+                        case TileType.ShavedLeft:
+                            slopeY = wy + (TileSize / 2f) - (localX / TileSize) * (TileSize / 2f);
+                            break;
+                        default:
+                            continue;
+                    }
+                    if (slopeY < bestY) bestY = slopeY;
                 }
-                if (slopeY < bestY) bestY = slopeY;
             }
         }
         return bestY;
@@ -308,6 +310,10 @@ public class TileGrid
     {
         float bestY = float.MinValue;
         float centerX = worldX + playerWidth / 2f;
+        float leftX = worldX + 2f;
+        float rightX = worldX + playerWidth - 2f;
+        float[] checkXs = new float[] { centerX, leftX, rightX };
+        
         for (int y = 0; y < Height; y++)
         {
             for (int x = 0; x < Width; x++)
@@ -316,15 +322,17 @@ public class TileGrid
                 if (!TileProperties.IsSlopeCeiling(t)) continue;
                 int wx = OriginX + x * TileSize;
                 int wy = OriginY + y * TileSize;
-                if (centerX < wx || centerX > wx + TileSize) continue;
-                // Only check if player is vertically near this tile
-                if (worldY > wy + TileSize || worldY + playerHeight < wy) continue;
-                float localX = MathHelper.Clamp(centerX - wx, 0, TileSize);
-                // Ceiling mirrors: SlopeCeilRight surface goes from top-left to bottom-right
-                float slopeY = t == TileType.SlopeCeilRight
-                    ? wy + localX
-                    : wy + TileSize - localX;
-                if (slopeY > bestY) bestY = slopeY;
+                
+                foreach (float sensorX in checkXs)
+                {
+                    if (sensorX < wx || sensorX > wx + TileSize) continue;
+                    if (worldY > wy + TileSize || worldY + playerHeight < wy) continue;
+                    float localX = MathHelper.Clamp(sensorX - wx, 0, TileSize);
+                    float slopeY = t == TileType.SlopeCeilRight
+                        ? wy + localX
+                        : wy + TileSize - localX;
+                    if (slopeY > bestY) bestY = slopeY;
+                }
             }
         }
         return bestY;

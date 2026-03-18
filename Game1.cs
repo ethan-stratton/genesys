@@ -358,9 +358,15 @@ public class Game1 : Game
                         {
                             string path = $"Content/levels/{_saveData.CurrentLevel}.json";
                             if (System.IO.File.Exists(path))
+                            {
                                 LoadLevel(path);
+                                _editorSaveFile = path;
+                            }
                             else
+                            {
                                 LoadLevel(DefaultLevel);
+                                _editorSaveFile = DefaultLevel;
+                            }
                             _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
                             _gameState = GameState.Playing;
                             _player = new Player(new Microsoft.Xna.Framework.Vector2(_saveData.SpawnX, _saveData.SpawnY));
@@ -3089,14 +3095,14 @@ public class Game1 : Game
                     lineW = row + 1;
                     break;
                 case TileType.SlopeCeilRight:
-                    // Ceiling ╲: solid above diagonal
-                    lineX = wx;
-                    lineW = row + 1;
+                    // Ceiling: solid top-right triangle (diagonal from top-left to bottom-right)
+                    lineX = wx + row;
+                    lineW = ts - row;
                     break;
                 case TileType.SlopeCeilLeft:
-                    // Ceiling ╱: solid above diagonal
-                    lineX = wx + (ts - 1 - row);
-                    lineW = row + 1;
+                    // Ceiling: solid top-left triangle (diagonal from top-right to bottom-left)
+                    lineX = wx;
+                    lineW = ts - row;
                     break;
                 case TileType.GentleUpRight:
                     // Rises right: surface from (0,ts) to (ts,ts/2)
@@ -3165,7 +3171,8 @@ public class Game1 : Game
 
     protected override void Draw(GameTime gameTime)
     {
-        GraphicsDevice.Clear(new Color(20, 20, 20));
+        bool isDebugLevel = _editorSaveFile.Contains("debug", StringComparison.OrdinalIgnoreCase);
+        GraphicsDevice.Clear(isDebugLevel ? new Color(25, 10, 35) : new Color(20, 20, 20));
 
         // Editor draw
         if (_gameState == GameState.Editing)
@@ -3264,8 +3271,8 @@ public class Game1 : Game
             }
         }
 
-        _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, floorH), new Color(40, 40, 40));
-        _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, 2), new Color(80, 80, 80));
+        _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, floorH), isDebugLevel ? new Color(40, 20, 55) : new Color(40, 40, 40));
+        _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, 2), isDebugLevel ? Color.White * 0.6f : new Color(80, 80, 80));
 
         // Draw platforms
         foreach (var plat in _level.PlatformRects)
@@ -3385,14 +3392,32 @@ public class Game1 : Game
                     }
                     else if (TileProperties.IsSlope(tile))
                     {
-                        DrawSlopeTile(wx, wy, tg.TileSize, tile, color);
+                        DrawSlopeTile(wx, wy, tg.TileSize, tile, isDebugLevel ? new Color(40, 20, 55) : color);
+                        if (isDebugLevel)
+                        {
+                            var outline = Color.White * 0.6f;
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 1), outline);
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + tg.TileSize - 1, tg.TileSize, 1), outline);
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, tg.TileSize), outline);
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx + tg.TileSize - 1, wy, 1, tg.TileSize), outline);
+                        }
                     }
                     else
                     {
-                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, tg.TileSize), color);
-                        if (tile == TileType.Grass)
+                        var tileColor = isDebugLevel ? new Color(40, 20, 55) : color;
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, tg.TileSize), tileColor);
+                        if (!isDebugLevel && tile == TileType.Grass)
                             _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 4), TileProperties.GetAccentColor(tile));
-                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 1), Color.White * 0.1f);
+                        if (!isDebugLevel)
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 1), Color.White * 0.1f);
+                        if (isDebugLevel)
+                        {
+                            var outline = Color.White * 0.6f;
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 1), outline);
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + tg.TileSize - 1, tg.TileSize, 1), outline);
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, tg.TileSize), outline);
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx + tg.TileSize - 1, wy, 1, tg.TileSize), outline);
+                        }
                     }
 
                     var dark = new Color(

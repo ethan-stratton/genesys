@@ -1,15 +1,19 @@
 {
-  "currentLevel": "debug-room",
-  "spawnX": 400,
-  "spawnY": 500,
+  "currentLevel": "the-descent",
+  "spawnX": 4,
+  "spawnY": 496,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 413.75977,
-  "meleeInventory": [],
+  "playTime": 411.91022,
+  "meleeInventory": [
+    "Stick"
+  ],
   "rangedInventory": [],
-  "meleeIndex": -1,
+  "meleeIndex": 0,
   "rangedIndex": -1,
-  "collectedItems": []
+  "collectedItems": [
+    "stick-1"
+  ]
 }
