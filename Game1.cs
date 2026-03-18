@@ -2906,7 +2906,7 @@ public class Game1 : Game
         {
             var entityTypes = Enum.GetValues<EntityType>();
             float epalW = 180, epalH = entityTypes.Length * 28 + 20;
-            float epalX = 400 - epalW / 2f, epalY = 300 - epalH / 2f;
+            float epalX = ViewW / 2f - epalW / 2f, epalY = ViewH / 2f - epalH / 2f;
             _spriteBatch.Draw(_pixel, new Rectangle((int)epalX, (int)epalY, (int)epalW, (int)epalH), Color.Black * 0.85f);
             _spriteBatch.DrawString(_font, SafeText("ENTITIES [E]"), new Vector2(epalX + 30, epalY + 4), Color.White);
 
@@ -3003,14 +3003,15 @@ public class Game1 : Game
 
     private void DrawSettingsMenu()
     {
-        float startY = 150f;
+        float cx = ViewW / 2f;
+        float startY = ViewH / 2f - 100f;
         float lineHeight = 30f;
 
         if (_settingsActiveCategory == null)
         {
             // Top-level category menu
-            { var hdr = "SETTINGS"; var hs = _fontLarge.MeasureString(hdr); _spriteBatch.DrawString(_fontLarge, hdr, new Vector2(400 - hs.X / 2, startY - 45), Color.White); }
-            _spriteBatch.DrawString(_fontSmall, SafeText("[Esc to close]"), new Vector2(355, startY - 18), Color.Gray * 0.5f);
+            { var hdr = "SETTINGS"; var hs = _fontLarge.MeasureString(hdr); _spriteBatch.DrawString(_fontLarge, hdr, new Vector2(cx - hs.X / 2, startY - 45), Color.White); }
+            { var sub = "[Esc to close]"; var ss = _fontSmall.MeasureString(sub); _spriteBatch.DrawString(_fontSmall, SafeText(sub), new Vector2(cx - ss.X / 2, startY - 18), Color.Gray * 0.5f); }
 
             string[] categories = { "Audio", "Graphics", "Debug", "Quit Game" };
             for (int i = 0; i < categories.Length; i++)
@@ -3022,17 +3023,19 @@ public class Game1 : Game
                     color = selected ? Color.Red : Color.DarkGray;
                 else
                     color = selected ? Color.Yellow : Color.Gray;
-                _spriteBatch.DrawString(_font, SafeText($"{prefix}{categories[i]}"), new Vector2(340f, startY + i * lineHeight), color);
+                var txt = $"{prefix}{categories[i]}";
+                var ts = _font.MeasureString(txt);
+                _spriteBatch.DrawString(_font, SafeText(txt), new Vector2(cx - ts.X / 2, startY + i * lineHeight), color);
             }
 
-            _spriteBatch.DrawString(_fontSmall, SafeText("[W/S] Navigate  [Enter/Space] Select"), new Vector2(240, startY + 4 * lineHeight + 20), Color.Gray * 0.6f);
+            { var hint = "[W/S] Navigate  [Enter/Space] Select"; var hs2 = _fontSmall.MeasureString(hint); _spriteBatch.DrawString(_fontSmall, SafeText(hint), new Vector2(cx - hs2.X / 2, startY + 4 * lineHeight + 20), Color.Gray * 0.6f); }
         }
         else
         {
             // Submenu
             string catName = _settingsActiveCategory.Value.ToString().ToUpper();
-            { var hdr = catName; var hs = _fontLarge.MeasureString(hdr); _spriteBatch.DrawString(_fontLarge, hdr, new Vector2(400 - hs.X / 2, startY - 45), Color.White); }
-            _spriteBatch.DrawString(_fontSmall, SafeText("[Esc to go back]"), new Vector2(350, startY - 18), Color.Gray * 0.5f);
+            { var hdr = catName; var hs = _fontLarge.MeasureString(hdr); _spriteBatch.DrawString(_fontLarge, hdr, new Vector2(cx - hs.X / 2, startY - 45), Color.White); }
+            { var sub = "[Esc to go back]"; var ss = _fontSmall.MeasureString(sub); _spriteBatch.DrawString(_fontSmall, SafeText(sub), new Vector2(cx - ss.X / 2, startY - 18), Color.Gray * 0.5f); }
 
             if (_settingsActiveCategory == SettingsCategory.Graphics)
             {
@@ -3041,8 +3044,9 @@ public class Game1 : Game
                 string prefix = "> ";
                 string sizeStr = $"{prefix}Window Size: {clabel}";
                 var color = Color.Yellow;
-                _spriteBatch.DrawString(_font, SafeText(sizeStr), new Vector2(280f, startY), color);
-                _spriteBatch.DrawString(_font, SafeText("(Enter to cycle)"), new Vector2(280f, startY + lineHeight), Color.Gray * 0.6f);
+                var sizeMs = _font.MeasureString(sizeStr);
+                _spriteBatch.DrawString(_font, SafeText(sizeStr), new Vector2(cx - sizeMs.X / 2, startY), color);
+                { var hint = "(Enter to cycle)"; var hs2 = _font.MeasureString(hint); _spriteBatch.DrawString(_font, SafeText(hint), new Vector2(cx - hs2.X / 2, startY + lineHeight), Color.Gray * 0.6f); }
             }
             else
             {
@@ -3051,7 +3055,7 @@ public class Game1 : Game
 
                 if (itemCount <= 4)
                 {
-                    // Single column
+                    // Single column — centered
                     for (int i = 0; i < itemCount; i++)
                     {
                         var s = items[i];
@@ -3060,12 +3064,14 @@ public class Game1 : Game
                         string value = s.IsAction ? "" : (s.Get() ? "  ON" : "  OFF");
                         var color = selected ? Color.Yellow : Color.Gray;
                         if (!s.IsAction && s.Get()) color = selected ? Color.Yellow : Color.LightGreen;
-                        _spriteBatch.DrawString(_font, SafeText($"{prefix}{s.Label}{value}"), new Vector2(280f, startY + i * lineHeight), color);
+                        var txt = $"{prefix}{s.Label}{value}";
+                        var ts = _font.MeasureString(txt);
+                        _spriteBatch.DrawString(_font, SafeText(txt), new Vector2(cx - ts.X / 2, startY + i * lineHeight), color);
                     }
                 }
                 else
                 {
-                    // Two-column layout
+                    // Two-column layout — centered around middle
                     int half = (itemCount + 1) / 2;
                     for (int i = 0; i < itemCount; i++)
                     {
@@ -3078,14 +3084,14 @@ public class Game1 : Game
 
                         int col = i < half ? 0 : 1;
                         int row = i < half ? i : i - half;
-                        float x = col == 0 ? 180f : 450f;
+                        float x = col == 0 ? cx - 220f : cx + 50f;
                         float y = startY + row * lineHeight;
                         _spriteBatch.DrawString(_font, SafeText($"{prefix}{s.Label}{value}"), new Vector2(x, y), color);
                     }
                 }
             }
 
-            _spriteBatch.DrawString(_fontSmall, SafeText("[Space/Enter] Toggle  [W/S] Navigate  [A/D] Column  [Esc] Back"), new Vector2(140, 540), Color.Gray * 0.6f);
+            { var hint = "[Space/Enter] Toggle  [W/S] Navigate  [A/D] Column  [Esc] Back"; var hs2 = _fontSmall.MeasureString(hint); _spriteBatch.DrawString(_fontSmall, SafeText(hint), new Vector2(cx - hs2.X / 2, ViewH - 60), Color.Gray * 0.6f); }
         }
     }
 
@@ -3147,9 +3153,9 @@ public class Game1 : Game
         // Semi-transparent overlay
         _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), Color.Black * 0.75f);
 
-        { var hdr = "INVENTORY"; var hs = _fontLarge.MeasureString(hdr); _spriteBatch.DrawString(_fontLarge, hdr, new Vector2(400 - hs.X / 2, 35), Color.White); }
-        _spriteBatch.DrawString(_font, SafeText("[A/D] Section  [W/S] Navigate  [Enter] Equip  [X] Discard  [Tab/Esc] Close"),
-            new Vector2(100, 560), Color.Gray * 0.5f);
+        { var hdr = "INVENTORY"; var hs = _fontLarge.MeasureString(hdr); _spriteBatch.DrawString(_fontLarge, hdr, new Vector2(ViewW / 2f - hs.X / 2, 35), Color.White); }
+        { var hint = "[A/D] Section  [W/S] Navigate  [Enter] Equip  [X] Discard  [Tab/Esc] Close"; var hs2 = _font.MeasureString(hint); _spriteBatch.DrawString(_font, SafeText(hint),
+            new Vector2(ViewW / 2f - hs2.X / 2, ViewH - 40), Color.Gray * 0.5f); }
 
         // Two columns
         float colX0 = 200, colX1 = 450;
@@ -3412,7 +3418,7 @@ public class Game1 : Game
 
         _spriteBatch.Begin();
 
-        { var hdr = "OVERWORLD"; var hs = _fontLarge.MeasureString(hdr); _spriteBatch.DrawString(_fontLarge, hdr, new Vector2(400 - hs.X / 2, 25), Color.White); }
+        { var hdr = "OVERWORLD"; var hs = _fontLarge.MeasureString(hdr); _spriteBatch.DrawString(_fontLarge, hdr, new Vector2(ViewW / 2f - hs.X / 2, 25), Color.White); }
 
         // Draw connections
         foreach (var node in _overworld.Nodes)
@@ -3818,13 +3824,15 @@ public class Game1 : Game
             // Title
             string title = "Genesys";
             var titleSize = _fontLarge.MeasureString(title);
-            _spriteBatch.DrawString(_fontLarge, title, new Vector2(400 - titleSize.X / 2, 170), Color.White);
+            float cx = ViewW / 2f;
+            float cy = ViewH / 2f;
+            _spriteBatch.DrawString(_fontLarge, title, new Vector2(cx - titleSize.X / 2, cy - 130), Color.White);
 
             // Subtitle
             // No subtitle for now
 
             // Menu options
-            float startY = 300;
+            float startY = cy - 30;
             float lineH = 35;
             for (int i = 0; i < _titleOptions.Length; i++)
             {
@@ -3833,10 +3841,12 @@ public class Game1 : Game
                 var color = selected ? Color.Yellow : Color.Gray;
                 var text = $"{prefix}{_titleOptions[i]}";
                 var size = _font.MeasureString(text);
-                _spriteBatch.DrawString(_font, text, new Vector2(400 - size.X / 2, startY + i * lineH), color);
+                _spriteBatch.DrawString(_font, text, new Vector2(cx - size.X / 2, startY + i * lineH), color);
             }
 
-            _spriteBatch.DrawString(_fontSmall, "[W/S] Navigate  [Space/Enter] Select", new Vector2(200, 480), Color.Gray * 0.4f);
+            var hintText = "[W/S] Navigate  [Space/Enter] Select";
+            var hintSize = _fontSmall.MeasureString(hintText);
+            _spriteBatch.DrawString(_fontSmall, hintText, new Vector2(cx - hintSize.X / 2, ViewH - 120), Color.Gray * 0.4f);
 
             // Settings overlay on title screen
             if (_menuOpen && _settingsFromTitle)
@@ -4248,8 +4258,8 @@ public class Game1 : Game
             {
                 string rangedName = CurrentRanged != WeaponType.None ? CurrentRanged.ToString() : "---";
                 string meleeName = CurrentMelee != WeaponType.None ? CurrentMelee.ToString() : "Fists";
-                _spriteBatch.DrawString(_font, SafeText($"[1] {rangedName}"), new Vector2(10, 570), Color.White * 0.7f);
-                _spriteBatch.DrawString(_font, SafeText($"[2] {meleeName}"), new Vector2(130, 570), Color.White * 0.7f);
+                _spriteBatch.DrawString(_font, SafeText($"[1] {rangedName}"), new Vector2(10, ViewH - 30), Color.White * 0.7f);
+                _spriteBatch.DrawString(_font, SafeText($"[2] {meleeName}"), new Vector2(130, ViewH - 30), Color.White * 0.7f);
             }
         }
 
