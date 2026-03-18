@@ -43,6 +43,7 @@ public class Game1 : Game
     // World map
     private WorldMapData _worldMap;
     private bool _worldMapGridVisible = false;
+    private float _worldMapZoom = 1f;
     private string _worldMapBiomeMenuId; // non-null = showing biome level list
     private int _worldMapBiomeMenuCursor;
     private int _overworldCursor;
@@ -3496,6 +3497,12 @@ public class Game1 : Game
                 _worldMap.Revealed[i] = true;
         }
 
+        // Zoom: Q = zoom out, E = zoom in
+        if (kb.IsKeyDown(Keys.Q) && _prevKb.IsKeyUp(Keys.Q))
+            _worldMapZoom = MathHelper.Clamp(_worldMapZoom - 0.25f, 0.25f, 2f);
+        if (kb.IsKeyDown(Keys.E) && _prevKb.IsKeyUp(Keys.E))
+            _worldMapZoom = MathHelper.Clamp(_worldMapZoom + 0.25f, 0.25f, 2f);
+
         // Escape
         if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape))
         {
@@ -3561,7 +3568,8 @@ public class Game1 : Game
         GraphicsDevice.Clear(new Color(8, 8, 16));
         _spriteBatch.Begin();
 
-        int ts = WorldMapData.TileSize;
+        int ts = (int)(WorldMapData.TileSize * _worldMapZoom);
+        if (ts < 4) ts = 4;
 
         // Camera centered on player
         float camX = _worldMap.PlayerX * ts + ts / 2f - ViewW / 2f;
@@ -3632,7 +3640,7 @@ public class Game1 : Game
         _spriteBatch.DrawString(_fontLarge, header, new Vector2(ViewW / 2f - hs.X / 2, 8), Color.White * 0.6f);
 
         // Position
-        string posInfo = $"({_worldMap.PlayerX}, {_worldMap.PlayerY})";
+        string posInfo = $"({_worldMap.PlayerX}, {_worldMap.PlayerY}) Zoom: {_worldMapZoom:0.##}x";
         _spriteBatch.DrawString(_fontSmall, posInfo, new Vector2(10, ViewH - 45), Color.Gray * 0.4f);
 
         // Proximity hint
@@ -3648,7 +3656,7 @@ public class Game1 : Game
         }
 
         // Controls
-        string hint = "[WASD] Move  [Enter] Enter Location  [G] Grid  [F] Reveal  [M] Close  [Esc] Title";
+        string hint = "[WASD] Move  [Q/E] Zoom  [Enter] Enter  [G] Grid  [F] Reveal  [M] Close  [Esc] Title";
         var hintSize = _fontSmall.MeasureString(hint);
         _spriteBatch.DrawString(_fontSmall, hint, new Vector2(ViewW / 2f - hintSize.X / 2, ViewH - 25), Color.Gray * 0.4f);
 
