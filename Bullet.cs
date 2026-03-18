@@ -8,7 +8,8 @@ public class Bullet
     public Vector2 Position;
     public Vector2 Direction { get; private set; }
     public const int Size = 6;
-    private const float Speed = 600f;
+    private const float Speed = 1000f;
+    private float _lifetime = 3f;
     public bool IsDead { get; set; }
 
     public Bullet(Vector2 start, Vector2 direction)
@@ -21,9 +22,8 @@ public class Bullet
     public void Update(float dt)
     {
         Position += Direction * Speed * dt;
-
-        // Mark as dead if off-screen
-        if (Position.X < -2000 || Position.X > 2000 || Position.Y < -2000 || Position.Y > 2000)
+        _lifetime -= dt;
+        if (_lifetime <= 0f)
             IsDead = true;
     }
 
