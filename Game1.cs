@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -38,6 +39,12 @@ public class Game1 : Game
     private SimRegion _simRegion;
     private int _simCursorX, _simCursorY;
     private string _simNodeId;
+
+    // World map
+    private WorldMapData _worldMap;
+    private bool _worldMapGridVisible = false;
+    private string _worldMapBiomeMenuId; // non-null = showing biome level list
+    private int _worldMapBiomeMenuCursor;
     private int _overworldCursor;
     private string _currentNodeId;
     private const string OverworldPath = "Content/overworld.json";
@@ -500,6 +507,14 @@ public class Game1 : Game
                         }
                         _overworld.Save(OverworldPath);
                         _currentNodeId = _overworld.StartNode;
+                        // Reset world map
+                        if (System.IO.File.Exists("Content/worldmap.json"))
+                            System.IO.File.Delete("Content/worldmap.json");
+                        _worldMap = null;
+                        // Clean sim data
+                        if (System.IO.Directory.Exists("Content/sim"))
+                            foreach (var f in System.IO.Directory.GetFiles("Content/sim", "*.json"))
+                                System.IO.File.Delete(f);
                         break;
                     case "Settings":
                         _menuOpen = true;
@@ -1219,6 +1234,10 @@ public class Game1 : Game
                             if (_overworldCursor < 0) _overworldCursor = 0;
                             _overworld.Save(OverworldPath);
                         }
+                        // Also mark cleared in world map biome data
+                        if (_worldMap == null) _worldMap = WorldMapData.LoadOrCreate();
+                        _worldMap.MarkLevelCleared(System.IO.Path.GetFileNameWithoutExtension(_editorSaveFile));
+                        _worldMap.Save();
                         _gameState = GameState.Overworld;
                         break;
                     }
@@ -1292,6 +1311,10 @@ public class Game1 : Game
                             }
                             _overworld.Save(OverworldPath);
                         }
+                        // Also mark in world map
+                        if (_worldMap == null) _worldMap = WorldMapData.LoadOrCreate();
+                        if (_sourceLevel != null) _worldMap.MarkLevelCleared(_sourceLevel);
+                        _worldMap.Save();
                     }
                     break;
                 }
@@ -3375,184 +3398,289 @@ public class Game1 : Game
 
     private void UpdateOverworld(KeyboardState kb)
     {
-        if (_overworld == null || _overworld.Nodes.Length == 0) return;
+        if (_worldMap == null) _worldMap = WorldMapData.LoadOrCreate();
 
-        var currentNode = _overworld.Nodes[_overworldCursor];
-
-        if ((kb.IsKeyDown(Keys.D) && _prevKb.IsKeyUp(Keys.D)) ||
-            (kb.IsKeyDown(Keys.Right) && _prevKb.IsKeyUp(Keys.Right)))
-            MoveOverworldCursor(currentNode, 1, 0);
-        if ((kb.IsKeyDown(Keys.A) && _prevKb.IsKeyUp(Keys.A)) ||
-            (kb.IsKeyDown(Keys.Left) && _prevKb.IsKeyUp(Keys.Left)))
-            MoveOverworldCursor(currentNode, -1, 0);
-        if ((kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W)) ||
-            (kb.IsKeyDown(Keys.Up) && _prevKb.IsKeyUp(Keys.Up)))
-            MoveOverworldCursor(currentNode, 0, -1);
-        if ((kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S)) ||
-            (kb.IsKeyDown(Keys.Down) && _prevKb.IsKeyUp(Keys.Down)))
-            MoveOverworldCursor(currentNode, 0, 1);
-
-        bool enterKey = kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter);
-        bool spaceKey = kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space);
-
-        if (enterKey || spaceKey)
+        // Biome level menu open?
+        if (_worldMapBiomeMenuId != null)
         {
-            var node = _overworld.Nodes[_overworldCursor];
-            if (node.Discovered && !string.IsNullOrEmpty(node.Level))
+            UpdateBiomeMenu(kb);
+            return;
+        }
+
+        // Movement
+        bool up = kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W);
+        bool down = kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S);
+        bool left = kb.IsKeyDown(Keys.A) && _prevKb.IsKeyUp(Keys.A);
+        bool right = kb.IsKeyDown(Keys.D) && _prevKb.IsKeyUp(Keys.D);
+        if (!up) up = kb.IsKeyDown(Keys.Up) && _prevKb.IsKeyUp(Keys.Up);
+        if (!down) down = kb.IsKeyDown(Keys.Down) && _prevKb.IsKeyUp(Keys.Down);
+        if (!left) left = kb.IsKeyDown(Keys.Left) && _prevKb.IsKeyUp(Keys.Left);
+        if (!right) right = kb.IsKeyDown(Keys.Right) && _prevKb.IsKeyUp(Keys.Right);
+
+        int nx = _worldMap.PlayerX, ny = _worldMap.PlayerY;
+        if (up) ny--;
+        if (down) ny++;
+        if (left) nx--;
+        if (right) nx++;
+
+        // Bounds + walkability check
+        if (nx >= 0 && nx < WorldMapData.MapW && ny >= 0 && ny < WorldMapData.MapH)
+        {
+            var tile = _worldMap.GetTile(nx, ny);
+            if (tile != MapTileType.Ocean && tile != MapTileType.Mountain)
             {
-                if (node.Cleared && enterKey)
+                _worldMap.PlayerX = nx;
+                _worldMap.PlayerY = ny;
+                _worldMap.Reveal(nx, ny);
+            }
+        }
+
+        // Enter/Space on biome entrance
+        bool enter = kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter);
+        bool space = kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space);
+        if (enter || space)
+        {
+            var point = _worldMap.Points.FirstOrDefault(p =>
+                Math.Abs(p.X - _worldMap.PlayerX) <= 1 && Math.Abs(p.Y - _worldMap.PlayerY) <= 1);
+            if (point != null && !string.IsNullOrEmpty(point.BiomeId))
+            {
+                var biome = _worldMap.FindBiome(point.BiomeId);
+                if (biome != null)
                 {
-                    // Cleared nodes + Enter → sim mode
-                    _simRegion = SimRegion.LoadOrGenerate(node.Id);
-                    _simCursorX = SimRegion.GridW / 2;
-                    _simCursorY = SimRegion.GridH / 2;
-                    _simNodeId = node.Id;
-                    _gameState = GameState.SimMode;
-                }
-                else
-                {
-                    // Uncleared or Space → action level
-                    string path = $"Content/levels/{node.Level}.json";
-                    if (path == _editorSaveFile && _level != null)
+                    if (biome.Cleared && enter)
                     {
-                        _gameState = GameState.Playing;
+                        // Sim mode for cleared biomes
+                        _simRegion = SimRegion.LoadOrGenerate(biome.Id);
+                        _simCursorX = SimRegion.GridW / 2;
+                        _simCursorY = SimRegion.GridH / 2;
+                        _simNodeId = biome.Id;
+                        _gameState = GameState.SimMode;
                     }
-                    else if (System.IO.File.Exists(path))
+                    else
                     {
-                        node.Discovered = true;
-                        _overworld.Save(OverworldPath);
-                        LoadLevel(path);
-                        _editorSaveFile = path;
-                        _camera = MakeCamera();
-                        _gameState = GameState.Playing;
-                        Restart();
-                        _prevInExit = new bool[_level.ExitRects.Length];
-                        for (int k = 0; k < _prevInExit.Length; k++)
-                            _prevInExit[k] = true;
+                        // Open biome level menu
+                        _worldMapBiomeMenuId = biome.Id;
+                        _worldMapBiomeMenuCursor = 0;
                     }
                 }
+            }
+        }
+
+        // Toggle grid
+        if (kb.IsKeyDown(Keys.G) && _prevKb.IsKeyUp(Keys.G))
+            _worldMapGridVisible = !_worldMapGridVisible;
+
+        // Escape
+        if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape))
+        {
+            _worldMap.Save();
+            _gameState = GameState.Title;
+        }
+
+        // M key
+        if (kb.IsKeyDown(Keys.M) && _prevKb.IsKeyUp(Keys.M))
+        {
+            _worldMap.Save();
+            if (_level != null)
+                _gameState = GameState.Playing;
+            else
+                _gameState = GameState.Title;
+        }
+    }
+
+    private void UpdateBiomeMenu(KeyboardState kb)
+    {
+        var biome = _worldMap.FindBiome(_worldMapBiomeMenuId);
+        if (biome == null) { _worldMapBiomeMenuId = null; return; }
+
+        var discovered = biome.Levels.Where(l => l.Discovered).ToList();
+        if (discovered.Count == 0) { _worldMapBiomeMenuId = null; return; }
+
+        if (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W))
+            _worldMapBiomeMenuCursor = (_worldMapBiomeMenuCursor - 1 + discovered.Count) % discovered.Count;
+        if (kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S))
+            _worldMapBiomeMenuCursor = (_worldMapBiomeMenuCursor + 1) % discovered.Count;
+        if (kb.IsKeyDown(Keys.Up) && _prevKb.IsKeyUp(Keys.Up))
+            _worldMapBiomeMenuCursor = (_worldMapBiomeMenuCursor - 1 + discovered.Count) % discovered.Count;
+        if (kb.IsKeyDown(Keys.Down) && _prevKb.IsKeyUp(Keys.Down))
+            _worldMapBiomeMenuCursor = (_worldMapBiomeMenuCursor + 1) % discovered.Count;
+
+        bool confirm = (kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter)) ||
+                       (kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space));
+        if (confirm)
+        {
+            var level = discovered[_worldMapBiomeMenuCursor];
+            string path = $"Content/levels/{level.LevelFile}.json";
+            if (System.IO.File.Exists(path))
+            {
+                LoadLevel(path);
+                _editorSaveFile = path;
+                _camera = MakeCamera();
+                _gameState = GameState.Playing;
+                Restart();
+                _prevInExit = new bool[_level.ExitRects.Length];
+                for (int k = 0; k < _prevInExit.Length; k++)
+                    _prevInExit[k] = true;
+                _worldMapBiomeMenuId = null;
             }
         }
 
         if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape))
-        {
-            _gameState = GameState.Title;
-            _titleCursor = 0;
-        }
-
-        // M key returns to current level without resetting
-        if (kb.IsKeyDown(Keys.M) && _prevKb.IsKeyUp(Keys.M) && _level != null)
-        {
-            _gameState = GameState.Playing;
-        }
-    }
-
-    private void MoveOverworldCursor(OverworldNode current, int dirX, int dirY)
-    {
-        OverworldNode best = null;
-        int bestIdx = -1;
-        float bestDist = float.MaxValue;
-
-        foreach (var connId in current.Connections)
-        {
-            var conn = _overworld.FindNode(connId);
-            if (conn == null || !conn.Discovered) continue;
-
-            int dx = conn.X - current.X;
-            int dy = conn.Y - current.Y;
-
-            bool valid = false;
-            if (dirX > 0 && dx > 0) valid = true;
-            if (dirX < 0 && dx < 0) valid = true;
-            if (dirY > 0 && dy > 0) valid = true;
-            if (dirY < 0 && dy < 0) valid = true;
-
-            if (!valid) continue;
-
-            float dist = dx * dx + dy * dy;
-            if (dist < bestDist)
-            {
-                bestDist = dist;
-                best = conn;
-                bestIdx = Array.IndexOf(_overworld.Nodes, conn);
-            }
-        }
-
-        if (best != null && bestIdx >= 0)
-        {
-            _overworldCursor = bestIdx;
-            _currentNodeId = best.Id;
-        }
+            _worldMapBiomeMenuId = null;
     }
 
     private void DrawOverworld()
     {
+        if (_worldMap == null) return;
         GraphicsDevice.Clear(new Color(8, 8, 16));
-
         _spriteBatch.Begin();
 
-        { var hdr = "OVERWORLD"; var hs = _fontLarge.MeasureString(hdr); _spriteBatch.DrawString(_fontLarge, hdr, new Vector2(ViewW / 2f - hs.X / 2, 25), Color.White); }
+        int ts = WorldMapData.TileSize;
 
-        // Draw connections
-        foreach (var node in _overworld.Nodes)
+        // Camera centered on player
+        float camX = _worldMap.PlayerX * ts + ts / 2f - ViewW / 2f;
+        float camY = _worldMap.PlayerY * ts + ts / 2f - ViewH / 2f;
+
+        // Draw visible tiles
+        int startX = Math.Max(0, (int)(camX / ts) - 1);
+        int startY = Math.Max(0, (int)(camY / ts) - 1);
+        int endX = Math.Min(WorldMapData.MapW, (int)((camX + ViewW) / ts) + 2);
+        int endY = Math.Min(WorldMapData.MapH, (int)((camY + ViewH) / ts) + 2);
+
+        for (int y = startY; y < endY; y++)
         {
-            if (!node.Discovered) continue;
-            foreach (var connId in node.Connections)
+            for (int x = startX; x < endX; x++)
             {
-                var conn = _overworld.FindNode(connId);
-                if (conn == null || !conn.Discovered) continue;
-                DrawLine(node.X, node.Y, conn.X, conn.Y, node.Cleared && conn.Cleared ? Color.White * 0.6f : Color.Gray * 0.3f);
+                int sx = (int)(x * ts - camX);
+                int sy = (int)(y * ts - camY);
+                var rect = new Rectangle(sx, sy, ts, ts);
+
+                if (!_worldMap.IsRevealed(x, y))
+                {
+                    _spriteBatch.Draw(_pixel, rect, new Color(5, 5, 10));
+                    continue;
+                }
+
+                var tile = _worldMap.GetTile(x, y);
+                Color fill = GetWorldTileColor(tile);
+                _spriteBatch.Draw(_pixel, rect, fill);
+
+                if (_worldMapGridVisible)
+                {
+                    _spriteBatch.Draw(_pixel, new Rectangle(sx, sy, ts, 1), Color.White * 0.1f);
+                    _spriteBatch.Draw(_pixel, new Rectangle(sx, sy, 1, ts), Color.White * 0.1f);
+                }
             }
         }
 
-        // Draw nodes
-        for (int i = 0; i < _overworld.Nodes.Length; i++)
+        // Draw biome entrance markers
+        foreach (var point in _worldMap.Points)
         {
-            var node = _overworld.Nodes[i];
-            bool selected = i == _overworldCursor;
+            if (!_worldMap.IsRevealed(point.X, point.Y)) continue;
+            int px = (int)(point.X * ts - camX);
+            int py = (int)(point.Y * ts - camY);
 
-            if (!node.Discovered)
-            {
-                _spriteBatch.Draw(_pixel, new Rectangle(node.X - 4, node.Y - 4, 8, 8), Color.DarkGray * 0.3f);
-                continue;
-            }
+            float pulse = 0.7f + 0.3f * MathF.Sin((float)DateTime.Now.TimeOfDay.TotalSeconds * 3f);
+            var biome = _worldMap.FindBiome(point.BiomeId);
+            Color markerColor = biome != null && biome.Cleared ? Color.LimeGreen * pulse : Color.Gold * pulse;
+            int markerSize = 10;
+            _spriteBatch.Draw(_pixel, new Rectangle(px + ts / 2 - markerSize / 2, py + ts / 2 - markerSize / 2, markerSize, markerSize), markerColor);
 
-            Color nodeColor = node.Cleared ? Color.LimeGreen : Color.Gold;
-            int nodeSize = selected ? 14 : 10;
-
-            if (selected)
-                _spriteBatch.Draw(_pixel, new Rectangle(node.X - nodeSize, node.Y - nodeSize, nodeSize * 2, nodeSize * 2), Color.White * 0.15f);
-
-            _spriteBatch.Draw(_pixel, new Rectangle(node.X - nodeSize / 2, node.Y - nodeSize / 2, nodeSize, nodeSize), nodeColor);
-
-            string name = SafeText(node.ShownName);
-            var nameSize = _font.MeasureString(name);
-            float nameX = node.X - nameSize.X / 2f;
-            float nameY = node.Y - nodeSize / 2f - 20;
-            _spriteBatch.DrawString(_font, name, new Vector2(nameX, nameY), selected ? Color.White : Color.Gray * 0.8f);
-
-            if (node.Cleared)
-            {
-                string cleared = SafeText("CLEARED");
-                var clearedSize = _font.MeasureString(cleared);
-                _spriteBatch.DrawString(_font, cleared, new Vector2(node.X - clearedSize.X / 2f, node.Y + nodeSize / 2f + 5), Color.LimeGreen * 0.6f);
-            }
+            var labelSize = _fontSmall.MeasureString(point.Label);
+            _spriteBatch.DrawString(_fontSmall, point.Label, new Vector2(px + ts / 2f - labelSize.X / 2, py - 14), Color.White * 0.8f);
         }
 
-        if (_overworldCursor >= 0 && _overworldCursor < _overworld.Nodes.Length)
+        // Draw player
         {
-            var sel = _overworld.Nodes[_overworldCursor];
-            if (sel.Discovered)
-            {
-                string info = SafeText($"[Space/Enter] Enter  |  {sel.ShownName}");
-                _spriteBatch.DrawString(_font, info, new Vector2(200, 540), Color.White * 0.7f);
-            }
+            int px = (int)(_worldMap.PlayerX * ts - camX);
+            int py = (int)(_worldMap.PlayerY * ts - camY);
+            int pSize = 12;
+            int pOff = (ts - pSize) / 2;
+            _spriteBatch.Draw(_pixel, new Rectangle(px + pOff - 1, py + pOff - 1, pSize + 2, pSize + 2), Color.Black);
+            _spriteBatch.Draw(_pixel, new Rectangle(px + pOff, py + pOff, pSize, pSize), Color.White);
         }
 
-        _spriteBatch.DrawString(_fontSmall, SafeText("[Esc] Back to Title  [WASD] Navigate  [Enter] Settlement  [Space] Enter Level"), new Vector2(60, ViewH - 30), Color.Gray * 0.4f);
+        // Header
+        string header = "WORLD MAP";
+        var hs = _fontLarge.MeasureString(header);
+        _spriteBatch.DrawString(_fontLarge, header, new Vector2(ViewW / 2f - hs.X / 2, 8), Color.White * 0.6f);
+
+        // Position
+        string posInfo = $"({_worldMap.PlayerX}, {_worldMap.PlayerY})";
+        _spriteBatch.DrawString(_fontSmall, posInfo, new Vector2(10, ViewH - 45), Color.Gray * 0.4f);
+
+        // Proximity hint
+        var nearPoint = _worldMap.Points.FirstOrDefault(p =>
+            Math.Abs(p.X - _worldMap.PlayerX) <= 1 && Math.Abs(p.Y - _worldMap.PlayerY) <= 1);
+        if (nearPoint != null)
+        {
+            var biome = _worldMap.FindBiome(nearPoint.BiomeId);
+            string status = biome != null && biome.Cleared ? "(Cleared)" : "";
+            string prompt = $"[Enter] {nearPoint.Label} {status}";
+            var promptSize = _font.MeasureString(prompt);
+            _spriteBatch.DrawString(_font, prompt, new Vector2(ViewW / 2f - promptSize.X / 2, ViewH - 75), Color.Yellow);
+        }
+
+        // Controls
+        string hint = "[WASD] Move  [Enter] Enter Location  [G] Grid  [M] Close  [Esc] Title";
+        var hintSize = _fontSmall.MeasureString(hint);
+        _spriteBatch.DrawString(_fontSmall, hint, new Vector2(ViewW / 2f - hintSize.X / 2, ViewH - 25), Color.Gray * 0.4f);
+
+        // Biome menu overlay
+        if (_worldMapBiomeMenuId != null)
+            DrawBiomeMenu();
 
         _spriteBatch.End();
     }
+
+    private void DrawBiomeMenu()
+    {
+        var biome = _worldMap.FindBiome(_worldMapBiomeMenuId);
+        if (biome == null) return;
+
+        var discovered = biome.Levels.Where(l => l.Discovered).ToList();
+
+        float boxW = 350, boxH = 60 + discovered.Count * 30;
+        float bx = ViewW / 2f - boxW / 2f;
+        float by = ViewH / 2f - boxH / 2f;
+        _spriteBatch.Draw(_pixel, new Rectangle((int)bx, (int)by, (int)boxW, (int)boxH), new Color(10, 10, 20) * 0.95f);
+        _spriteBatch.Draw(_pixel, new Rectangle((int)bx, (int)by, (int)boxW, 2), Color.White * 0.5f);
+        _spriteBatch.Draw(_pixel, new Rectangle((int)bx, (int)(by + boxH - 2), (int)boxW, 2), Color.White * 0.5f);
+
+        var nameSize = _font.MeasureString(biome.Name);
+        _spriteBatch.DrawString(_font, biome.Name, new Vector2(ViewW / 2f - nameSize.X / 2, by + 10), Color.White);
+
+        for (int i = 0; i < discovered.Count; i++)
+        {
+            var level = discovered[i];
+            bool selected = i == _worldMapBiomeMenuCursor;
+            string prefix = selected ? "> " : "  ";
+            string cleared = level.Cleared ? " [Cleared]" : "";
+            string text = $"{prefix}{level.Name}{cleared}";
+            Color color = selected ? Color.Yellow : (level.Cleared ? Color.LimeGreen * 0.7f : Color.Gray);
+            var textSize = _font.MeasureString(text);
+            _spriteBatch.DrawString(_font, text, new Vector2(ViewW / 2f - textSize.X / 2, by + 40 + i * 30), color);
+        }
+    }
+
+    private static Color GetWorldTileColor(MapTileType tile)
+    {
+        return tile switch
+        {
+            MapTileType.Ocean => new Color(15, 25, 60),
+            MapTileType.Plains => new Color(45, 85, 40),
+            MapTileType.Forest => new Color(20, 55, 20),
+            MapTileType.Mountain => new Color(100, 95, 85),
+            MapTileType.Water => new Color(30, 55, 110),
+            MapTileType.Desert => new Color(160, 140, 80),
+            MapTileType.Swamp => new Color(50, 65, 35),
+            MapTileType.Snow => new Color(200, 210, 220),
+            MapTileType.Path => new Color(130, 115, 85),
+            MapTileType.BiomeEntrance => new Color(80, 70, 50),
+            _ => new Color(20, 20, 20),
+        };
+    }
+
 
     // ── Sim Mode ──────────────────────────────────────────
 
