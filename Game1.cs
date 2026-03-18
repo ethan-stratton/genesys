@@ -228,6 +228,12 @@ public class Game1 : Game
         Player.WorldLeft = _level.Bounds.Left;
         Player.WorldRight = _level.Bounds.Right;
 
+        // Clear enemies (SpawnEnemiesFromLevel re-populates if needed)
+        _swarms.Clear();
+        _crawlers.Clear();
+        _hoppers.Clear();
+        _thornbacks.Clear();
+
         // Load item pickups
         _itemPickups.Clear();
         foreach (var item in _level.Items)
