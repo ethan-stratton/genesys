@@ -84,6 +84,10 @@ public class Player
     // Frontflip/backflip (double-tap jump quickly)
     public bool IsFlipping { get; private set; }
     private float _flipTimer;
+    
+    // Ceiling deflection momentum preservation
+    private float _ceilDeflectTimer;
+    private float _ceilDeflectVelX;
     private const float FlipDuration = 0.3f;
     private const float FlipSpeed = 450f;
     private const float FlipJumpForce = -350f;
@@ -946,6 +950,16 @@ public class Player
             // Track space so vault kick/jump works properly after crouch-slide
             _jumpHeld = kb.IsKeyDown(Keys.Space);
         }
+        else if (_ceilDeflectTimer > 0)
+        {
+            _ceilDeflectTimer -= dt;
+            // Gradually blend deflection momentum with input (drag toward input speed)
+            float drag = 1f - dt * 3f; // ~3x per second decay
+            _ceilDeflectVelX *= drag;
+            vel.X = _ceilDeflectVelX + inputX * Speed * 0.3f;
+            vel.Y += Gravity * dt;
+            if (IsGrounded) _ceilDeflectTimer = 0; // landing cancels deflect state
+        }
         else
         {
             float moveSpeed = (IsDashing && inputX == _dashDir) ? DashSpeed : Speed;
@@ -1138,6 +1152,10 @@ public class Player
                     vel.Y = upSpeed * 0.3f;
                     pos.Y = slopeCeilY + 4;
                     System.Console.WriteLine($"[DEFLECT] hBoost={hBoost:F1} vel.X={vel.X:F1} vel.Y={vel.Y:F1}");
+                    
+                    // Preserve momentum — prevent normal movement from overwriting vel.X
+                    _ceilDeflectTimer = 0.4f;
+                    _ceilDeflectVelX = vel.X;
                     
                     // Cancel uppercut so the deflection momentum isn't overridden
                     if (IsUppercutting)
