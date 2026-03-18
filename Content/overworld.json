@@ -53,7 +53,7 @@
       "y": 200,
       "level": "the-summit",
       "discovered": true,
-      "cleared": false,
+      "cleared": true,
       "connections": [
         "the-gauntlet"
       ],
