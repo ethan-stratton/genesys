@@ -397,6 +397,15 @@ public class Game1 : Game
 
         if (_gameState == GameState.Title)
         {
+            // Handle settings menu first (consumes input)
+            if (_menuOpen && _settingsFromTitle)
+            {
+                UpdateMenu(kb);
+                _prevKb = kb;
+                base.Update(gameTime);
+                return;
+            }
+
             if (_titleCursor >= _titleOptions.Length) _titleCursor = 0;
             if (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W))
                 _titleCursor = (_titleCursor - 1 + _titleOptions.Length) % _titleOptions.Length;
@@ -495,10 +504,6 @@ public class Game1 : Game
             }
 
             // Handle settings menu while on title screen
-            if (_menuOpen && _settingsFromTitle)
-            {
-                UpdateMenu(kb);
-            }
 
             _prevKb = kb;
             base.Update(gameTime);
