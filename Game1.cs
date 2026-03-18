@@ -2176,24 +2176,7 @@ public class Game1 : Game
                     var rect = new Rectangle(wx, wy, tg.TileSize, tg.TileSize);
                     var color = TileProperties.GetColor(tile);
 
-                    if (TileProperties.IsPlatform(tile))
-                    {
-                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 4), color);
-                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 2), Color.White * 0.3f);
-                    }
-                    else if (TileProperties.IsHazard(tile))
-                    {
-                        _spriteBatch.Draw(_pixel, rect, color * 0.7f);
-                    }
-                    else if (TileProperties.IsSlope(tile))
-                    {
-                        DrawSlopeTile(wx, wy, tg.TileSize, tile, color);
-                    }
-                    else if (TileProperties.IsHazard(tile))
-                    {
-                        DrawSpikeTile(wx, wy, tg.TileSize, tile, color);
-                    }
-                    else if (tile == TileType.PlatformTop || tile == TileType.PlatformBottom)
+                    if (tile == TileType.PlatformTop || tile == TileType.PlatformBottom)
                     {
                         int ts = tg.TileSize;
                         int halfH = ts / 2;
@@ -2205,17 +2188,92 @@ public class Game1 : Game
                         _spriteBatch.Draw(_pixel, new Rectangle(wx, py, 1, halfH), dark);
                         _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, py, 1, halfH), dark);
                     }
+                    else if (TileProperties.IsPlatform(tile))
+                    {
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 4), color);
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 2), Color.White * 0.3f);
+                    }
+                    else if (TileProperties.IsHazard(tile))
+                    {
+                        DrawSpikeTile(wx, wy, tg.TileSize, tile, color);
+                    }
+                    else if (TileProperties.IsSlope(tile))
+                    {
+                        DrawSlopeTile(wx, wy, tg.TileSize, tile, color);
+                    }
                     else if (TileProperties.IsEffectTile(tile) || tile == TileType.Breakable)
                     {
                         int ts = tg.TileSize;
-                        // Draw with a pulsing inner glow effect (just a border + fill for now)
-                        _spriteBatch.Draw(_pixel, rect, color * 0.5f);
+                        // Background fill
+                        _spriteBatch.Draw(_pixel, rect, color * 0.4f);
                         var bright = new Color(
-                            Math.Min(255, color.R + 60), Math.Min(255, color.G + 60), Math.Min(255, color.B + 60));
-                        _spriteBatch.Draw(_pixel, new Rectangle(wx + 2, wy + 2, ts - 4, 2), bright);
-                        _spriteBatch.Draw(_pixel, new Rectangle(wx + 2, wy + ts - 4, ts - 4, 2), bright);
-                        _spriteBatch.Draw(_pixel, new Rectangle(wx + 2, wy + 2, 2, ts - 4), bright);
-                        _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 4, wy + 2, 2, ts - 4), bright);
+                            Math.Min(255, color.R + 80), Math.Min(255, color.G + 80), Math.Min(255, color.B + 80));
+                        
+                        // Draw symbol based on tile type
+                        int cx = wx + ts / 2;
+                        int cy = wy + ts / 2;
+                        
+                        if (tile == TileType.Breakable)
+                        {
+                            // "X" crack symbol
+                            for (int i = -6; i <= 6; i++)
+                            {
+                                _spriteBatch.Draw(_pixel, new Rectangle(cx + i, cy + i, 2, 2), bright);
+                                _spriteBatch.Draw(_pixel, new Rectangle(cx + i, cy - i, 2, 2), bright);
+                            }
+                        }
+                        else if (tile == TileType.DamageTile)
+                        {
+                            // Flame shape: narrow at bottom, wide in middle, narrow tip
+                            int[] flameW = { 2, 4, 6, 8, 10, 10, 8, 6, 6, 4, 2, 2 };
+                            for (int i = 0; i < flameW.Length; i++)
+                            {
+                                int fy = cy + 8 - i * 2;
+                                int fw = flameW[i];
+                                _spriteBatch.Draw(_pixel, new Rectangle(cx - fw/2, fy, fw, 2), bright);
+                            }
+                        }
+                        else if (tile == TileType.KnockbackTile)
+                        {
+                            // Arrow pointing right
+                            _spriteBatch.Draw(_pixel, new Rectangle(cx - 8, cy - 1, 12, 3), bright); // shaft
+                            for (int i = 0; i < 6; i++) // arrowhead
+                            {
+                                _spriteBatch.Draw(_pixel, new Rectangle(cx + 4, cy - i, 2, 1), bright);
+                                _spriteBatch.Draw(_pixel, new Rectangle(cx + 4, cy + i, 2, 1), bright);
+                                cx++;
+                            }
+                        }
+                        else if (tile == TileType.SpeedBoostTile)
+                        {
+                            // Double chevron >>
+                            for (int i = -5; i <= 5; i++)
+                            {
+                                int ax = Math.Abs(i);
+                                _spriteBatch.Draw(_pixel, new Rectangle(cx - 6 + ax, cy + i, 2, 1), bright);
+                                _spriteBatch.Draw(_pixel, new Rectangle(cx + ax, cy + i, 2, 1), bright);
+                            }
+                        }
+                        else if (tile == TileType.FloatTile)
+                        {
+                            // Up arrow with wavy lines
+                            _spriteBatch.Draw(_pixel, new Rectangle(cx - 1, cy - 6, 3, 14), bright); // shaft
+                            for (int i = 0; i < 5; i++) // arrowhead
+                            {
+                                _spriteBatch.Draw(_pixel, new Rectangle(cx - i, cy - 6 - i, 1, 1), bright);
+                                _spriteBatch.Draw(_pixel, new Rectangle(cx + i, cy - 6 - i, 1, 1), bright);
+                            }
+                            // wavy lines on sides
+                            _spriteBatch.Draw(_pixel, new Rectangle(cx - 7, cy - 2, 3, 2), bright);
+                            _spriteBatch.Draw(_pixel, new Rectangle(cx + 5, cy + 2, 3, 2), bright);
+                        }
+                        
+                        // Border
+                        var border = bright * 0.7f;
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), border);
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), border);
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts), border);
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts), border);
                     }
                     else
                     {
@@ -3350,42 +3408,71 @@ public class Game1 : Game
         bool left = tile == TileType.SpikesLeft || tile == TileType.HalfSpikesLeft;
         bool right = tile == TileType.SpikesRight || tile == TileType.HalfSpikesRight;
         
-        int spikeCount = 4;
+        int n = 4; // number of spikes
         
         if (up || down)
         {
-            int spikeH = isHalf ? ts / 2 : ts;
-            int sw = ts / spikeCount;
-            for (int s = 0; s < spikeCount; s++)
+            int h = isHalf ? ts / 2 : ts;
+            int oy = 0;
+            if (up && isHalf) oy = ts - h; // half-up sits at bottom of tile
+            if (down && !isHalf) oy = 0;
+            if (down && isHalf) oy = 0; // half-down sits at top of tile
+            if (up && !isHalf) oy = 0;
+            
+            int sw = ts / n;
+            for (int s = 0; s < n; s++)
             {
-                int baseX = wx + s * sw;
-                int tipX = baseX + sw / 2;
-                for (int row = 0; row < spikeH; row++)
+                int tipX = wx + s * sw + sw / 2;
+                for (int row = 0; row < h; row++)
                 {
-                    // t goes from 0 (base) to 1 (tip)
-                    float t_val = (float)row / spikeH;
-                    if (up) t_val = 1f - t_val; // up: tip at top (row 0), base at bottom
-                    int halfW = Math.Max(1, (int)(sw / 2f * (1f - t_val)));
-                    int drawY = up ? wy + (isHalf ? ts / 2 : 0) + row : wy + row;
-                    _spriteBatch.Draw(_pixel, new Rectangle(tipX - halfW, drawY, halfW * 2, 1), color);
+                    // For UP: row 0 = tip (narrow), row h-1 = base (wide)
+                    // For DOWN: row 0 = base (wide), row h-1 = tip (narrow)
+                    float baseRatio;
+                    if (up)
+                        baseRatio = (float)row / (h - 1); // 0 at top (tip), 1 at bottom (base)
+                    else
+                        baseRatio = 1f - (float)row / (h - 1); // 1 at top (base), 0 at bottom (tip)
+                    
+                    int halfW = Math.Max(0, (int)(sw / 2f * baseRatio));
+                    if (halfW == 0 && baseRatio > 0) halfW = 1;
+                    if (halfW > 0)
+                        _spriteBatch.Draw(_pixel, new Rectangle(tipX - halfW, wy + oy + row, halfW * 2, 1), color);
+                    else
+                        _spriteBatch.Draw(_pixel, new Rectangle(tipX, wy + oy + row, 1, 1), color); // single pixel tip
                 }
             }
         }
-        else
+        else // left or right
         {
-            int spikeW = isHalf ? ts / 2 : ts;
-            int sh = ts / spikeCount;
-            for (int s = 0; s < spikeCount; s++)
+            int w = isHalf ? ts / 2 : ts;
+            int ox = 0;
+            if (left && isHalf) ox = ts - w; // half-left sits at right side
+            if (right && isHalf) ox = 0; // half-right sits at left side
+            // Wait: left spikes point LEFT, so tips are on the left, base on right
+            // half-left: tips on left, narrower tile, base attached to right side
+            if (left && isHalf) ox = 0;
+            if (right && isHalf) ox = ts - w;
+            if (left && !isHalf) ox = 0;
+            if (right && !isHalf) ox = 0;
+            
+            int sh = ts / n;
+            for (int s = 0; s < n; s++)
             {
-                int baseY = wy + s * sh;
-                int tipY = baseY + sh / 2;
-                for (int col = 0; col < spikeW; col++)
+                int tipY = wy + s * sh + sh / 2;
+                for (int col = 0; col < w; col++)
                 {
-                    float t_val = (float)col / spikeW;
-                    if (left) t_val = 1f - t_val; // left: tip at left (col 0), base at right
-                    int halfH = Math.Max(1, (int)(sh / 2f * (1f - t_val)));
-                    int drawX = left ? wx + (isHalf ? ts / 2 : 0) + col : wx + col;
-                    _spriteBatch.Draw(_pixel, new Rectangle(drawX, tipY - halfH, 1, halfH * 2), color);
+                    float baseRatio;
+                    if (right)
+                        baseRatio = 1f - (float)col / (w - 1); // col 0 = base, col w-1 = tip
+                    else // left
+                        baseRatio = (float)col / (w - 1); // col 0 = tip, col w-1 = base
+                    
+                    int halfH = Math.Max(0, (int)(sh / 2f * baseRatio));
+                    if (halfH == 0 && baseRatio > 0) halfH = 1;
+                    if (halfH > 0)
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx + ox + col, tipY - halfH, 1, halfH * 2), color);
+                    else
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx + ox + col, tipY, 1, 1), color);
                 }
             }
         }
@@ -3596,21 +3683,24 @@ public class Game1 : Game
                     int wy = tg.OriginY + ty * tg.TileSize;
                     var color = TileProperties.GetColor(tile);
 
-                    if (TileProperties.IsPlatform(tile))
+                    if (tile == TileType.PlatformTop || tile == TileType.PlatformBottom)
+                    {
+                        int ts2 = tg.TileSize;
+                        int halfH = ts2 / 2;
+                        int py = tile == TileType.PlatformBottom ? wy + halfH : wy;
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, py, ts2, halfH), color);
+                        var dark2 = new Color((int)(color.R * 0.5f), (int)(color.G * 0.5f), (int)(color.B * 0.5f));
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, py, ts2, 1), dark2);
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, py + halfH - 1, ts2, 1), dark2);
+                    }
+                    else if (TileProperties.IsPlatform(tile))
                     {
                         _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 4), color);
                         _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 2), new Color(90, 90, 90));
                     }
                     else if (TileProperties.IsHazard(tile))
                     {
-                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, tg.TileSize), color * 0.8f);
-                        int teeth = tg.TileSize / 12;
-                        for (int t = 0; t < teeth; t++)
-                        {
-                            int ttx = wx + t * 12 + 2;
-                            _spriteBatch.Draw(_pixel, new Rectangle(ttx, wy - 4, 8, 4), Color.Red * 0.6f);
-                            _spriteBatch.Draw(_pixel, new Rectangle(ttx + 2, wy - 8, 4, 4), Color.Red * 0.4f);
-                        }
+                        DrawSpikeTile(wx, wy, tg.TileSize, tile, color);
                     }
                     else if (TileProperties.IsSlope(tile))
                     {
