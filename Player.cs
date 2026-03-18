@@ -197,6 +197,14 @@ public class Player
     private const float RegenStartDelay = 2.0f; // 2s before regen kicks in
     private float _regenAccum; // fractional HP accumulator
     private const float RegenRate = 5f; // HP per second (slow)
+    
+    // Effect tile state
+    public float SpeedBoostTimer { get; set; }
+    private const float SpeedBoostDuration = 3.0f;
+    private const float SpeedBoostMultiplier = 1.8f;
+    public float FloatTimer { get; set; }
+    private const float FloatDuration = 2.0f;
+    private const float FloatLiftSpeed = -120f; // upward velocity
 
     public void TakeDamage(int amount, float knockbackDirX = 0f)
     {
@@ -329,6 +337,8 @@ public class Player
         _shootCooldown -= dt;
         _meleeCooldown -= dt;
         if (DamageCooldown > 0) DamageCooldown -= dt;
+        if (SpeedBoostTimer > 0) SpeedBoostTimer -= dt;
+        if (FloatTimer > 0) FloatTimer -= dt;
         _slideCooldownTimer -= dt;
         _cartwheelCooldownTimer -= dt;
         if (MeleeTimer > 0) MeleeTimer -= dt;
@@ -993,6 +1003,7 @@ public class Player
         else
         {
             float moveSpeed = (IsDashing && inputX == _dashDir) ? DashSpeed : Speed;
+            if (SpeedBoostTimer > 0) moveSpeed *= SpeedBoostMultiplier;
             vel.X = inputX * moveSpeed;
 
             // Jump (Space) — only if NOT holding S (S+Space = slide)
@@ -1303,6 +1314,12 @@ public class Player
         }
 
         pos.X = MathHelper.Clamp(pos.X, WorldLeft, WorldRight - Width);
+
+        // Float tile effect: gentle upward lift
+        if (FloatTimer > 0 && vel.Y > FloatLiftSpeed)
+        {
+            vel.Y = MathHelper.Lerp(vel.Y, FloatLiftSpeed, 0.1f);
+        }
 
         Position = pos;
         Velocity = vel;

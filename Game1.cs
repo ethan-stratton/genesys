@@ -896,6 +896,89 @@ public class Game1 : Game
             }
         }
 
+        // Effect tile collision (damage, knockback, speed boost, float)
+        if (!_isDead)
+        {
+            var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
+            var tgi = _level.TileGridInstance;
+            if (tgi != null)
+            {
+                int ts = tgi.TileSize;
+                int ox = tgi.OriginX, oy = tgi.OriginY;
+                int startCol = Math.Max(0, (pRect.Left - ox) / ts);
+                int endCol = Math.Min(tgi.Width - 1, (pRect.Right - ox) / ts);
+                int startRow = Math.Max(0, (pRect.Top - oy) / ts);
+                int endRow = Math.Min(tgi.Height - 1, (pRect.Bottom - oy) / ts);
+                for (int row = startRow; row <= endRow; row++)
+                {
+                    for (int col = startCol; col <= endCol; col++)
+                    {
+                        var tile = tgi.GetTileAt(col, row);
+                        int twx = ox + col * ts, twy = oy + row * ts;
+                        var tileRect = new Rectangle(twx, twy, ts, ts);
+                        if (!pRect.Intersects(tileRect)) continue;
+                        
+                        switch (tile)
+                        {
+                            case TileType.DamageTile:
+                                if (_spawnInvincibility <= 0f)
+                                {
+                                    _player.TakeDamage(5, _player.Position.X - tileRect.Center.X);
+                                    if (_player.Hp <= 0) _isDead = true;
+                                }
+                                break;
+                            case TileType.KnockbackTile:
+                                {
+                                    var vel = _player.Velocity;
+                                    float dirX = _player.Position.X + Player.Width / 2f - tileRect.Center.X;
+                                    float dirY = _player.Position.Y + Player.Height / 2f - tileRect.Center.Y;
+                                    float len = MathF.Sqrt(dirX * dirX + dirY * dirY);
+                                    if (len > 0) { dirX /= len; dirY /= len; }
+                                    else { dirX = -_player.FacingDir; dirY = -0.5f; }
+                                    vel.X = dirX * 400f;
+                                    vel.Y = dirY * 400f;
+                                    _player.Velocity = vel;
+                                }
+                                break;
+                            case TileType.SpeedBoostTile:
+                                _player.SpeedBoostTimer = 3.0f;
+                                break;
+                            case TileType.FloatTile:
+                                _player.FloatTimer = 2.0f;
+                                break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Breakable tile destruction (melee hits)
+        if (_player.MeleeTimer > 0)
+        {
+            var meleeRect = _player.MeleeHitbox;
+            var tgi = _level.TileGridInstance;
+            if (tgi != null)
+            {
+                int ts = tgi.TileSize;
+                int ox = tgi.OriginX, oy = tgi.OriginY;
+                int startCol = Math.Max(0, (meleeRect.Left - ox) / ts);
+                int endCol = Math.Min(tgi.Width - 1, (meleeRect.Right - ox) / ts);
+                int startRow = Math.Max(0, (meleeRect.Top - oy) / ts);
+                int endRow = Math.Min(tgi.Height - 1, (meleeRect.Bottom - oy) / ts);
+                for (int row = startRow; row <= endRow; row++)
+                {
+                    for (int col = startCol; col <= endCol; col++)
+                    {
+                        if (tgi.GetTileAt(col, row) == TileType.Breakable)
+                        {
+                            tgi.SetTileAt(col, row, TileType.Empty);
+                            // TODO: spawn health pickup at tile location
+                        }
+                    }
+                }
+            }
+        }
+
         // Exit collision — enter-trigger (only fires on transition from outside → inside)
         if (!_isDead)
         {
@@ -3900,6 +3983,11 @@ public class Game1 : Game
             bool visible = _spawnInvincibility <= 0f || MathF.Sin(_spawnInvincibility * 20f) > 0;
             if (visible)
                 _player.Draw(_spriteBatch, _pixel);
+                // Effect overlays
+                if (_player.SpeedBoostTimer > 0)
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height), Color.Lime * 0.2f);
+                if (_player.FloatTimer > 0)
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height), Color.MediumPurple * 0.25f);
         }
 
         // Draw EVE orbiting companion
