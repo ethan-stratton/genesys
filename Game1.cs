@@ -2158,41 +2158,23 @@ public class Game1 : Game
                     }
                     else if (TileProperties.IsSlope(tile))
                     {
-                        int ts2 = tg.TileSize;
-                        bool isRight = (tile == TileType.SlopeUpRight || tile == TileType.SlopeCeilRight);
-                        bool isCeiling = TileProperties.IsSlopeCeiling(tile);
-                        for (int row = 0; row < ts2; row++)
-                        {
-                            int lineY = wy + row;
-                            int lineW, lineX;
-                            if (isCeiling)
-                            {
-                                if (isRight) { lineX = wx; lineW = row + 1; }
-                                else { lineX = wx + ts2 - row - 1; lineW = row + 1; }
-                            }
-                            else
-                            {
-                                if (isRight) { lineX = wx; lineW = ts2 - row; }
-                                else { lineX = wx + row; lineW = ts2 - row; }
-                            }
-                            _spriteBatch.Draw(_pixel, new Rectangle(lineX, lineY, lineW, 1), color);
-                        }
+                        DrawSlopeTile(wx, wy, tg.TileSize, tile, color);
                     }
                     else
                     {
                         _spriteBatch.Draw(_pixel, rect, color);
                         if (tile == TileType.Grass)
                             _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 4), TileProperties.GetAccentColor(tile));
-                    }
 
-                    // Outline
-                    var dark = new Color(
-                        (int)(color.R * 0.5f), (int)(color.G * 0.5f), (int)(color.B * 0.5f));
-                    int ts = tg.TileSize;
-                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), dark);
-                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), dark);
-                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts), dark);
-                    _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts), dark);
+                        // Outline (non-slope only)
+                        var dark = new Color(
+                            (int)(color.R * 0.5f), (int)(color.G * 0.5f), (int)(color.B * 0.5f));
+                        int ts = tg.TileSize;
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), dark);
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), dark);
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts), dark);
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts), dark);
+                    }
                 }
             }
 
@@ -3063,6 +3045,106 @@ public class Game1 : Game
         _spriteBatch.Draw(_pixel, new Rectangle(x + w - 1, y, 1, h), c);
     }
 
+    /// <summary>Draw a slope tile as a filled shape (scanline).</summary>
+    private void DrawSlopeTile(int wx, int wy, int ts, TileType tile, Color color)
+    {
+        for (int row = 0; row < ts; row++)
+        {
+            int lineY = wy + row;
+            int lineX, lineW;
+
+            switch (tile)
+            {
+                case TileType.SlopeUpRight:
+                    // ╱ shape: solid below diagonal (bottom-left to top-right)
+                    lineX = wx + (ts - 1 - row);
+                    lineW = row + 1;
+                    break;
+                case TileType.SlopeUpLeft:
+                    // ╲ shape: solid below diagonal (bottom-right to top-left)
+                    lineX = wx;
+                    lineW = row + 1;
+                    break;
+                case TileType.SlopeCeilRight:
+                    // Ceiling ╲: solid above diagonal
+                    lineX = wx;
+                    lineW = row + 1;
+                    break;
+                case TileType.SlopeCeilLeft:
+                    // Ceiling ╱: solid above diagonal
+                    lineX = wx + (ts - 1 - row);
+                    lineW = row + 1;
+                    break;
+                case TileType.GentleUpRight:
+                    // Gentle rise to right: 16px rise over 32px run
+                    // At row=0 (top), nothing. Surface starts at row=ts/2.
+                    {
+                        float surfaceRow = ts - (float)(ts - row) * 0.5f; // surface at this row
+                        // Fill from surface down
+                        int fillStart = (int)(ts / 2f + (float)row / ts * (ts / 2f));
+                        if (row < fillStart) continue;
+                        // Surface X: at row, how much of the width is filled?
+                        // Bottom row (row=ts-1): full width. Half-height row: nothing.
+                        float frac = (float)(row - ts / 2) / (ts / 2f);
+                        if (frac < 0) continue;
+                        lineW = ts;
+                        lineX = wx + (int)((1f - frac) * ts);
+                        lineW = ts - (lineX - wx);
+                        if (lineW <= 0) continue;
+                    }
+                    break;
+                case TileType.GentleUpLeft:
+                    {
+                        float frac = (float)(row - ts / 2) / (ts / 2f);
+                        if (frac < 0) continue;
+                        lineX = wx;
+                        lineW = (int)(frac * ts) + 1;
+                        if (lineW <= 0) continue;
+                    }
+                    break;
+                case TileType.ShavedRight:
+                    // Full block with top-right corner shaved off by gentle slope
+                    // At row=0: full width minus the shave. At row=ts/2: full width.
+                    // Below ts/2: full width.
+                    {
+                        lineX = wx;
+                        if (row < ts / 2)
+                        {
+                            // Shaved region: how much is cut from the right
+                            float cutFrac = 1f - (float)row / (ts / 2f);
+                            lineW = ts - (int)(cutFrac * ts);
+                            if (lineW <= 0) continue;
+                        }
+                        else
+                        {
+                            lineW = ts;
+                        }
+                    }
+                    break;
+                case TileType.ShavedLeft:
+                    {
+                        if (row < ts / 2)
+                        {
+                            float cutFrac = 1f - (float)row / (ts / 2f);
+                            int cut = (int)(cutFrac * ts);
+                            lineX = wx + cut;
+                            lineW = ts - cut;
+                            if (lineW <= 0) continue;
+                        }
+                        else
+                        {
+                            lineX = wx;
+                            lineW = ts;
+                        }
+                    }
+                    break;
+                default:
+                    return;
+            }
+            _spriteBatch.Draw(_pixel, new Rectangle(lineX, lineY, lineW, 1), color);
+        }
+    }
+
     protected override void Draw(GameTime gameTime)
     {
         GraphicsDevice.Clear(new Color(20, 20, 20));
@@ -3285,25 +3367,7 @@ public class Game1 : Game
                     }
                     else if (TileProperties.IsSlope(tile))
                     {
-                        int ts2 = tg.TileSize;
-                        bool isRight = (tile == TileType.SlopeUpRight || tile == TileType.SlopeCeilRight);
-                        bool isCeiling = TileProperties.IsSlopeCeiling(tile);
-                        for (int row = 0; row < ts2; row++)
-                        {
-                            int lineY = wy + row;
-                            int lineW, lineX;
-                            if (isCeiling)
-                            {
-                                if (isRight) { lineX = wx; lineW = row + 1; }
-                                else { lineX = wx + ts2 - row - 1; lineW = row + 1; }
-                            }
-                            else
-                            {
-                                if (isRight) { lineX = wx; lineW = ts2 - row; }
-                                else { lineX = wx + row; lineW = ts2 - row; }
-                            }
-                            _spriteBatch.Draw(_pixel, new Rectangle(lineX, lineY, lineW, 1), color);
-                        }
+                        DrawSlopeTile(wx, wy, tg.TileSize, tile, color);
                     }
                     else
                     {

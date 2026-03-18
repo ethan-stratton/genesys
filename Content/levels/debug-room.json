@@ -1,0 +1,50 @@
+{
+    "bounds": {
+        "left": -32,
+        "right": 1632,
+        "top": -128,
+        "bottom": 416
+    },
+    "floor": {
+        "y": 352,
+        "height": 64
+    },
+    "platforms": [],
+    "walls": [
+        { "x": -32, "y": 0, "w": 32, "h": 352, "climbSide": 99 },
+        { "x": 1600, "y": 0, "w": 32, "h": 352, "climbSide": 99 }
+    ],
+    "solidFloors": [],
+    "ceilings": [
+        { "x": 0, "y": 0, "w": 1600, "h": 32 }
+    ],
+    "spikes": [],
+    "wallSpikes": [],
+    "ropes": [],
+    "exits": [
+        {
+            "x": 5,
+            "y": 296,
+            "w": 30,
+            "h": 48,
+            "targetLevel": "test-arena",
+            "id": "exit-left",
+            "targetExitId": "exit-debug"
+        },
+        {
+            "x": 1565,
+            "y": 296,
+            "w": 30,
+            "h": 48,
+            "targetLevel": "test-arena",
+            "id": "exit-right",
+            "targetExitId": "exit-debug"
+        }
+    ],
+    "npcs": [],
+    "items": [],
+    "objects": [],
+    "enemies": [],
+    "spawn": { "x": 64, "y": 288 },
+    "tileGrid": null
+}

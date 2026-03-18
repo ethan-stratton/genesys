@@ -1,63 +1,78 @@
 {
-  "nodes": [
-    {
-      "id": "test-arena",
-      "name": "The Garden",
-      "displayName": "",
-      "x": 200,
-      "y": 350,
-      "level": "test-arena",
-      "discovered": true,
-      "cleared": true,
-      "connections": [
-        "the-descent"
-      ],
-      "ShownName": "The Garden"
-    },
-    {
-      "id": "the-descent",
-      "name": "???",
-      "displayName": "The Descent",
-      "x": 350,
-      "y": 250,
-      "level": "the-descent",
-      "discovered": true,
-      "cleared": true,
-      "connections": [
-        "test-arena",
-        "the-gauntlet"
-      ],
-      "ShownName": "The Descent"
-    },
-    {
-      "id": "the-gauntlet",
-      "name": "???",
-      "displayName": "The Gauntlet",
-      "x": 500,
-      "y": 350,
-      "level": "the-gauntlet",
-      "discovered": true,
-      "cleared": false,
-      "connections": [
-        "the-descent",
-        "the-summit"
-      ],
-      "ShownName": "The Gauntlet"
-    },
-    {
-      "id": "the-summit",
-      "name": "???",
-      "displayName": "The Summit",
-      "x": 650,
-      "y": 200,
-      "level": "the-summit",
-      "discovered": false,
-      "cleared": false,
-      "connections": [
-        "the-gauntlet"
-      ],
-      "ShownName": "???"
-    }
-  ],
-  "startNode": "test-arena"
+    "nodes": [
+        {
+            "id": "test-arena",
+            "name": "The Garden",
+            "displayName": "",
+            "x": 200,
+            "y": 350,
+            "level": "test-arena",
+            "discovered": true,
+            "cleared": true,
+            "connections": [
+                "the-descent",
+                "debug-room"
+            ],
+            "ShownName": "The Garden"
+        },
+        {
+            "id": "the-descent",
+            "name": "???",
+            "displayName": "The Descent",
+            "x": 350,
+            "y": 250,
+            "level": "the-descent",
+            "discovered": true,
+            "cleared": true,
+            "connections": [
+                "test-arena",
+                "the-gauntlet"
+            ],
+            "ShownName": "The Descent"
+        },
+        {
+            "id": "the-gauntlet",
+            "name": "???",
+            "displayName": "The Gauntlet",
+            "x": 500,
+            "y": 350,
+            "level": "the-gauntlet",
+            "discovered": true,
+            "cleared": false,
+            "connections": [
+                "the-descent",
+                "the-summit"
+            ],
+            "ShownName": "The Gauntlet"
+        },
+        {
+            "id": "the-summit",
+            "name": "???",
+            "displayName": "The Summit",
+            "x": 650,
+            "y": 200,
+            "level": "the-summit",
+            "discovered": false,
+            "cleared": false,
+            "connections": [
+                "the-gauntlet"
+            ],
+            "ShownName": "???"
+        },
+        {
+            "id": "debug-room",
+            "name": "Debug Room",
+            "displayName": "Debug Room",
+            "x": 50,
+            "y": 350,
+            "level": "debug-room",
+            "discovered": true,
+            "cleared": false,
+            "connections": [
+                "test-arena"
+            ],
+            "ShownName": "Debug Room"
+        }
+    ],
+    "startNode": "test-arena"
 }

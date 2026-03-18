@@ -24,10 +24,14 @@ public enum TileType : byte
     Spikes = 40,
 
     // Slopes (45°)
-    SlopeUpRight = 50,   // floor slopes up left→right
-    SlopeUpLeft = 51,    // floor slopes up right→left
+    SlopeUpRight = 50,   // floor slopes up left→right (45°)
+    SlopeUpLeft = 51,    // floor slopes up right→left (45°)
     SlopeCeilRight = 52, // ceiling slope mirror of UpRight
     SlopeCeilLeft = 53,  // ceiling slope mirror of UpLeft
+    GentleUpRight = 54,  // gentle floor slope up right (half height: 16px rise over 32px)
+    GentleUpLeft = 55,   // gentle floor slope up left (half height)
+    ShavedRight = 56,    // full block with gentle slope shaved off top-right
+    ShavedLeft = 57,     // full block with gentle slope shaved off top-left
 
     // Reserved ranges:
     // 54-59: Future slope variants
@@ -46,8 +50,10 @@ public static class TileProperties
     public static bool IsPlatform(TileType t) => t >= TileType.PlatformWood && t <= TileType.PlatformStone;
     public static bool IsHazard(TileType t) => t == TileType.Spikes;
     public static bool IsBackground(TileType t) => (int)t >= 100;
-    public static bool IsSlope(TileType t) => t >= TileType.SlopeUpRight && t <= TileType.SlopeCeilLeft;
-    public static bool IsSlopeFloor(TileType t) => t == TileType.SlopeUpRight || t == TileType.SlopeUpLeft;
+    public static bool IsSlope(TileType t) => t >= TileType.SlopeUpRight && t <= TileType.ShavedLeft;
+    public static bool IsSlopeFloor(TileType t) => t == TileType.SlopeUpRight || t == TileType.SlopeUpLeft
+        || t == TileType.GentleUpRight || t == TileType.GentleUpLeft
+        || t == TileType.ShavedRight || t == TileType.ShavedLeft;
     public static bool IsSlopeCeiling(TileType t) => t == TileType.SlopeCeilRight || t == TileType.SlopeCeilLeft;
 
     public static Color GetColor(TileType t) => t switch
@@ -64,6 +70,10 @@ public static class TileProperties
         TileType.SlopeUpLeft => new Color(90, 60, 30),
         TileType.SlopeCeilRight => new Color(70, 50, 25),
         TileType.SlopeCeilLeft => new Color(70, 50, 25),
+        TileType.GentleUpRight => new Color(95, 65, 35),
+        TileType.GentleUpLeft => new Color(95, 65, 35),
+        TileType.ShavedRight => new Color(85, 55, 28),
+        TileType.ShavedLeft => new Color(85, 55, 28),
         TileType.DirtBg => new Color(50, 33, 16),
         TileType.StoneBg => new Color(60, 60, 60),
         TileType.GrassBg => new Color(38, 76, 0),
@@ -84,6 +94,10 @@ public static class TileProperties
         TileType.SlopeUpLeft => new Color(70, 45, 20),
         TileType.SlopeCeilRight => new Color(55, 38, 18),
         TileType.SlopeCeilLeft => new Color(55, 38, 18),
+        TileType.GentleUpRight => new Color(75, 50, 25),
+        TileType.GentleUpLeft => new Color(75, 50, 25),
+        TileType.ShavedRight => new Color(68, 42, 20),
+        TileType.ShavedLeft => new Color(68, 42, 20),
         TileType.DirtBg => new Color(40, 25, 12),
         TileType.StoneBg => new Color(45, 45, 45),
         TileType.GrassBg => new Color(25, 60, 10),
@@ -107,6 +121,10 @@ public static class TileProperties
         TileType.SlopeUpLeft,
         TileType.SlopeCeilRight,
         TileType.SlopeCeilLeft,
+        TileType.GentleUpRight,
+        TileType.GentleUpLeft,
+        TileType.ShavedRight,
+        TileType.ShavedLeft,
         TileType.DirtBg,
         TileType.StoneBg,
         TileType.GrassBg,
@@ -247,9 +265,37 @@ public class TileGrid
                 int wy = OriginY + y * TileSize;
                 if (centerX < wx || centerX > wx + TileSize) continue;
                 float localX = MathHelper.Clamp(centerX - wx, 0, TileSize);
-                float slopeY = t == TileType.SlopeUpRight
-                    ? wy + TileSize - localX
-                    : wy + localX;
+                float slopeY;
+                switch (t)
+                {
+                    case TileType.SlopeUpRight:
+                        // 45°: bottom-left to top-right
+                        slopeY = wy + TileSize - localX;
+                        break;
+                    case TileType.SlopeUpLeft:
+                        // 45°: bottom-right to top-left
+                        slopeY = wy + localX;
+                        break;
+                    case TileType.GentleUpRight:
+                        // Gentle: rises half a tile (16px) from left to right
+                        slopeY = wy + TileSize - (localX / TileSize) * (TileSize / 2f);
+                        break;
+                    case TileType.GentleUpLeft:
+                        // Gentle: rises half a tile from right to left
+                        slopeY = wy + TileSize / 2f + (localX / TileSize) * (TileSize / 2f);
+                        break;
+                    case TileType.ShavedRight:
+                        // Full block with gentle slope shaved off top-right
+                        // Surface: flat at wy from left, then slopes up from wy to wy + TileSize/2 on right
+                        slopeY = wy + (localX / TileSize) * (TileSize / 2f);
+                        break;
+                    case TileType.ShavedLeft:
+                        // Full block with gentle slope shaved off top-left
+                        slopeY = wy + (TileSize / 2f) - (localX / TileSize) * (TileSize / 2f);
+                        break;
+                    default:
+                        continue;
+                }
                 if (slopeY < bestY) bestY = slopeY;
             }
         }
