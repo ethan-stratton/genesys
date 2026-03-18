@@ -50,6 +50,7 @@ public class Game1 : Game
     private List<Bullet> _bullets;
     private List<InsectSwarm> _swarms = new();
     private List<Crawler> _crawlers = new();
+    private List<Hopper> _hoppers = new();
     private List<Thornback> _thornbacks = new();
 
     private Random _rng;
@@ -152,7 +153,7 @@ public class Game1 : Game
     private Vector2 _editorMoveOffset; // offset from entity origin to grab point
     private bool _entityPaletteOpen;
     private int _entityPaletteCursor;
-    private enum EntityType { Swarm, Crawler, Thornback, Tree }
+    private enum EntityType { Swarm, Crawler, Thornback, Hopper, Tree }
 
     // Tile paint state
     private int _tilePaletteCursor;
@@ -275,6 +276,7 @@ public class Game1 : Game
     {
         _swarms.Clear();
         _crawlers.Clear();
+        _hoppers.Clear();
         _thornbacks.Clear();
         if (_rng == null) _rng = new Random();
         foreach (var e in _level.Enemies)
@@ -292,6 +294,10 @@ public class Game1 : Game
                 case "thornback":
                     float tSnapY = SnapToSurface(e.X, e.Y, Thornback.Width, Thornback.Height);
                     _thornbacks.Add(new Thornback(new Vector2(e.X, tSnapY)));
+                    break;
+                case "hopper":
+                    float hSnapY = SnapToSurface(e.X, e.Y, Hopper.Width, Hopper.Height);
+                    _hoppers.Add(new Hopper(new Vector2(e.X, hSnapY), hSnapY + Hopper.Height));
                     break;
             }
         }
@@ -722,6 +728,22 @@ public class Game1 : Game
             }
         }
 
+        // Update hoppers
+        foreach (var h in _hoppers)
+        {
+            h.Update(dt, playerCenter2, _level.SolidFloorRects, _level.AllPlatforms);
+            if (_spawnInvincibility <= 0 && !_isDead)
+            {
+                int dmg = h.CheckPlayerDamage(playerRect2);
+                if (dmg > 0) _player.TakeDamage(dmg);
+            }
+            if (_player.MeleeTimer > 0 && h.Alive)
+            {
+                if (_player.MeleeHitbox.Intersects(h.Rect))
+                    h.TakeHit(1);
+            }
+        }
+
         // Bullets vs crawlers and thornbacks
         foreach (var b in _bullets)
         {
@@ -737,6 +759,12 @@ public class Game1 : Game
             {
                 if (t.Alive && bRect.Intersects(t.Rect))
                 { t.TakeHit(1); b.IsDead = true; break; }
+            }
+            if (b.IsDead) continue;
+            foreach (var h in _hoppers)
+            {
+                if (h.Alive && bRect.Intersects(h.Rect))
+                { h.TakeHit(2); b.IsDead = true; break; }
             }
         }
         } // end _enemiesEnabled
@@ -1116,6 +1144,12 @@ public class Game1 : Game
                         _level.Enemies = tList.ToArray();
                         SetEditorStatus($"Placed thornback at ({(int)cx}, {(int)cy})");
                         break;
+                    case EntityType.Hopper:
+                        var hList = new List<EnemySpawnData>(_level.Enemies);
+                        hList.Add(new EnemySpawnData { Id = $"hopper-{hList.Count}", Type = "hopper", X = cx, Y = cy });
+                        _level.Enemies = hList.ToArray();
+                        SetEditorStatus($"Placed hopper at ({(int)cx}, {(int)cy})");
+                        break;
                     case EntityType.Tree:
                         var oList = new List<EnvObjectData>(_level.Objects);
                         float treeSnapY = SnapToSurface(cx, cy, 40, 80);
@@ -1449,8 +1483,8 @@ public class Game1 : Game
             if (_editorMovingEntity == null)
                 foreach (var e in _level.Enemies)
                 {
-                    int sz = e.Type == "thornback" ? 32 : (e.Type == "swarm" ? 20 : 16);
-                    int h = e.Type == "thornback" ? 28 : (e.Type == "swarm" ? 20 : 10);
+                    int sz = e.Type == "thornback" ? 32 : (e.Type == "hopper" ? 20 : (e.Type == "swarm" ? 20 : 16));
+                    int h = e.Type == "thornback" ? 28 : (e.Type == "hopper" ? 16 : (e.Type == "swarm" ? 20 : 10));
                     if (new Rectangle((int)e.X, (int)e.Y, sz, h).Contains(mp))
                     { _editorMovingEntity = e; _editorMoveOffset = new Vector2(worldMouse.X - e.X, worldMouse.Y - e.Y); SetEditorStatus($"Grabbed {e.Type}"); break; }
                 }
@@ -1704,8 +1738,8 @@ public class Game1 : Game
         for (int i = _level.Enemies.Length - 1; i >= 0; i--)
         {
             var e = _level.Enemies[i];
-            int size = e.Type == "thornback" ? 32 : (e.Type == "swarm" ? 20 : 16);
-            int h = e.Type == "thornback" ? 28 : (e.Type == "swarm" ? 20 : 10);
+            int size = e.Type == "thornback" ? 32 : (e.Type == "hopper" ? 20 : (e.Type == "swarm" ? 20 : 16));
+            int h = e.Type == "thornback" ? 28 : (e.Type == "hopper" ? 16 : (e.Type == "swarm" ? 20 : 10));
             if (new Rectangle((int)e.X, (int)e.Y, size, h).Contains(p))
             {
                 var list = new List<EnemySpawnData>(_level.Enemies);
@@ -2268,10 +2302,11 @@ public class Game1 : Game
             {
                 "swarm" => Color.OrangeRed,
                 "crawler" => new Color(120, 60, 20),
+                "hopper" => new Color(80, 140, 60),
                 "thornback" => new Color(60, 100, 30),
                 _ => Color.White
             };
-            int size = e.Type == "thornback" ? 32 : (e.Type == "swarm" ? 20 : 16);
+            int size = e.Type == "thornback" ? 32 : (e.Type == "hopper" ? 20 : (e.Type == "swarm" ? 20 : 16));
             _spriteBatch.Draw(_pixel, new Rectangle((int)e.X, (int)e.Y, size, size), ec * 0.6f);
             _spriteBatch.DrawString(_font, SafeText(e.Type), new Vector2(e.X, e.Y - 14), ec * 0.8f);
         }
@@ -3360,6 +3395,7 @@ public class Game1 : Game
         {
             foreach (var swarm in _swarms) swarm.Draw(_spriteBatch, _pixel);
             foreach (var c in _crawlers) c.Draw(_spriteBatch, _pixel);
+            foreach (var h in _hoppers) h.Draw(_spriteBatch, _pixel);
             foreach (var t in _thornbacks) t.Draw(_spriteBatch, _pixel);
         }
 

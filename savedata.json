@@ -1,12 +1,12 @@
 {
   "currentLevel": "test-arena",
-  "spawnX": 480,
-  "spawnY": 224,
+  "spawnX": 1139,
+  "spawnY": 488,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 66.31636,
+  "playTime": 80.43604,
   "meleeInventory": [],
   "rangedInventory": [],
   "meleeIndex": -1,
