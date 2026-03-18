@@ -1447,8 +1447,18 @@ public class Game1 : Game
             if (_level.TileGridInstance != null)
                 _level.TileGrid = _level.TileGridInstance.ToData();
             _level.Build();
+            // Save camera position before rebuilding
+            float prevCamX = _camera?.Position.X ?? 0f;
+            float prevCamY = _camera?.Position.Y ?? 0f;
             _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
-            Restart();
+            // Keep player at current camera center instead of respawning at spawn point
+            float camCX = prevCamX + 400f;
+            float camCY = prevCamY + 300f;
+            _player.Position = new Vector2(camCX - Player.Width / 2f, camCY - Player.Height / 2f);
+            _camera.SnapTo(_player.Position, Player.Width, Player.Height);
+            _spawnInvincibility = 2.0f; // extra invincibility in case we land in danger
+            _isDead = false;
+            _bullets = new List<Bullet>();
             // Suppress exit triggers so spawning on a loading zone doesn't teleport you
             _prevInExit = new bool[_level.ExitRects.Length];
             for (int k = 0; k < _prevInExit.Length; k++)
