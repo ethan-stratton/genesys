@@ -2840,13 +2840,13 @@ public class Game1 : Game
         if (_editorTool == EditorTool.TilePaint)
         {
             string tileInfo = $"Tile: {_selectedTileType}  [{_tilePaletteCursor + 1}/{TileProperties.PaletteTiles.Length}]  RClick=Erase";
-            _spriteBatch.DrawString(_font, SafeText(tileInfo), new Vector2(10, ViewH - 60), Color.Yellow);
-            // Mini palette — wrap into rows
-            int colsPerRow = 18;
+            _spriteBatch.DrawString(_font, SafeText(tileInfo), new Vector2(ViewW - 360, 10), Color.Yellow);
+            // Mini palette — wrap into rows, right side
+            int colsPerRow = 16;
             int tileW = 20;
             int tileH = 20;
-            int startX = 10;
-            int startY = ViewH - 40;
+            int startX = ViewW - colsPerRow * tileW - 10;
+            int startY = 30;
             for (int i = 0; i < TileProperties.PaletteTiles.Length; i++)
             {
                 var tt = TileProperties.PaletteTiles[i];

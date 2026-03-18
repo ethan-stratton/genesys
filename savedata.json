@@ -1,12 +1,12 @@
 {
-  "currentLevel": "the-summit",
-  "spawnX": 4,
-  "spawnY": 496,
+  "currentLevel": "debug-room",
+  "spawnX": 1042,
+  "spawnY": 148,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 1541.2058,
+  "playTime": 1733.1764,
   "meleeInventory": [
     "Stick",
     "Sword"
