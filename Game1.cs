@@ -845,6 +845,50 @@ public class Game1 : Game
             }
         }
 
+        // Tile-based spike collision
+        if (!_isDead && _spawnInvincibility <= 0f)
+        {
+            var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
+            var tg = _level.TileGrid;
+            int ts = tg.TileSize;
+            int startCol = Math.Max(0, pRect.Left / ts);
+            int endCol = Math.Min(tg.Width - 1, pRect.Right / ts);
+            int startRow = Math.Max(0, pRect.Top / ts);
+            int endRow = Math.Min(tg.Height - 1, pRect.Bottom / ts);
+            bool hit = false;
+            for (int row = startRow; row <= endRow && !hit; row++)
+            {
+                for (int col = startCol; col <= endCol && !hit; col++)
+                {
+                    var tile = tg.GetTileAt(col, row);
+                    if (!TileProperties.IsHazard(tile)) continue;
+                    
+                    // Build hitbox based on tile type
+                    int twx = col * ts, twy = row * ts;
+                    Rectangle spikeRect;
+                    switch (tile)
+                    {
+                        case TileType.Spikes:       spikeRect = new Rectangle(twx, twy, ts, ts); break;
+                        case TileType.SpikesDown:   spikeRect = new Rectangle(twx, twy, ts, ts); break;
+                        case TileType.SpikesLeft:   spikeRect = new Rectangle(twx, twy, ts, ts); break;
+                        case TileType.SpikesRight:  spikeRect = new Rectangle(twx, twy, ts, ts); break;
+                        case TileType.HalfSpikesUp:    spikeRect = new Rectangle(twx, twy + ts / 2, ts, ts / 2); break;
+                        case TileType.HalfSpikesDown:  spikeRect = new Rectangle(twx, twy, ts, ts / 2); break;
+                        case TileType.HalfSpikesLeft:  spikeRect = new Rectangle(twx + ts / 2, twy, ts / 2, ts); break;
+                        case TileType.HalfSpikesRight: spikeRect = new Rectangle(twx, twy, ts / 2, ts); break;
+                        default: continue;
+                    }
+                    
+                    if (pRect.Intersects(spikeRect))
+                    {
+                        _player.TakeDamage(33);
+                        if (_player.Hp <= 0) _isDead = true;
+                        hit = true;
+                    }
+                }
+            }
+        }
+
         // Exit collision — enter-trigger (only fires on transition from outside → inside)
         if (!_isDead)
         {
@@ -3401,6 +3445,7 @@ public class Game1 : Game
     /// <summary>Draw a spike tile (triangular spikes pointing in a direction).</summary>
     private void DrawSpikeTile(int wx, int wy, int ts, TileType tile, Color color)
     {
+        bool isHalf = tile >= TileType.HalfSpikesUp && tile <= TileType.HalfSpikesRight;
         bool up = tile == TileType.Spikes || tile == TileType.HalfSpikesUp;
         bool down = tile == TileType.SpikesDown || tile == TileType.HalfSpikesDown;
         bool left = tile == TileType.SpikesLeft || tile == TileType.HalfSpikesLeft;
@@ -3410,54 +3455,59 @@ public class Game1 : Game
         
         if (up || down)
         {
-            // Spikes span full tile width, full tile height
-            // UP: base at BOTTOM (row ts-1), tips at TOP (row 0)
-            // DOWN: base at TOP (row 0), tips at BOTTOM (row ts-1)
-            int sw = ts / n; // width per spike
+            int h = isHalf ? ts / 2 : ts; // half spikes = half height
+            int sw = ts / n;
+            // Base is flush with the wall: UP base at bottom, DOWN base at top
+            int oy = 0;
+            if (up) oy = ts - h; // UP: base at bottom of tile, tips point up
+            // DOWN: oy=0, base at top of tile, tips point down
+            
             for (int s = 0; s < n; s++)
             {
                 int tipX = wx + s * sw + sw / 2;
-                for (int row = 0; row < ts; row++)
+                for (int row = 0; row < h; row++)
                 {
-                    // How far from base? 0 = at base (wide), 1 = at tip (narrow)
                     float tipRatio;
                     if (up)
-                        tipRatio = 1f - (float)row / (ts - 1); // row 0=tip(1), row ts-1=base(0)
+                        tipRatio = 1f - (float)row / (h - 1); // row 0=tip, row h-1=base
                     else
-                        tipRatio = (float)row / (ts - 1); // row 0=base(0), row ts-1=tip(1)
+                        tipRatio = (float)row / (h - 1); // row 0=base, row h-1=tip
                     
                     float widthRatio = 1f - tipRatio;
                     int halfW = Math.Max(0, (int)(sw / 2f * widthRatio));
                     if (halfW > 0)
-                        _spriteBatch.Draw(_pixel, new Rectangle(tipX - halfW, wy + row, halfW * 2, 1), color);
-                    else if (widthRatio > 0f || tipRatio < 1f)
-                        _spriteBatch.Draw(_pixel, new Rectangle(tipX, wy + row, 1, 1), color);
+                        _spriteBatch.Draw(_pixel, new Rectangle(tipX - halfW, wy + oy + row, halfW * 2, 1), color);
+                    else if (widthRatio > 0f)
+                        _spriteBatch.Draw(_pixel, new Rectangle(tipX, wy + oy + row, 1, 1), color);
                 }
             }
         }
         else // left or right
         {
-            // Spikes span full tile height, full tile width
-            // LEFT: base at RIGHT edge (col ts-1), tips at LEFT (col 0)
-            // RIGHT: base at LEFT edge (col 0), tips at RIGHT (col ts-1)
-            int sh = ts / n; // height per spike
+            int w = isHalf ? ts / 2 : ts; // half spikes = half width
+            int sh = ts / n;
+            // Base is flush with the wall: RIGHT base at left, LEFT base at right
+            int ox = 0;
+            if (left) ox = ts - w; // LEFT: base at right edge, tips point left
+            // RIGHT: ox=0, base at left edge, tips point right
+            
             for (int s = 0; s < n; s++)
             {
                 int tipY = wy + s * sh + sh / 2;
-                for (int col = 0; col < ts; col++)
+                for (int col = 0; col < w; col++)
                 {
                     float tipRatio;
                     if (right)
-                        tipRatio = (float)col / (ts - 1); // col 0=base(0), col ts-1=tip(1)
+                        tipRatio = (float)col / (w - 1); // col 0=base, col w-1=tip
                     else // left
-                        tipRatio = 1f - (float)col / (ts - 1); // col 0=tip(1), col ts-1=base(0)
+                        tipRatio = 1f - (float)col / (w - 1); // col 0=tip, col w-1=base
                     
                     float heightRatio = 1f - tipRatio;
                     int halfH = Math.Max(0, (int)(sh / 2f * heightRatio));
                     if (halfH > 0)
-                        _spriteBatch.Draw(_pixel, new Rectangle(wx + col, tipY - halfH, 1, halfH * 2), color);
-                    else if (heightRatio > 0f || tipRatio < 1f)
-                        _spriteBatch.Draw(_pixel, new Rectangle(wx + col, tipY, 1, 1), color);
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx + ox + col, tipY - halfH, 1, halfH * 2), color);
+                    else if (heightRatio > 0f)
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx + ox + col, tipY, 1, 1), color);
                 }
             }
         }
