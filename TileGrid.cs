@@ -89,7 +89,7 @@ public enum TileType : byte
 
 public static class TileProperties
 {
-    public static bool IsSolid(TileType t) => (t >= TileType.Dirt && t <= TileType.Sand) || t == TileType.Breakable;
+    public static bool IsSolid(TileType t) => (t >= TileType.Dirt && t <= TileType.Sand);
     public static bool IsPlatform(TileType t) => t >= TileType.PlatformWood && t <= TileType.PlatformBottom;
     /// <summary>Standard thin platforms only (for merged rects). Half platforms use custom rects.</summary>
     public static bool IsStandardPlatform(TileType t) => t == TileType.PlatformWood || t == TileType.PlatformStone;

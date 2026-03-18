@@ -972,27 +972,40 @@ public class Game1 : Game
                                 break;
                             case TileType.KnockbackTile:
                                 {
+                                    // Rubber bounce: reflect incoming velocity with boost
                                     var vel = _player.Velocity;
                                     float px = _player.Position.X + Player.Width / 2f;
                                     float py = _player.Position.Y + Player.Height / 2f;
                                     float dx = px - tileRect.Center.X;
                                     float dy = py - tileRect.Center.Y;
-                                    // Determine primary axis: if horizontal overlap is less, push horizontally
                                     float overlapX = (Player.Width / 2f + ts / 2f) - MathF.Abs(dx);
                                     float overlapY = (Player.Height / 2f + ts / 2f) - MathF.Abs(dy);
+                                    
+                                    float minBounce = 300f; // minimum bounce speed
+                                    float bounceMult = 1.5f; // velocity multiplier
+                                    
                                     if (overlapX < overlapY)
                                     {
-                                        // Side contact — strong horizontal push, small vertical
-                                        vel.X = MathF.Sign(dx) * 450f;
-                                        vel.Y = -100f;
+                                        // Side hit — reflect horizontal, keep vertical
+                                        float bounceX = MathF.Max(MathF.Abs(vel.X) * bounceMult, minBounce);
+                                        vel.X = MathF.Sign(dx) * bounceX;
+                                        // Push player out of tile
+                                        var pos = _player.Position;
+                                        pos.X = dx > 0 ? tileRect.Right : tileRect.Left - Player.Width;
+                                        _player.Position = pos;
                                     }
                                     else
                                     {
-                                        // Top/bottom contact
-                                        vel.X = dx != 0 ? MathF.Sign(dx) * 100f : 0f;
-                                        vel.Y = MathF.Sign(dy) * 450f;
+                                        // Top/bottom hit — reflect vertical, keep horizontal
+                                        float bounceY = MathF.Max(MathF.Abs(vel.Y) * bounceMult, minBounce);
+                                        vel.Y = MathF.Sign(dy) * bounceY;
+                                        var pos = _player.Position;
+                                        pos.Y = dy > 0 ? tileRect.Bottom : tileRect.Top - Player.Height;
+                                        _player.Position = pos;
                                     }
                                     _player.Velocity = vel;
+                                    // Use knockback timer to prevent movement override
+                                    _player.TriggerKnockbackTimer(0.15f);
                                 }
                                 break;
                             case TileType.SpeedBoostTile:

@@ -206,6 +206,11 @@ public class Player
     private const float FloatDuration = 2.0f;
     private const float FloatLiftSpeed = -120f; // upward velocity
 
+    public void TriggerKnockbackTimer(float duration)
+    {
+        _knockbackTimer = duration;
+    }
+
     public void TakeDamage(int amount, float knockbackDirX = 0f)
     {
         if (DamageCooldown > 0) return;
