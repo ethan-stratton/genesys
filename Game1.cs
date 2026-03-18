@@ -66,6 +66,7 @@ public class Game1 : Game
     private List<Crawler> _crawlers = new();
     private List<Hopper> _hoppers = new();
     private List<Thornback> _thornbacks = new();
+    private List<Bird> _birds = new();
 
     private Random _rng;
 
@@ -185,7 +186,7 @@ public class Game1 : Game
     private Vector2 _editorMoveOffset; // offset from entity origin to grab point
     private bool _entityPaletteOpen;
     private int _entityPaletteCursor;
-    private enum EntityType { Swarm, Crawler, Thornback, Hopper, Tree }
+    private enum EntityType { Swarm, Crawler, Thornback, Hopper, Tree, Bird }
 
     // Tile paint state
     private int _tilePaletteCursor;
@@ -277,6 +278,7 @@ public class Game1 : Game
         _crawlers.Clear();
         _hoppers.Clear();
         _thornbacks.Clear();
+        _birds.Clear();
 
         // Load item pickups
         _itemPickups.Clear();
@@ -353,6 +355,7 @@ public class Game1 : Game
         _crawlers.Clear();
         _hoppers.Clear();
         _thornbacks.Clear();
+        _birds.Clear();
         if (_rng == null) _rng = new Random();
         foreach (var e in _level.Enemies)
         {
@@ -373,6 +376,11 @@ public class Game1 : Game
                 case "hopper":
                     float hSnapY = SnapToSurface(e.X, e.Y, Hopper.Width, Hopper.Height);
                     _hoppers.Add(new Hopper(new Vector2(e.X, hSnapY), hSnapY + Hopper.Height));
+                    break;
+                case "bird":
+                    float bSnapY = SnapToSurface(e.X, e.Y, Bird.Width, Bird.Height);
+                    var bEdges = FindSurfaceEdges(e.X, bSnapY + Bird.Height);
+                    _birds.Add(new Bird(new Vector2(e.X, bSnapY), bEdges.Item1, bEdges.Item2, _rng));
                     break;
             }
         }
@@ -859,6 +867,11 @@ public class Game1 : Game
                     h.TakeHit(1);
             }
         }
+
+        // Update birds (non-hostile ambient creatures)
+        foreach (var bird in _birds)
+            bird.Update(dt, playerCenter2);
+        _birds.RemoveAll(b => !b.Alive);
 
         // Bullets vs crawlers and thornbacks
         foreach (var b in _bullets)
@@ -1546,6 +1559,12 @@ public class Game1 : Game
                         oList.Add(new EnvObjectData { Id = $"tree-{oList.Count}", Type = "tree", X = cx, Y = treeSnapY, W = 40, H = 80 });
                         _level.Objects = oList.ToArray();
                         SetEditorStatus($"Placed tree at ({(int)cx}, {(int)treeSnapY})");
+                        break;
+                    case EntityType.Bird:
+                        var birdList = new List<EnemySpawnData>(_level.Enemies);
+                        birdList.Add(new EnemySpawnData { Id = $"bird-{birdList.Count}", Type = "bird", X = cx, Y = cy });
+                        _level.Enemies = birdList.ToArray();
+                        SetEditorStatus($"Placed bird at ({(int)cx}, {(int)cy})");
                         break;
                 }
             }
@@ -4520,6 +4539,7 @@ public class Game1 : Game
             foreach (var c in _crawlers) c.Draw(_spriteBatch, _pixel);
             foreach (var h in _hoppers) h.Draw(_spriteBatch, _pixel);
             foreach (var t in _thornbacks) t.Draw(_spriteBatch, _pixel);
+            foreach (var bird in _birds) bird.Draw(_spriteBatch, _pixel);
         }
 
         // Draw player
