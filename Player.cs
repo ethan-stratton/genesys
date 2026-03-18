@@ -1151,8 +1151,8 @@ public class Player
                     else
                         vel.X -= hBoost;
                     
-                    // Push player below the ceiling surface so they don't re-collide next frame
-                    vel.Y = upSpeed * 0.3f;
+                    // Push player just below ceiling surface, minimal downward velocity
+                    vel.Y = 20f;
                     pos.Y = slopeCeilY + 4;
                     System.Console.WriteLine($"[DEFLECT] hBoost={hBoost:F1} vel.X={vel.X:F1} vel.Y={vel.Y:F1}");
                     
