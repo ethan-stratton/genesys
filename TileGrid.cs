@@ -92,6 +92,8 @@ public static class TileProperties
     public static bool IsSolid(TileType t) => (t >= TileType.Dirt && t <= TileType.Sand) || t == TileType.Breakable;
     public static bool IsPlatform(TileType t) => t >= TileType.PlatformWood && t <= TileType.PlatformBottom;
     public static bool IsHazard(TileType t) => t >= TileType.Spikes && t <= TileType.HalfSpikesRight;
+    /// <summary>Full-size hazards only (for merged rect collision). Half spikes use per-tile hitboxes.</summary>
+    public static bool IsFullHazard(TileType t) => t >= TileType.Spikes && t <= TileType.SpikesRight;
     public static bool IsBackground(TileType t) => (int)t >= 100;
     public static bool IsSlope(TileType t) => (t >= TileType.SlopeUpRight && t <= TileType.ShavedCeilLeft)
         || (t >= TileType.Gentle4UpRightA && t <= TileType.Gentle4UpLeftD)
@@ -387,7 +389,7 @@ public class TileGrid
         _dirty = false;
         _solidRects = MergeRects(TileProperties.IsSolid);
         _platformRects = MergeRects(TileProperties.IsPlatform);
-        _hazardRects = MergeRects(TileProperties.IsHazard);
+        _hazardRects = MergeRects(TileProperties.IsFullHazard);
     }
 
     public Rectangle[] GetSolidRects() { RebuildIfDirty(); return _solidRects; }
