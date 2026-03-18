@@ -2395,7 +2395,7 @@ public class Game1 : Game
         {
             var camInv = Matrix.Invert(_camera.TransformMatrix);
             var topLeft = Vector2.Transform(Vector2.Zero, camInv);
-            var botRight = Vector2.Transform(new Vector2(800, 600), camInv);
+            var botRight = Vector2.Transform(new Vector2(ViewW, ViewH), camInv);
             int gs = _editorGridSize;
             int startX = ((int)topLeft.X / gs) * gs;
             int startY = ((int)topLeft.Y / gs) * gs;
@@ -2457,7 +2457,7 @@ public class Game1 : Game
             var tg = _level.TileGridInstance;
             var camInv2 = Matrix.Invert(_camera.TransformMatrix);
             var tl = Vector2.Transform(Vector2.Zero, camInv2);
-            var br = Vector2.Transform(new Vector2(800, 600), camInv2);
+            var br = Vector2.Transform(new Vector2(ViewW, ViewH), camInv2);
             int startTX = Math.Max(0, ((int)tl.X - tg.OriginX) / tg.TileSize - 1);
             int startTY = Math.Max(0, ((int)tl.Y - tg.OriginY) / tg.TileSize - 1);
             int endTX = Math.Min(tg.Width, ((int)br.X - tg.OriginX) / tg.TileSize + 2);
@@ -3867,7 +3867,7 @@ public class Game1 : Game
             var tg = _level.TileGridInstance;
             var camInvBg = Matrix.Invert(_camera.TransformMatrix);
             var tlBg = Vector2.Transform(Vector2.Zero, camInvBg);
-            var brBg = Vector2.Transform(new Vector2(800, 600), camInvBg);
+            var brBg = Vector2.Transform(new Vector2(ViewW, ViewH), camInvBg);
             int stxBg = Math.Max(0, ((int)tlBg.X - tg.OriginX) / tg.TileSize - 1);
             int styBg = Math.Max(0, ((int)tlBg.Y - tg.OriginY) / tg.TileSize - 1);
             int etxBg = Math.Min(tg.Width, ((int)brBg.X - tg.OriginX) / tg.TileSize + 2);
@@ -3979,7 +3979,7 @@ public class Game1 : Game
             var tg = _level.TileGridInstance;
             var camInvG = Matrix.Invert(_camera.TransformMatrix);
             var tlG = Vector2.Transform(Vector2.Zero, camInvG);
-            var brG = Vector2.Transform(new Vector2(800, 600), camInvG);
+            var brG = Vector2.Transform(new Vector2(ViewW, ViewH), camInvG);
             int stx = Math.Max(0, ((int)tlG.X - tg.OriginX) / tg.TileSize - 1);
             int sty = Math.Max(0, ((int)tlG.Y - tg.OriginY) / tg.TileSize - 1);
             int etx = Math.Min(tg.Width, ((int)brG.X - tg.OriginX) / tg.TileSize + 2);
