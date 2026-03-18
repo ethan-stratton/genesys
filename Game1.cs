@@ -3104,6 +3104,14 @@ public class Game1 : Game
                     lineX = wx;
                     lineW = ts - row;
                     break;
+                case TileType.GentleCeilRight:
+                    lineX = wx + Math.Min(row * 2, ts);
+                    lineW = Math.Max(0, ts - row * 2);
+                    break;
+                case TileType.GentleCeilLeft:
+                    lineX = wx;
+                    lineW = Math.Max(0, ts - row * 2);
+                    break;
                 case TileType.GentleUpRight:
                     // Rises right: surface from (0,ts) to (ts,ts/2)
                     // At row r, fill from the surface X to the right edge

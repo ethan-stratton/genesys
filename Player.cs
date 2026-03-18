@@ -1109,6 +1109,45 @@ public class Player
             }
         }
 
+        // Slope ceiling collision — deflect momentum along surface
+        if (tileGrid != null)
+        {
+            TileType ceilTile;
+            float slopeCeilY = tileGrid.GetSlopeCeilY(pos.X, pos.Y, Width, Height, out ceilTile);
+            if (slopeCeilY > float.MinValue && pos.Y <= slopeCeilY + 2)
+            {
+                pos.Y = slopeCeilY;
+                
+                // Convert upward momentum into horizontal momentum along the ceiling slope
+                if (vel.Y < 0 && ceilTile != TileType.Empty)
+                {
+                    float upSpeed = MathF.Abs(vel.Y);
+                    // 45° ceiling slopes: deflect ~70% of upward speed into horizontal
+                    float deflectRatio = 0.7f;
+                    // Gentle ceiling slopes: deflect more (shallower angle)
+                    if (ceilTile == TileType.GentleCeilRight || ceilTile == TileType.GentleCeilLeft)
+                        deflectRatio = 0.85f;
+                    // Uppercut gets extra deflection for movement tech
+                    if (IsUppercutting) deflectRatio = 0.9f;
+                    
+                    float hBoost = upSpeed * deflectRatio;
+                    // SlopeCeilRight (╲): pushes player to the right
+                    // SlopeCeilLeft (╱): pushes player to the left
+                    if (ceilTile == TileType.SlopeCeilRight || ceilTile == TileType.GentleCeilRight)
+                        vel.X += hBoost;
+                    else
+                        vel.X -= hBoost;
+                    
+                    // Keep a small downward push so player slides along the surface
+                    vel.Y = upSpeed * 0.15f;
+                }
+                else if (vel.Y < 0)
+                {
+                    vel.Y = 0;
+                }
+            }
+        }
+
         // Ceiling collision (bonk head) — skip if near ceiling slope tiles
         if (ceilings != null && vel.Y < 0)
         {
@@ -1141,42 +1180,6 @@ public class Player
                         pos.Y = ceil.Bottom;
                         vel.Y = 0;
                     }
-                }
-            }
-        }
-
-        // Slope ceiling collision — deflect momentum along surface
-        if (tileGrid != null)
-        {
-            TileType ceilTile;
-            float slopeCeilY = tileGrid.GetSlopeCeilY(pos.X, pos.Y, Width, Height, out ceilTile);
-            if (slopeCeilY > float.MinValue && pos.Y <= slopeCeilY + 2)
-            {
-                pos.Y = slopeCeilY;
-                
-                // Convert upward momentum into horizontal momentum along the ceiling slope
-                if (vel.Y < 0 && ceilTile != TileType.Empty)
-                {
-                    float upSpeed = MathF.Abs(vel.Y);
-                    // 45° ceiling slopes: deflect ~70% of upward speed into horizontal
-                    float deflectRatio = 0.7f;
-                    // Uppercut gets extra deflection for movement tech
-                    if (IsUppercutting) deflectRatio = 0.9f;
-                    
-                    float hBoost = upSpeed * deflectRatio;
-                    // SlopeCeilRight (╲): pushes player to the right
-                    // SlopeCeilLeft (╱): pushes player to the left
-                    if (ceilTile == TileType.SlopeCeilRight)
-                        vel.X += hBoost;
-                    else
-                        vel.X -= hBoost;
-                    
-                    // Keep a small downward push so player slides along the surface
-                    vel.Y = upSpeed * 0.15f;
-                }
-                else if (vel.Y < 0)
-                {
-                    vel.Y = 0;
                 }
             }
         }
