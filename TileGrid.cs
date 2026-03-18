@@ -308,7 +308,13 @@ public class TileGrid
 
     public float GetSlopeCeilY(float worldX, float worldY, int playerWidth, int playerHeight)
     {
+        return GetSlopeCeilY(worldX, worldY, playerWidth, playerHeight, out _);
+    }
+
+    public float GetSlopeCeilY(float worldX, float worldY, int playerWidth, int playerHeight, out TileType hitTile)
+    {
         float bestY = float.MinValue;
+        hitTile = TileType.Empty;
         float centerX = worldX + playerWidth / 2f;
         float leftX = worldX + 2f;
         float rightX = worldX + playerWidth - 2f;
@@ -331,7 +337,7 @@ public class TileGrid
                     float slopeY = t == TileType.SlopeCeilRight
                         ? wy + localX
                         : wy + TileSize - localX;
-                    if (slopeY > bestY) bestY = slopeY;
+                    if (slopeY > bestY) { bestY = slopeY; hitTile = t; }
                 }
             }
         }
