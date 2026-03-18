@@ -1057,15 +1057,19 @@ public class Player
         }
 
         // Slope floor collision
+        bool _onSlope = false;
+        float _slopeFloorY = float.MaxValue;
         if (tileGrid != null)
         {
-            float slopeY = tileGrid.GetSlopeFloorY(pos.X, pos.Y, Width);
-            if (slopeY < float.MaxValue && pos.Y + Height >= slopeY)
+            float slopeY = tileGrid.GetSlopeFloorY(pos.X, pos.Y, Width, Height);
+            if (slopeY < float.MaxValue && pos.Y + Height >= slopeY - 2)
             {
                 pos.Y = slopeY - Height;
                 vel.Y = 0;
                 IsGrounded = true;
                 _jumpsLeft = MaxJumps;
+                _onSlope = true;
+                _slopeFloorY = slopeY;
             }
         }
 
@@ -1103,13 +1107,13 @@ public class Player
         }
 
         // Slope ceiling collision
-        if (tileGrid != null && vel.Y < 0)
+        if (tileGrid != null)
         {
-            float slopeCeilY = tileGrid.GetSlopeCeilY(pos.X, pos.Y, Width);
+            float slopeCeilY = tileGrid.GetSlopeCeilY(pos.X, pos.Y, Width, Height);
             if (slopeCeilY > float.MinValue && pos.Y <= slopeCeilY)
             {
                 pos.Y = slopeCeilY;
-                vel.Y = 0;
+                if (vel.Y < 0) vel.Y = 0;
             }
         }
 
@@ -1145,10 +1149,11 @@ public class Player
                             vel.Y = 0;
                         }
                     }
-                    // Push out horizontally if inside
+                    // Push out horizontally if inside (skip if player is on a slope near this block)
                     float playerBottom = pos.Y + Height;
                     float playerTop = pos.Y;
-                    if (playerBottom > sf.Y + 4 && playerTop < sf.Bottom - 4)
+                    bool slopeAdjacent = _onSlope && sf.Y >= _slopeFloorY - Height;
+                    if (!slopeAdjacent && playerBottom > sf.Y + 4 && playerTop < sf.Bottom - 4)
                     {
                         float playerCenterX = pos.X + Width / 2f;
                         float sfCenterX = sf.X + sf.Width / 2f;

@@ -251,7 +251,7 @@ public class TileGrid
         return rects.ToArray();
     }
 
-    public float GetSlopeFloorY(float worldX, float worldY, int playerWidth)
+    public float GetSlopeFloorY(float worldX, float worldY, int playerWidth, int playerHeight)
     {
         float bestY = float.MaxValue;
         float centerX = worldX + playerWidth / 2f;
@@ -264,6 +264,8 @@ public class TileGrid
                 int wx = OriginX + x * TileSize;
                 int wy = OriginY + y * TileSize;
                 if (centerX < wx || centerX > wx + TileSize) continue;
+                // Only check if player is vertically near this tile
+                if (worldY + playerHeight < wy - 4 || worldY > wy + TileSize) continue;
                 float localX = MathHelper.Clamp(centerX - wx, 0, TileSize);
                 float slopeY;
                 switch (t)
@@ -302,7 +304,7 @@ public class TileGrid
         return bestY;
     }
 
-    public float GetSlopeCeilY(float worldX, float worldY, int playerWidth)
+    public float GetSlopeCeilY(float worldX, float worldY, int playerWidth, int playerHeight)
     {
         float bestY = float.MinValue;
         float centerX = worldX + playerWidth / 2f;
@@ -315,6 +317,8 @@ public class TileGrid
                 int wx = OriginX + x * TileSize;
                 int wy = OriginY + y * TileSize;
                 if (centerX < wx || centerX > wx + TileSize) continue;
+                // Only check if player is vertically near this tile
+                if (worldY > wy + TileSize || worldY + playerHeight < wy) continue;
                 float localX = MathHelper.Clamp(centerX - wx, 0, TileSize);
                 // Ceiling mirrors: SlopeCeilRight surface goes from top-left to bottom-right
                 float slopeY = t == TileType.SlopeCeilRight
