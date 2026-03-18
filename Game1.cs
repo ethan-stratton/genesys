@@ -3447,7 +3447,7 @@ public class Game1 : Game
         if (nx >= 0 && nx < WorldMapData.MapW && ny >= 0 && ny < WorldMapData.MapH)
         {
             var tile = _worldMap.GetTile(nx, ny);
-            if (tile != MapTileType.Ocean && tile != MapTileType.Mountain)
+            if (tile != MapTileType.Ocean && tile != MapTileType.DeepOcean && tile != MapTileType.Mountain && tile != MapTileType.Volcano)
             {
                 _worldMap.PlayerX = nx;
                 _worldMap.PlayerY = ny;
@@ -3701,14 +3701,21 @@ public class Game1 : Game
     {
         return tile switch
         {
+            MapTileType.DeepOcean => new Color(8, 15, 45),
             MapTileType.Ocean => new Color(15, 25, 60),
-            MapTileType.Plains => new Color(45, 85, 40),
-            MapTileType.Forest => new Color(20, 55, 20),
-            MapTileType.Mountain => new Color(100, 95, 85),
-            MapTileType.Water => new Color(30, 55, 110),
-            MapTileType.Desert => new Color(160, 140, 80),
-            MapTileType.Swamp => new Color(50, 65, 35),
-            MapTileType.Snow => new Color(200, 210, 220),
+            MapTileType.Beach => new Color(190, 175, 130),
+            MapTileType.Plains => new Color(55, 95, 45),
+            MapTileType.Forest => new Color(25, 60, 22),
+            MapTileType.DenseForest => new Color(12, 40, 12),
+            MapTileType.Mountain => new Color(110, 100, 88),
+            MapTileType.Water => new Color(35, 60, 120),
+            MapTileType.Desert => new Color(170, 150, 85),
+            MapTileType.Swamp => new Color(55, 70, 38),
+            MapTileType.Snow => new Color(220, 225, 235),
+            MapTileType.SnowForest => new Color(140, 160, 150),
+            MapTileType.Tundra => new Color(160, 170, 165),
+            MapTileType.Cave => new Color(60, 50, 45),
+            MapTileType.Volcano => new Color(80, 30, 20),
             MapTileType.Path => new Color(130, 115, 85),
             MapTileType.BiomeEntrance => new Color(80, 70, 50),
             _ => new Color(20, 20, 20),

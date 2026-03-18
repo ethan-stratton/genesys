@@ -1,12 +1,12 @@
 {
-  "currentLevel": "the-descent",
+  "currentLevel": "the-summit",
   "spawnX": 4,
   "spawnY": 496,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 2015.371,
+  "playTime": 2049.4597,
   "meleeInventory": [
     "Stick",
     "Sword"
@@ -19,5 +19,5 @@
   "collectedItems": [
     "stick-1"
   ],
-  "windowSizeIndex": 0
+  "windowSizeIndex": 1
 }
