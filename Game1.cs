@@ -849,18 +849,18 @@ public class Game1 : Game
         if (!_isDead && _spawnInvincibility <= 0f)
         {
             var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
-            var tg = _level.TileGrid;
-            int ts = tg.TileSize;
+            var tgi = _level.TileGridInstance;
+            int ts = tgi.TileSize;
             int startCol = Math.Max(0, pRect.Left / ts);
-            int endCol = Math.Min(tg.Width - 1, pRect.Right / ts);
+            int endCol = Math.Min(tgi.Width - 1, pRect.Right / ts);
             int startRow = Math.Max(0, pRect.Top / ts);
-            int endRow = Math.Min(tg.Height - 1, pRect.Bottom / ts);
+            int endRow = Math.Min(tgi.Height - 1, pRect.Bottom / ts);
             bool hit = false;
             for (int row = startRow; row <= endRow && !hit; row++)
             {
                 for (int col = startCol; col <= endCol && !hit; col++)
                 {
-                    var tile = tg.GetTileAt(col, row);
+                    var tile = tgi.GetTileAt(col, row);
                     if (!TileProperties.IsHazard(tile)) continue;
                     
                     // Build hitbox based on tile type
