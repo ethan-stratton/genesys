@@ -136,7 +136,7 @@ public class Game1 : Game
     private bool _toolPaletteOpen;
     private Vector2 _editorCursor; // world position
     private bool _editorGridSnap = true;
-    private int _editorGridSize = 16;
+    private int _editorGridSize = 32;
     private bool _editorDragging;
     private Vector2 _editorDragStart;
     private bool _editorMenuOpen;
@@ -1090,8 +1090,8 @@ public class Game1 : Game
             if (place)
             {
                 var selectedType = entityTypes[_entityPaletteCursor];
-                float cx = _editorGridSnap ? MathF.Round(_editorCursor.X / 20) * 20 : _editorCursor.X;
-                float cy = _editorGridSnap ? MathF.Round(_editorCursor.Y / 20) * 20 : _editorCursor.Y;
+                float cx = _editorGridSnap ? MathF.Round(_editorCursor.X / 32) * 32 : _editorCursor.X;
+                float cy = _editorGridSnap ? MathF.Round(_editorCursor.Y / 32) * 32 : _editorCursor.Y;
 
                 switch (selectedType)
                 {
@@ -2040,67 +2040,7 @@ public class Game1 : Game
                 _spriteBatch.Draw(_pixel, new Rectangle((int)topLeft.X, gy, (int)(botRight.X - topLeft.X), 1), Color.White * 0.04f);
         }
 
-        // Draw tile grid
-        if (_level.TileGridInstance != null)
-        {
-            var tg = _level.TileGridInstance;
-            var camInv2 = Matrix.Invert(_camera.TransformMatrix);
-            var tl = Vector2.Transform(Vector2.Zero, camInv2);
-            var br = Vector2.Transform(new Vector2(800, 600), camInv2);
-            int startTX = Math.Max(0, ((int)tl.X - tg.OriginX) / tg.TileSize - 1);
-            int startTY = Math.Max(0, ((int)tl.Y - tg.OriginY) / tg.TileSize - 1);
-            int endTX = Math.Min(tg.Width, ((int)br.X - tg.OriginX) / tg.TileSize + 2);
-            int endTY = Math.Min(tg.Height, ((int)br.Y - tg.OriginY) / tg.TileSize + 2);
-
-            for (int ty = startTY; ty < endTY; ty++)
-            {
-                for (int tx = startTX; tx < endTX; tx++)
-                {
-                    var tile = tg.Tiles[tx, ty];
-                    if (tile == TileType.Empty) continue;
-                    int wx = tg.OriginX + tx * tg.TileSize;
-                    int wy = tg.OriginY + ty * tg.TileSize;
-                    var rect = new Rectangle(wx, wy, tg.TileSize, tg.TileSize);
-                    var color = TileProperties.GetColor(tile);
-
-                    if (TileProperties.IsPlatform(tile))
-                    {
-                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 4), color);
-                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 2), Color.White * 0.3f);
-                    }
-                    else if (TileProperties.IsHazard(tile))
-                    {
-                        _spriteBatch.Draw(_pixel, rect, color * 0.7f);
-                    }
-                    else
-                    {
-                        _spriteBatch.Draw(_pixel, rect, color);
-                        // Accent on top edge for grass
-                        if (tile == TileType.Grass)
-                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 4), TileProperties.GetAccentColor(tile));
-                    }
-
-                    // Outline — slightly darker border on all 4 sides
-                    var dark = new Color(
-                        (int)(color.R * 0.5f), (int)(color.G * 0.5f), (int)(color.B * 0.5f));
-                    int ts = tg.TileSize;
-                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), dark);           // top
-                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), dark);  // bottom
-                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts), dark);            // left
-                    _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts), dark);  // right
-                }
-            }
-
-            // Ghost preview at cursor for tile paint mode
-            if (_editorTool == EditorTool.TilePaint)
-            {
-                var wm = Vector2.Transform(new Vector2(mouse.X, mouse.Y), Matrix.Invert(_camera.TransformMatrix));
-                int gx = (int)MathF.Floor(wm.X / 32f) * 32;
-                int gy = (int)MathF.Floor(wm.Y / 32f) * 32;
-                _spriteBatch.Draw(_pixel, new Rectangle(gx, gy, 32, 32), TileProperties.GetColor(_selectedTileType) * 0.4f);
-                DrawHollowRect(gx, gy, 32, 32, Color.White * 0.5f);
-            }
-        }
+        // (tile grid drawn after walls — see below)
 
         // Draw platforms
         foreach (var p in _level.Platforms)
@@ -2144,6 +2084,67 @@ public class Game1 : Game
                 _spriteBatch.Draw(_pixel, new Rectangle(w.X - 4, w.Y + w.H / 2 - 2, 4, 4), Color.Cyan * 0.6f);
             }
             // 99 = no indicator (solid, no climb)
+        }
+
+        // Draw tile grid (editor — after walls so tiles paint over them)
+        if (_level.TileGridInstance != null)
+        {
+            var tg = _level.TileGridInstance;
+            var camInv2 = Matrix.Invert(_camera.TransformMatrix);
+            var tl = Vector2.Transform(Vector2.Zero, camInv2);
+            var br = Vector2.Transform(new Vector2(800, 600), camInv2);
+            int startTX = Math.Max(0, ((int)tl.X - tg.OriginX) / tg.TileSize - 1);
+            int startTY = Math.Max(0, ((int)tl.Y - tg.OriginY) / tg.TileSize - 1);
+            int endTX = Math.Min(tg.Width, ((int)br.X - tg.OriginX) / tg.TileSize + 2);
+            int endTY = Math.Min(tg.Height, ((int)br.Y - tg.OriginY) / tg.TileSize + 2);
+
+            for (int ty = startTY; ty < endTY; ty++)
+            {
+                for (int tx = startTX; tx < endTX; tx++)
+                {
+                    var tile = tg.Tiles[tx, ty];
+                    if (tile == TileType.Empty) continue;
+                    int wx = tg.OriginX + tx * tg.TileSize;
+                    int wy = tg.OriginY + ty * tg.TileSize;
+                    var rect = new Rectangle(wx, wy, tg.TileSize, tg.TileSize);
+                    var color = TileProperties.GetColor(tile);
+
+                    if (TileProperties.IsPlatform(tile))
+                    {
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 4), color);
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 2), Color.White * 0.3f);
+                    }
+                    else if (TileProperties.IsHazard(tile))
+                    {
+                        _spriteBatch.Draw(_pixel, rect, color * 0.7f);
+                    }
+                    else
+                    {
+                        _spriteBatch.Draw(_pixel, rect, color);
+                        if (tile == TileType.Grass)
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 4), TileProperties.GetAccentColor(tile));
+                    }
+
+                    // Outline
+                    var dark = new Color(
+                        (int)(color.R * 0.5f), (int)(color.G * 0.5f), (int)(color.B * 0.5f));
+                    int ts = tg.TileSize;
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), dark);
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), dark);
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts), dark);
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts), dark);
+                }
+            }
+
+            // Ghost preview at cursor for tile paint mode
+            if (_editorTool == EditorTool.TilePaint)
+            {
+                var wm = Vector2.Transform(new Vector2(mouse.X, mouse.Y), Matrix.Invert(_camera.TransformMatrix));
+                int gx = (int)MathF.Floor(wm.X / 32f) * 32;
+                int gy = (int)MathF.Floor(wm.Y / 32f) * 32;
+                _spriteBatch.Draw(_pixel, new Rectangle(gx, gy, 32, 32), TileProperties.GetColor(_selectedTileType) * 0.4f);
+                DrawHollowRect(gx, gy, 32, 32, Color.White * 0.5f);
+            }
         }
 
         // Draw ropes
@@ -3101,12 +3102,12 @@ public class Game1 : Game
         // Draw platforms
         foreach (var plat in _level.PlatformRects)
         {
-            // Skip platforms covered by tiles
+            // Skip platforms fully covered by solid foreground tiles
             if (_level.TileGridInstance != null)
             {
                 var tg = _level.TileGridInstance;
                 var (ttx, tty) = tg.WorldToTile(plat.X, plat.Y);
-                if (ttx >= 0 && tty >= 0 && tg.GetTileAt(ttx, tty) != TileType.Empty)
+                if (ttx >= 0 && tty >= 0 && TileProperties.IsSolid(tg.GetTileAt(ttx, tty)))
                     continue;
             }
             _spriteBatch.Draw(_pixel, plat, new Color(50, 50, 50));
@@ -3137,12 +3138,12 @@ public class Game1 : Game
         // Draw solid floors
         foreach (var sf in _level.SolidFloorRects)
         {
-            // Skip solid floors covered by tiles
+            // Skip solid floors covered by solid foreground tiles
             if (_level.TileGridInstance != null)
             {
                 var tg = _level.TileGridInstance;
                 var (ttx, tty) = tg.WorldToTile(sf.X, sf.Y);
-                if (ttx >= 0 && tty >= 0 && tg.GetTileAt(ttx, tty) != TileType.Empty)
+                if (ttx >= 0 && tty >= 0 && TileProperties.IsSolid(tg.GetTileAt(ttx, tty)))
                     continue;
             }
             _spriteBatch.Draw(_pixel, sf, new Color(70, 50, 30));

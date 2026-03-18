@@ -301,5 +301,6 @@
   "npcs": [],
   "items": [],
   "objects": [],
-  "enemies": []
+  "enemies": [],
+  "tileGrid": null
 }
