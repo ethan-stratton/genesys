@@ -91,6 +91,8 @@ public static class TileProperties
 {
     public static bool IsSolid(TileType t) => (t >= TileType.Dirt && t <= TileType.Sand) || t == TileType.Breakable;
     public static bool IsPlatform(TileType t) => t >= TileType.PlatformWood && t <= TileType.PlatformBottom;
+    /// <summary>Standard thin platforms only (for merged rects). Half platforms use custom rects.</summary>
+    public static bool IsStandardPlatform(TileType t) => t == TileType.PlatformWood || t == TileType.PlatformStone;
     public static bool IsHazard(TileType t) => t >= TileType.Spikes && t <= TileType.HalfSpikesRight;
     /// <summary>Full-size hazards only (for merged rect collision). Half spikes use per-tile hitboxes.</summary>
     public static bool IsFullHazard(TileType t) => t >= TileType.Spikes && t <= TileType.SpikesRight;
@@ -388,7 +390,29 @@ public class TileGrid
         if (!_dirty) return;
         _dirty = false;
         _solidRects = MergeRects(TileProperties.IsSolid);
-        _platformRects = MergeRects(TileProperties.IsPlatform);
+        _platformRects = MergeRects(TileProperties.IsStandardPlatform);
+        // Add half-platform rects individually (not merged — they're half-tile sized)
+        var halfPlats = new List<Rectangle>();
+        for (int ty = 0; ty < Height; ty++)
+        {
+            for (int tx = 0; tx < Width; tx++)
+            {
+                var t = Tiles[tx, ty];
+                int wx = OriginX + tx * TileSize;
+                int wy = OriginY + ty * TileSize;
+                if (t == TileType.PlatformTop)
+                    halfPlats.Add(new Rectangle(wx, wy, TileSize, TileSize / 2));
+                else if (t == TileType.PlatformBottom)
+                    halfPlats.Add(new Rectangle(wx, wy + TileSize / 2, TileSize, TileSize / 2));
+            }
+        }
+        if (halfPlats.Count > 0)
+        {
+            var merged = new Rectangle[_platformRects.Length + halfPlats.Count];
+            _platformRects.CopyTo(merged, 0);
+            halfPlats.CopyTo(merged, _platformRects.Length);
+            _platformRects = merged;
+        }
         _hazardRects = MergeRects(TileProperties.IsFullHazard);
     }
 
