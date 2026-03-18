@@ -45,10 +45,16 @@ public enum TileType : byte
     ShavedCeilLeft = 61,  // full block with gentle ceiling slope shaved off bottom-left
 
     // 1:4 gentle slopes (1 tile rise over 4 tile run = 8px per tile)
-    Gentle4UpRight = 62,  // very gentle floor slope going right
-    Gentle4UpLeft = 63,   // very gentle floor slope going left
-    Gentle4CeilRight = 64, // very gentle ceiling slope going right
-    Gentle4CeilLeft = 65,  // very gentle ceiling slope going left
+    // Each tile handles one quarter of the total rise
+    // UpRight: surface goes from bottom-left to top-right across 4 tiles
+    Gentle4UpRightA = 62,  // lowest quarter (surface 32→24)
+    Gentle4UpRightB = 63,  // second quarter (surface 24→16)
+    Gentle4UpRightC = 64,  // third quarter (surface 16→8)
+    Gentle4UpRightD = 65,  // top quarter (surface 8→0)
+    Gentle4UpLeftA = 66,   // lowest quarter going left
+    Gentle4UpLeftB = 67,
+    Gentle4UpLeftC = 68,
+    Gentle4UpLeftD = 69,
 
     // Interactive / Effect tiles
     Breakable = 70,       // solid until attacked, drops health item
@@ -56,6 +62,16 @@ public enum TileType : byte
     KnockbackTile = 72,   // knocks player back at high velocity
     SpeedBoostTile = 73,  // briefly increases movement speed
     FloatTile = 74,       // slowly floats player upward on timer
+
+    // 1:4 ceiling slopes
+    Gentle4CeilRightA = 75, // shallowest (surface wy→wy+8)
+    Gentle4CeilRightB = 76,
+    Gentle4CeilRightC = 77,
+    Gentle4CeilRightD = 78, // deepest (surface wy+24→wy+32)
+    Gentle4CeilLeftA = 79,
+    Gentle4CeilLeftB = 80,
+    Gentle4CeilLeftC = 81,
+    Gentle4CeilLeftD = 82,
 
     // Platforms
     PlatformTop = 22,     // half platform spanning top half of tile
@@ -78,15 +94,16 @@ public static class TileProperties
     public static bool IsHazard(TileType t) => t >= TileType.Spikes && t <= TileType.HalfSpikesRight;
     public static bool IsBackground(TileType t) => (int)t >= 100;
     public static bool IsSlope(TileType t) => (t >= TileType.SlopeUpRight && t <= TileType.ShavedCeilLeft)
-        || (t >= TileType.Gentle4UpRight && t <= TileType.Gentle4CeilLeft);
+        || (t >= TileType.Gentle4UpRightA && t <= TileType.Gentle4UpLeftD)
+        || (t >= TileType.Gentle4CeilRightA && t <= TileType.Gentle4CeilLeftD);
     public static bool IsSlopeFloor(TileType t) => t == TileType.SlopeUpRight || t == TileType.SlopeUpLeft
         || t == TileType.GentleUpRight || t == TileType.GentleUpLeft
         || t == TileType.ShavedRight || t == TileType.ShavedLeft
-        || t == TileType.Gentle4UpRight || t == TileType.Gentle4UpLeft;
+        || (t >= TileType.Gentle4UpRightA && t <= TileType.Gentle4UpLeftD);
     public static bool IsSlopeCeiling(TileType t) => t == TileType.SlopeCeilRight || t == TileType.SlopeCeilLeft
         || t == TileType.GentleCeilRight || t == TileType.GentleCeilLeft
         || t == TileType.ShavedCeilRight || t == TileType.ShavedCeilLeft
-        || t == TileType.Gentle4CeilRight || t == TileType.Gentle4CeilLeft;
+        || (t >= TileType.Gentle4CeilRightA && t <= TileType.Gentle4CeilLeftD);
     public static bool IsEffectTile(TileType t) => t >= TileType.DamageTile && t <= TileType.FloatTile;
 
     public static Color GetColor(TileType t) => t switch
@@ -120,10 +137,22 @@ public static class TileProperties
         TileType.GentleCeilLeft => new Color(65, 45, 22),
         TileType.ShavedCeilRight => new Color(65, 45, 22),
         TileType.ShavedCeilLeft => new Color(65, 45, 22),
-        TileType.Gentle4UpRight => new Color(95, 65, 35),
-        TileType.Gentle4UpLeft => new Color(95, 65, 35),
-        TileType.Gentle4CeilRight => new Color(65, 45, 22),
-        TileType.Gentle4CeilLeft => new Color(65, 45, 22),
+        TileType.Gentle4UpRightA => new Color(95, 65, 35),
+        TileType.Gentle4UpRightB => new Color(95, 65, 35),
+        TileType.Gentle4UpRightC => new Color(95, 65, 35),
+        TileType.Gentle4UpRightD => new Color(95, 65, 35),
+        TileType.Gentle4UpLeftA => new Color(95, 65, 35),
+        TileType.Gentle4UpLeftB => new Color(95, 65, 35),
+        TileType.Gentle4UpLeftC => new Color(95, 65, 35),
+        TileType.Gentle4UpLeftD => new Color(95, 65, 35),
+        TileType.Gentle4CeilRightA => new Color(65, 45, 22),
+        TileType.Gentle4CeilRightB => new Color(65, 45, 22),
+        TileType.Gentle4CeilRightC => new Color(65, 45, 22),
+        TileType.Gentle4CeilRightD => new Color(65, 45, 22),
+        TileType.Gentle4CeilLeftA => new Color(65, 45, 22),
+        TileType.Gentle4CeilLeftB => new Color(65, 45, 22),
+        TileType.Gentle4CeilLeftC => new Color(65, 45, 22),
+        TileType.Gentle4CeilLeftD => new Color(65, 45, 22),
         TileType.Breakable => new Color(160, 140, 80),
         TileType.DamageTile => new Color(150, 40, 150),
         TileType.KnockbackTile => new Color(40, 120, 200),
@@ -167,10 +196,22 @@ public static class TileProperties
         TileType.HalfSpikesRight => new Color(140, 18, 18),
         TileType.PlatformTop => new Color(80, 80, 80),
         TileType.PlatformBottom => new Color(80, 80, 80),
-        TileType.Gentle4UpRight => new Color(75, 50, 25),
-        TileType.Gentle4UpLeft => new Color(75, 50, 25),
-        TileType.Gentle4CeilRight => new Color(50, 35, 16),
-        TileType.Gentle4CeilLeft => new Color(50, 35, 16),
+        TileType.Gentle4UpRightA => new Color(75, 50, 25),
+        TileType.Gentle4UpRightB => new Color(75, 50, 25),
+        TileType.Gentle4UpRightC => new Color(75, 50, 25),
+        TileType.Gentle4UpRightD => new Color(75, 50, 25),
+        TileType.Gentle4UpLeftA => new Color(75, 50, 25),
+        TileType.Gentle4UpLeftB => new Color(75, 50, 25),
+        TileType.Gentle4UpLeftC => new Color(75, 50, 25),
+        TileType.Gentle4UpLeftD => new Color(75, 50, 25),
+        TileType.Gentle4CeilRightA => new Color(50, 35, 16),
+        TileType.Gentle4CeilRightB => new Color(50, 35, 16),
+        TileType.Gentle4CeilRightC => new Color(50, 35, 16),
+        TileType.Gentle4CeilRightD => new Color(50, 35, 16),
+        TileType.Gentle4CeilLeftA => new Color(50, 35, 16),
+        TileType.Gentle4CeilLeftB => new Color(50, 35, 16),
+        TileType.Gentle4CeilLeftC => new Color(50, 35, 16),
+        TileType.Gentle4CeilLeftD => new Color(50, 35, 16),
         TileType.Breakable => new Color(130, 110, 60),
         TileType.DamageTile => new Color(120, 30, 120),
         TileType.KnockbackTile => new Color(30, 90, 160),
@@ -207,10 +248,22 @@ public static class TileProperties
         TileType.GentleCeilLeft,
         TileType.ShavedCeilRight,
         TileType.ShavedCeilLeft,
-        TileType.Gentle4UpRight,
-        TileType.Gentle4UpLeft,
-        TileType.Gentle4CeilRight,
-        TileType.Gentle4CeilLeft,
+        TileType.Gentle4UpRightA,
+        TileType.Gentle4UpRightB,
+        TileType.Gentle4UpRightC,
+        TileType.Gentle4UpRightD,
+        TileType.Gentle4UpLeftA,
+        TileType.Gentle4UpLeftB,
+        TileType.Gentle4UpLeftC,
+        TileType.Gentle4UpLeftD,
+        TileType.Gentle4CeilRightA,
+        TileType.Gentle4CeilRightB,
+        TileType.Gentle4CeilRightC,
+        TileType.Gentle4CeilRightD,
+        TileType.Gentle4CeilLeftA,
+        TileType.Gentle4CeilLeftB,
+        TileType.Gentle4CeilLeftC,
+        TileType.Gentle4CeilLeftD,
         TileType.SpikesDown,
         TileType.SpikesLeft,
         TileType.SpikesRight,
@@ -396,12 +449,31 @@ public class TileGrid
                         case TileType.ShavedLeft:
                             slopeY = wy + (TileSize / 2f) - (localX / TileSize) * (TileSize / 2f);
                             break;
-                        case TileType.Gentle4UpRight:
-                            // 1:4 slope: 8px rise per 32px tile (quarter height)
+                        case TileType.Gentle4UpRightA:
+                            // Lowest quarter: surface from ts (left) to ts*3/4 (right)
                             slopeY = wy + TileSize - (localX / TileSize) * (TileSize / 4f);
                             break;
-                        case TileType.Gentle4UpLeft:
+                        case TileType.Gentle4UpRightB:
+                            slopeY = wy + TileSize * 3f / 4f - (localX / TileSize) * (TileSize / 4f);
+                            break;
+                        case TileType.Gentle4UpRightC:
+                            slopeY = wy + TileSize / 2f - (localX / TileSize) * (TileSize / 4f);
+                            break;
+                        case TileType.Gentle4UpRightD:
+                            slopeY = wy + TileSize / 4f - (localX / TileSize) * (TileSize / 4f);
+                            break;
+                        case TileType.Gentle4UpLeftA:
+                            // Lowest quarter going left: surface from ts*3/4 (left) to ts (right)
                             slopeY = wy + TileSize * 3f / 4f + (localX / TileSize) * (TileSize / 4f);
+                            break;
+                        case TileType.Gentle4UpLeftB:
+                            slopeY = wy + TileSize / 2f + (localX / TileSize) * (TileSize / 4f);
+                            break;
+                        case TileType.Gentle4UpLeftC:
+                            slopeY = wy + TileSize / 4f + (localX / TileSize) * (TileSize / 4f);
+                            break;
+                        case TileType.Gentle4UpLeftD:
+                            slopeY = wy + (localX / TileSize) * (TileSize / 4f);
                             break;
                         default:
                             continue;
@@ -464,13 +536,30 @@ public class TileGrid
                             // Full block with bottom-left shaved: left=wy+ts/2, right=wy+ts
                             slopeY = wy + TileSize / 2f + (localX / TileSize) * (TileSize / 2f);
                             break;
-                        case TileType.Gentle4CeilRight:
-                            // 1:4 ceiling: surface from wy (left) to wy+ts/4 (right)
+                        case TileType.Gentle4CeilRightA:
+                            // Shallowest: surface from wy (left) to wy+ts/4 (right)
                             slopeY = wy + (localX / TileSize) * (TileSize / 4f);
                             break;
-                        case TileType.Gentle4CeilLeft:
-                            // 1:4 ceiling: surface from wy+ts/4 (left) to wy (right)
+                        case TileType.Gentle4CeilRightB:
+                            slopeY = wy + TileSize / 4f + (localX / TileSize) * (TileSize / 4f);
+                            break;
+                        case TileType.Gentle4CeilRightC:
+                            slopeY = wy + TileSize / 2f + (localX / TileSize) * (TileSize / 4f);
+                            break;
+                        case TileType.Gentle4CeilRightD:
+                            slopeY = wy + TileSize * 3f / 4f + (localX / TileSize) * (TileSize / 4f);
+                            break;
+                        case TileType.Gentle4CeilLeftA:
                             slopeY = wy + TileSize / 4f - (localX / TileSize) * (TileSize / 4f);
+                            break;
+                        case TileType.Gentle4CeilLeftB:
+                            slopeY = wy + TileSize / 2f - (localX / TileSize) * (TileSize / 4f);
+                            break;
+                        case TileType.Gentle4CeilLeftC:
+                            slopeY = wy + TileSize * 3f / 4f - (localX / TileSize) * (TileSize / 4f);
+                            break;
+                        case TileType.Gentle4CeilLeftD:
+                            slopeY = wy + TileSize - (localX / TileSize) * (TileSize / 4f);
                             break;
                         default:
                             continue;

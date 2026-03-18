@@ -2197,7 +2197,7 @@ public class Game1 : Game
                     {
                         int ts = tg.TileSize;
                         int halfH = ts / 2;
-                        int py = tile == TileType.PlatformTop ? wy : wy + halfH;
+                        int py = tile == TileType.PlatformBottom ? wy + halfH : wy;
                         _spriteBatch.Draw(_pixel, new Rectangle(wx, py, ts, halfH), color);
                         var dark = new Color((int)(color.R * 0.5f), (int)(color.G * 0.5f), (int)(color.B * 0.5f));
                         _spriteBatch.Draw(_pixel, new Rectangle(wx, py, ts, 1), dark);
@@ -3214,43 +3214,123 @@ public class Game1 : Game
                         }
                     }
                     break;
-                case TileType.Gentle4UpRight:
-                    // 1:4 slope rising right: surface from (0,ts) to (ts, ts*3/4)
+                case TileType.Gentle4UpRightA:
+                case TileType.Gentle4UpRightB:
+                case TileType.Gentle4UpRightC:
+                case TileType.Gentle4UpRightD:
                     {
-                        int surfRow = ts - (int)((float)(ts - row) * 4f); // row where fill starts
-                        if (row < ts * 3 / 4) continue;
-                        int surfX = (int)((ts - row) * 4f);
-                        if (surfX >= ts) continue;
-                        lineX = wx + surfX;
-                        lineW = ts - surfX;
+                        // Quarter index: A=0, B=1, C=2, D=3
+                        int qi = tile - TileType.Gentle4UpRightA;
+                        int baseRow = ts - (qi + 1) * (ts / 4); // top of fill for this quarter
+                        if (row < baseRow + (int)((float)(ts - 1 - (row - baseRow)) / ts * 0 )) { }
+                        // Surface at this row: baseRow + slope within tile
+                        int surfaceRow = ts * (3 - qi) / 4 + (int)((float)(ts - 1 - row) * 0); // wrong approach
+                        // Simpler: surface Y relative to tile = (3-qi)*ts/4 - (localX/ts)*(ts/4) but we iterate rows
+                        // At each row, how much width is filled (from right side)?
+                        // Surface: left edge is at slopeY = wy + (3-qi)*ts/4 + (localX/ts)*ts/4... 
+                        // No wait: UpRight means rises to the right. Surface goes DOWN as X goes right.
+                        // Actually for UpRight, surface Y DECREASES going right.
+                        // Gentle4UpRightA: surface from ts (left) to ts*3/4 (right). Solid below surface.
+                        // At row r: solid if r >= surface. Surface at column c = ts - qi*ts/4 - (c/ts)*(ts/4)
+                        // For UpRightA (qi=0): surface(c) = ts - (c/ts)*(ts/4). r >= surface means fill.
+                        // fillStart = ts - (3-qi)*ts/4 ... this is getting complex. Let me just compute per-row.
+                        int qBase = (3 - qi) * ts / 4; // surface at left edge of tile
+                        int qTop = qBase - ts / 4;     // surface at right edge
+                        // surface at column c: qBase - c * (ts/4) / ts = qBase - c/4
+                        if (row < qTop) continue; // above highest point
+                        if (row >= qBase)
+                        {
+                            // Below lowest point - full row
+                            lineX = wx;
+                            lineW = ts;
+                        }
+                        else
+                        {
+                            // Partially filled: fill from right
+                            // At which X does surface = row? row = qBase - x/4 → x = (qBase - row) * 4
+                            int surfX = (qBase - row) * 4;
+                            if (surfX > ts) surfX = ts;
+                            if (surfX < 0) surfX = 0;
+                            lineX = wx + surfX;
+                            lineW = ts - surfX;
+                            if (lineW <= 0) continue;
+                        }
                     }
                     break;
-                case TileType.Gentle4UpLeft:
-                    // 1:4 slope rising left: surface from (0, ts*3/4) to (ts, ts)
+                case TileType.Gentle4UpLeftA:
+                case TileType.Gentle4UpLeftB:
+                case TileType.Gentle4UpLeftC:
+                case TileType.Gentle4UpLeftD:
                     {
-                        if (row < ts * 3 / 4) continue;
-                        int fillW = (int)((row - ts * 3 / 4) * 4f) + 1;
-                        if (fillW > ts) fillW = ts;
-                        lineX = wx;
-                        lineW = fillW;
+                        int qi = tile - TileType.Gentle4UpLeftA;
+                        int qBase = (3 - qi) * ts / 4; // surface at right edge
+                        int qTop = qBase - ts / 4;     // surface at left edge
+                        if (row < qTop) continue;
+                        if (row >= qBase)
+                        {
+                            lineX = wx;
+                            lineW = ts;
+                        }
+                        else
+                        {
+                            // Fill from left
+                            int surfX = (qBase - row) * 4;
+                            if (surfX > ts) surfX = ts;
+                            if (surfX < 0) surfX = 0;
+                            lineX = wx;
+                            lineW = ts - surfX;
+                            if (lineW <= 0) continue;
+                        }
                     }
                     break;
-                case TileType.Gentle4CeilRight:
-                    // 1:4 ceiling going right: surface from wy(left) to wy+ts/4(right)
+                case TileType.Gentle4CeilRightA:
+                case TileType.Gentle4CeilRightB:
+                case TileType.Gentle4CeilRightC:
+                case TileType.Gentle4CeilRightD:
                     {
-                        int maxRow = Math.Min(row * 4, ts);
-                        lineX = wx + maxRow;
-                        lineW = Math.Max(0, ts - maxRow);
-                        if (lineW <= 0) continue;
+                        int qi = tile - TileType.Gentle4CeilRightA;
+                        // Surface at left = qi*ts/4, at right = (qi+1)*ts/4
+                        int surfLeft = qi * ts / 4;
+                        int surfRight = (qi + 1) * ts / 4;
+                        if (row > surfRight) continue;
+                        if (row <= surfLeft)
+                        {
+                            lineX = wx;
+                            lineW = ts;
+                        }
+                        else
+                        {
+                            // surface X where row intersects: x = (row - surfLeft) * 4
+                            int sx = (row - surfLeft) * 4;
+                            if (sx > ts) sx = ts;
+                            lineX = wx + sx;
+                            lineW = ts - sx;
+                            if (lineW <= 0) continue;
+                        }
                     }
                     break;
-                case TileType.Gentle4CeilLeft:
-                    // 1:4 ceiling going left
+                case TileType.Gentle4CeilLeftA:
+                case TileType.Gentle4CeilLeftB:
+                case TileType.Gentle4CeilLeftC:
+                case TileType.Gentle4CeilLeftD:
                     {
-                        int maxRow = Math.Min(row * 4, ts);
-                        lineX = wx;
-                        lineW = Math.Max(0, ts - maxRow);
-                        if (lineW <= 0) continue;
+                        int qi = tile - TileType.Gentle4CeilLeftA;
+                        int surfRight = qi * ts / 4;
+                        int surfLeft = (qi + 1) * ts / 4;
+                        if (row > surfLeft) continue;
+                        if (row <= surfRight)
+                        {
+                            lineX = wx;
+                            lineW = ts;
+                        }
+                        else
+                        {
+                            int sx = (row - surfRight) * 4;
+                            if (sx > ts) sx = ts;
+                            lineX = wx;
+                            lineW = ts - sx;
+                            if (lineW <= 0) continue;
+                        }
                     }
                     break;
                 default:
@@ -3264,52 +3344,48 @@ public class Game1 : Game
     private void DrawSpikeTile(int wx, int wy, int ts, TileType tile, Color color)
     {
         bool isHalf = tile >= TileType.HalfSpikesUp && tile <= TileType.HalfSpikesRight;
-        int h = isHalf ? ts / 2 : ts;
         
-        // Normalize direction
         bool up = tile == TileType.Spikes || tile == TileType.HalfSpikesUp;
         bool down = tile == TileType.SpikesDown || tile == TileType.HalfSpikesDown;
         bool left = tile == TileType.SpikesLeft || tile == TileType.HalfSpikesLeft;
         bool right = tile == TileType.SpikesRight || tile == TileType.HalfSpikesRight;
         
-        // Offset for half tiles pointing down/right
-        int ox = 0, oy = 0;
-        if (down && isHalf) oy = ts / 2;
-        if (right && isHalf) ox = ts / 2;
-        
-        // Draw 4 triangular spikes
         int spikeCount = 4;
+        
         if (up || down)
         {
-            int sw = ts / spikeCount; // spike width
+            int spikeH = isHalf ? ts / 2 : ts;
+            int sw = ts / spikeCount;
             for (int s = 0; s < spikeCount; s++)
             {
-                int sx = wx + s * sw;
-                for (int row = 0; row < h; row++)
+                int baseX = wx + s * sw;
+                int tipX = baseX + sw / 2;
+                for (int row = 0; row < spikeH; row++)
                 {
-                    float t = (float)row / h;
-                    if (down) t = 1f - t;
-                    int halfW = (int)(sw / 2f * t);
-                    int cx = sx + sw / 2;
-                    if (halfW > 0)
-                        _spriteBatch.Draw(_pixel, new Rectangle(cx - halfW, wy + oy + row, halfW * 2, 1), color);
+                    // t goes from 0 (base) to 1 (tip)
+                    float t_val = (float)row / spikeH;
+                    if (up) t_val = 1f - t_val; // up: tip at top (row 0), base at bottom
+                    int halfW = Math.Max(1, (int)(sw / 2f * (1f - t_val)));
+                    int drawY = up ? wy + (isHalf ? ts / 2 : 0) + row : wy + row;
+                    _spriteBatch.Draw(_pixel, new Rectangle(tipX - halfW, drawY, halfW * 2, 1), color);
                 }
             }
         }
-        else // left or right
+        else
         {
-            int sw = ts / spikeCount; // spike height per spike
+            int spikeW = isHalf ? ts / 2 : ts;
+            int sh = ts / spikeCount;
             for (int s = 0; s < spikeCount; s++)
             {
-                int sy = wy + s * sw;
-                for (int col = 0; col < h; col++)
+                int baseY = wy + s * sh;
+                int tipY = baseY + sh / 2;
+                for (int col = 0; col < spikeW; col++)
                 {
-                    float t = (float)col / h;
-                    if (left) t = 1f - t;
-                    int halfH = (int)(sw / 2f * t);
-                    int cy = sy + sw / 2;
-                    if (halfH > 0)
-                        _spriteBatch.Draw(_pixel, new Rectangle(wx + ox + col, cy - halfH, 1, halfH * 2), color);
+                    float t_val = (float)col / spikeW;
+                    if (left) t_val = 1f - t_val; // left: tip at left (col 0), base at right
+                    int halfH = Math.Max(1, (int)(sh / 2f * (1f - t_val)));
+                    int drawX = left ? wx + (isHalf ? ts / 2 : 0) + col : wx + col;
+                    _spriteBatch.Draw(_pixel, new Rectangle(drawX, tipY - halfH, 1, halfH * 2), color);
                 }
             }
         }
