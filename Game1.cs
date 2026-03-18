@@ -833,6 +833,37 @@ public class Game1 : Game
                 if (h.Alive && bRect.Intersects(h.Rect))
                 { h.TakeHit(2); b.IsDead = true; break; }
             }
+            // Bullet vs breakable tiles
+            if (!b.IsDead && _level.TileGridInstance != null)
+            {
+                var tgi = _level.TileGridInstance;
+                int ts = tgi.TileSize;
+                int ox = tgi.OriginX, oy = tgi.OriginY;
+                int bc = ((int)b.Position.X + Bullet.Size / 2 - ox) / ts;
+                int br2 = ((int)b.Position.Y + Bullet.Size / 2 - oy) / ts;
+                if (bc >= 0 && bc < tgi.Width && br2 >= 0 && br2 < tgi.Height)
+                {
+                    if (tgi.GetTileAt(bc, br2) == TileType.Breakable)
+                    {
+                        _destroyedBreakables.Add((bc, br2));
+                        tgi.SetTileAt(bc, br2, TileType.Empty);
+                        _level.RebuildTileCollision();
+                        int twx = ox + bc * ts, twy = oy + br2 * ts;
+                        _itemPickups.Add(new ItemPickup
+                        {
+                            Id = $"heart-break-{twx}-{twy}",
+                            X = twx + ts / 2f - 8,
+                            Y = twy,
+                            W = 16, H = 16,
+                            ItemType = "heart",
+                            Collected = false,
+                            HasGravity = true,
+                            VelY = -150f
+                        });
+                        b.IsDead = true;
+                    }
+                }
+            }
         }
         } // end _enemiesEnabled
 
@@ -2840,13 +2871,13 @@ public class Game1 : Game
         if (_editorTool == EditorTool.TilePaint)
         {
             string tileInfo = $"Tile: {_selectedTileType}  [{_tilePaletteCursor + 1}/{TileProperties.PaletteTiles.Length}]  RClick=Erase";
-            _spriteBatch.DrawString(_font, SafeText(tileInfo), new Vector2(ViewW - 360, 10), Color.Yellow);
+            _spriteBatch.DrawString(_font, SafeText(tileInfo), new Vector2(ViewW - 360, 30), Color.Yellow);
             // Mini palette — wrap into rows, right side
             int colsPerRow = 16;
             int tileW = 20;
             int tileH = 20;
             int startX = ViewW - colsPerRow * tileW - 10;
-            int startY = 30;
+            int startY = 50;
             for (int i = 0; i < TileProperties.PaletteTiles.Length; i++)
             {
                 var tt = TileProperties.PaletteTiles[i];

@@ -59,6 +59,15 @@
       "targetLevel": "test-arena",
       "id": "exit-left",
       "targetExitId": "exit-debug"
+    },
+    {
+      "x": 2500,
+      "y": 81,
+      "w": 30,
+      "h": 90,
+      "targetLevel": "test-arena",
+      "id": "exit-right",
+      "targetExitId": ""
     }
   ],
   "npcs": [],
