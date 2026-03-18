@@ -13,26 +13,46 @@ public class InsectSwarm
     public bool Aggroed;
     public List<Insect> Insects = new();
 
+    // Swarm-level coherence: a slowly drifting "cloud center" the swarm loosely follows
+    private Vector2 _cloudOffset;
+    private Vector2 _cloudVelocity;
+    private float _cloudDriftTimer;
+
     public InsectSwarm(Vector2 home, int count, Random rng)
     {
         HomePosition = home;
+        _cloudOffset = Vector2.Zero;
+        _cloudVelocity = RandomDir(rng) * 15f;
+        _cloudDriftTimer = 1f + (float)(rng.NextDouble() * 2f);
+
         for (int i = 0; i < count; i++)
         {
             float angle = (float)(rng.NextDouble() * Math.PI * 2);
-            float dist = 20f + (float)(rng.NextDouble() * 30f);
+            float dist = 8f + (float)(rng.NextDouble() * 25f);
             Insects.Add(new Insect
             {
                 Position = home + new Vector2(MathF.Cos(angle) * dist, MathF.Sin(angle) * dist),
+                Velocity = RandomDir(rng) * (30f + (float)(rng.NextDouble() * 60f)),
                 Alive = true,
-                OrbitAngle = angle,
-                OrbitSpeed = 1.5f + (float)(rng.NextDouble() * 1.5f),
-                OrbitRadius = dist,
                 StingCooldown = 0,
-                Jitter = new Vector2((float)(rng.NextDouble() - 0.5) * 2, (float)(rng.NextDouble() - 0.5) * 2),
-                InBackground = rng.NextDouble() < 0.3,  // 30% start behind trees
+
+                // Lévy flight: time until next sudden dart
+                DartTimer = 0.3f + (float)(rng.NextDouble() * 1.5f),
+                // Perlin-ish smooth steering
+                SteerAngle = (float)(rng.NextDouble() * MathF.PI * 2),
+                SteerRate = 2f + (float)(rng.NextDouble() * 4f), // how fast steering angle rotates
+                BaseSpeed = 40f + (float)(rng.NextDouble() * 40f),
+
+                InBackground = rng.NextDouble() < 0.3,
                 LayerSwitchTimer = 2f + (float)(rng.NextDouble() * 4f),
             });
         }
+    }
+
+    private static Vector2 RandomDir(Random rng)
+    {
+        float a = (float)(rng.NextDouble() * MathF.PI * 2);
+        return new Vector2(MathF.Cos(a), MathF.Sin(a));
     }
 
     public int AliveCount()
@@ -51,50 +71,97 @@ public class InsectSwarm
         if (Aggroed && distToPlayer > LeashRange)
             Aggroed = false;
 
+        // Drift the cloud center slowly (gives the whole swarm a gentle sway)
+        _cloudDriftTimer -= dt;
+        if (_cloudDriftTimer <= 0)
+        {
+            _cloudVelocity = RandomDir(rng) * (10f + (float)(rng.NextDouble() * 20f));
+            _cloudDriftTimer = 1.5f + (float)(rng.NextDouble() * 3f);
+        }
+        _cloudOffset += _cloudVelocity * dt;
+        // Spring the cloud back toward home so it doesn't wander too far
+        _cloudOffset *= MathF.Pow(0.3f, dt); // exponential decay toward zero
+
+        Vector2 swarmCenter = Aggroed ? playerCenter : (HomePosition + _cloudOffset);
+
         foreach (var ins in Insects)
         {
             if (!ins.Alive) continue;
 
             if (ins.StingCooldown > 0) ins.StingCooldown -= dt;
 
-            // Layer switching — bugs fly in and out of tree canopy
+            // Layer switching
             ins.LayerSwitchTimer -= dt;
             if (ins.LayerSwitchTimer <= 0)
             {
                 ins.InBackground = !ins.InBackground;
                 ins.LayerSwitchTimer = 2f + (float)(rng.NextDouble() * 5f);
-                // Background bugs don't sting
                 if (ins.InBackground) ins.StingCooldown = MathF.Max(ins.StingCooldown, 0.5f);
             }
 
-            if (Aggroed)
+            // --- Fly movement model ---
+            // 1. Smooth random steering (Perlin-like: rotating angle gives curved paths)
+            ins.SteerAngle += ins.SteerRate * dt;
+            Vector2 steerForce = new Vector2(
+                MathF.Cos(ins.SteerAngle),
+                MathF.Sin(ins.SteerAngle)) * ins.BaseSpeed * 0.6f;
+
+            // 2. Lévy flight: occasional sudden dart
+            ins.DartTimer -= dt;
+            if (ins.DartTimer <= 0)
             {
-                var dir = playerCenter - ins.Position;
-                if (dir.LengthSquared() > 1f)
+                // Sudden burst in random direction
+                float dartSpeed = 80f + (float)(rng.NextDouble() * 160f);
+                ins.Velocity = RandomDir(rng) * dartSpeed;
+                // Vary the steering to create a new flight pattern after dart
+                ins.SteerRate = 2f + (float)(rng.NextDouble() * 5f);
+                ins.BaseSpeed = 40f + (float)(rng.NextDouble() * 40f);
+                // Next dart: mostly short waits, occasionally long (Lévy-ish)
+                double r = rng.NextDouble();
+                ins.DartTimer = r < 0.7f
+                    ? 0.2f + (float)(rng.NextDouble() * 0.8f)   // short: frequent jittery darts
+                    : 1.5f + (float)(rng.NextDouble() * 3f);    // long: calm cruising
+            }
+
+            // 3. Cohesion: pull toward swarm center
+            Vector2 toCenter = swarmCenter - ins.Position;
+            float distFromCenter = toCenter.Length();
+            Vector2 cohesion = Vector2.Zero;
+            if (distFromCenter > 1f)
+            {
+                toCenter /= distFromCenter; // normalize
+                // Stronger pull the further away (quadratic ramp)
+                float pullStrength = Aggroed ? 200f : 80f;
+                float ramp = MathF.Min(distFromCenter / 50f, 3f);
+                cohesion = toCenter * pullStrength * ramp;
+            }
+
+            // 4. Separation: push away from very close neighbors
+            Vector2 separation = Vector2.Zero;
+            foreach (var other in Insects)
+            {
+                if (other == ins || !other.Alive) continue;
+                Vector2 diff = ins.Position - other.Position;
+                float d = diff.Length();
+                if (d < 12f && d > 0.1f)
                 {
-                    dir.Normalize();
-                    ins.JitterTimer -= dt;
-                    if (ins.JitterTimer <= 0)
-                    {
-                        ins.Jitter = new Vector2((float)(rng.NextDouble() - 0.5) * 100, (float)(rng.NextDouble() - 0.5) * 100);
-                        ins.JitterTimer = 0.2f + (float)(rng.NextDouble() * 0.3f);
-                    }
-                    var moveDir = dir * 120f + ins.Jitter;
-                    if (moveDir.LengthSquared() > 1f)
-                    {
-                        moveDir.Normalize();
-                        ins.Position += moveDir * 110f * dt;
-                    }
+                    separation += (diff / d) * (12f - d) * 8f;
                 }
             }
-            else
-            {
-                ins.OrbitAngle += ins.OrbitSpeed * dt;
-                var target = HomePosition + new Vector2(
-                    MathF.Cos(ins.OrbitAngle) * ins.OrbitRadius,
-                    MathF.Sin(ins.OrbitAngle) * ins.OrbitRadius);
-                ins.Position = Vector2.Lerp(ins.Position, target, 3f * dt);
-            }
+
+            // Combine forces
+            Vector2 acceleration = steerForce + cohesion + separation;
+
+            // Apply acceleration with drag (terminal velocity feel)
+            ins.Velocity += acceleration * dt;
+            // Drag: flies decelerate quickly when not being pushed
+            ins.Velocity *= MathF.Pow(0.05f, dt); // heavy drag = snappy stops
+            // But maintain a minimum buzzing speed
+            float speed = ins.Velocity.Length();
+            if (speed < 20f && speed > 0.1f)
+                ins.Velocity = (ins.Velocity / speed) * 20f;
+
+            ins.Position += ins.Velocity * dt;
         }
     }
 
@@ -150,7 +217,6 @@ public class InsectSwarm
         foreach (var ins in Insects)
         {
             if (!ins.Alive || !ins.InBackground) continue;
-            // Smaller + darker = behind trees
             sb.Draw(pixel, new Rectangle((int)ins.Position.X - 1, (int)ins.Position.Y - 1, 3, 3),
                 (Aggroed ? Color.OrangeRed : Color.DarkOliveGreen) * 0.4f);
         }
@@ -170,13 +236,19 @@ public class InsectSwarm
 public class Insect
 {
     public Vector2 Position;
+    public Vector2 Velocity;
     public bool Alive;
-    public float OrbitAngle;
-    public float OrbitSpeed;
-    public float OrbitRadius;
     public float StingCooldown;
-    public Vector2 Jitter;
-    public float JitterTimer;
-    public bool InBackground;       // true = behind trees (darker, smaller)
-    public float LayerSwitchTimer;   // countdown to next layer switch
+
+    // Smooth steering: rotating angle creates curved flight paths
+    public float SteerAngle;
+    public float SteerRate;
+    public float BaseSpeed;
+
+    // Lévy flight: timer until next sudden direction change
+    public float DartTimer;
+
+    // Layer depth (3D illusion)
+    public bool InBackground;
+    public float LayerSwitchTimer;
 }
