@@ -2189,6 +2189,34 @@ public class Game1 : Game
                     {
                         DrawSlopeTile(wx, wy, tg.TileSize, tile, color);
                     }
+                    else if (TileProperties.IsHazard(tile))
+                    {
+                        DrawSpikeTile(wx, wy, tg.TileSize, tile, color);
+                    }
+                    else if (tile == TileType.PlatformTop || tile == TileType.PlatformBottom)
+                    {
+                        int ts = tg.TileSize;
+                        int halfH = ts / 2;
+                        int py = tile == TileType.PlatformTop ? wy : wy + halfH;
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, py, ts, halfH), color);
+                        var dark = new Color((int)(color.R * 0.5f), (int)(color.G * 0.5f), (int)(color.B * 0.5f));
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, py, ts, 1), dark);
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, py + halfH - 1, ts, 1), dark);
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, py, 1, halfH), dark);
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, py, 1, halfH), dark);
+                    }
+                    else if (TileProperties.IsEffectTile(tile) || tile == TileType.Breakable)
+                    {
+                        int ts = tg.TileSize;
+                        // Draw with a pulsing inner glow effect (just a border + fill for now)
+                        _spriteBatch.Draw(_pixel, rect, color * 0.5f);
+                        var bright = new Color(
+                            Math.Min(255, color.R + 60), Math.Min(255, color.G + 60), Math.Min(255, color.B + 60));
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx + 2, wy + 2, ts - 4, 2), bright);
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx + 2, wy + ts - 4, ts - 4, 2), bright);
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx + 2, wy + 2, 2, ts - 4), bright);
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 4, wy + 2, 2, ts - 4), bright);
+                    }
                     else
                     {
                         _spriteBatch.Draw(_pixel, rect, color);
@@ -3186,10 +3214,104 @@ public class Game1 : Game
                         }
                     }
                     break;
+                case TileType.Gentle4UpRight:
+                    // 1:4 slope rising right: surface from (0,ts) to (ts, ts*3/4)
+                    {
+                        int surfRow = ts - (int)((float)(ts - row) * 4f); // row where fill starts
+                        if (row < ts * 3 / 4) continue;
+                        int surfX = (int)((ts - row) * 4f);
+                        if (surfX >= ts) continue;
+                        lineX = wx + surfX;
+                        lineW = ts - surfX;
+                    }
+                    break;
+                case TileType.Gentle4UpLeft:
+                    // 1:4 slope rising left: surface from (0, ts*3/4) to (ts, ts)
+                    {
+                        if (row < ts * 3 / 4) continue;
+                        int fillW = (int)((row - ts * 3 / 4) * 4f) + 1;
+                        if (fillW > ts) fillW = ts;
+                        lineX = wx;
+                        lineW = fillW;
+                    }
+                    break;
+                case TileType.Gentle4CeilRight:
+                    // 1:4 ceiling going right: surface from wy(left) to wy+ts/4(right)
+                    {
+                        int maxRow = Math.Min(row * 4, ts);
+                        lineX = wx + maxRow;
+                        lineW = Math.Max(0, ts - maxRow);
+                        if (lineW <= 0) continue;
+                    }
+                    break;
+                case TileType.Gentle4CeilLeft:
+                    // 1:4 ceiling going left
+                    {
+                        int maxRow = Math.Min(row * 4, ts);
+                        lineX = wx;
+                        lineW = Math.Max(0, ts - maxRow);
+                        if (lineW <= 0) continue;
+                    }
+                    break;
                 default:
                     return;
             }
             _spriteBatch.Draw(_pixel, new Rectangle(lineX, lineY, lineW, 1), color);
+        }
+    }
+
+    /// <summary>Draw a spike tile (triangular spikes pointing in a direction).</summary>
+    private void DrawSpikeTile(int wx, int wy, int ts, TileType tile, Color color)
+    {
+        bool isHalf = tile >= TileType.HalfSpikesUp && tile <= TileType.HalfSpikesRight;
+        int h = isHalf ? ts / 2 : ts;
+        
+        // Normalize direction
+        bool up = tile == TileType.Spikes || tile == TileType.HalfSpikesUp;
+        bool down = tile == TileType.SpikesDown || tile == TileType.HalfSpikesDown;
+        bool left = tile == TileType.SpikesLeft || tile == TileType.HalfSpikesLeft;
+        bool right = tile == TileType.SpikesRight || tile == TileType.HalfSpikesRight;
+        
+        // Offset for half tiles pointing down/right
+        int ox = 0, oy = 0;
+        if (down && isHalf) oy = ts / 2;
+        if (right && isHalf) ox = ts / 2;
+        
+        // Draw 4 triangular spikes
+        int spikeCount = 4;
+        if (up || down)
+        {
+            int sw = ts / spikeCount; // spike width
+            for (int s = 0; s < spikeCount; s++)
+            {
+                int sx = wx + s * sw;
+                for (int row = 0; row < h; row++)
+                {
+                    float t = (float)row / h;
+                    if (down) t = 1f - t;
+                    int halfW = (int)(sw / 2f * t);
+                    int cx = sx + sw / 2;
+                    if (halfW > 0)
+                        _spriteBatch.Draw(_pixel, new Rectangle(cx - halfW, wy + oy + row, halfW * 2, 1), color);
+                }
+            }
+        }
+        else // left or right
+        {
+            int sw = ts / spikeCount; // spike height per spike
+            for (int s = 0; s < spikeCount; s++)
+            {
+                int sy = wy + s * sw;
+                for (int col = 0; col < h; col++)
+                {
+                    float t = (float)col / h;
+                    if (left) t = 1f - t;
+                    int halfH = (int)(sw / 2f * t);
+                    int cy = sy + sw / 2;
+                    if (halfH > 0)
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx + ox + col, cy - halfH, 1, halfH * 2), color);
+                }
+            }
         }
     }
 
