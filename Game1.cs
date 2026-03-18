@@ -828,6 +828,9 @@ public class Game1 : Game
                         case "sling": EquipRanged(WeaponType.Sling); break;
                         case "bow": EquipRanged(WeaponType.Bow); break;
                         case "gun": EquipRanged(WeaponType.Gun); break;
+                        case "heart":
+                            _player.Hp = Math.Min(_player.Hp + 25, _player.MaxHp);
+                            break;
                     }
                     break; // pick up one at a time
                 }
@@ -972,7 +975,16 @@ public class Game1 : Game
                         if (tgi.GetTileAt(col, row) == TileType.Breakable)
                         {
                             tgi.SetTileAt(col, row, TileType.Empty);
-                            // TODO: spawn health pickup at tile location
+                            int twx = ox + col * ts, twy = oy + row * ts;
+                            _itemPickups.Add(new ItemPickup
+                            {
+                                Id = $"heart-break-{twx}-{twy}",
+                                X = twx + ts / 2f - 8,
+                                Y = twy + ts / 2f - 8,
+                                W = 16, H = 16,
+                                ItemType = "heart",
+                                Collected = false
+                            });
                         }
                     }
                 }
@@ -3891,11 +3903,14 @@ public class Game1 : Game
                     "axe" => Color.DarkGray,
                     "bow" => new Color(160, 120, 60),
                     "gun" => Color.SlateGray,
+                    "heart" => Color.Red,
                     _ => Color.White
                 };
                 // Draw with glow so it's visible
                 _spriteBatch.Draw(_pixel, new Rectangle(item.Rect.X - 2, item.Rect.Y - 2, item.Rect.Width + 4, item.Rect.Height + 4), Color.White * 0.25f);
                 _spriteBatch.Draw(_pixel, item.Rect, itemColor);
+                // Heart items: no pickup prompt, auto-collect on touch
+                if (item.ItemType == "heart") continue;
                 // Draw "[W]" prompt above when player is near (X and Y)
                 var pCenter = _player.Position.X + Player.Width / 2f;
                 var pCenterY = _player.Position.Y + Player.Height / 2f;
