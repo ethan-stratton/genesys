@@ -227,19 +227,23 @@ public class Game1 : Game
 
         _graphicsSettings = new SettingEntry[]
         {
-            new() { Label = "Window Size", Get = () => true, Toggle = () => {
-                _windowSizeIndex = (_windowSizeIndex + 1) % WindowSizes.Length;
-                var (w, h, _) = WindowSizes[_windowSizeIndex];
-                _graphics.PreferredBackBufferWidth = w;
-                _graphics.PreferredBackBufferHeight = h;
-                _graphics.ApplyChanges();
-                // Rebuild camera with new viewport
-                if (_level != null)
-                    _camera = new Camera(w, h, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
-            }},
+            new() { Label = "Window Size", Get = () => true, Toggle = () => ApplyWindowSize(_windowSizeIndex + 1) },
         };
 
         Restart();
+
+        // Load saved window size
+        var tempSave = SaveData.Load();
+        if (tempSave != null && tempSave.WindowSizeIndex > 0 && tempSave.WindowSizeIndex < WindowSizes.Length)
+        {
+            _windowSizeIndex = tempSave.WindowSizeIndex;
+            var (w, h, _) = WindowSizes[_windowSizeIndex];
+            _graphics.PreferredBackBufferWidth = w;
+            _graphics.PreferredBackBufferHeight = h;
+            _graphics.ApplyChanges();
+            if (_level != null)
+                _camera = MakeCamera();
+        }
 
         if (System.IO.File.Exists(OverworldPath))
             _overworld = OverworldData.Load(OverworldPath);
@@ -276,6 +280,19 @@ public class Game1 : Game
 
     private int ViewW => _graphics.PreferredBackBufferWidth;
     private int ViewH => _graphics.PreferredBackBufferHeight;
+
+    private void ApplyWindowSize(int index)
+    {
+        _windowSizeIndex = index % WindowSizes.Length;
+        var (w, h, _) = WindowSizes[_windowSizeIndex];
+        _graphics.PreferredBackBufferWidth = w;
+        _graphics.PreferredBackBufferHeight = h;
+        _graphics.ApplyChanges();
+        if (_level != null)
+            _camera = MakeCamera();
+        // Persist
+        if (_saveData != null) { _saveData.WindowSizeIndex = _windowSizeIndex; _saveData.Save(); }
+    }
 
     private Camera MakeCamera() => new Camera(ViewW, ViewH, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
 
@@ -3273,13 +3290,7 @@ public class Game1 : Game
             {
                 if (confirm)
                 {
-                    _windowSizeIndex = (_windowSizeIndex + 1) % WindowSizes.Length;
-                    var (w, h, _) = WindowSizes[_windowSizeIndex];
-                    _graphics.PreferredBackBufferWidth = w;
-                    _graphics.PreferredBackBufferHeight = h;
-                    _graphics.ApplyChanges();
-                    if (_level != null)
-                        _camera = MakeCamera();
+                    ApplyWindowSize(_windowSizeIndex + 1);
                 }
                 if (esc) _settingsActiveCategory = null;
                 return;
