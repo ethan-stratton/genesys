@@ -3405,7 +3405,8 @@ public class Game1 : Game
                 case TileType.Gentle4CeilLeftD:
                     {
                         int qi = tile - TileType.Gentle4CeilLeftA;
-                        // CeilLeft: mirror of CeilRight
+                        // CeilLeft: descends going left. A is shallowest.
+                        // Solid hangs from top-right. Surface at right = qi*ts/4, left = (qi+1)*ts/4
                         int surfRight = qi * (ts / 4);
                         int surfLeft = surfRight + ts / 4;
                         if (row > surfLeft) continue;
@@ -3416,11 +3417,12 @@ public class Game1 : Game
                         }
                         else
                         {
-                            int fillW = (row - surfRight) * 4;
-                            if (fillW > ts) fillW = ts;
-                            if (fillW <= 0) continue;
+                            // Fill from right side
+                            int sx = (row - surfRight) * 4;
+                            if (sx > ts) sx = ts;
                             lineX = wx;
-                            lineW = fillW;
+                            lineW = ts - sx;
+                            if (lineW <= 0) continue;
                         }
                     }
                     break;
