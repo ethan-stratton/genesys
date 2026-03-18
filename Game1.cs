@@ -3112,6 +3112,22 @@ public class Game1 : Game
                     lineX = wx;
                     lineW = Math.Max(0, ts - row * 2);
                     break;
+                case TileType.ShavedCeilRight:
+                {
+                    // Full block with bottom-right shaved off
+                    int sr = Math.Max(0, row - ts / 2);
+                    lineX = wx;
+                    lineW = Math.Max(0, ts - sr * 2);
+                    break;
+                }
+                case TileType.ShavedCeilLeft:
+                {
+                    // Full block with bottom-left shaved off
+                    int sr = Math.Max(0, row - ts / 2);
+                    lineX = wx + sr * 2;
+                    lineW = Math.Max(0, ts - sr * 2);
+                    break;
+                }
                 case TileType.GentleUpRight:
                     // Rises right: surface from (0,ts) to (ts,ts/2)
                     // At row r, fill from the surface X to the right edge

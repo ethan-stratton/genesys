@@ -1142,8 +1142,11 @@ public class Player
                         deflectRatio = 0.85f;
                     if (IsUppercutting) deflectRatio = 0.95f;
                     
-                    float hBoost = upSpeed * deflectRatio;
-                    if (ceilTile == TileType.SlopeCeilRight || ceilTile == TileType.GentleCeilRight)
+                    float hBoost = upSpeed * deflectRatio * 0.5f; // toned down
+                    // Deflect toward the open side of the slope
+                    // SlopeCeilRight (solid top-right): open side is LEFT
+                    // SlopeCeilLeft (solid top-left): open side is RIGHT
+                    if (ceilTile == TileType.SlopeCeilLeft || ceilTile == TileType.GentleCeilLeft)
                         vel.X += hBoost;
                     else
                         vel.X -= hBoost;
