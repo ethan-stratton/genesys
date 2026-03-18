@@ -23,8 +23,14 @@ public enum TileType : byte
     // Hazards
     Spikes = 40,
 
+    // Slopes (45°)
+    SlopeUpRight = 50,   // floor slopes up left→right
+    SlopeUpLeft = 51,    // floor slopes up right→left
+    SlopeCeilRight = 52, // ceiling slope mirror of UpRight
+    SlopeCeilLeft = 53,  // ceiling slope mirror of UpLeft
+
     // Reserved ranges:
-    // 50-59: Slope tiles
+    // 54-59: Future slope variants
     // 60-69: Special (ladder, water, etc.)
     // 100+: Decorative/background tiles
     DirtBg = 101,
@@ -40,6 +46,9 @@ public static class TileProperties
     public static bool IsPlatform(TileType t) => t >= TileType.PlatformWood && t <= TileType.PlatformStone;
     public static bool IsHazard(TileType t) => t == TileType.Spikes;
     public static bool IsBackground(TileType t) => (int)t >= 100;
+    public static bool IsSlope(TileType t) => t >= TileType.SlopeUpRight && t <= TileType.SlopeCeilLeft;
+    public static bool IsSlopeFloor(TileType t) => t == TileType.SlopeUpRight || t == TileType.SlopeUpLeft;
+    public static bool IsSlopeCeiling(TileType t) => t == TileType.SlopeCeilRight || t == TileType.SlopeCeilLeft;
 
     public static Color GetColor(TileType t) => t switch
     {
@@ -51,6 +60,10 @@ public static class TileProperties
         TileType.PlatformWood => new Color(139, 90, 43),
         TileType.PlatformStone => new Color(100, 100, 100),
         TileType.Spikes => new Color(200, 30, 30),
+        TileType.SlopeUpRight => new Color(90, 60, 30),
+        TileType.SlopeUpLeft => new Color(90, 60, 30),
+        TileType.SlopeCeilRight => new Color(70, 50, 25),
+        TileType.SlopeCeilLeft => new Color(70, 50, 25),
         TileType.DirtBg => new Color(50, 33, 16),
         TileType.StoneBg => new Color(60, 60, 60),
         TileType.GrassBg => new Color(38, 76, 0),
@@ -67,6 +80,10 @@ public static class TileProperties
         TileType.Stone => new Color(90, 90, 90),
         TileType.Wood => new Color(110, 70, 33),
         TileType.Sand => new Color(170, 155, 110),
+        TileType.SlopeUpRight => new Color(70, 45, 20),
+        TileType.SlopeUpLeft => new Color(70, 45, 20),
+        TileType.SlopeCeilRight => new Color(55, 38, 18),
+        TileType.SlopeCeilLeft => new Color(55, 38, 18),
         TileType.DirtBg => new Color(40, 25, 12),
         TileType.StoneBg => new Color(45, 45, 45),
         TileType.GrassBg => new Color(25, 60, 10),
@@ -86,6 +103,10 @@ public static class TileProperties
         TileType.PlatformWood,
         TileType.PlatformStone,
         TileType.Spikes,
+        TileType.SlopeUpRight,
+        TileType.SlopeUpLeft,
+        TileType.SlopeCeilRight,
+        TileType.SlopeCeilLeft,
         TileType.DirtBg,
         TileType.StoneBg,
         TileType.GrassBg,
@@ -201,6 +222,63 @@ public class TileGrid
     public Rectangle[] GetSolidRects() { RebuildIfDirty(); return _solidRects; }
     public Rectangle[] GetPlatformRects() { RebuildIfDirty(); return _platformRects; }
     public Rectangle[] GetHazardRects() { RebuildIfDirty(); return _hazardRects; }
+
+    public Rectangle[] GetSlopeRects()
+    {
+        var rects = new List<Rectangle>();
+        for (int y = 0; y < Height; y++)
+            for (int x = 0; x < Width; x++)
+                if (TileProperties.IsSlope(Tiles[x, y]))
+                    rects.Add(new Rectangle(OriginX + x * TileSize, OriginY + y * TileSize, TileSize, TileSize));
+        return rects.ToArray();
+    }
+
+    public float GetSlopeFloorY(float worldX, float worldY, int playerWidth)
+    {
+        float bestY = float.MaxValue;
+        float centerX = worldX + playerWidth / 2f;
+        for (int y = 0; y < Height; y++)
+        {
+            for (int x = 0; x < Width; x++)
+            {
+                var t = Tiles[x, y];
+                if (!TileProperties.IsSlopeFloor(t)) continue;
+                int wx = OriginX + x * TileSize;
+                int wy = OriginY + y * TileSize;
+                if (centerX < wx || centerX > wx + TileSize) continue;
+                float localX = MathHelper.Clamp(centerX - wx, 0, TileSize);
+                float slopeY = t == TileType.SlopeUpRight
+                    ? wy + TileSize - localX
+                    : wy + localX;
+                if (slopeY < bestY) bestY = slopeY;
+            }
+        }
+        return bestY;
+    }
+
+    public float GetSlopeCeilY(float worldX, float worldY, int playerWidth)
+    {
+        float bestY = float.MinValue;
+        float centerX = worldX + playerWidth / 2f;
+        for (int y = 0; y < Height; y++)
+        {
+            for (int x = 0; x < Width; x++)
+            {
+                var t = Tiles[x, y];
+                if (!TileProperties.IsSlopeCeiling(t)) continue;
+                int wx = OriginX + x * TileSize;
+                int wy = OriginY + y * TileSize;
+                if (centerX < wx || centerX > wx + TileSize) continue;
+                float localX = MathHelper.Clamp(centerX - wx, 0, TileSize);
+                // Ceiling mirrors: SlopeCeilRight surface goes from top-left to bottom-right
+                float slopeY = t == TileType.SlopeCeilRight
+                    ? wy + localX
+                    : wy + TileSize - localX;
+                if (slopeY > bestY) bestY = slopeY;
+            }
+        }
+        return bestY;
+    }
 
     /// <summary>Greedy rectangle merging for tiles matching a predicate.</summary>
     private Rectangle[] MergeRects(Func<TileType, bool> predicate)

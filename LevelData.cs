@@ -49,6 +49,7 @@ public class LevelData
     [JsonIgnore] public float[] RopeXPositions { get; private set; } = Array.Empty<float>();
     [JsonIgnore] public float[] RopeTops { get; private set; } = Array.Empty<float>();
     [JsonIgnore] public float[] RopeBottoms { get; private set; } = Array.Empty<float>();
+    [JsonIgnore] public Rectangle[] SlopeRects { get; private set; } = Array.Empty<Rectangle>();
 
     public void Build()
     {
@@ -198,6 +199,9 @@ public class LevelData
                 tileHazards.CopyTo(merged, AllSpikeRects.Length);
                 AllSpikeRects = merged;
             }
+
+            // Build slope rects (individual per-tile, no merging)
+            SlopeRects = TileGridInstance.GetSlopeRects();
         }
     }
 

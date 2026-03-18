@@ -564,7 +564,7 @@ public class Game1 : Game
         var ropeTopsToPass = _enableRopeClimb ? _level.RopeTops : null;
         var ropeBottomsToPass = _enableRopeClimb ? _level.RopeBottoms : null;
 
-        _player.Update(dt, kb, _level.Floor.Y, _level.AllPlatforms, ropesToPass, ropeTopsToPass, ropeBottomsToPass, wallsToPass, wallSidesToPass, _level.WallRects, _level.CeilingRects, _level.SolidFloorRects);
+        _player.Update(dt, kb, _level.Floor.Y, _level.AllPlatforms, ropesToPass, ropeTopsToPass, ropeBottomsToPass, wallsToPass, wallSidesToPass, _level.WallRects, _level.CeilingRects, _level.SolidFloorRects, _level.TileGridInstance);
         _player.UpdateRegen(dt);
 
         // Track play time
@@ -2156,6 +2156,28 @@ public class Game1 : Game
                     {
                         _spriteBatch.Draw(_pixel, rect, color * 0.7f);
                     }
+                    else if (TileProperties.IsSlope(tile))
+                    {
+                        int ts2 = tg.TileSize;
+                        bool isRight = (tile == TileType.SlopeUpRight || tile == TileType.SlopeCeilRight);
+                        bool isCeiling = TileProperties.IsSlopeCeiling(tile);
+                        for (int row = 0; row < ts2; row++)
+                        {
+                            int lineY = wy + row;
+                            int lineW, lineX;
+                            if (isCeiling)
+                            {
+                                if (isRight) { lineX = wx; lineW = row + 1; }
+                                else { lineX = wx + ts2 - row - 1; lineW = row + 1; }
+                            }
+                            else
+                            {
+                                if (isRight) { lineX = wx; lineW = ts2 - row; }
+                                else { lineX = wx + row; lineW = ts2 - row; }
+                            }
+                            _spriteBatch.Draw(_pixel, new Rectangle(lineX, lineY, lineW, 1), color);
+                        }
+                    }
                     else
                     {
                         _spriteBatch.Draw(_pixel, rect, color);
@@ -3259,6 +3281,28 @@ public class Game1 : Game
                             int ttx = wx + t * 12 + 2;
                             _spriteBatch.Draw(_pixel, new Rectangle(ttx, wy - 4, 8, 4), Color.Red * 0.6f);
                             _spriteBatch.Draw(_pixel, new Rectangle(ttx + 2, wy - 8, 4, 4), Color.Red * 0.4f);
+                        }
+                    }
+                    else if (TileProperties.IsSlope(tile))
+                    {
+                        int ts2 = tg.TileSize;
+                        bool isRight = (tile == TileType.SlopeUpRight || tile == TileType.SlopeCeilRight);
+                        bool isCeiling = TileProperties.IsSlopeCeiling(tile);
+                        for (int row = 0; row < ts2; row++)
+                        {
+                            int lineY = wy + row;
+                            int lineW, lineX;
+                            if (isCeiling)
+                            {
+                                if (isRight) { lineX = wx; lineW = row + 1; }
+                                else { lineX = wx + ts2 - row - 1; lineW = row + 1; }
+                            }
+                            else
+                            {
+                                if (isRight) { lineX = wx; lineW = ts2 - row; }
+                                else { lineX = wx + row; lineW = ts2 - row; }
+                            }
+                            _spriteBatch.Draw(_pixel, new Rectangle(lineX, lineY, lineW, 1), color);
                         }
                     }
                     else

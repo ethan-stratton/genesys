@@ -291,7 +291,7 @@ public class Player
         }
     }
 
-    public void Update(float dt, KeyboardState kb, float floorY, Rectangle[] platforms, float[] ropeXPositions = null, float[] ropeTops = null, float[] ropeBottoms = null, Rectangle[] walls = null, int[] wallClimbSides = null, Rectangle[] solidWalls = null, Rectangle[] ceilings = null, Rectangle[] solidFloors = null)
+    public void Update(float dt, KeyboardState kb, float floorY, Rectangle[] platforms, float[] ropeXPositions = null, float[] ropeTops = null, float[] ropeBottoms = null, Rectangle[] walls = null, int[] wallClimbSides = null, Rectangle[] solidWalls = null, Rectangle[] ceilings = null, Rectangle[] solidFloors = null, TileGrid tileGrid = null)
     {
         WantsToShoot = false;
         WantsToMelee = false;
@@ -1056,6 +1056,19 @@ public class Player
             _jumpsLeft = MaxJumps;
         }
 
+        // Slope floor collision
+        if (tileGrid != null)
+        {
+            float slopeY = tileGrid.GetSlopeFloorY(pos.X, pos.Y, Width);
+            if (slopeY < float.MaxValue && pos.Y + Height >= slopeY)
+            {
+                pos.Y = slopeY - Height;
+                vel.Y = 0;
+                IsGrounded = true;
+                _jumpsLeft = MaxJumps;
+            }
+        }
+
         if (Velocity.Y >= 0 && !WantsDropThrough)
         {
             foreach (var plat in platforms)
@@ -1086,6 +1099,17 @@ public class Player
                     pos.Y = ceil.Bottom;
                     vel.Y = 0;
                 }
+            }
+        }
+
+        // Slope ceiling collision
+        if (tileGrid != null && vel.Y < 0)
+        {
+            float slopeCeilY = tileGrid.GetSlopeCeilY(pos.X, pos.Y, Width);
+            if (slopeCeilY > float.MinValue && pos.Y <= slopeCeilY)
+            {
+                pos.Y = slopeCeilY;
+                vel.Y = 0;
             }
         }
 
