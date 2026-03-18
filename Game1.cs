@@ -817,9 +817,10 @@ public class Game1 : Game
             {
                 item.VelY += 600f * dt; // gravity
                 item.Y += item.VelY * dt;
-                // Simple floor collision against level floor and solid rects
+                // Floor collision: level floor
                 float floorY = _level.Floor.Y - item.H;
                 if (item.Y >= floorY) { item.Y = floorY; item.VelY = 0; item.HasGravity = false; }
+                // Solid rects
                 foreach (var s in _level.SolidFloorRects)
                 {
                     if (item.Rect.Intersects(s) && item.Y + item.H > s.Top && item.Y + item.H < s.Top + 16)
@@ -828,6 +829,18 @@ public class Game1 : Game
                         item.VelY = 0;
                         item.HasGravity = false;
                         break;
+                    }
+                }
+                // Tile grid slopes and solids
+                var tgi = _level.TileGridInstance;
+                if (tgi != null && item.HasGravity)
+                {
+                    float slopeY = tgi.GetSlopeFloorY(item.X, item.Y + item.H, item.W, item.H);
+                    if (slopeY < item.Y + item.H && item.Y + item.H - slopeY < 20f)
+                    {
+                        item.Y = slopeY - item.H;
+                        item.VelY = 0;
+                        item.HasGravity = false;
                     }
                 }
             }
