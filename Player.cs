@@ -1150,8 +1150,6 @@ public class Player
                 }
             }
         }
-            }
-        }
 
         // Ceiling collision (bonk head) — skip if near ceiling slope tiles
         if (ceilings != null && vel.Y < 0)
