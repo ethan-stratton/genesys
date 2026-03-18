@@ -3322,35 +3322,21 @@ public class Game1 : Game
                 case TileType.Gentle4UpRightC:
                 case TileType.Gentle4UpRightD:
                     {
-                        // Quarter index: A=0, B=1, C=2, D=3
-                        int qi = tile - TileType.Gentle4UpRightA;
-                        int baseRow = ts - (qi + 1) * (ts / 4); // top of fill for this quarter
-                        if (row < baseRow + (int)((float)(ts - 1 - (row - baseRow)) / ts * 0 )) { }
-                        // Surface at this row: baseRow + slope within tile
-                        int surfaceRow = ts * (3 - qi) / 4 + (int)((float)(ts - 1 - row) * 0); // wrong approach
-                        // Simpler: surface Y relative to tile = (3-qi)*ts/4 - (localX/ts)*(ts/4) but we iterate rows
-                        // At each row, how much width is filled (from right side)?
-                        // Surface: left edge is at slopeY = wy + (3-qi)*ts/4 + (localX/ts)*ts/4... 
-                        // No wait: UpRight means rises to the right. Surface goes DOWN as X goes right.
-                        // Actually for UpRight, surface Y DECREASES going right.
-                        // Gentle4UpRightA: surface from ts (left) to ts*3/4 (right). Solid below surface.
-                        // At row r: solid if r >= surface. Surface at column c = ts - qi*ts/4 - (c/ts)*(ts/4)
-                        // For UpRightA (qi=0): surface(c) = ts - (c/ts)*(ts/4). r >= surface means fill.
-                        // fillStart = ts - (3-qi)*ts/4 ... this is getting complex. Let me just compute per-row.
-                        int qBase = (3 - qi) * ts / 4; // surface at left edge of tile
-                        int qTop = qBase - ts / 4;     // surface at right edge
-                        // surface at column c: qBase - c * (ts/4) / ts = qBase - c/4
-                        if (row < qTop) continue; // above highest point
+                        int qi = tile - TileType.Gentle4UpRightA; // 0=A, 1=B, 2=C, 3=D
+                        // UpRight rises going right. A is shallowest.
+                        // A: surface left=32, right=24. B: left=24, right=16. C: left=16, right=8. D: left=8, right=0.
+                        int qBase = ts - qi * (ts / 4);       // surface Y at left edge (higher value = lower)
+                        int qTop = qBase - ts / 4;            // surface Y at right edge
+                        if (row < qTop) continue;
                         if (row >= qBase)
                         {
-                            // Below lowest point - full row
                             lineX = wx;
                             lineW = ts;
                         }
                         else
                         {
-                            // Partially filled: fill from right
-                            // At which X does surface = row? row = qBase - x/4 → x = (qBase - row) * 4
+                            // surface X where row intersects: row = qBase - x/(ts/(ts/4)) = qBase - x/4
+                            // x = (qBase - row) * 4
                             int surfX = (qBase - row) * 4;
                             if (surfX > ts) surfX = ts;
                             if (surfX < 0) surfX = 0;
@@ -3366,8 +3352,10 @@ public class Game1 : Game
                 case TileType.Gentle4UpLeftD:
                     {
                         int qi = tile - TileType.Gentle4UpLeftA;
-                        int qBase = (3 - qi) * ts / 4; // surface at right edge
-                        int qTop = qBase - ts / 4;     // surface at left edge
+                        // UpLeft rises going left. A is shallowest.
+                        // A: surface left=24, right=32. B: left=16, right=24. etc.
+                        int qBase = ts - qi * (ts / 4);       // surface Y at right edge
+                        int qTop = qBase - ts / 4;            // surface Y at left edge
                         if (row < qTop) continue;
                         if (row >= qBase)
                         {
@@ -3376,13 +3364,12 @@ public class Game1 : Game
                         }
                         else
                         {
-                            // Fill from left
-                            int surfX = (qBase - row) * 4;
-                            if (surfX > ts) surfX = ts;
-                            if (surfX < 0) surfX = 0;
+                            // Fill from left: x = (row - qTop) * 4
+                            int fillW = (row - qTop) * 4;
+                            if (fillW > ts) fillW = ts;
+                            if (fillW <= 0) continue;
                             lineX = wx;
-                            lineW = ts - surfX;
-                            if (lineW <= 0) continue;
+                            lineW = fillW;
                         }
                     }
                     break;
@@ -3392,9 +3379,10 @@ public class Game1 : Game
                 case TileType.Gentle4CeilRightD:
                     {
                         int qi = tile - TileType.Gentle4CeilRightA;
-                        // Surface at left = qi*ts/4, at right = (qi+1)*ts/4
-                        int surfLeft = qi * ts / 4;
-                        int surfRight = (qi + 1) * ts / 4;
+                        // CeilRight: A is shallowest (near ceiling). Solid above surface.
+                        // A: surface left=0, right=8. B: left=8, right=16. etc.
+                        int surfLeft = qi * (ts / 4);
+                        int surfRight = surfLeft + ts / 4;
                         if (row > surfRight) continue;
                         if (row <= surfLeft)
                         {
@@ -3403,7 +3391,6 @@ public class Game1 : Game
                         }
                         else
                         {
-                            // surface X where row intersects: x = (row - surfLeft) * 4
                             int sx = (row - surfLeft) * 4;
                             if (sx > ts) sx = ts;
                             lineX = wx + sx;
@@ -3418,8 +3405,9 @@ public class Game1 : Game
                 case TileType.Gentle4CeilLeftD:
                     {
                         int qi = tile - TileType.Gentle4CeilLeftA;
-                        int surfRight = qi * ts / 4;
-                        int surfLeft = (qi + 1) * ts / 4;
+                        // CeilLeft: mirror of CeilRight
+                        int surfRight = qi * (ts / 4);
+                        int surfLeft = surfRight + ts / 4;
                         if (row > surfLeft) continue;
                         if (row <= surfRight)
                         {
@@ -3428,11 +3416,11 @@ public class Game1 : Game
                         }
                         else
                         {
-                            int sx = (row - surfRight) * 4;
-                            if (sx > ts) sx = ts;
+                            int fillW = (row - surfRight) * 4;
+                            if (fillW > ts) fillW = ts;
+                            if (fillW <= 0) continue;
                             lineX = wx;
-                            lineW = ts - sx;
-                            if (lineW <= 0) continue;
+                            lineW = fillW;
                         }
                     }
                     break;
