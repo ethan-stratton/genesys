@@ -3234,7 +3234,7 @@ public class Game1 : Game
             // In a submenu
             if (_settingsActiveCategory == SettingsCategory.Graphics)
             {
-                if (enter)
+                if (confirm)
                 {
                     _windowSizeIndex = (_windowSizeIndex + 1) % WindowSizes.Length;
                     var (w, h, _) = WindowSizes[_windowSizeIndex];
