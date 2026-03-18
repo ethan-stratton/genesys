@@ -163,46 +163,67 @@ public class LevelData
         }
         if (TileGridInstance != null)
         {
-            var tileSolids = TileGridInstance.GetSolidRects();
-            var tilePlatforms = TileGridInstance.GetPlatformRects();
-            var tileHazards = TileGridInstance.GetHazardRects();
-
-            // Merge tile solids into SolidFloorRects and CeilingRects
-            if (tileSolids.Length > 0)
-            {
-                var merged = new Rectangle[SolidFloorRects.Length + tileSolids.Length];
-                SolidFloorRects.CopyTo(merged, 0);
-                tileSolids.CopyTo(merged, SolidFloorRects.Length);
-                SolidFloorRects = merged;
-
-                // Solid tiles also act as ceilings
-                var mergedCeil = new Rectangle[CeilingRects.Length + tileSolids.Length];
-                CeilingRects.CopyTo(mergedCeil, 0);
-                tileSolids.CopyTo(mergedCeil, CeilingRects.Length);
-                CeilingRects = mergedCeil;
-            }
-
-            // Merge tile platforms into AllPlatforms
-            if (tilePlatforms.Length > 0)
-            {
-                var merged = new Rectangle[AllPlatforms.Length + tilePlatforms.Length];
-                AllPlatforms.CopyTo(merged, 0);
-                tilePlatforms.CopyTo(merged, AllPlatforms.Length);
-                AllPlatforms = merged;
-            }
-
-            // Merge tile hazards into AllSpikeRects
-            if (tileHazards.Length > 0)
-            {
-                var merged = new Rectangle[AllSpikeRects.Length + tileHazards.Length];
-                AllSpikeRects.CopyTo(merged, 0);
-                tileHazards.CopyTo(merged, AllSpikeRects.Length);
-                AllSpikeRects = merged;
-            }
-
-            // Build slope rects (individual per-tile, no merging)
-            SlopeRects = TileGridInstance.GetSlopeRects();
+            RebuildTileCollision();
         }
+    }
+
+    /// <summary>Rebuild merged collision rects from tile grid (call after tile changes like breakable destruction).</summary>
+    public void RebuildTileCollision()
+    {
+        if (TileGridInstance == null) return;
+        
+        var tileSolids = TileGridInstance.GetSolidRects();
+        var tilePlatforms = TileGridInstance.GetPlatformRects();
+        var tileHazards = TileGridInstance.GetHazardRects();
+
+        // Reset to base rects (non-tile)
+        SolidFloorRects = new Rectangle[SolidFloors.Length];
+        for (int i = 0; i < SolidFloors.Length; i++)
+        {
+            var sf = SolidFloors[i];
+            SolidFloorRects[i] = new Rectangle(sf.X, sf.Y, sf.W, sf.H);
+        }
+        CeilingRects = new Rectangle[Ceilings.Length];
+        for (int i = 0; i < Ceilings.Length; i++)
+        {
+            var c = Ceilings[i];
+            CeilingRects[i] = new Rectangle(c.X, c.Y, c.W, c.H);
+        }
+        AllPlatforms = new Rectangle[PlatformRects.Length + WallLedges.Length];
+        PlatformRects.CopyTo(AllPlatforms, 0);
+        WallLedges.CopyTo(AllPlatforms, PlatformRects.Length);
+        AllSpikeRects = new Rectangle[SpikeRects.Length + WallSpikeRects.Length];
+        SpikeRects.CopyTo(AllSpikeRects, 0);
+        WallSpikeRects.CopyTo(AllSpikeRects, SpikeRects.Length);
+
+        // Merge tile rects
+        if (tileSolids.Length > 0)
+        {
+            var merged = new Rectangle[SolidFloorRects.Length + tileSolids.Length];
+            SolidFloorRects.CopyTo(merged, 0);
+            tileSolids.CopyTo(merged, SolidFloorRects.Length);
+            SolidFloorRects = merged;
+
+            var mergedCeil = new Rectangle[CeilingRects.Length + tileSolids.Length];
+            CeilingRects.CopyTo(mergedCeil, 0);
+            tileSolids.CopyTo(mergedCeil, CeilingRects.Length);
+            CeilingRects = mergedCeil;
+        }
+        if (tilePlatforms.Length > 0)
+        {
+            var merged = new Rectangle[AllPlatforms.Length + tilePlatforms.Length];
+            AllPlatforms.CopyTo(merged, 0);
+            tilePlatforms.CopyTo(merged, AllPlatforms.Length);
+            AllPlatforms = merged;
+        }
+        if (tileHazards.Length > 0)
+        {
+            var merged = new Rectangle[AllSpikeRects.Length + tileHazards.Length];
+            AllSpikeRects.CopyTo(merged, 0);
+            tileHazards.CopyTo(merged, AllSpikeRects.Length);
+            AllSpikeRects = merged;
+        }
+        SlopeRects = TileGridInstance.GetSlopeRects();
     }
 
     public static LevelData Load(string path)

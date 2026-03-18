@@ -16,6 +16,8 @@ public class ItemPickup
     public int W = 20, H = 20;
     public string ItemType;
     public bool Collected;
+    public float VelY; // for gravity on dropped items
+    public bool HasGravity;
     public Rectangle Rect => new((int)X, (int)Y, W, H);
 }
 
@@ -808,6 +810,44 @@ public class Game1 : Game
             _isDead = true;
         }
 
+        // Update item physics (gravity for dropped items)
+        foreach (var item in _itemPickups)
+        {
+            if (item.HasGravity && !item.Collected)
+            {
+                item.VelY += 600f * dt; // gravity
+                item.Y += item.VelY * dt;
+                // Simple floor collision against level floor and solid rects
+                float floorY = _level.Floor.Y - item.H;
+                if (item.Y >= floorY) { item.Y = floorY; item.VelY = 0; item.HasGravity = false; }
+                foreach (var s in _level.SolidFloorRects)
+                {
+                    if (item.Rect.Intersects(s) && item.Y + item.H > s.Top && item.Y + item.H < s.Top + 16)
+                    {
+                        item.Y = s.Top - item.H;
+                        item.VelY = 0;
+                        item.HasGravity = false;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Auto-collect hearts on touch
+        if (!_isDead)
+        {
+            var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
+            for (int i = 0; i < _itemPickups.Count; i++)
+            {
+                var item = _itemPickups[i];
+                if (!item.Collected && item.ItemType == "heart" && pRect.Intersects(item.Rect))
+                {
+                    item.Collected = true;
+                    _player.Hp = Math.Min(_player.Hp + 25, _player.MaxHp);
+                }
+            }
+        }
+
         // Item pickups (W key, near item, grounded)
         if (_player.IsGrounded && kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W) && !_dialogueOpen)
         {
@@ -933,13 +973,25 @@ public class Game1 : Game
                             case TileType.KnockbackTile:
                                 {
                                     var vel = _player.Velocity;
-                                    float dirX = _player.Position.X + Player.Width / 2f - tileRect.Center.X;
-                                    float dirY = _player.Position.Y + Player.Height / 2f - tileRect.Center.Y;
-                                    float len = MathF.Sqrt(dirX * dirX + dirY * dirY);
-                                    if (len > 0) { dirX /= len; dirY /= len; }
-                                    else { dirX = -_player.FacingDir; dirY = -0.5f; }
-                                    vel.X = dirX * 400f;
-                                    vel.Y = dirY * 400f;
+                                    float px = _player.Position.X + Player.Width / 2f;
+                                    float py = _player.Position.Y + Player.Height / 2f;
+                                    float dx = px - tileRect.Center.X;
+                                    float dy = py - tileRect.Center.Y;
+                                    // Determine primary axis: if horizontal overlap is less, push horizontally
+                                    float overlapX = (Player.Width / 2f + ts / 2f) - MathF.Abs(dx);
+                                    float overlapY = (Player.Height / 2f + ts / 2f) - MathF.Abs(dy);
+                                    if (overlapX < overlapY)
+                                    {
+                                        // Side contact — strong horizontal push, small vertical
+                                        vel.X = MathF.Sign(dx) * 450f;
+                                        vel.Y = -100f;
+                                    }
+                                    else
+                                    {
+                                        // Top/bottom contact
+                                        vel.X = dx != 0 ? MathF.Sign(dx) * 100f : 0f;
+                                        vel.Y = MathF.Sign(dy) * 450f;
+                                    }
                                     _player.Velocity = vel;
                                 }
                                 break;
@@ -975,15 +1027,18 @@ public class Game1 : Game
                         if (tgi.GetTileAt(col, row) == TileType.Breakable)
                         {
                             tgi.SetTileAt(col, row, TileType.Empty);
+                            _level.RebuildTileCollision();
                             int twx = ox + col * ts, twy = oy + row * ts;
                             _itemPickups.Add(new ItemPickup
                             {
                                 Id = $"heart-break-{twx}-{twy}",
                                 X = twx + ts / 2f - 8,
-                                Y = twy + ts / 2f - 8,
+                                Y = twy,
                                 W = 16, H = 16,
                                 ItemType = "heart",
-                                Collected = false
+                                Collected = false,
+                                HasGravity = true,
+                                VelY = -150f // pop upward then fall
                             });
                         }
                     }
