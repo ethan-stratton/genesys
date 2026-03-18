@@ -3470,6 +3470,13 @@ public class Game1 : Game
         if (kb.IsKeyDown(Keys.G) && _prevKb.IsKeyUp(Keys.G))
             _worldMapGridVisible = !_worldMapGridVisible;
 
+        // Debug: reveal all fog
+        if (kb.IsKeyDown(Keys.F) && _prevKb.IsKeyUp(Keys.F))
+        {
+            for (int i = 0; i < _worldMap.Revealed.Length; i++)
+                _worldMap.Revealed[i] = true;
+        }
+
         // Escape
         if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape))
         {
@@ -3622,7 +3629,7 @@ public class Game1 : Game
         }
 
         // Controls
-        string hint = "[WASD] Move  [Enter] Enter Location  [G] Grid  [M] Close  [Esc] Title";
+        string hint = "[WASD] Move  [Enter] Enter Location  [G] Grid  [F] Reveal  [M] Close  [Esc] Title";
         var hintSize = _fontSmall.MeasureString(hint);
         _spriteBatch.DrawString(_fontSmall, hint, new Vector2(ViewW / 2f - hintSize.X / 2, ViewH - 25), Color.Gray * 0.4f);
 

@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Xna.Framework;
 
 namespace ArenaShooter;
 
@@ -138,82 +139,165 @@ public class WorldMapData
     public static WorldMapData GenerateDefault()
     {
         var map = new WorldMapData();
-        var rng = new Random(42); // deterministic seed
+        const int W = MapW, H = MapH;
+        const int seed = 42;
 
-        // Fill with grass
-        for (int i = 0; i < map.Tiles.Length; i++)
-            map.Tiles[i] = (int)MapTileType.Plains;
+        // ── Step 1: Multi-octave fractal noise heightmap ──
+        float[,] height = new float[W, H];
+        float[,] moisture = new float[W, H];
+        FractalNoise(height, W, H, seed, 6, 0.028f, 0.55f);
+        FractalNoise(moisture, W, H, seed + 100, 4, 0.04f, 0.5f);
 
-        // Generate terrain regions
-        // Ocean borders
-        for (int x = 0; x < MapW; x++)
+        // ── Step 2: Island shaping — fade edges to ocean ──
+        for (int y = 0; y < H; y++)
         {
-            for (int d = 0; d < 3; d++)
+            for (int x = 0; x < W; x++)
             {
-                map.SetTile(x, d, MapTileType.Ocean);
-                map.SetTile(x, MapH - 1 - d, MapTileType.Ocean);
+                // Normalized distance from center (0 = center, 1 = corner)
+                float nx = 2f * x / W - 1f;
+                float ny = 2f * y / H - 1f;
+                float d = MathF.Sqrt(nx * nx + ny * ny) / 1.2f; // 1.2 = allow land near edges
+                // Smooth falloff
+                float falloff = 1f - MathF.Pow(MathHelper.Clamp(d, 0, 1), 2.5f);
+                height[x, y] = height[x, y] * falloff;
             }
         }
-        for (int y = 0; y < MapH; y++)
+
+        // ── Step 3: Simple thermal erosion (smooth steep slopes) ──
+        for (int pass = 0; pass < 3; pass++)
         {
-            for (int d = 0; d < 3; d++)
+            float[,] temp = (float[,])height.Clone();
+            for (int y = 1; y < H - 1; y++)
             {
-                map.SetTile(d, y, MapTileType.Ocean);
-                map.SetTile(MapW - 1 - d, y, MapTileType.Ocean);
+                for (int x = 1; x < W - 1; x++)
+                {
+                    float h = height[x, y];
+                    float maxDiff = 0;
+                    for (int dy = -1; dy <= 1; dy++)
+                        for (int dx = -1; dx <= 1; dx++)
+                        {
+                            if (dx == 0 && dy == 0) continue;
+                            float diff = h - height[x + dx, y + dy];
+                            if (diff > maxDiff) maxDiff = diff;
+                        }
+                    // If slope is too steep, smooth it
+                    if (maxDiff > 0.12f)
+                        temp[x, y] = h - maxDiff * 0.2f;
+                }
+            }
+            Array.Copy(temp, height, temp.Length);
+        }
+
+        // ── Step 4: Assign terrain from heightmap + moisture ──
+        const float seaLevel = 0.32f;
+        const float beachLevel = 0.35f;
+        const float mountainLevel = 0.72f;
+        const float snowLevel = 0.85f;
+
+        for (int y = 0; y < H; y++)
+        {
+            for (int x = 0; x < W; x++)
+            {
+                float h = height[x, y];
+                float m = moisture[x, y];
+
+                MapTileType tile;
+                if (h < seaLevel)
+                    tile = MapTileType.Ocean;
+                else if (h < beachLevel)
+                    tile = MapTileType.Desert; // beach/sand
+                else if (h >= snowLevel)
+                    tile = MapTileType.Snow;
+                else if (h >= mountainLevel)
+                    tile = MapTileType.Mountain;
+                else
+                {
+                    // Biome from moisture + height
+                    if (m > 0.6f)
+                        tile = MapTileType.Forest;
+                    else if (m > 0.45f)
+                        tile = MapTileType.Plains;
+                    else if (m > 0.3f)
+                        tile = h > 0.55f ? MapTileType.Plains : MapTileType.Swamp;
+                    else
+                        tile = MapTileType.Desert;
+                }
+                map.SetTile(x, y, tile);
             }
         }
 
-        // Scatter forests
-        for (int i = 0; i < 300; i++)
+        // ── Step 5: Rivers — trace downhill from high points ──
+        var rng = new Random(seed + 200);
+        for (int r = 0; r < 8; r++)
         {
-            int fx = rng.Next(5, MapW - 5);
-            int fy = rng.Next(5, MapH - 5);
-            int size = rng.Next(1, 4);
-            for (int dy = 0; dy < size; dy++)
-                for (int dx = 0; dx < size; dx++)
-                    if (map.GetTile(fx + dx, fy + dy) == MapTileType.Plains)
-                        map.SetTile(fx + dx, fy + dy, MapTileType.Forest);
-        }
+            // Start river at a random high point
+            int rx = rng.Next(10, W - 10);
+            int ry = rng.Next(10, H - 10);
+            if (height[rx, ry] < 0.55f) continue; // need to start high
 
-        // Mountain ranges
-        for (int i = 0; i < 80; i++)
-        {
-            int mx = rng.Next(5, MapW - 5);
-            int my = rng.Next(5, MapH - 5);
-            map.SetTile(mx, my, MapTileType.Mountain);
-            if (rng.NextDouble() < 0.5) map.SetTile(mx + 1, my, MapTileType.Mountain);
-            if (rng.NextDouble() < 0.5) map.SetTile(mx, my + 1, MapTileType.Mountain);
-        }
-
-        // Rivers/lakes
-        for (int i = 0; i < 40; i++)
-        {
-            int rx = rng.Next(5, MapW - 5);
-            int ry = rng.Next(5, MapH - 5);
-            map.SetTile(rx, ry, MapTileType.Water);
-            // Extend river a bit
-            for (int j = 0; j < rng.Next(2, 6); j++)
+            for (int step = 0; step < 60; step++)
             {
-                rx += rng.Next(-1, 2);
-                ry += rng.Next(-1, 2);
-                if (rx > 3 && rx < MapW - 3 && ry > 3 && ry < MapH - 3)
+                if (rx < 1 || rx >= W - 1 || ry < 1 || ry >= H - 1) break;
+                if (height[rx, ry] < seaLevel) break; // reached ocean
+
+                var cur = map.GetTile(rx, ry);
+                if (cur != MapTileType.BiomeEntrance)
                     map.SetTile(rx, ry, MapTileType.Water);
+
+                // Find lowest neighbor
+                float lowestH = height[rx, ry];
+                int bestDx = 0, bestDy = 0;
+                for (int dy = -1; dy <= 1; dy++)
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        if (dx == 0 && dy == 0) continue;
+                        int nx = rx + dx, ny = ry + dy;
+                        if (nx >= 0 && nx < W && ny >= 0 && ny < H && height[nx, ny] < lowestH)
+                        {
+                            lowestH = height[nx, ny];
+                            bestDx = dx;
+                            bestDy = dy;
+                        }
+                    }
+                if (bestDx == 0 && bestDy == 0)
+                {
+                    // Stuck — carve slightly downhill in random direction
+                    bestDx = rng.Next(-1, 2);
+                    bestDy = rng.Next(-1, 2);
+                    if (rx + bestDx >= 0 && rx + bestDx < W && ry + bestDy >= 0 && ry + bestDy < H)
+                        height[rx + bestDx, ry + bestDy] = height[rx, ry] - 0.01f;
+                }
+                rx += bestDx;
+                ry += bestDy;
             }
         }
 
-        // Desert patches
-        for (int i = 0; i < 30; i++)
+        // ── Step 6: Place biome — find good inland location ──
+        // Find a plains tile near center
+        int biomeX = W / 2, biomeY = H / 2;
+        float bestDist = float.MaxValue;
+        for (int y = H / 4; y < 3 * H / 4; y++)
         {
-            int dx = rng.Next(MapW / 2, MapW - 8);
-            int dy = rng.Next(5, MapH - 5);
-            int size = rng.Next(2, 5);
-            for (int yy = 0; yy < size; yy++)
-                for (int xx = 0; xx < size; xx++)
-                    if (map.GetTile(dx + xx, dy + yy) == MapTileType.Plains)
-                        map.SetTile(dx + xx, dy + yy, MapTileType.Desert);
+            for (int x = W / 4; x < 3 * W / 4; x++)
+            {
+                if (height[x, y] > beachLevel + 0.05f && height[x, y] < mountainLevel - 0.1f)
+                {
+                    float dist = (x - W / 2f) * (x - W / 2f) + (y - H / 2f) * (y - H / 2f);
+                    if (dist < bestDist) { bestDist = dist; biomeX = x; biomeY = y; }
+                }
+            }
         }
 
-        // ── First Biome: Eden Reach ──
+        // Clear area around biome entrance
+        for (int dy = -2; dy <= 2; dy++)
+            for (int dx = -2; dx <= 2; dx++)
+            {
+                var cur = map.GetTile(biomeX + dx, biomeY + dy);
+                if (cur == MapTileType.Ocean || cur == MapTileType.Mountain || cur == MapTileType.Water)
+                    map.SetTile(biomeX + dx, biomeY + dy, MapTileType.Plains);
+            }
+        map.SetTile(biomeX, biomeY, MapTileType.BiomeEntrance);
+
         var edenReach = new BiomeData
         {
             Id = "eden-reach",
@@ -228,14 +312,6 @@ public class WorldMapData
         };
         map.Biomes.Add(edenReach);
 
-        // Place biome entrance on map
-        int biomeX = MapW / 2, biomeY = MapH / 2;
-        // Clear area around biome entrance
-        for (int dy = -2; dy <= 2; dy++)
-            for (int dx = -2; dx <= 2; dx++)
-                map.SetTile(biomeX + dx, biomeY + dy, MapTileType.Plains);
-        map.SetTile(biomeX, biomeY, MapTileType.BiomeEntrance);
-
         map.Points.Add(new MapPoint
         {
             X = biomeX,
@@ -244,18 +320,90 @@ public class WorldMapData
             Label = "Eden Reach"
         });
 
-        // Player starts near biome entrance
+        // Player starts at biome entrance
         map.PlayerX = biomeX;
         map.PlayerY = biomeY + 2;
+        // Make sure spawn is walkable
+        if (map.GetTile(map.PlayerX, map.PlayerY) == MapTileType.Ocean ||
+            map.GetTile(map.PlayerX, map.PlayerY) == MapTileType.Mountain)
+            map.SetTile(map.PlayerX, map.PlayerY, MapTileType.Plains);
 
-        // Reveal starting area
         map.Reveal(map.PlayerX, map.PlayerY);
 
         map.Save();
         return map;
     }
-}
 
+    // ── Fractal Brownian Motion noise ──
+    private static void FractalNoise(float[,] grid, int w, int h, int seed, int octaves, float baseFreq, float persistence)
+    {
+        var perm = GeneratePermutation(seed);
+        for (int y = 0; y < h; y++)
+        {
+            for (int x = 0; x < w; x++)
+            {
+                float val = 0, amp = 1f, freq = baseFreq, maxAmp = 0;
+                for (int o = 0; o < octaves; o++)
+                {
+                    val += amp * Perlin2D(x * freq, y * freq, perm);
+                    maxAmp += amp;
+                    amp *= persistence;
+                    freq *= 2f;
+                }
+                grid[x, y] = (val / maxAmp + 1f) * 0.5f; // normalize to 0-1
+            }
+        }
+    }
+
+    private static int[] GeneratePermutation(int seed)
+    {
+        var rng = new Random(seed);
+        var p = new int[512];
+        var source = new int[256];
+        for (int i = 0; i < 256; i++) source[i] = i;
+        // Fisher-Yates shuffle
+        for (int i = 255; i > 0; i--)
+        {
+            int j = rng.Next(i + 1);
+            (source[i], source[j]) = (source[j], source[i]);
+        }
+        for (int i = 0; i < 512; i++) p[i] = source[i & 255];
+        return p;
+    }
+
+    private static float Perlin2D(float x, float y, int[] perm)
+    {
+        int xi = (int)MathF.Floor(x) & 255;
+        int yi = (int)MathF.Floor(y) & 255;
+        float xf = x - MathF.Floor(x);
+        float yf = y - MathF.Floor(y);
+
+        float u = Fade(xf);
+        float v = Fade(yf);
+
+        int aa = perm[perm[xi] + yi];
+        int ab = perm[perm[xi] + yi + 1];
+        int ba = perm[perm[xi + 1] + yi];
+        int bb = perm[perm[xi + 1] + yi + 1];
+
+        float x1 = Lerp(Grad(aa, xf, yf), Grad(ba, xf - 1, yf), u);
+        float x2 = Lerp(Grad(ab, xf, yf - 1), Grad(bb, xf - 1, yf - 1), u);
+        return Lerp(x1, x2, v);
+    }
+
+    private static float Fade(float t) => t * t * t * (t * (t * 6 - 15) + 10);
+    private static float Lerp(float a, float b, float t) => a + t * (b - a);
+    private static float Grad(int hash, float x, float y)
+    {
+        return (hash & 3) switch
+        {
+            0 => x + y,
+            1 => -x + y,
+            2 => x - y,
+            _ => -x - y,
+        };
+    }
+}
 public class MapPoint
 {
     [JsonPropertyName("x")] public int X { get; set; }
