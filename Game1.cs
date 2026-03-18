@@ -940,7 +940,7 @@ public class Game1 : Game
         }
 
         // Tile-based spike collision
-        if (!_isDead && _spawnInvincibility <= 0f)
+        if (!_isDead && _spawnInvincibility <= 0f && _level.TileGridInstance != null)
         {
             var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
             var tgi = _level.TileGridInstance;
