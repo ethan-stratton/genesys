@@ -1123,49 +1123,40 @@ public class Player
             }
         }
 
-        // Slope ceiling collision — deflect momentum along surface
-        if (tileGrid != null && vel.Y <= 0)
+        // Slope ceiling collision — slide along surface
+        bool _onCeilSlope = false;
+        if (tileGrid != null)
         {
             TileType ceilTile;
             float slopeCeilY = tileGrid.GetSlopeCeilY(pos.X, pos.Y, Width, Height, out ceilTile);
             if (slopeCeilY > float.MinValue && pos.Y <= slopeCeilY + 4)
             {
                 pos.Y = slopeCeilY;
+                _onCeilSlope = true;
                 
-                // Convert upward momentum into horizontal momentum along the ceiling slope
-                System.Console.WriteLine($"[CEIL] hit={ceilTile} vel.Y={vel.Y:F1} pos.Y={pos.Y:F1} slopeCeilY={slopeCeilY:F1}");
+                // First contact: convert upward momentum into horizontal
                 if (vel.Y < 0 && ceilTile != TileType.Empty)
                 {
                     float upSpeed = MathF.Abs(vel.Y);
-                    float deflectRatio = 0.7f;
-                    if (ceilTile == TileType.GentleCeilRight || ceilTile == TileType.GentleCeilLeft)
-                        deflectRatio = 0.85f;
-                    if (IsUppercutting) deflectRatio = 0.95f;
                     
-                    float hBoost = upSpeed * deflectRatio * 0.5f; // toned down
-                    // Deflect toward the open side of the slope
-                    // SlopeCeilRight (solid top-right): open side is LEFT
-                    // SlopeCeilLeft (solid top-left): open side is RIGHT
-                    if (ceilTile == TileType.SlopeCeilLeft || ceilTile == TileType.GentleCeilLeft)
-                        vel.X += hBoost;
-                    else
-                        vel.X -= hBoost;
+                    // Determine slope direction
+                    float slopeDir = 0;
+                    if (ceilTile == TileType.SlopeCeilLeft || ceilTile == TileType.GentleCeilLeft
+                        || ceilTile == TileType.ShavedCeilLeft)
+                        slopeDir = 1f;  // open to the right
+                    else if (ceilTile == TileType.SlopeCeilRight || ceilTile == TileType.GentleCeilRight
+                        || ceilTile == TileType.ShavedCeilRight)
+                        slopeDir = -1f; // open to the left
                     
-                    // Preserve some upward momentum — deflect, don't bonk
-                    // 45° slope: split evenly between horizontal and vertical
-                    // Gentle slope: more horizontal, less vertical
-                    float vertKeep = 0.4f;
-                    if (ceilTile == TileType.GentleCeilRight || ceilTile == TileType.GentleCeilLeft)
-                        vertKeep = 0.2f;
-                    vel.Y = -(upSpeed * vertKeep); // negative = still going UP
-                    pos.Y = slopeCeilY + 2;
-                    System.Console.WriteLine($"[DEFLECT] hBoost={hBoost:F1} vel.X={vel.X:F1} vel.Y={vel.Y:F1}");
+                    float deflectRatio = 0.35f;
+                    if (IsUppercutting) deflectRatio = 0.5f;
                     
-                    // Preserve momentum — prevent normal movement from overwriting vel.X
-                    _ceilDeflectTimer = 0.4f;
+                    vel.X += upSpeed * deflectRatio * slopeDir;
+                    vel.Y = 0; // zero out — will re-snap each frame
+                    
+                    _ceilDeflectTimer = 0.6f;
                     _ceilDeflectVelX = vel.X;
                     
-                    // Cancel uppercut so the deflection momentum isn't overridden
                     if (IsUppercutting)
                     {
                         IsUppercutting = false;
@@ -1174,7 +1165,8 @@ public class Player
                 }
                 else
                 {
-                    vel.Y = 0;
+                    // Already sliding — keep snapped, kill upward vel
+                    if (vel.Y < 0) vel.Y = 0;
                 }
             }
         }
