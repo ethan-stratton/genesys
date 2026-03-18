@@ -87,6 +87,17 @@ public class Game1 : Game
 
     private SettingEntry[] _audioSettings;
     private SettingEntry[] _debugSettings;
+    private SettingEntry[] _graphicsSettings;
+    private static readonly (int w, int h, string label)[] WindowSizes = {
+        (800, 600, "800x600"),
+        (1024, 768, "1024x768"),
+        (1280, 720, "1280x720"),
+        (1280, 960, "1280x960"),
+        (1440, 900, "1440x900"),
+        (1600, 900, "1600x900"),
+        (1920, 1080, "1920x1080"),
+    };
+    private int _windowSizeIndex = 0;
 
     private enum SettingsCategory { Audio, Graphics, Debug }
     private int _settingsCategoryCursor;
@@ -214,6 +225,20 @@ public class Game1 : Game
             new() { Label = "EVE Orb", Get = () => _eveOrbActive, Toggle = () => _eveOrbActive = !_eveOrbActive },
         };
 
+        _graphicsSettings = new SettingEntry[]
+        {
+            new() { Label = "Window Size", Get = () => true, Toggle = () => {
+                _windowSizeIndex = (_windowSizeIndex + 1) % WindowSizes.Length;
+                var (w, h, _) = WindowSizes[_windowSizeIndex];
+                _graphics.PreferredBackBufferWidth = w;
+                _graphics.PreferredBackBufferHeight = h;
+                _graphics.ApplyChanges();
+                // Rebuild camera with new viewport
+                if (_level != null)
+                    _camera = new Camera(w, h, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
+            }},
+        };
+
         Restart();
 
         if (System.IO.File.Exists(OverworldPath))
@@ -248,6 +273,11 @@ public class Game1 : Game
 
         // Enemies are spawned in SpawnEnemiesFromLevel(), called by Restart()
     }
+
+    private int ViewW => _graphics.PreferredBackBufferWidth;
+    private int ViewH => _graphics.PreferredBackBufferHeight;
+
+    private Camera MakeCamera() => new Camera(ViewW, ViewH, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
 
     private void Restart()
     {
@@ -322,7 +352,7 @@ public class Game1 : Game
     protected override void LoadContent()
     {
         _spriteBatch = new SpriteBatch(GraphicsDevice);
-        _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
+        _camera = MakeCamera();
         _pixel = new Texture2D(GraphicsDevice, 1, 1);
         _pixel.SetData(new[] { Color.White });
         _fontSystem = new FontSystem();
@@ -377,7 +407,7 @@ public class Game1 : Game
                                 LoadLevel(DefaultLevel);
                                 _editorSaveFile = DefaultLevel;
                             }
-                            _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
+                            _camera = MakeCamera();
                             _gameState = GameState.Playing;
                             _player = new Player(new Microsoft.Xna.Framework.Vector2(_saveData.SpawnX, _saveData.SpawnY));
                             _camera.SnapTo(_player.Position, Player.Width, Player.Height);
@@ -409,7 +439,7 @@ public class Game1 : Game
                         _debugSword = false;
                         _debugGun = false;
                         LoadLevel(DefaultLevel);
-                        _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
+                        _camera = MakeCamera();
                         _gameState = GameState.Playing;
                         Restart();
                         _prevInExit = new bool[_level.ExitRects.Length];
@@ -1133,7 +1163,7 @@ public class Game1 : Game
                     {
                         LoadLevel(nextPath);
                         _editorSaveFile = nextPath;
-                        _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
+                        _camera = MakeCamera();
                         Restart();
 
                         // Tunnel: reposition at target exit
@@ -1450,7 +1480,7 @@ public class Game1 : Game
             // Save camera position before rebuilding
             float prevCamX = _camera?.Position.X ?? 0f;
             float prevCamY = _camera?.Position.Y ?? 0f;
-            _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
+            _camera = MakeCamera();
             // Keep player at current camera center instead of respawning at spawn point
             float camCX = prevCamX + 400f;
             float camCY = prevCamY + 300f;
@@ -2204,7 +2234,7 @@ public class Game1 : Game
                         _editorSaveFile = "Content/levels/untitled.json";
                         SaveLevel();
                     }
-                    _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
+                    _camera = MakeCamera();
                     _editorCursor = new Vector2(_level.PlayerSpawn.X, _level.PlayerSpawn.Y);
                     _editorMenuOpen = false;
                     break;
@@ -2212,7 +2242,7 @@ public class Game1 : Game
                     SaveLevel(); // auto-save level edits
                     _gameState = GameState.Playing;
                     _level.Build();
-                    _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
+                    _camera = MakeCamera();
                     Restart();
                     // Suppress exit triggers so spawning on a loading zone doesn't teleport you
                     _prevInExit = new bool[_level.ExitRects.Length];
@@ -2810,13 +2840,13 @@ public class Game1 : Game
         if (_editorTool == EditorTool.TilePaint)
         {
             string tileInfo = $"Tile: {_selectedTileType}  [{_tilePaletteCursor + 1}/{TileProperties.PaletteTiles.Length}]  RClick=Erase";
-            _spriteBatch.DrawString(_font, SafeText(tileInfo), new Vector2(10, 30), Color.Yellow);
+            _spriteBatch.DrawString(_font, SafeText(tileInfo), new Vector2(10, ViewH - 60), Color.Yellow);
             // Mini palette — wrap into rows
             int colsPerRow = 18;
             int tileW = 20;
             int tileH = 20;
             int startX = 10;
-            int startY = 50;
+            int startY = ViewH - 40;
             for (int i = 0; i < TileProperties.PaletteTiles.Length; i++)
             {
                 var tt = TileProperties.PaletteTiles[i];
@@ -2835,15 +2865,15 @@ public class Game1 : Game
         if (_toolPaletteOpen)
         {
             // Semi-transparent background
-            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, 800, 600), Color.Black * 0.7f);
+            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), Color.Black * 0.7f);
 
             string[] paletteNames = { "Solid Floor", "Platform", "Rope", "Wall", "Spike", "Exit", "Spawn", "Wall Spike", "Overworld Exit", "Ceiling", "Tile Paint" };
             int paletteCount = paletteNames.Length;
             float palW = 260f;
             float palLineH = 24f;
             float palH = paletteCount * palLineH + 60f;
-            float palX = (800 - palW) / 2f;
-            float palY = (600 - palH) / 2f;
+            float palX = (ViewW - palW) / 2f;
+            float palY = (ViewH - palH) / 2f;
 
             // Background box
             _spriteBatch.Draw(_pixel, new Rectangle((int)palX, (int)palY, (int)palW, (int)palH), new Color(30, 30, 30) * 0.95f);
@@ -2904,7 +2934,7 @@ public class Game1 : Game
         // Editor menu overlay
         if (_editorMenuOpen)
         {
-            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, 800, 600), Color.Black * 0.8f);
+            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), Color.Black * 0.8f);
 
             if (_editorMenuMode == EditorMenuMode.SaveAs)
             {
@@ -3006,7 +3036,13 @@ public class Game1 : Game
 
             if (_settingsActiveCategory == SettingsCategory.Graphics)
             {
-                _spriteBatch.DrawString(_font, SafeText("Coming soon"), new Vector2(340f, startY), Color.Gray * 0.6f);
+                // Show window size with current value
+                var (cw, ch, clabel) = WindowSizes[_windowSizeIndex];
+                string prefix = "> ";
+                string sizeStr = $"{prefix}Window Size: {clabel}";
+                var color = Color.Yellow;
+                _spriteBatch.DrawString(_font, SafeText(sizeStr), new Vector2(280f, startY), color);
+                _spriteBatch.DrawString(_font, SafeText("(Enter to cycle)"), new Vector2(280f, startY + lineHeight), Color.Gray * 0.6f);
             }
             else
             {
@@ -3109,7 +3145,7 @@ public class Game1 : Game
     private void DrawInventory()
     {
         // Semi-transparent overlay
-        _spriteBatch.Draw(_pixel, new Rectangle(0, 0, 800, 600), Color.Black * 0.75f);
+        _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), Color.Black * 0.75f);
 
         { var hdr = "INVENTORY"; var hs = _fontLarge.MeasureString(hdr); _spriteBatch.DrawString(_fontLarge, hdr, new Vector2(400 - hs.X / 2, 35), Color.White); }
         _spriteBatch.DrawString(_font, SafeText("[A/D] Section  [W/S] Navigate  [Enter] Equip  [X] Discard  [Tab/Esc] Close"),
@@ -3198,7 +3234,16 @@ public class Game1 : Game
             // In a submenu
             if (_settingsActiveCategory == SettingsCategory.Graphics)
             {
-                // Nothing to navigate — just go back on Esc
+                if (enter)
+                {
+                    _windowSizeIndex = (_windowSizeIndex + 1) % WindowSizes.Length;
+                    var (w, h, _) = WindowSizes[_windowSizeIndex];
+                    _graphics.PreferredBackBufferWidth = w;
+                    _graphics.PreferredBackBufferHeight = h;
+                    _graphics.ApplyChanges();
+                    if (_level != null)
+                        _camera = MakeCamera();
+                }
                 if (esc) _settingsActiveCategory = null;
                 return;
             }
@@ -3300,7 +3345,7 @@ public class Game1 : Game
                     _overworld.Save(OverworldPath);
                     LoadLevel(path);
                     _editorSaveFile = path;
-                    _camera = new Camera(800, 600, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
+                    _camera = MakeCamera();
                     _gameState = GameState.Playing;
                     Restart();
                     _prevInExit = new bool[_level.ExitRects.Length];
@@ -3796,7 +3841,7 @@ public class Game1 : Game
             // Settings overlay on title screen
             if (_menuOpen && _settingsFromTitle)
             {
-                _spriteBatch.Draw(_pixel, new Rectangle(0, 0, 800, 600), new Color(20, 20, 20));
+                _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), new Color(20, 20, 20));
                 DrawSettingsMenu();
             }
 
@@ -4171,13 +4216,13 @@ public class Game1 : Game
         // Death overlay
         if (_isDead)
         {
-            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, 800, 600), Color.Black * 0.6f);
+            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), Color.Black * 0.6f);
         }
 
         // --- Settings menu overlay ---
         if (_menuOpen)
         {
-            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, 800, 600), new Color(20, 20, 20));
+            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), new Color(20, 20, 20));
             DrawSettingsMenu();
         }
         else if (_inventoryOpen)
@@ -4250,7 +4295,7 @@ public class Game1 : Game
         if (_transitionActive && _transitionAlpha > 0f)
         {
             _spriteBatch.Begin();
-            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, 800, 600), Color.Black * _transitionAlpha);
+            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), Color.Black * _transitionAlpha);
             _spriteBatch.End();
         }
 
