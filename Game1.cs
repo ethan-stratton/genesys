@@ -21,7 +21,7 @@ public class ItemPickup
     public Rectangle Rect => new((int)X, (int)Y, W, H);
 }
 
-public enum GameState { Title, Playing, Editing, Overworld }
+public enum GameState { Title, Playing, Editing, Overworld, SimMode }
 
 public class Game1 : Game
 {
@@ -33,6 +33,11 @@ public class Game1 : Game
         : new[] { "New Game", "Settings", "Quit" };
 
     private OverworldData _overworld;
+
+    // Sim mode
+    private SimRegion _simRegion;
+    private int _simCursorX, _simCursorY;
+    private string _simNodeId;
     private int _overworldCursor;
     private string _currentNodeId;
     private const string OverworldPath = "Content/overworld.json";
@@ -395,6 +400,13 @@ public class Game1 : Game
             return;
         }
 
+        if (_gameState == GameState.SimMode)
+        {
+            UpdateSimMode(kb);
+            _prevKb = kb;
+            base.Update(gameTime);
+            return;
+        }
         if (_gameState == GameState.Title)
         {
             // Handle settings menu first (consumes input)
@@ -3380,30 +3392,44 @@ public class Game1 : Game
             (kb.IsKeyDown(Keys.Down) && _prevKb.IsKeyUp(Keys.Down)))
             MoveOverworldCursor(currentNode, 0, 1);
 
-        if ((kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space)) ||
-            (kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter)))
+        bool enterKey = kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter);
+        bool spaceKey = kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space);
+
+        if (enterKey || spaceKey)
         {
             var node = _overworld.Nodes[_overworldCursor];
             if (node.Discovered && !string.IsNullOrEmpty(node.Level))
             {
-                string path = $"Content/levels/{node.Level}.json";
-                // If re-entering the same level, just resume without resetting
-                if (path == _editorSaveFile && _level != null)
+                if (node.Cleared && enterKey)
                 {
-                    _gameState = GameState.Playing;
+                    // Cleared nodes + Enter → sim mode
+                    _simRegion = SimRegion.LoadOrGenerate(node.Id);
+                    _simCursorX = SimRegion.GridW / 2;
+                    _simCursorY = SimRegion.GridH / 2;
+                    _simNodeId = node.Id;
+                    _gameState = GameState.SimMode;
                 }
-                else if (System.IO.File.Exists(path))
+                else
                 {
-                    node.Discovered = true;
-                    _overworld.Save(OverworldPath);
-                    LoadLevel(path);
-                    _editorSaveFile = path;
-                    _camera = MakeCamera();
-                    _gameState = GameState.Playing;
-                    Restart();
-                    _prevInExit = new bool[_level.ExitRects.Length];
-                    for (int k = 0; k < _prevInExit.Length; k++)
-                        _prevInExit[k] = true;
+                    // Uncleared or Space → action level
+                    string path = $"Content/levels/{node.Level}.json";
+                    if (path == _editorSaveFile && _level != null)
+                    {
+                        _gameState = GameState.Playing;
+                    }
+                    else if (System.IO.File.Exists(path))
+                    {
+                        node.Discovered = true;
+                        _overworld.Save(OverworldPath);
+                        LoadLevel(path);
+                        _editorSaveFile = path;
+                        _camera = MakeCamera();
+                        _gameState = GameState.Playing;
+                        Restart();
+                        _prevInExit = new bool[_level.ExitRects.Length];
+                        for (int k = 0; k < _prevInExit.Length; k++)
+                            _prevInExit[k] = true;
+                    }
                 }
             }
         }
@@ -3523,9 +3549,128 @@ public class Game1 : Game
             }
         }
 
-        _spriteBatch.DrawString(_fontSmall, SafeText("[Esc] Back to Title  [WASD] Navigate"), new Vector2(220, 570), Color.Gray * 0.4f);
+        _spriteBatch.DrawString(_fontSmall, SafeText("[Esc] Back to Title  [WASD] Navigate  [Enter] Settlement  [Space] Enter Level"), new Vector2(60, ViewH - 30), Color.Gray * 0.4f);
 
         _spriteBatch.End();
+    }
+
+    // ── Sim Mode ──────────────────────────────────────────
+
+    private void UpdateSimMode(KeyboardState kb)
+    {
+        // Cursor movement
+        if (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W)) _simCursorY = Math.Max(0, _simCursorY - 1);
+        if (kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S)) _simCursorY = Math.Min(SimRegion.GridH - 1, _simCursorY + 1);
+        if (kb.IsKeyDown(Keys.A) && _prevKb.IsKeyUp(Keys.A)) _simCursorX = Math.Max(0, _simCursorX - 1);
+        if (kb.IsKeyDown(Keys.D) && _prevKb.IsKeyUp(Keys.D)) _simCursorX = Math.Min(SimRegion.GridW - 1, _simCursorX + 1);
+
+        // Also arrow keys
+        if (kb.IsKeyDown(Keys.Up) && _prevKb.IsKeyUp(Keys.Up)) _simCursorY = Math.Max(0, _simCursorY - 1);
+        if (kb.IsKeyDown(Keys.Down) && _prevKb.IsKeyUp(Keys.Down)) _simCursorY = Math.Min(SimRegion.GridH - 1, _simCursorY + 1);
+        if (kb.IsKeyDown(Keys.Left) && _prevKb.IsKeyUp(Keys.Left)) _simCursorX = Math.Max(0, _simCursorX - 1);
+        if (kb.IsKeyDown(Keys.Right) && _prevKb.IsKeyUp(Keys.Right)) _simCursorX = Math.Min(SimRegion.GridW - 1, _simCursorX + 1);
+
+        // Escape → back to overworld
+        if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape))
+        {
+            _simRegion.Save();
+            _gameState = GameState.Overworld;
+        }
+
+        // M key → back to overworld
+        if (kb.IsKeyDown(Keys.M) && _prevKb.IsKeyUp(Keys.M))
+        {
+            _simRegion.Save();
+            _gameState = GameState.Overworld;
+        }
+    }
+
+    private void DrawSimMode()
+    {
+        GraphicsDevice.Clear(new Color(10, 14, 10));
+        _spriteBatch.Begin();
+
+        if (_simRegion == null) { _spriteBatch.End(); return; }
+
+        // Center the grid on screen
+        int ts = SimRegion.TileSize;
+        float gridPixW = SimRegion.GridW * ts;
+        float gridPixH = SimRegion.GridH * ts;
+        float ox = (ViewW - gridPixW) / 2f;
+        float oy = (ViewH - gridPixH) / 2f + 15;
+
+        // Draw tiles
+        for (int y = 0; y < SimRegion.GridH; y++)
+        {
+            for (int x = 0; x < SimRegion.GridW; x++)
+            {
+                var tile = _simRegion.GetTile(x, y);
+                var rect = new Rectangle((int)(ox + x * ts), (int)(oy + y * ts), ts, ts);
+                Color fill = GetSimTileColor(tile);
+                _spriteBatch.Draw(_pixel, rect, fill);
+
+                // Grid lines
+                _spriteBatch.Draw(_pixel, new Rectangle(rect.X, rect.Y, ts, 1), Color.Black * 0.3f);
+                _spriteBatch.Draw(_pixel, new Rectangle(rect.X, rect.Y, 1, ts), Color.Black * 0.3f);
+            }
+        }
+
+        // Draw cursor
+        {
+            var cRect = new Rectangle((int)(ox + _simCursorX * ts), (int)(oy + _simCursorY * ts), ts, ts);
+            int b = 2;
+            _spriteBatch.Draw(_pixel, new Rectangle(cRect.X - b, cRect.Y - b, cRect.Width + b * 2, b), Color.White);
+            _spriteBatch.Draw(_pixel, new Rectangle(cRect.X - b, cRect.Bottom, cRect.Width + b * 2, b), Color.White);
+            _spriteBatch.Draw(_pixel, new Rectangle(cRect.X - b, cRect.Y, b, cRect.Height), Color.White);
+            _spriteBatch.Draw(_pixel, new Rectangle(cRect.Right, cRect.Y, b, cRect.Height), Color.White);
+        }
+
+        // Header
+        string nodeName = _simNodeId ?? "Unknown";
+        var node = _overworld?.FindNode(_simNodeId);
+        if (node != null) nodeName = node.Name ?? node.Id;
+        string header = $"SETTLEMENT: {nodeName.ToUpper()}";
+        var hs = _fontLarge.MeasureString(header);
+        _spriteBatch.DrawString(_fontLarge, header, new Vector2(ViewW / 2f - hs.X / 2, 8), Color.White);
+
+        // Tile info at cursor
+        var curTile = _simRegion.GetTile(_simCursorX, _simCursorY);
+        string tileLabel = curTile.ToString();
+        string info = $"({_simCursorX},{_simCursorY}) {tileLabel}";
+        var infoSize = _font.MeasureString(info);
+        _spriteBatch.DrawString(_font, info, new Vector2(ViewW / 2f - infoSize.X / 2, ViewH - 55), Color.Yellow);
+
+        // Population
+        string pop = $"Population: {_simRegion.Population}";
+        var popSize = _font.MeasureString(pop);
+        _spriteBatch.DrawString(_font, pop, new Vector2(ViewW - popSize.X - 20, 40), Color.LightGreen);
+
+        // Controls
+        string hint = "[WASD] Move  [Esc/M] Overworld";
+        var hintSize = _fontSmall.MeasureString(hint);
+        _spriteBatch.DrawString(_fontSmall, hint, new Vector2(ViewW / 2f - hintSize.X / 2, ViewH - 30), Color.Gray * 0.5f);
+
+        _spriteBatch.End();
+    }
+
+    private static Color GetSimTileColor(SimTileType tile)
+    {
+        return tile switch
+        {
+            SimTileType.Grass => new Color(34, 80, 34),
+            SimTileType.Forest => new Color(15, 55, 15),
+            SimTileType.Rock => new Color(90, 85, 75),
+            SimTileType.Water => new Color(30, 50, 100),
+            SimTileType.Ruins => new Color(100, 85, 60),
+            SimTileType.Road => new Color(120, 110, 90),
+            SimTileType.Hub => new Color(200, 180, 60),
+            SimTileType.Shelter => new Color(140, 100, 60),
+            SimTileType.Farm => new Color(80, 140, 40),
+            SimTileType.Workshop => new Color(130, 80, 50),
+            SimTileType.Wall => new Color(110, 110, 120),
+            SimTileType.MonsterLair => new Color(120, 20, 30),
+            _ => new Color(20, 20, 20),
+        };
     }
 
     private void DrawLine(int x1, int y1, int x2, int y2, Color color)
@@ -3860,6 +4005,13 @@ public class Game1 : Game
         if (_gameState == GameState.Overworld)
         {
             DrawOverworld();
+            base.Draw(gameTime);
+            return;
+        }
+
+        if (_gameState == GameState.SimMode)
+        {
+            DrawSimMode();
             base.Draw(gameTime);
             return;
         }
