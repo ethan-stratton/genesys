@@ -86,7 +86,8 @@ public class Player
     private float _flipTimer;
     
     // Ceiling deflection momentum preservation
-    // (reserved for future ceiling movement tech)
+    private float _ceilDeflectTimer;
+    private float _ceilDeflectVelX;
     private const float FlipDuration = 0.3f;
     private const float FlipSpeed = 450f;
     private const float FlipJumpForce = -350f;
@@ -949,6 +950,16 @@ public class Player
             // Track space so vault kick/jump works properly after crouch-slide
             _jumpHeld = kb.IsKeyDown(Keys.Space);
         }
+        else if (_ceilDeflectTimer > 0)
+        {
+            _ceilDeflectTimer -= dt;
+            // Gradually blend deflection momentum with input (drag toward input speed)
+            float drag = 1f - dt * 3f; // ~3x per second decay
+            _ceilDeflectVelX *= drag;
+            vel.X = _ceilDeflectVelX + inputX * Speed * 0.3f;
+            vel.Y += Gravity * dt;
+            if (IsGrounded) _ceilDeflectTimer = 0; // landing cancels deflect state
+        }
         else
         {
             float moveSpeed = (IsDashing && inputX == _dashDir) ? DashSpeed : Speed;
@@ -1112,18 +1123,21 @@ public class Player
             }
         }
 
-        // Slope ceiling collision — position correction only (no velocity changes)
-        // Player slides along ceiling naturally from their jump/uppercut momentum
+        // Slope ceiling collision — slide along surface
         bool _onCeilSlope = false;
         if (tileGrid != null)
         {
             TileType ceilTile;
             float slopeCeilY = tileGrid.GetSlopeCeilY(pos.X, pos.Y, Width, Height, out ceilTile);
-            if (slopeCeilY > float.MinValue && pos.Y < slopeCeilY)
+            if (slopeCeilY > float.MinValue && pos.Y <= slopeCeilY + 4)
             {
-                // Player's head penetrated the ceiling surface — push them out
                 pos.Y = slopeCeilY;
                 _onCeilSlope = true;
+                
+                // Snap to surface and zero upward velocity
+                // Player keeps moving horizontally from their existing vel.X
+                // Gravity still pulls down — once it overcomes the jump, player falls off
+                if (vel.Y < 0) vel.Y = 0;
             }
         }
 
