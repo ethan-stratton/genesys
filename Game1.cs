@@ -71,7 +71,9 @@ public class Game1 : Game
         public string Label;
         public Func<bool> Get;
         public Action Toggle;
+        #pragma warning disable CS0649
         public bool IsAction; // true = triggers action on Enter, not a toggle
+        #pragma warning restore CS0649
     }
 
     private SettingEntry[] _audioSettings;
@@ -1097,7 +1099,8 @@ public class Game1 : Game
                 {
                     case EntityType.Swarm:
                         var enemyList = new List<EnemySpawnData>(_level.Enemies);
-                        enemyList.Add(new EnemySpawnData { Id = $"swarm-{enemyList.Count}", Type = "swarm", X = cx, Y = cy, Count = 10 });
+                        // Swarms don't snap — they float freely
+                        enemyList.Add(new EnemySpawnData { Id = $"swarm-{enemyList.Count}", Type = "swarm", X = _editorCursor.X, Y = _editorCursor.Y, Count = 10 });
                         _level.Enemies = enemyList.ToArray();
                         SetEditorStatus($"Placed swarm at ({(int)cx}, {(int)cy})");
                         break;
@@ -1259,7 +1262,8 @@ public class Game1 : Game
             else
             {
                 _editorDragging = true;
-                _editorDragStart = snapped;
+                // Exits don't snap to grid (sub-grid width)
+                _editorDragStart = (_editorTool == EditorTool.Exit) ? worldMouse : snapped;
             }
         }
 
@@ -1267,7 +1271,7 @@ public class Game1 : Game
         if (mouse.LeftButton == ButtonState.Released && _prevMouse.LeftButton == ButtonState.Pressed && _editorDragging)
         {
             _editorDragging = false;
-            var dragEnd = snapped;
+            var dragEnd = (_editorTool == EditorTool.Exit) ? worldMouse : snapped;
             int x = (int)MathF.Min(_editorDragStart.X, dragEnd.X);
             int y = (int)MathF.Min(_editorDragStart.Y, dragEnd.Y);
             int w = (int)MathF.Abs(dragEnd.X - _editorDragStart.X);
@@ -2145,6 +2149,13 @@ public class Game1 : Game
                 _spriteBatch.Draw(_pixel, new Rectangle(gx, gy, 32, 32), TileProperties.GetColor(_selectedTileType) * 0.4f);
                 DrawHollowRect(gx, gy, 32, 32, Color.White * 0.5f);
             }
+        }
+
+        // Re-draw ceilings over background tiles so they stay visible in editor
+        foreach (var c in _level.Ceilings)
+        {
+            _spriteBatch.Draw(_pixel, new Rectangle(c.X, c.Y, c.W, c.H), new Color(50, 50, 50));
+            _spriteBatch.Draw(_pixel, new Rectangle(c.X, c.Y + c.H - 2, c.W, 2), new Color(90, 90, 90));
         }
 
         // Draw ropes
@@ -3319,6 +3330,10 @@ public class Game1 : Game
                     new Vector2(npc.X + npc.W / 2f - nameSize.X / 2f, npc.Y - 16), Color.White * 0.8f);
             }
         }
+
+        // Draw background layer of insect swarms (behind trees)
+        if (_enemiesEnabled)
+            foreach (var swarm in _swarms) swarm.DrawBackground(_spriteBatch, _pixel);
 
         // Draw environment objects (trees etc)
         foreach (var obj in _level.Objects)

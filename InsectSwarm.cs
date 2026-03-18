@@ -28,7 +28,9 @@ public class InsectSwarm
                 OrbitSpeed = 1.5f + (float)(rng.NextDouble() * 1.5f),
                 OrbitRadius = dist,
                 StingCooldown = 0,
-                Jitter = new Vector2((float)(rng.NextDouble() - 0.5) * 2, (float)(rng.NextDouble() - 0.5) * 2)
+                Jitter = new Vector2((float)(rng.NextDouble() - 0.5) * 2, (float)(rng.NextDouble() - 0.5) * 2),
+                InBackground = rng.NextDouble() < 0.3,  // 30% start behind trees
+                LayerSwitchTimer = 2f + (float)(rng.NextDouble() * 4f),
             });
         }
     }
@@ -54,6 +56,16 @@ public class InsectSwarm
             if (!ins.Alive) continue;
 
             if (ins.StingCooldown > 0) ins.StingCooldown -= dt;
+
+            // Layer switching — bugs fly in and out of tree canopy
+            ins.LayerSwitchTimer -= dt;
+            if (ins.LayerSwitchTimer <= 0)
+            {
+                ins.InBackground = !ins.InBackground;
+                ins.LayerSwitchTimer = 2f + (float)(rng.NextDouble() * 5f);
+                // Background bugs don't sting
+                if (ins.InBackground) ins.StingCooldown = MathF.Max(ins.StingCooldown, 0.5f);
+            }
 
             if (Aggroed)
             {
@@ -91,7 +103,7 @@ public class InsectSwarm
         int totalDmg = 0;
         foreach (var ins in Insects)
         {
-            if (!ins.Alive || ins.StingCooldown > 0) continue;
+            if (!ins.Alive || ins.InBackground || ins.StingCooldown > 0) continue;
             var insRect = new Rectangle((int)ins.Position.X - 2, (int)ins.Position.Y - 2, 4, 4);
             if (insRect.Intersects(playerRect))
             {
@@ -133,11 +145,22 @@ public class InsectSwarm
         return false;
     }
 
+    public void DrawBackground(SpriteBatch sb, Texture2D pixel)
+    {
+        foreach (var ins in Insects)
+        {
+            if (!ins.Alive || !ins.InBackground) continue;
+            // Smaller + darker = behind trees
+            sb.Draw(pixel, new Rectangle((int)ins.Position.X - 1, (int)ins.Position.Y - 1, 3, 3),
+                (Aggroed ? Color.OrangeRed : Color.DarkOliveGreen) * 0.4f);
+        }
+    }
+
     public void Draw(SpriteBatch sb, Texture2D pixel)
     {
         foreach (var ins in Insects)
         {
-            if (!ins.Alive) continue;
+            if (!ins.Alive || ins.InBackground) continue;
             sb.Draw(pixel, new Rectangle((int)ins.Position.X - 2, (int)ins.Position.Y - 2, 4, 4),
                 Aggroed ? Color.OrangeRed : Color.DarkOliveGreen);
         }
@@ -154,4 +177,6 @@ public class Insect
     public float StingCooldown;
     public Vector2 Jitter;
     public float JitterTimer;
+    public bool InBackground;       // true = behind trees (darker, smaller)
+    public float LayerSwitchTimer;   // countdown to next layer switch
 }
