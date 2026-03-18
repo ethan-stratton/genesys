@@ -367,12 +367,12 @@ public class TileGrid
                             slopeY = wy + TileSize / 2f - (localX / TileSize) * (TileSize / 2f);
                             break;
                         case TileType.ShavedCeilRight:
-                            // Full block with bottom-right shaved: surface = wy + TileSize/2 + (localX/TileSize)*(TileSize/2)
-                            slopeY = wy + TileSize / 2f + (localX / TileSize) * (TileSize / 2f);
+                            // Full block with bottom-right shaved: left=wy+ts, right=wy+ts/2
+                            slopeY = wy + TileSize - (localX / TileSize) * (TileSize / 2f);
                             break;
                         case TileType.ShavedCeilLeft:
-                            // Full block with bottom-left shaved: surface = wy + TileSize - (localX/TileSize)*(TileSize/2)
-                            slopeY = wy + TileSize - (localX / TileSize) * (TileSize / 2f);
+                            // Full block with bottom-left shaved: left=wy+ts/2, right=wy+ts
+                            slopeY = wy + TileSize / 2f + (localX / TileSize) * (TileSize / 2f);
                             break;
                         default:
                             continue;

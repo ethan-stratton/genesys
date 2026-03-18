@@ -1151,9 +1151,14 @@ public class Player
                     else
                         vel.X -= hBoost;
                     
-                    // Push player just below ceiling surface, minimal downward velocity
-                    vel.Y = 20f;
-                    pos.Y = slopeCeilY + 4;
+                    // Preserve some upward momentum — deflect, don't bonk
+                    // 45° slope: split evenly between horizontal and vertical
+                    // Gentle slope: more horizontal, less vertical
+                    float vertKeep = 0.4f;
+                    if (ceilTile == TileType.GentleCeilRight || ceilTile == TileType.GentleCeilLeft)
+                        vertKeep = 0.2f;
+                    vel.Y = -(upSpeed * vertKeep); // negative = still going UP
+                    pos.Y = slopeCeilY + 2;
                     System.Console.WriteLine($"[DEFLECT] hBoost={hBoost:F1} vel.X={vel.X:F1} vel.Y={vel.Y:F1}");
                     
                     // Preserve momentum — prevent normal movement from overwriting vel.X
