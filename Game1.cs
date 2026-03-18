@@ -2809,17 +2809,25 @@ public class Game1 : Game
         // Tile type indicator when in tile paint mode
         if (_editorTool == EditorTool.TilePaint)
         {
-            string tileInfo = $"Tile: {_selectedTileType}  [{_tilePaletteCursor + 1}/{TileProperties.PaletteTiles.Length}]";
-            _spriteBatch.DrawString(_font, SafeText(tileInfo), new Vector2(400, 30), Color.Yellow);
-            // Mini palette
+            string tileInfo = $"Tile: {_selectedTileType}  [{_tilePaletteCursor + 1}/{TileProperties.PaletteTiles.Length}]  RClick=Erase";
+            _spriteBatch.DrawString(_font, SafeText(tileInfo), new Vector2(10, 30), Color.Yellow);
+            // Mini palette — wrap into rows
+            int colsPerRow = 18;
+            int tileW = 20;
+            int tileH = 20;
+            int startX = 10;
+            int startY = 50;
             for (int i = 0; i < TileProperties.PaletteTiles.Length; i++)
             {
                 var tt = TileProperties.PaletteTiles[i];
                 bool sel = i == _tilePaletteCursor;
-                int px = 400 + i * 20;
-                _spriteBatch.Draw(_pixel, new Rectangle(px, 50, 16, 16), TileProperties.GetColor(tt));
+                int col = i % colsPerRow;
+                int row = i / colsPerRow;
+                int px = startX + col * tileW;
+                int py = startY + row * tileH;
+                _spriteBatch.Draw(_pixel, new Rectangle(px, py, 16, 16), TileProperties.GetColor(tt));
                 if (sel)
-                    DrawHollowRect(px - 1, 49, 18, 18, Color.White);
+                    DrawHollowRect(px - 1, py - 1, 18, 18, Color.White);
             }
         }
 
