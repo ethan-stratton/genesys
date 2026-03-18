@@ -983,6 +983,18 @@ public class Game1 : Game
                                     if (_player.Hp <= 0) _isDead = true;
                                 }
                                 break;
+                            case TileType.DamageNoKBTile:
+                                if (_spawnInvincibility <= 0f)
+                                {
+                                    // Damage without knockback — just reduce HP directly
+                                    if (_player.DamageCooldown <= 0)
+                                    {
+                                        _player.Hp -= 5;
+                                        _player.DamageCooldown = 1.0f;
+                                        if (_player.Hp <= 0) { _player.Hp = 0; _isDead = true; }
+                                    }
+                                }
+                                break;
                             case TileType.KnockbackTile:
                                 {
                                     // Rubber bounce: reflect incoming velocity with boost
@@ -2493,6 +2505,17 @@ public class Game1 : Game
                             // wavy lines on sides
                             _spriteBatch.Draw(_pixel, new Rectangle(cx - 7, cy - 2, 3, 2), bright);
                             _spriteBatch.Draw(_pixel, new Rectangle(cx + 5, cy + 2, 3, 2), bright);
+                        }
+                        else if (tile == TileType.DamageNoKBTile)
+                        {
+                            // Smaller flame (like DamageTile but dimmer/smaller)
+                            int[] flameW = { 2, 3, 5, 6, 6, 5, 4, 3, 2 };
+                            for (int i = 0; i < flameW.Length; i++)
+                            {
+                                int fy = cy + 6 - i * 2;
+                                int fw = flameW[i];
+                                _spriteBatch.Draw(_pixel, new Rectangle(cx - fw/2, fy, fw, 2), bright);
+                            }
                         }
                         
                         // Border
