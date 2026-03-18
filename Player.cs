@@ -1119,6 +1119,7 @@ public class Player
                 pos.Y = slopeCeilY;
                 
                 // Convert upward momentum into horizontal momentum along the ceiling slope
+                System.Console.WriteLine($"[CEIL] hit={ceilTile} vel.Y={vel.Y:F1} pos.Y={pos.Y:F1} slopeCeilY={slopeCeilY:F1}");
                 if (vel.Y < 0 && ceilTile != TileType.Empty)
                 {
                     float upSpeed = MathF.Abs(vel.Y);
@@ -1136,6 +1137,7 @@ public class Player
                     // Push player below the ceiling surface so they don't re-collide next frame
                     vel.Y = upSpeed * 0.3f;
                     pos.Y = slopeCeilY + 4;
+                    System.Console.WriteLine($"[DEFLECT] hBoost={hBoost:F1} vel.X={vel.X:F1} vel.Y={vel.Y:F1}");
                     
                     // Cancel uppercut so the deflection momentum isn't overridden
                     if (IsUppercutting)
@@ -1217,6 +1219,7 @@ public class Player
                         float newTop = pos.Y;
                         if (prevTop >= sf.Bottom - 2 && newTop < sf.Bottom)
                         {
+                            System.Console.WriteLine($"[SOLIDFLOOR BONK] sf=({sf.X},{sf.Y},{sf.Width},{sf.Height}) pos.Y={pos.Y:F1} vel=({vel.X:F1},{vel.Y:F1})");
                             pos.Y = sf.Bottom;
                             vel.Y = 0;
                         }
