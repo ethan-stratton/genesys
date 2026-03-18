@@ -1134,40 +1134,10 @@ public class Player
                 pos.Y = slopeCeilY;
                 _onCeilSlope = true;
                 
-                // First contact: convert upward momentum into horizontal
-                if (vel.Y < 0 && ceilTile != TileType.Empty)
-                {
-                    float upSpeed = MathF.Abs(vel.Y);
-                    
-                    // Determine slope direction
-                    float slopeDir = 0;
-                    if (ceilTile == TileType.SlopeCeilLeft || ceilTile == TileType.GentleCeilLeft
-                        || ceilTile == TileType.ShavedCeilLeft)
-                        slopeDir = 1f;  // open to the right
-                    else if (ceilTile == TileType.SlopeCeilRight || ceilTile == TileType.GentleCeilRight
-                        || ceilTile == TileType.ShavedCeilRight)
-                        slopeDir = -1f; // open to the left
-                    
-                    float deflectRatio = 0.35f;
-                    if (IsUppercutting) deflectRatio = 0.5f;
-                    
-                    vel.X += upSpeed * deflectRatio * slopeDir;
-                    vel.Y = 0; // zero out — will re-snap each frame
-                    
-                    _ceilDeflectTimer = 0.6f;
-                    _ceilDeflectVelX = vel.X;
-                    
-                    if (IsUppercutting)
-                    {
-                        IsUppercutting = false;
-                        _uppercutTimer = 0;
-                    }
-                }
-                else
-                {
-                    // Already sliding — keep snapped, kill upward vel
-                    if (vel.Y < 0) vel.Y = 0;
-                }
+                // Snap to surface and zero upward velocity
+                // Player keeps moving horizontally from their existing vel.X
+                // Gravity still pulls down — once it overcomes the jump, player falls off
+                if (vel.Y < 0) vel.Y = 0;
             }
         }
 
