@@ -73,6 +73,7 @@ public enum TileType : byte
     Gentle4CeilLeftC = 81,
     Gentle4CeilLeftD = 82,
     DamageNoKBTile = 83,  // continuous damage, no knockback (dark red)
+    DamageFloorTile = 84, // solid + continuous damage, no knockback (dark red, standable)
 
     // Platforms
     PlatformTop = 22,     // half platform spanning top half of tile
@@ -90,7 +91,7 @@ public enum TileType : byte
 
 public static class TileProperties
 {
-    public static bool IsSolid(TileType t) => (t >= TileType.Dirt && t <= TileType.Sand);
+    public static bool IsSolid(TileType t) => (t >= TileType.Dirt && t <= TileType.Sand) || t == TileType.Breakable || t == TileType.DamageFloorTile;
     public static bool IsPlatform(TileType t) => t >= TileType.PlatformWood && t <= TileType.PlatformBottom;
     /// <summary>Standard thin platforms only (for merged rects). Half platforms use custom rects.</summary>
     public static bool IsStandardPlatform(TileType t) => t == TileType.PlatformWood || t == TileType.PlatformStone;
@@ -109,7 +110,7 @@ public static class TileProperties
         || t == TileType.GentleCeilRight || t == TileType.GentleCeilLeft
         || t == TileType.ShavedCeilRight || t == TileType.ShavedCeilLeft
         || (t >= TileType.Gentle4CeilRightA && t <= TileType.Gentle4CeilLeftD);
-    public static bool IsEffectTile(TileType t) => (t >= TileType.DamageTile && t <= TileType.FloatTile) || t == TileType.DamageNoKBTile;
+    public static bool IsEffectTile(TileType t) => (t >= TileType.DamageTile && t <= TileType.FloatTile) || t == TileType.DamageNoKBTile || t == TileType.DamageFloorTile;
 
     public static Color GetColor(TileType t) => t switch
     {
@@ -164,6 +165,7 @@ public static class TileProperties
         TileType.SpeedBoostTile => new Color(40, 200, 80),
         TileType.FloatTile => new Color(180, 180, 255),
         TileType.DamageNoKBTile => new Color(120, 20, 20),
+        TileType.DamageFloorTile => new Color(100, 15, 15),
         TileType.DirtBg => new Color(50, 33, 16),
         TileType.StoneBg => new Color(60, 60, 60),
         TileType.GrassBg => new Color(38, 76, 0),
@@ -224,6 +226,7 @@ public static class TileProperties
         TileType.SpeedBoostTile => new Color(30, 160, 60),
         TileType.FloatTile => new Color(150, 150, 220),
         TileType.DamageNoKBTile => new Color(90, 15, 15),
+        TileType.DamageFloorTile => new Color(80, 10, 10),
         TileType.DirtBg => new Color(40, 25, 12),
         TileType.StoneBg => new Color(45, 45, 45),
         TileType.GrassBg => new Color(25, 60, 10),
@@ -286,6 +289,7 @@ public static class TileProperties
         TileType.SpeedBoostTile,
         TileType.FloatTile,
         TileType.DamageNoKBTile,
+        TileType.DamageFloorTile,
         TileType.DirtBg,
         TileType.StoneBg,
         TileType.GrassBg,

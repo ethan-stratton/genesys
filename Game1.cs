@@ -139,6 +139,7 @@ public class Game1 : Game
     private bool _debugGun;
 
     private List<ItemPickup> _itemPickups = new();
+    private HashSet<(int col, int row)> _destroyedBreakables = new();
 
     // --- Editor state ---
     private enum EditorTool { SolidFloor = 0, Platform = 1, Rope = 2, Wall = 3, Spike = 4, Exit = 5, Spawn = 6, WallSpike = 7, OverworldExit = 8, Ceiling = 9, TilePaint = 10 }
@@ -238,6 +239,7 @@ public class Game1 : Game
 
         // Load item pickups
         _itemPickups.Clear();
+        _destroyedBreakables.Clear();
         foreach (var item in _level.Items)
         {
             bool alreadyCollected = _saveData?.CollectedItems?.Contains(item.Id) == true;
@@ -984,6 +986,7 @@ public class Game1 : Game
                                 }
                                 break;
                             case TileType.DamageNoKBTile:
+                            case TileType.DamageFloorTile:
                                 if (_spawnInvincibility <= 0f)
                                 {
                                     // Damage without knockback — just reduce HP directly
@@ -1064,6 +1067,7 @@ public class Game1 : Game
                     {
                         if (tgi.GetTileAt(col, row) == TileType.Breakable)
                         {
+                            _destroyedBreakables.Add((col, row));
                             tgi.SetTileAt(col, row, TileType.Empty);
                             _level.RebuildTileCollision();
                             int twx = ox + col * ts, twy = oy + row * ts;
@@ -2307,6 +2311,13 @@ public class Game1 : Game
         if (!string.IsNullOrEmpty(dir) && !System.IO.Directory.Exists(dir))
             System.IO.Directory.CreateDirectory(dir);
 
+        // Restore destroyed breakables before saving (runtime-only changes)
+        if (_level.TileGridInstance != null)
+        {
+            foreach (var (col, row) in _destroyedBreakables)
+                _level.TileGridInstance.SetTileAt(col, row, TileType.Breakable);
+        }
+
         // Sync tile grid instance to serializable data
         if (_level.TileGridInstance != null)
             _level.TileGrid = _level.TileGridInstance.ToData();
@@ -2314,6 +2325,14 @@ public class Game1 : Game
         var opts = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
         var json = System.Text.Json.JsonSerializer.Serialize(_level, opts);
         System.IO.File.WriteAllText(_editorSaveFile, json);
+
+        // Re-destroy breakables after saving
+        if (_level.TileGridInstance != null)
+        {
+            foreach (var (col, row) in _destroyedBreakables)
+                _level.TileGridInstance.SetTileAt(col, row, TileType.Empty);
+        }
+
         SetEditorStatus($"Saved to {_editorSaveFile}");
     }
 
@@ -2506,7 +2525,7 @@ public class Game1 : Game
                             _spriteBatch.Draw(_pixel, new Rectangle(cx - 7, cy - 2, 3, 2), bright);
                             _spriteBatch.Draw(_pixel, new Rectangle(cx + 5, cy + 2, 3, 2), bright);
                         }
-                        else if (tile == TileType.DamageNoKBTile)
+                        else if (tile == TileType.DamageNoKBTile || tile == TileType.DamageFloorTile)
                         {
                             // Smaller flame (like DamageTile but dimmer/smaller)
                             int[] flameW = { 2, 3, 5, 6, 6, 5, 4, 3, 2 };
