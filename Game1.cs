@@ -743,6 +743,27 @@ public class Game1 : Game
             {
                 _meleeIndex = (_meleeIndex + 1) % _meleeInventory.Length;
             }
+
+            // --- Spawn weapon menu (P key) ---
+            if (kb.IsKeyDown(Keys.P) && _prevKb.IsKeyUp(Keys.P))
+            {
+                _spawnMenuOpen = !_spawnMenuOpen;
+                if (_spawnMenuOpen) _spawnMenuCursor = 0;
+            }
+            if (_spawnMenuOpen)
+            {
+                if (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W))
+                    _spawnMenuCursor = (_spawnMenuCursor - 1 + SpawnMenuItems.Length) % SpawnMenuItems.Length;
+                if (kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S))
+                    _spawnMenuCursor = (_spawnMenuCursor + 1) % SpawnMenuItems.Length;
+                if (kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter))
+                {
+                    SpawnItemAtPlayer(SpawnMenuItems[_spawnMenuCursor].ToLower());
+                    _spawnMenuOpen = false;
+                }
+                if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape))
+                    _spawnMenuOpen = false;
+            }
         }
 
         var wallsToPass = _enableWallClimb ? _level.WallRects : null;
