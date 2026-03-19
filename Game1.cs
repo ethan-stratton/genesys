@@ -3604,6 +3604,14 @@ public class Game1 : Game
             }
         }
 
+        // Backtick (`) — instant teleport to debug room
+        if (kb.IsKeyDown(Keys.OemTilde) && _prevKb.IsKeyUp(Keys.OemTilde))
+        {
+            LoadLevel("Content/Levels/debug-room.json");
+            _gameState = GameState.Playing;
+            return;
+        }
+
         // Enter/Space on biome entrance
         bool enter = kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter);
         bool space = kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space);
