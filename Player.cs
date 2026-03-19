@@ -1559,7 +1559,7 @@ public class Player
     private const int SpriteW = 48, SpriteH = 48;
     private const int RowIdle = 0, RowCrouch = 1, RowJump = 2, RowWalk = 3, RowRun = 4;
     private const int RowWhip = 5, RowBackflip = 6, RowDamaged = 7, RowSuperjump = 8, RowDash = 9;
-    private static readonly int[] RowFrameCounts = { 6, 3, 8, 8, 8, 10, 10, 3, 6, 3 };
+    private static readonly int[] RowFrameCounts = { 4, 3, 8, 8, 8, 10, 10, 3, 6, 3 };
     private float _idleTimer; // tracks how long standing still
     private bool _wasCrouching; // for crouch transition detection
     private float _crouchTransTimer; // >0 = transitioning into/out of crouch
@@ -1635,8 +1635,9 @@ public class Player
             int wf = ((int)(_animTimer * 8f)) % 8;
             return (RowWalk, wf);
         }
-        // Idle: use fallback (sprite sheet idle row disabled for rework)
-        return (-1, 0);
+        // Idle: 4-frame loop
+        int idleF = ((int)(_animTimer * 3f)) % 4;
+        return (RowIdle, idleF);
     }
 
     public void Draw(SpriteBatch spriteBatch, Texture2D pixel, Texture2D spriteSheet = null)
