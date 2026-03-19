@@ -1,31 +1,31 @@
 {
   "idle": {
     "row": 0,
-    "frameCount": 4
+    "frameCount": 6
   },
-  "walk": {
+  "crouch": {
     "row": 1,
-    "frameCount": 7
+    "frameCount": 5
   },
-  "run": {
+  "jump": {
     "row": 2,
     "frameCount": 8
   },
-  "jump": {
+  "walk": {
     "row": 3,
-    "frameCount": 4
+    "frameCount": 7
   },
-  "crouch": {
+  "run": {
     "row": 4,
-    "frameCount": 2
+    "frameCount": 8
   },
   "whip": {
     "row": 5,
-    "frameCount": 6
+    "frameCount": 10
   },
   "backflip": {
     "row": 6,
-    "frameCount": 6
+    "frameCount": 10
   },
   "damaged": {
     "row": 7,

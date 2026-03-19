@@ -1556,9 +1556,9 @@ public class Player
     // Row 0: idle(4) 1: walk(7) 2: run(8) 3: jump(4) 4: crouch(2) 
     // 5: whip/attack(6) 6: backflip(6) 7: damaged(3) 8: superjump(6) 9: dash(3)
     private const int SpriteW = 48, SpriteH = 48;
-    private const int RowIdle = 0, RowWalk = 1, RowRun = 2, RowJump = 3, RowCrouch = 4;
+    private const int RowIdle = 0, RowCrouch = 1, RowJump = 2, RowWalk = 3, RowRun = 4;
     private const int RowWhip = 5, RowBackflip = 6, RowDamaged = 7, RowSuperjump = 8, RowDash = 9;
-    private static readonly int[] RowFrameCounts = { 4, 7, 8, 4, 2, 6, 6, 3, 6, 3 };
+    private static readonly int[] RowFrameCounts = { 6, 5, 8, 7, 8, 10, 10, 3, 6, 3 };
     private float _animTimer;
 
     private (int row, int frame) GetSpriteAnim()
@@ -1573,7 +1573,7 @@ public class Player
         if (MeleeTimer > 0)
         {
             float progress = 1f - (MeleeTimer / 0.15f); // 0→1 over attack duration
-            int f = Math.Min((int)(progress * 6), 5);
+            int f = Math.Min((int)(progress * 10), 9);
             return (RowWhip, f);
         }
         // Uppercut → super jump
@@ -1587,7 +1587,7 @@ public class Player
         if (IsFlipping)
         {
             float progress = 1f - (_flipTimer / FlipDuration);
-            int f = Math.Min((int)(progress * 6), 5);
+            int f = Math.Min((int)(progress * 10), 9);
             return (RowBackflip, f);
         }
         // Slide / dash
@@ -1596,15 +1596,15 @@ public class Player
             int f = ((int)(_animTimer * 10f)) % 3;
             return (RowDash, f);
         }
-        if (IsCrouching) return (RowCrouch, ((int)(_animTimer * 3f)) % 2);
+        if (IsCrouching) return (RowCrouch, ((int)(_animTimer * 3f)) % 5);
         if (!IsGrounded)
-            return Velocity.Y < 0 ? (RowJump, 1) : (RowJump, 2);
+            return Velocity.Y < 0 ? (RowJump, 1) : (RowJump, 5);
         if (MathF.Abs(Velocity.X) > 10f)
         {
             int f = ((int)(_animTimer * 10f)) % 8;
             return (RowRun, f);
         }
-        return (RowIdle, ((int)(_animTimer * 3f)) % 4);
+        return (RowIdle, ((int)(_animTimer * 3f)) % 6);
     }
 
     public void Draw(SpriteBatch spriteBatch, Texture2D pixel, Texture2D spriteSheet = null)
