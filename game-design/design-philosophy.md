@@ -158,4 +158,84 @@ Practical room-based map system for metroidvanias using Godot principles that tr
 
 ---
 
+## 12. ROOM TRANSITIONS: Single Source of Truth
+
+**From Inbound Shovel — "Game Dev Secrets: Maps and Transitions":**
+
+Define each doorway/transition ONCE as an external object. Both connected rooms reference the same transition resource. Never define a connection in two places — they WILL disagree eventually.
+
+**For Genesis:**
+- Create a `transitions.json` (or similar) that maps transition IDs to room pairs + spawn positions
+- Each room's doorway references a transition ID, not a destination room directly
+- Room loading: hit transition trigger → look up transition ID → find paired room + spawn point → load
+- This prevents the classic bug: door A→B works, door B→A goes somewhere random
+- Transition triggers should be slightly past camera boundaries — player must clearly exit the screen
+- **Implement this before building more than 3-4 rooms.** Retrofitting is painful
+
+## 13. EASING EVERYWHERE
+
+**From Challacade — "How to make your game movement SMOOTH":**
+
+Tweens aren't just for UI animations. Apply easing to any value that changes over time — moving platforms, enemy patrol points, camera tracking, even HUD elements.
+
+**Reference:** easings.net for interactive easing curves
+
+**For Genesis:**
+- Moving platforms: in-out cubic (slow at endpoints, fast in middle) instead of linear. Immediately more dynamic
+- Enemy wind-up animations: ease-out on the squish, ease-in on the spring
+- Camera: ease toward player rather than hard-follow. Already somewhat doing this, but tighten it
+- Hit feedback: screen shake should ease-out (strong start, quick decay), not linear fade
+- Menu transitions, health bar changes, damage numbers — everything that moves should ease
+- **Rule of thumb:** if a value changes linearly, it probably looks mechanical. Add a curve
+
+## 14. ANIMATION SELLS CONTROLS (Movement Communication)
+
+**From Nonsensical 2D — "Why your 2D platformer doesn't feel nice to control":**
+
+Controls that feel good aren't just about input parameters (speed, gravity, jump force). They're about how every state, transition, and edge case is *communicated* visually. Same underlying controller can feel terrible or great depending on animation work.
+
+**Key principles:**
+- **Every state transition needs an animation.** Fall→land, idle→run, wall→slide — if two states connect, animate the bridge. Missing transitions = "you don't care"
+- **Weight and squash/stretch.** Characters should deform during movement. Head pushes into body during bounce. Landing compresses. Launching elongates. Weight > rigidity
+- **Communicate hidden systems visually.** If coyote time triggers, show a different jump. If ledge boost fires, play a vault animation. Players can't feel what they can't see
+- **Ledge boosting.** If raycast detects player barely missing a ledge, nudge them up. Then animate the correction so it reads as intentional movement, not a glitch
+- **Edge case animations matter more than base animations.** The 80/20 is inverted — the rare transitions and special states are where polish lives
+- **15 minutes to implement, 8 hours to feel right.** Every mechanic has this ratio. Budget for the polish, not just the feature
+
+**For Genesis (immediate actions):**
+- Landing animation (we likely don't have one — this is the #1 gap)
+- Head bonk animation when hitting ceiling
+- Different jump animations for normal vs coyote jump
+- Wall slide should squish the character against the wall
+- Slide→stand transition animation (currently instant)
+- Ledge boost: detect near-misses and nudge player up with a vault animation
+
+## 15. DUAL-GRID AUTO-TILING
+
+**From Nonsensical 2D — "Auto-Tiling while drawing only 5 tiles" + Inbound Shovel tiles short:**
+
+Instead of drawing 47 tiles for every terrain type, use a dual-grid system: one grid for colliders (gameplay), one offset grid for visuals. Only need 5 base tiles per terrain: corner, straight edge, nook, double nook, fill.
+
+**How it works:**
+- Collider grid: ugly placeholder squares defining where solid ground is
+- Visual grid: offset by half a tile, each visual tile checks which quadrants have a collider tile beneath
+- 16 possible combinations (4 quadrants × present/absent) → map each to a tile from your 5-tile set with rotations
+- Edges/corners/nooks all emerge automatically from the 5 base tiles
+
+**Benefits:**
+- Draw 5 tiles instead of 47 per terrain type → can spend more time making each tile look great
+- Visuals perfectly match colliders (no overhangs causing collision mismatches)
+- Adding tile variation is trivial — just add a few alternative tiles
+- Terrain transitions (grass→rock) work by layering visual grids
+
+**For Genesis:**
+- Our current TileGrid already separates collision from rendering somewhat, but we're manually placing visual tiles
+- Implementing dual-grid would massively speed up level creation
+- Priority: after core gameplay is solid, before building large world areas
+- Start with 5 tiles per terrain (dirt, stone, grass, sand, wood) = 25 tiles total for 5 terrain types
+- Auto-tiling rules stored per-tile-type, visual grid generated at level load or in editor
+- Alternative tiles (randomized at placement) prevent repetition cheaply
+
+---
+
 *These aren't rules to follow rigidly. They're lenses to evaluate every design decision through. When in doubt: Does this serve a Core pillar? Does it have a unique silhouette? Does it deepen the mystery? Does it reward mastery? Does it preserve soul?*
