@@ -18,6 +18,7 @@ public class Crawler
     public float Speed = 60f;
     public float ChaseSpeed = 100f;
     public float DamageCooldown;
+    public float HitFlash;
 
     public Crawler(Vector2 pos, float patrolLeft, float patrolRight, float surfaceLeft, float surfaceRight)
     {
@@ -34,6 +35,7 @@ public class Crawler
     {
         if (!Alive) return;
         if (DamageCooldown > 0) DamageCooldown -= dt;
+        if (HitFlash > 0) HitFlash -= dt;
 
         float dist = Vector2.Distance(playerCenter, Position + new Vector2(Width / 2f, Height / 2f));
         Aggroed = dist < AggroRange;
@@ -79,6 +81,7 @@ public class Crawler
     {
         if (!Alive) return false;
         Hp -= damage;
+        HitFlash = 0.15f;
         if (Hp <= 0) { Alive = false; return true; }
         return false;
     }
@@ -86,7 +89,8 @@ public class Crawler
     public void Draw(SpriteBatch sb, Texture2D pixel)
     {
         if (!Alive) return;
-        sb.Draw(pixel, Rect, Aggroed ? new Color(120, 60, 20) : new Color(80, 50, 20));
+        Color bodyColor = HitFlash > 0 ? Color.Red : (Aggroed ? new Color(120, 60, 20) : new Color(80, 50, 20));
+        sb.Draw(pixel, Rect, bodyColor);
         sb.Draw(pixel, new Rectangle((int)Position.X + 2, (int)Position.Y + Height, 2, 3), new Color(60, 30, 10));
         sb.Draw(pixel, new Rectangle((int)Position.X + Width - 4, (int)Position.Y + Height, 2, 3), new Color(60, 30, 10));
     }

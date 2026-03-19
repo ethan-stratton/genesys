@@ -69,6 +69,15 @@ public class Player
     private const float MeleeActiveTime = 0.12f; // how long the hitbox stays out
     public const int MeleeRange = 40;
 
+    // Combo chain system
+    private int _comboStep; // 0, 1, 2 — current position in combo chain
+    private float _comboWindow; // time remaining to input next hit
+    private float _comboCooldown; // cooldown after combo ends
+    private bool[] _comboHit = new bool[3]; // tracks whether each hit connected
+    public int ComboStep => _comboStep;
+    public WeaponType CurrentWeapon { get; set; }
+    private float _prevMeleeTimer; // for detecting melee active→inactive transition
+
     // Spinning melee (hold K for 0.2s+ while grounded)
     public bool IsSpinningMelee { get; private set; }
     private float _meleeHoldTimer; // how long K has been held
@@ -302,11 +311,41 @@ public class Player
     {
         get
         {
-            // Hitbox above the player's head
-            int hbX = (int)Position.X + (Width - UppercutHitboxW) / 2;
-            int hbY = (int)Position.Y - UppercutHitboxH;
-            return new Rectangle(hbX, hbY, UppercutHitboxW, UppercutHitboxH);
+            // Bounding box of both L-shape arms (backward compat)
+            var boxes = UppercutHitboxes;
+            return Rectangle.Union(boxes[0], boxes[1]);
         }
+    }
+
+    public Rectangle[] UppercutHitboxes
+    {
+        get
+        {
+            // Vertical arm (above head): 16w × 28h, centered horizontally
+            int vX = (int)Position.X + (Width - 16) / 2;
+            int vY = (int)Position.Y - 28;
+            // Horizontal arm (body-height, forward): 24w × 20h
+            int hX = FacingDir == 1 ? (int)Position.X + Width / 2 : (int)Position.X + Width / 2 - 24;
+            int hY = (int)Position.Y + 8;
+            return new Rectangle[]
+            {
+                new Rectangle(vX, vY, 16, 28),
+                new Rectangle(hX, hY, 24, 20)
+            };
+        }
+    }
+
+    public void RegisterComboHit()
+    {
+        if (_comboStep >= 0 && _comboStep < _comboHit.Length)
+            _comboHit[_comboStep] = true;
+    }
+
+    private void ResetCombo()
+    {
+        _comboStep = 0;
+        _comboWindow = 0;
+        _comboHit[0] = _comboHit[1] = _comboHit[2] = false;
     }
 
     public Rectangle BladeDashHitbox
@@ -324,13 +363,51 @@ public class Player
         get
         {
             var center = Position + new Vector2(Width / 2f, Height / 2f);
-            var dir = MeleeDirection;
-            // Offset the hitbox center along the aim direction
-            var hbCenter = center + dir * (MeleeRangeOverride * 0.6f);
-            return new Rectangle(
-                (int)(hbCenter.X - MeleeWidth / 2f),
-                (int)(hbCenter.Y - MeleeWidth / 2f),
-                MeleeWidth, MeleeWidth);
+
+            if (CurrentWeapon == WeaponType.None)
+            {
+                // Fist combo: narrow 14×14 hitboxes
+                float extend = _comboStep == 0 ? 20f : 26f;
+                float hbCenterX = center.X + FacingDir * extend;
+                float hbCenterY = Position.Y + 20f; // chest height
+                return new Rectangle(
+                    (int)(hbCenterX - 7f), (int)(hbCenterY - 7f), 14, 14);
+            }
+            else if (CurrentWeapon == WeaponType.Stick)
+            {
+                // Stick combo
+                if (_comboStep == 0)
+                {
+                    // Hit 1 — left sweep: 28×16, biased behind (-12px from center)
+                    float offsetX = FacingDir * -12f;
+                    return new Rectangle(
+                        (int)(center.X + offsetX - 14f), (int)(center.Y - 8f), 28, 16);
+                }
+                else if (_comboStep == 1)
+                {
+                    // Hit 2 — right sweep: 28×16, biased forward (+14px)
+                    float offsetX = FacingDir * 14f;
+                    return new Rectangle(
+                        (int)(center.X + offsetX - 14f), (int)(center.Y - 8f), 28, 16);
+                }
+                else
+                {
+                    // Hit 3 — downward slam: 22×24, extends forward + below
+                    float offsetX = FacingDir * 12f;
+                    return new Rectangle(
+                        (int)(center.X + offsetX - 11f), (int)(center.Y - 4f), 22, 24);
+                }
+            }
+            else
+            {
+                // Default melee hitbox for other weapons
+                var dir = MeleeDirection;
+                var hbCenter = center + dir * (MeleeRangeOverride * 0.6f);
+                return new Rectangle(
+                    (int)(hbCenter.X - MeleeWidth / 2f),
+                    (int)(hbCenter.Y - MeleeWidth / 2f),
+                    MeleeWidth, MeleeWidth);
+            }
         }
     }
 
@@ -347,6 +424,20 @@ public class Player
         _slideCooldownTimer -= dt;
         _cartwheelCooldownTimer -= dt;
         if (MeleeTimer > 0) MeleeTimer -= dt;
+
+        // Combo timers
+        if (_comboCooldown > 0) _comboCooldown -= dt;
+        if (_comboWindow > 0)
+        {
+            _comboWindow -= dt;
+            if (_comboWindow <= 0)
+            {
+                // Combo window expired — reset combo and start cooldown
+                float cd = CurrentWeapon == WeaponType.Stick ? 0.35f : 0.25f;
+                _comboCooldown = cd;
+                ResetCombo();
+            }
+        }
 
         bool shift = kb.IsKeyDown(Keys.LeftShift) || kb.IsKeyDown(Keys.RightShift);
 
@@ -1095,14 +1186,99 @@ public class Player
             }
         }
 
-        if (HasMeleeWeapon && !IsSpinningMelee && kPressed && !_meleeHeld && _meleeCooldown <= 0f)
+        if (HasMeleeWeapon && !IsSpinningMelee && kPressed && !_meleeHeld && _comboCooldown <= 0f)
         {
-            _meleeCooldown = MeleeRate;
-            WantsToMelee = true;
-            MeleeDirection = AimDir;
-            MeleeTimer = MeleeActiveTime;
+            if (CurrentWeapon == WeaponType.None)
+            {
+                // Fist combo: 2-hit chain
+                if (_comboStep == 0 && _comboWindow <= 0 && MeleeTimer <= 0)
+                {
+                    // Jab 1
+                    WantsToMelee = true;
+                    MeleeDirection = new Vector2(FacingDir, 0);
+                    MeleeTimer = 0.06f;
+                    _comboWindow = 0; // window starts after active time ends (handled below)
+                }
+                else if (_comboStep == 0 && _comboWindow > 0)
+                {
+                    // Advance to jab 2
+                    _comboStep = 1;
+                    WantsToMelee = true;
+                    MeleeDirection = new Vector2(FacingDir, 0);
+                    MeleeTimer = 0.06f;
+                    _comboWindow = 0; // will set after active ends
+                }
+            }
+            else if (CurrentWeapon == WeaponType.Stick)
+            {
+                // Stick combo: 3-hit chain
+                if (_comboStep == 0 && _comboWindow <= 0 && MeleeTimer <= 0)
+                {
+                    WantsToMelee = true;
+                    MeleeDirection = new Vector2(FacingDir, 0);
+                    MeleeTimer = 0.1f;
+                    _comboWindow = 0;
+                }
+                else if (_comboStep == 0 && _comboWindow > 0)
+                {
+                    _comboStep = 1;
+                    WantsToMelee = true;
+                    MeleeDirection = new Vector2(FacingDir, 0);
+                    MeleeTimer = 0.1f;
+                    _comboWindow = 0;
+                }
+                else if (_comboStep == 1 && _comboWindow > 0 && _comboHit[0] && _comboHit[1])
+                {
+                    // Hit 3 only if hits 1 and 2 both connected
+                    _comboStep = 2;
+                    WantsToMelee = true;
+                    MeleeDirection = new Vector2(FacingDir, 0);
+                    MeleeTimer = 0.12f;
+                    _comboWindow = 0;
+                    // Forward burst
+                    var v = Velocity;
+                    v.X += FacingDir * 150f;
+                    Velocity = v;
+                    vel = Velocity;
+                }
+            }
+            else
+            {
+                // Other weapons: single hit, no combo
+                if (_meleeCooldown <= 0f)
+                {
+                    _meleeCooldown = MeleeRate;
+                    WantsToMelee = true;
+                    MeleeDirection = AimDir;
+                    MeleeTimer = MeleeActiveTime;
+                }
+            }
         }
         _meleeHeld = kPressed;
+
+        // Set combo window when melee active time ends (transition from active to waiting)
+        if (MeleeTimer <= 0 && _comboWindow <= 0 && _comboCooldown <= 0 && 
+            (CurrentWeapon == WeaponType.None || CurrentWeapon == WeaponType.Stick))
+        {
+            // Check if we just finished an active hit
+            if (_prevMeleeTimer > 0)
+            {
+                int maxStep = CurrentWeapon == WeaponType.None ? 1 : 2;
+                float window = CurrentWeapon == WeaponType.None ? 0.35f : 0.4f;
+                if (_comboStep < maxStep)
+                {
+                    _comboWindow = window;
+                }
+                else
+                {
+                    // Combo finished
+                    float cd = CurrentWeapon == WeaponType.Stick ? 0.35f : 0.25f;
+                    _comboCooldown = cd;
+                    ResetCombo();
+                }
+            }
+        }
+        _prevMeleeTimer = MeleeTimer;
 
         // Apply velocity
         var pos = Position + vel * dt;
@@ -1192,8 +1368,9 @@ public class Player
         {
             foreach (var ceil in ceilings)
             {
-                float prevTop = Position.Y;
-                float newTop = pos.Y;
+                float slideOffset = Height - CurrentHeight;
+                float prevTop = Position.Y + slideOffset;
+                float newTop = pos.Y + slideOffset;
                 if (prevTop >= ceil.Bottom - 2 && newTop < ceil.Bottom &&
                     pos.X + Width > ceil.X && pos.X < ceil.X + ceil.Width)
                 {
@@ -1249,8 +1426,9 @@ public class Player
                     // Hitting from below
                     if (vel.Y < 0)
                     {
-                        float prevTop = Position.Y;
-                        float newTop = pos.Y;
+                        float slideOff = Height - CurrentHeight;
+                        float prevTop = Position.Y + slideOff;
+                        float newTop = pos.Y + slideOff;
                         if (prevTop >= sf.Bottom - 2 && newTop < sf.Bottom)
                         {
                             System.Console.WriteLine($"[SOLIDFLOOR BONK] sf=({sf.X},{sf.Y},{sf.Width},{sf.Height}) pos.Y={pos.Y:F1} vel=({vel.X:F1},{vel.Y:F1})");
@@ -1301,7 +1479,7 @@ public class Player
         // --- Wall solid collision (can't walk through walls) ---
         if (solidWalls != null)
         {
-            var pRect = new Rectangle((int)pos.X, (int)pos.Y, Width, Height);
+            var pRect = new Rectangle((int)pos.X, (int)pos.Y + Height - CurrentHeight, Width, CurrentHeight);
             foreach (var w in solidWalls)
             {
                 if (pRect.Intersects(w))

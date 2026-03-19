@@ -10,6 +10,8 @@ using FontStashSharp;
 
 namespace ArenaShooter;
 
+public enum WeaponType { None, Stick, Sword, Axe, Sling, Bow, Gun }
+
 public class ItemPickup
 {
     public string Id;
@@ -62,6 +64,12 @@ public class Game1 : Game
     private SpriteFontBase _fontLarge;
     private Song _bgm;
     private Player _player;
+
+    // Hit feedback
+    private float _hitStopTimer;
+    private float _shakeTimer;
+    private float _shakeIntensity;
+    private Random _shakeRng = new();
 
     private List<Bullet> _bullets;
     private List<InsectSwarm> _swarms = new();
@@ -153,7 +161,7 @@ public class Game1 : Game
     #pragma warning restore CS0414
 
     // --- Weapon system ---
-    private enum WeaponType { None, Stick, Sword, Axe, Sling, Bow, Gun }
+
 
     private WeaponType[] _meleeInventory = Array.Empty<WeaponType>();
     private int _meleeIndex = -1;
@@ -663,6 +671,7 @@ public class Game1 : Game
         // Weapon system: set weapon availability and melee range
         _player.HasMeleeWeapon = true; // always have fists at minimum
         _player.HasRangedWeapon = CurrentRanged != WeaponType.None;
+        _player.CurrentWeapon = CurrentMelee;
         _player.MeleeRangeOverride = CurrentMelee switch
         {
             WeaponType.Sword => 60,
@@ -690,8 +699,17 @@ public class Game1 : Game
         var ropeTopsToPass = _enableRopeClimb ? _level.RopeTops : null;
         var ropeBottomsToPass = _enableRopeClimb ? _level.RopeBottoms : null;
 
+        // Hitstop: decrement timer and skip entity updates if active
+        if (_hitStopTimer > 0) _hitStopTimer -= dt;
+        if (_shakeTimer > 0) _shakeTimer -= dt;
+
+        bool hitStopped = _hitStopTimer > 0;
+
+        if (!hitStopped)
+        {
         _player.Update(dt, kb, _level.Floor.Y, _level.AllPlatforms, ropesToPass, ropeTopsToPass, ropeBottomsToPass, wallsToPass, wallSidesToPass, _level.WallRects, _level.CeilingRects, _level.SolidFloorRects, _level.TileGridInstance);
         _player.UpdateRegen(dt);
+        }
 
         // Track play time
         if (_saveData != null) _saveData.PlayTime += dt;
@@ -788,10 +806,10 @@ public class Game1 : Game
         _bullets.RemoveAll(b => b.IsDead);
 
         // Update all enemies (swarms, crawlers, thornbacks)
-        if (_enemiesEnabled)
+        if (_enemiesEnabled && !hitStopped)
         {
         var playerCenter2 = new Vector2(_player.Position.X + Player.Width / 2f, _player.Position.Y + Player.Height / 2f);
-        var playerRect2 = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
+        var playerRect2 = new Rectangle((int)_player.Position.X, (int)_player.Position.Y + Player.Height - _player.CurrentHeight, Player.Width, _player.CurrentHeight);
         foreach (var swarm in _swarms)
         {
             swarm.Update(dt, playerCenter2, _rng);
@@ -834,7 +852,13 @@ public class Game1 : Game
             if (_player.MeleeTimer > 0 && c.Alive)
             {
                 if (_player.MeleeHitbox.Intersects(c.Rect))
-                    c.TakeHit(1);
+                {
+                    int dmg = (_player.CurrentWeapon == WeaponType.Stick && _player.ComboStep == 2) ? 2 : 1;
+                    bool killed = c.TakeHit(dmg);
+                    _player.RegisterComboHit();
+                    if (killed) { _hitStopTimer = 0.06f; _shakeTimer = 0.12f; _shakeIntensity = 4f; }
+                    else { _hitStopTimer = 0.03f; _shakeTimer = 0.08f; _shakeIntensity = 2f; }
+                }
             }
         }
 
@@ -850,7 +874,13 @@ public class Game1 : Game
             if (_player.MeleeTimer > 0 && t.Alive)
             {
                 if (_player.MeleeHitbox.Intersects(t.Rect))
-                    t.TakeHit(1);
+                {
+                    int dmg = (_player.CurrentWeapon == WeaponType.Stick && _player.ComboStep == 2) ? 2 : 1;
+                    bool killed = t.TakeHit(dmg);
+                    _player.RegisterComboHit();
+                    if (killed) { _hitStopTimer = 0.06f; _shakeTimer = 0.12f; _shakeIntensity = 4f; }
+                    else { _hitStopTimer = 0.03f; _shakeTimer = 0.08f; _shakeIntensity = 2f; }
+                }
             }
         }
 
@@ -866,7 +896,13 @@ public class Game1 : Game
             if (_player.MeleeTimer > 0 && h.Alive)
             {
                 if (_player.MeleeHitbox.Intersects(h.Rect))
-                    h.TakeHit(1);
+                {
+                    int dmg = (_player.CurrentWeapon == WeaponType.Stick && _player.ComboStep == 2) ? 2 : 1;
+                    bool killed = h.TakeHit(dmg);
+                    _player.RegisterComboHit();
+                    if (killed) { _hitStopTimer = 0.06f; _shakeTimer = 0.12f; _shakeIntensity = 4f; }
+                    else { _hitStopTimer = 0.03f; _shakeTimer = 0.08f; _shakeIntensity = 2f; }
+                }
             }
         }
 
@@ -2489,8 +2525,15 @@ public class Game1 : Game
     {
         var mouse = Mouse.GetState();
 
-        // World-space rendering with camera
-        _spriteBatch.Begin(transformMatrix: _camera.TransformMatrix);
+        // World-space rendering with camera (+ screen shake)
+        var shakeOffset = Matrix.Identity;
+        if (_shakeTimer > 0)
+        {
+            float sx = (float)(_shakeRng.NextDouble() * 2 - 1) * _shakeIntensity;
+            float sy = (float)(_shakeRng.NextDouble() * 2 - 1) * _shakeIntensity;
+            shakeOffset = Matrix.CreateTranslation(sx, sy, 0);
+        }
+        _spriteBatch.Begin(transformMatrix: _camera.TransformMatrix * shakeOffset);
 
         // Draw floor
         int floorY = _level.Floor.Y;

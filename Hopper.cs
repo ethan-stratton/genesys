@@ -19,6 +19,7 @@ public class Hopper
     public float AggroRange = 180f;
     public bool Aggroed;
     public float DamageCooldown;
+    public float HitFlash;
 
     // Hop state machine
     private enum State { Grounded, Winding, Airborne, Landing }
@@ -55,6 +56,7 @@ public class Hopper
     {
         if (!Alive) return;
         if (DamageCooldown > 0) DamageCooldown -= dt;
+        if (HitFlash > 0) HitFlash -= dt;
 
         float dist = Vector2.Distance(playerCenter, Position + new Vector2(Width / 2f, Height / 2f));
         Aggroed = dist < AggroRange;
@@ -171,6 +173,7 @@ public class Hopper
     {
         if (!Alive) return false;
         Hp -= damage;
+        HitFlash = 0.15f;
         if (Hp <= 0) { Alive = false; return true; }
         return false;
     }
@@ -220,7 +223,7 @@ public class Hopper
         }
 
         // Body
-        Color bodyColor = Aggroed ? new Color(80, 140, 60) : new Color(60, 120, 50);
+        Color bodyColor = HitFlash > 0 ? Color.Red : (Aggroed ? new Color(80, 140, 60) : new Color(60, 120, 50));
         sb.Draw(pixel, new Rectangle(drawX, drawY, drawW, drawH), bodyColor);
 
         // Highlight on top
