@@ -75,6 +75,7 @@ public class Player
     private float _comboCooldown; // cooldown after combo ends
     private bool[] _comboHit = new bool[3]; // tracks whether each hit connected
     public int ComboStep => _comboStep;
+    public bool IsComboFinisher => CurrentWeapon == WeaponType.Stick && _comboStep == 2 && MeleeTimer > 0;
     public WeaponType CurrentWeapon { get; set; }
     private float _prevMeleeTimer; // for detecting melee active→inactive transition
 
@@ -401,10 +402,28 @@ public class Player
                 }
                 else
                 {
-                    // Hit 3 — downward slam: 30×28, forward + below
-                    float offsetX = aimX * 14f;
-                    return new Rectangle(
-                        (int)(center.X + offsetX - 15f), (int)(center.Y + 2f), 30, 28);
+                    // Hit 3 — overhead slam: cascading 3-phase sweep (top → mid → low)
+                    // MeleeTimer counts down from 0.18s. Phase based on remaining time.
+                    float offsetX = aimX * 16f;
+                    float phase = MeleeTimer; // counts down
+                    if (phase > 0.12f)
+                    {
+                        // Phase 1: overhead — above and forward
+                        return new Rectangle(
+                            (int)(center.X + offsetX - 16f), (int)(Position.Y - 20f), 32, 22);
+                    }
+                    else if (phase > 0.06f)
+                    {
+                        // Phase 2: mid-level — forward at chest height
+                        return new Rectangle(
+                            (int)(center.X + offsetX - 16f), (int)(center.Y - 12f), 34, 24);
+                    }
+                    else
+                    {
+                        // Phase 3: low finisher — forward and below, wider
+                        return new Rectangle(
+                            (int)(center.X + offsetX - 18f), (int)(center.Y + 8f), 36, 26);
+                    }
                 }
             }
             else
@@ -1242,7 +1261,7 @@ public class Player
                     _comboStep = 2;
                     WantsToMelee = true;
                     MeleeDirection = new Vector2(FacingDir, 0);
-                    MeleeTimer = 0.12f;
+                    MeleeTimer = 0.18f; // 3 phases × 0.06s each (top → mid → low)
                     _comboWindow = 0;
                     // Forward burst
                     var v = Velocity;

@@ -628,8 +628,8 @@ public class Game1 : Game
             return; // game is paused while inventory is open
         }
 
-        // Toggle spawn menu with P
-        if (kb.IsKeyDown(Keys.P) && _prevKb.IsKeyUp(Keys.P) && !_dialogueOpen)
+        // Toggle spawn menu with P (editor only)
+        if (kb.IsKeyDown(Keys.P) && _prevKb.IsKeyUp(Keys.P) && !_dialogueOpen && _gameState == GameState.Editing)
         {
             _spawnMenuOpen = !_spawnMenuOpen;
             if (_spawnMenuOpen) _spawnMenuCursor = 0;
@@ -890,11 +890,19 @@ public class Game1 : Game
             {
                 if (_player.MeleeHitbox.Intersects(c.Rect))
                 {
-                    int dmg = (_player.CurrentWeapon == WeaponType.Stick && _player.ComboStep == 2) ? 2 : 1;
+                    bool finisher = _player.IsComboFinisher;
+                    int prevHp = c.Hp;
+                    int dmg = finisher ? 2 : 1;
                     bool killed = c.TakeHit(dmg);
-                    _player.RegisterComboHit();
-                    if (killed) { _hitStopTimer = 0.06f; _shakeTimer = 0.15f; _shakeIntensity = 8f; }
-                    else { _hitStopTimer = 0.03f; _shakeTimer = 0.1f; _shakeIntensity = 5f; }
+                    bool didHit = c.Hp < prevHp || killed;
+                    if (didHit)
+                    {
+                        _player.RegisterComboHit();
+                        if (finisher) c.MeleeHitCooldown = 0.055f; // short cooldown so next phase can hit
+                        if (killed) { _hitStopTimer = 0.06f; _shakeTimer = 0.15f; _shakeIntensity = 8f; }
+                        else if (finisher) { _hitStopTimer = 0.05f; _shakeTimer = 0.12f; _shakeIntensity = 6f; }
+                        else { _hitStopTimer = 0.03f; _shakeTimer = 0.1f; _shakeIntensity = 5f; }
+                    }
                 }
             }
         }
@@ -912,11 +920,19 @@ public class Game1 : Game
             {
                 if (_player.MeleeHitbox.Intersects(t.Rect))
                 {
-                    int dmg = (_player.CurrentWeapon == WeaponType.Stick && _player.ComboStep == 2) ? 2 : 1;
+                    bool finisher = _player.IsComboFinisher;
+                    int prevHp = t.Hp;
+                    int dmg = finisher ? 2 : 1;
                     bool killed = t.TakeHit(dmg);
-                    _player.RegisterComboHit();
-                    if (killed) { _hitStopTimer = 0.06f; _shakeTimer = 0.15f; _shakeIntensity = 8f; }
-                    else { _hitStopTimer = 0.03f; _shakeTimer = 0.1f; _shakeIntensity = 5f; }
+                    bool didHit = t.Hp < prevHp || killed;
+                    if (didHit)
+                    {
+                        _player.RegisterComboHit();
+                        if (finisher) t.MeleeHitCooldown = 0.055f;
+                        if (killed) { _hitStopTimer = 0.06f; _shakeTimer = 0.15f; _shakeIntensity = 8f; }
+                        else if (finisher) { _hitStopTimer = 0.05f; _shakeTimer = 0.12f; _shakeIntensity = 6f; }
+                        else { _hitStopTimer = 0.03f; _shakeTimer = 0.1f; _shakeIntensity = 5f; }
+                    }
                 }
             }
         }
@@ -934,11 +950,19 @@ public class Game1 : Game
             {
                 if (_player.MeleeHitbox.Intersects(h.Rect))
                 {
-                    int dmg = (_player.CurrentWeapon == WeaponType.Stick && _player.ComboStep == 2) ? 2 : 1;
+                    bool finisher = _player.IsComboFinisher;
+                    int prevHp = h.Hp;
+                    int dmg = finisher ? 2 : 1;
                     bool killed = h.TakeHit(dmg);
-                    _player.RegisterComboHit();
-                    if (killed) { _hitStopTimer = 0.06f; _shakeTimer = 0.15f; _shakeIntensity = 8f; }
-                    else { _hitStopTimer = 0.03f; _shakeTimer = 0.1f; _shakeIntensity = 5f; }
+                    bool didHit = h.Hp < prevHp || killed;
+                    if (didHit)
+                    {
+                        _player.RegisterComboHit();
+                        if (finisher) h.MeleeHitCooldown = 0.055f;
+                        if (killed) { _hitStopTimer = 0.06f; _shakeTimer = 0.15f; _shakeIntensity = 8f; }
+                        else if (finisher) { _hitStopTimer = 0.05f; _shakeTimer = 0.12f; _shakeIntensity = 6f; }
+                        else { _hitStopTimer = 0.03f; _shakeTimer = 0.1f; _shakeIntensity = 5f; }
+                    }
                 }
             }
         }
@@ -1029,6 +1053,21 @@ public class Game1 : Game
                         item.VelY = 0;
                         item.HasGravity = false;
                         break;
+                    }
+                }
+                // Platforms (land on top)
+                if (item.HasGravity && item.VelY > 0)
+                {
+                    foreach (var p in _level.AllPlatforms)
+                    {
+                        if (item.X + item.W > p.X && item.X < p.Right &&
+                            item.Y + item.H >= p.Y && item.Y + item.H <= p.Y + item.VelY * dt + 8)
+                        {
+                            item.Y = p.Y - item.H;
+                            item.VelY = 0;
+                            item.HasGravity = false;
+                            break;
+                        }
                     }
                 }
                 // Tile grid slopes and solids
