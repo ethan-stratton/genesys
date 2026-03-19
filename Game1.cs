@@ -88,6 +88,7 @@ public class Game1 : Game
     private Random _rng;
 
     private bool _isDead;
+    private bool _isPaused;
     private float _spawnInvincibility;
     private bool[] _prevInExit = Array.Empty<bool>();
     private KeyboardState _prevKb;
@@ -726,6 +727,13 @@ public class Game1 : Game
         // Weapon cycling (only during gameplay, not editor)
         if (!_menuOpen && !_dialogueOpen && _gameState == GameState.Playing)
         {
+            // Pause toggle
+            if (kb.IsKeyDown(Keys.B) && _prevKb.IsKeyUp(Keys.B))
+            {
+                _isPaused = !_isPaused;
+            }
+            if (_isPaused) { _prevKb = kb; return; }
+
             if (kb.IsKeyDown(Keys.D1) && _prevKb.IsKeyUp(Keys.D1) && _rangedInventory.Length > 0)
             {
                 _rangedIndex = (_rangedIndex + 1) % _rangedInventory.Length;
@@ -4999,9 +5007,19 @@ public class Game1 : Game
             }
         }
 
-        _spriteBatch.End();
+        // Pause indicator
+        if (_isPaused)
+        {
+            // Draw two vertical bars (pause symbol) bottom-right
+            int bw = 6, bh = 20, gap = 5;
+            int px = ViewW - 30;
+            int py = ViewH - 30;
+            _spriteBatch.Draw(_pixel, new Rectangle(px, py, bw, bh), Color.White * 0.8f);
+            _spriteBatch.Draw(_pixel, new Rectangle(px + bw + gap, py, bw, bh), Color.White * 0.8f);
+            _spriteBatch.DrawString(_fontSmall, "PAUSED", new Vector2(ViewW / 2f - 25, ViewH / 2f), Color.White * 0.5f);
+        }
 
-        // Room transition overlay
+        _spriteBatch.End();
         if (_transitionActive && _transitionAlpha > 0f)
         {
             _spriteBatch.Begin();
