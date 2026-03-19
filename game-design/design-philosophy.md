@@ -86,4 +86,76 @@ This is where all three videos converge. The Mecha Dragon shouldn't be a generic
 
 ---
 
-*These aren't rules to follow rigidly. They're lenses to evaluate every design decision through. When in doubt: Does this serve a Core pillar? Does it have a unique silhouette? Does it deepen the mystery? Does it reward mastery?*
+## 8. EMERGENT MOVEMENT AS IDENTITY (SOTN Legacy)
+
+**From SuedeLoaf — "Symphony Does What Modern Metroidvanias Don't":**
+
+Symphony of the Night's movement isn't just good — it's an emergent system where individual mechanics combine into something far greater than intended. Shield dashing, wing smash, dive kick→bat cancel, gravity boot super jumps — none were explicitly designed as a combo system, but together they create unmatched movement potential.
+
+**Key insight:** Modern metroidvanias sand down emergent mechanics in favor of "controlled, consistent experiences." This leaves fun on the table. SOTN's fighting-game-rooted command inputs gate powerful movement behind execution, not progression.
+
+**For Genesis:**
+- **Design for emergence, not against it.** If slide→vault kick→uppercut creates an unintended air combo chain, that's a FEATURE. Don't patch it — design around it
+- **Execution as gating.** The most powerful movement options (blade dash QCF, chained slides, etc.) should reward execution skill, not just unlocking abilities
+- **Movement carries between rooms.** Momentum shouldn't reset on room transitions. If you super jump into a doorway, you should fly into the next room
+- **Fighting game DNA.** Command inputs for special moves are correct. Keep them. They create an execution skill ceiling that separates casual from dedicated players
+- **Imagine a style meter.** Movement + offense contributing to a dynamic score. Not necessarily implemented, but design as if every action is being graded for style
+- **Don't compartmentalize movement abilities.** Every movement option should be usable at any time, not context-gated to specific design beats. Tools, not triggers
+
+## 9. MOLDY WORLDBUILDING (Digestive Rebirth)
+
+**From Curious Archive — "The Most Powerful Type of Worldbuilding":**
+
+The most resonant fictional worlds aren't post-apocalyptic — they're *digestive*. They actively consume their own foundations to fuel new growth. Rot is a story. Ruins are questions.
+
+**Core concept:** Every ruin tells two stories — what was, and what grew from its corpse. Earth's worldbuilding is deeply moldy (Bronze Age collapse, lost technologies like Greek Fire). That's why it feels authentic.
+
+**For Genesis:**
+- **Layered ruins.** Eden wasn't the first civilization. Build environments with visible geological strata — ruins atop ruins, like Elden Ring's dragon corpse on an ancient church. Each layer implies an era the player never saw
+- **Scavenger ecology.** Characters and creatures should live *on* the remains of the old world, not just near them. Technology is repurposed, misunderstood, worshipped. The Federation's tech is the new world's scrap metal
+- **Misunderstood relics.** The gap between what something WAS and what current inhabitants THINK it is creates mystery naturally. Pre-Fall artifacts interpreted through post-Fall ignorance
+- **Decomposition of ideas, not just structures.** Eden's original principles rotted alongside its buildings. The Mecha Dragon may be acting on a corrupted version of its original directive — a philosophy putrefied through time
+- **White birds.** (Seriously, they're in every moldy world. Consider it.)
+- **Every ruin is a question.** Don't answer why a structure was built. Let the player wonder. Ambiguity > exposition, always
+- **Rot implies life.** A decaying forest isn't dead — it's *feeding*. Environmental decay should coexist with aggressive new growth. Corrupted flora overtaking pristine architecture. Fungi blooming from ancient tech
+
+## 10. SOUL THROUGH SYSTEMS (Anti-Simplification)
+
+**From TheoGaming756 — "The Loss of Soul in Gaming":**
+
+Games lose their soul through excessive simplification, derivative design, and fear of making a point. Mechanical complexity creates believability. Flaws create charm. Player agency creates meaning.
+
+**For Genesis:**
+- **Complexity is soul.** Don't simplify systems to be accessible — make them learnable. The weapon combo system (conditional hits, execution gating) is exactly right. A flattened combat system would feel soulless
+- **Flaws are features.** If the physics engine creates weird edge cases that are fun, keep them. Jank that enables creativity > polish that removes it. SOTN's shield dash was never "intended" — it's the game's defining mechanic
+- **Player agency over narrative safety.** Let the player make morally complex choices. If Genesis has factions, let the player support the "wrong" one. Don't morality-meter them into correct behavior
+- **Don't derive — synthesize.** We're inspired by SOTN, Metroid, Elden Ring, Genesis scripture. But the output should be unrecognizable as any one of them. The synthesis IS the identity
+- **World reactivity.** Actions should have visible consequences. Clearing an area should change it. Defeating a boss should alter the environment, NPC dialogue, enemy spawns. The Skyrim civil war example — even small changes make the world feel alive
+- **Be willing to make a point.** Genesis is a sci-fi retelling of sacred text. Don't sanitize it. Let it ask uncomfortable questions about creation, free will, obedience, and the cost of knowledge
+
+## 11. MAP & ROOM TRANSITION ARCHITECTURE
+
+**From Inbound Shovel — "I made a Metroidvania Map System":**
+
+Practical room-based map system for metroidvanias using Godot principles that translate to any engine.
+
+**Data model insights:**
+- **Map room ≠ World room.** Separate the map representation from the gameplay scene. Map rooms are lightweight references; world rooms contain all gameplay data
+- **Room transitions as paired resources.** Each transition has a unique ID. The world map stores pairs of connected transition IDs. When the player hits a trigger zone, look up the connected transition → load that room → spawn at that transition point
+- **Transition trigger zones** should be slightly offset past camera boundaries (not exactly at the edge) so the player has clearly left the screen before transitioning
+- **Map metadata lives in the room.** Each room defines how it draws on the map and what transitions it contains. The map reads this data — it doesn't duplicate it
+
+**Display insights:**
+- Brute-forcing room display (shrinking tile sets to map size) tanks performance at scale (~300 rooms kills FPS). Need a dedicated map rendering approach
+- Mapping tile overlay that generates a small polygon/sprite for the map is the practical solution
+- **Fog of war per-tile:** Track which map tiles the player has touched. Only draw discovered portions. SOTN's map completion percentage was deeply compelling — crawling every corner to tick up that number
+
+**For Genesis:**
+- Plan room transitions early. Define a world map scene where all rooms and their connections are declared. This prevents spaghetti-navigation bugs later
+- Room transitions should feel seamless — momentum carries through (connects to Principle 8)
+- Map completion as a discovery mechanic. Percentage visible. Reward exploration with lore fragments, hidden areas, optional bosses
+- Camera boundary visualization in the editor is essential tooling — build it before building dozens of rooms
+
+---
+
+*These aren't rules to follow rigidly. They're lenses to evaluate every design decision through. When in doubt: Does this serve a Core pillar? Does it have a unique silhouette? Does it deepen the mystery? Does it reward mastery? Does it preserve soul?*
