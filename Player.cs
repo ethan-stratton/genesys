@@ -801,7 +801,7 @@ public class Player
         }
 
         // --- Facing direction ---
-        if (inputX != 0 && !IsCrouching && !IsSliding) FacingDir = inputX;
+        if (inputX != 0 && !IsSliding) FacingDir = inputX;
 
         // --- Aim direction ---
         if (IsCrouching)
@@ -1151,7 +1151,8 @@ public class Player
             float elapsed = SlideDuration - _slideTimer;
             // Vault kick: jump during slide (after minimum slide time, requires fresh space press)
             bool spaceSlide = kb.IsKeyDown(Keys.Space);
-            if (EnableVaultKick && spaceSlide && !_jumpHeld && elapsed >= VaultKickMinSlideTime)
+            if (EnableVaultKick && spaceSlide && !_jumpHeld && elapsed >= VaultKickMinSlideTime
+                && HasHeadroom(Height, ceilings, solidFloors, tileGrid))
             {
                 IsSliding = false;
                 IsVaultKicking = true;
