@@ -1635,22 +1635,8 @@ public class Player
             int wf = ((int)(_animTimer * 8f)) % 8;
             return (RowWalk, wf);
         }
-        // Idle: Stand A (frames 0-3) loops 3 times, then Stand B (frames 4-5) plays once and holds frame 5
-        float standAFps = 3f; // 3 frames per second
-        float standACycleDuration = 4f / standAFps; // ~1.33s per cycle
-        float standATotal = standACycleDuration * 3f; // 3 full loops ~4s
-        if (_idleTimer < standATotal)
-        {
-            int f = ((int)(_idleTimer * standAFps)) % 4;
-            return (RowIdle, f);
-        }
-        else
-        {
-            float elapsed = _idleTimer - standATotal;
-            float standBFps = 3f;
-            int f = Math.Min(1, (int)(elapsed * standBFps));
-            return (RowIdle, 4 + f);
-        }
+        // Idle: use fallback (sprite sheet idle row disabled for rework)
+        return (-1, 0);
     }
 
     public void Draw(SpriteBatch spriteBatch, Texture2D pixel, Texture2D spriteSheet = null)
@@ -1683,6 +1669,7 @@ public class Player
         if (spriteSheet != null)
         {
             var (row, frame) = GetSpriteAnim();
+            if (row < 0) { DrawFallback(spriteBatch, pixel); goto afterSprite; }
             var srcRect = new Rectangle(frame * SpriteW, row * SpriteH, SpriteW, SpriteH);
             var flip = FacingDir < 0 ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
             var tint = Color.White;
@@ -1704,6 +1691,7 @@ public class Player
             // Fallback: colored rectangles (original code)
             DrawFallback(spriteBatch, pixel);
         }
+        afterSprite:
 
         // Melee/special hitbox overlays
         if (IsSpinningMelee && MeleeTimer > 0)

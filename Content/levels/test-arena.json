@@ -2,8 +2,8 @@
   "name": "test-arena",
   "author": "Dantalion",
   "playerSpawn": {
-    "x": 480,
-    "y": 224
+    "x": 416,
+    "y": 192
   },
   "bounds": {
     "left": -608,
