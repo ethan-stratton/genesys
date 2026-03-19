@@ -1552,34 +1552,59 @@ public class Player
         _prevKb = kb;
     }
 
-    // Sprite sheet frame indices (32x48 each)
-    private const int FrameIdle = 0, FrameRun1 = 1, FrameRun2 = 2, FrameRun3 = 3, FrameRun4 = 4;
-    private const int FrameJump = 5, FrameFall = 6, FrameSlide = 7, FrameCrouch = 8;
-    private const int FrameAttack1 = 9, FrameAttack2 = 10, FrameAttack3 = 11;
+    // Sprite sheet layout: 48x48 per frame, multi-row
+    // Row 0: idle(4) 1: walk(7) 2: run(8) 3: jump(4) 4: crouch(2) 
+    // 5: whip/attack(6) 6: backflip(6) 7: damaged(3) 8: superjump(6) 9: dash(3)
+    private const int SpriteW = 48, SpriteH = 48;
+    private const int RowIdle = 0, RowWalk = 1, RowRun = 2, RowJump = 3, RowCrouch = 4;
+    private const int RowWhip = 5, RowBackflip = 6, RowDamaged = 7, RowSuperjump = 8, RowDash = 9;
+    private static readonly int[] RowFrameCounts = { 4, 7, 8, 4, 2, 6, 6, 3, 6, 3 };
     private float _animTimer;
 
-    private int GetSpriteFrame()
+    private (int row, int frame) GetSpriteAnim()
     {
+        // Damaged/knockback
+        if (IsInvincible && DamageCooldown > 0.15f)
+        {
+            int f = Math.Min((int)((0.25f - DamageCooldown) * 12f), 2);
+            return (RowDamaged, Math.Max(0, f));
+        }
+        // Attack (whip animation for all melee)
         if (MeleeTimer > 0)
         {
-            if (CurrentWeapon == WeaponType.Stick)
-            {
-                if (_comboStep == 2) return FrameAttack3; // slam
-                if (_comboStep == 1) return FrameAttack2; // overhead
-                return FrameAttack1;
-            }
-            return FrameAttack1; // fist
+            float progress = 1f - (MeleeTimer / 0.15f); // 0→1 over attack duration
+            int f = Math.Min((int)(progress * 6), 5);
+            return (RowWhip, f);
         }
-        if (IsSliding) return FrameSlide;
-        if (IsCrouching) return FrameCrouch;
+        // Uppercut → super jump
+        if (IsUppercutting)
+        {
+            float progress = 1f - (_uppercutTimer / UppercutDuration);
+            int f = Math.Min((int)(progress * 6), 5);
+            return (RowSuperjump, f);
+        }
+        // Backflip
+        if (IsFlipping)
+        {
+            float progress = 1f - (_flipTimer / FlipDuration);
+            int f = Math.Min((int)(progress * 6), 5);
+            return (RowBackflip, f);
+        }
+        // Slide / dash
+        if (IsSliding || IsDashing || IsBladeDashing)
+        {
+            int f = ((int)(_animTimer * 10f)) % 3;
+            return (RowDash, f);
+        }
+        if (IsCrouching) return (RowCrouch, ((int)(_animTimer * 3f)) % 2);
         if (!IsGrounded)
-            return Velocity.Y < 0 ? FrameJump : FrameFall;
+            return Velocity.Y < 0 ? (RowJump, 1) : (RowJump, 2);
         if (MathF.Abs(Velocity.X) > 10f)
         {
-            int f = ((int)(_animTimer * 10f)) % 4; // 10fps run cycle
-            return f switch { 0 => FrameRun1, 1 => FrameRun2, 2 => FrameRun3, _ => FrameRun4 };
+            int f = ((int)(_animTimer * 10f)) % 8;
+            return (RowRun, f);
         }
-        return FrameIdle;
+        return (RowIdle, ((int)(_animTimer * 3f)) % 4);
     }
 
     public void Draw(SpriteBatch spriteBatch, Texture2D pixel, Texture2D spriteSheet = null)
@@ -1596,8 +1621,8 @@ public class Player
 
         if (spriteSheet != null)
         {
-            int fi = GetSpriteFrame();
-            var srcRect = new Rectangle(fi * Width, 0, Width, Height);
+            var (row, frame) = GetSpriteAnim();
+            var srcRect = new Rectangle(frame * SpriteW, row * SpriteH, SpriteW, SpriteH);
             var flip = FacingDir < 0 ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
             var tint = Color.White;
             if (IsVaulting || IsCartwheeling) tint = Color.CornflowerBlue;
@@ -1607,7 +1632,10 @@ public class Player
             else if (IsBladeDashing) tint = Color.White * 0.9f;
             else if (IsDashing) tint = new Color(200, 200, 200);
 
-            var destRect = new Rectangle((int)Position.X, (int)Position.Y, Width, Height);
+            // Center the 48x48 sprite frame on the 32x48 collision box
+            int drawX = (int)Position.X - (SpriteW - Width) / 2;
+            int drawY = (int)Position.Y + Height - SpriteH; // bottom-aligned
+            var destRect = new Rectangle(drawX, drawY, SpriteW, SpriteH);
             spriteBatch.Draw(spriteSheet, destRect, srcRect, tint, 0f, Vector2.Zero, flip, 0f);
         }
         else

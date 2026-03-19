@@ -1,12 +1,12 @@
 {
   "currentLevel": "test-arena",
-  "spawnX": 480,
-  "spawnY": 224,
+  "spawnX": 334.9989,
+  "spawnY": 116,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 104.97462,
+  "playTime": 116.593765,
   "meleeInventory": [
     "Stick"
   ],
@@ -16,5 +16,6 @@
   "collectedItems": [
     "stick-1"
   ],
-  "windowSizeIndex": 0
+  "windowSizeIndex": 1,
+  "crtEnabled": false
 }

@@ -423,11 +423,16 @@ public class Game1 : Game
         _camera = MakeCamera();
         _pixel = new Texture2D(GraphicsDevice, 1, 1);
         _pixel.SetData(new[] { Color.White });
-        // Load player sprite sheet
-        if (File.Exists("Content/sprites/adam_sheet.png"))
+        // Load player sprite sheet (prefer richter, fall back to adam)
+        string[] sheetPaths = { "Content/sprites/richter_sheet.png", "Content/sprites/adam_sheet.png" };
+        foreach (var sp in sheetPaths)
         {
-            using var fs = File.OpenRead("Content/sprites/adam_sheet.png");
-            _adamSheet = Texture2D.FromStream(GraphicsDevice, fs);
+            if (File.Exists(sp))
+            {
+                using var fs = File.OpenRead(sp);
+                _adamSheet = Texture2D.FromStream(GraphicsDevice, fs);
+                break;
+            }
         }
 
         // CRT setup: render target + scanline overlay texture
