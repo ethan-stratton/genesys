@@ -1558,7 +1558,7 @@ public class Player
     private const int SpriteW = 48, SpriteH = 48;
     private const int RowIdle = 0, RowCrouch = 1, RowJump = 2, RowWalk = 3, RowRun = 4;
     private const int RowWhip = 5, RowBackflip = 6, RowDamaged = 7, RowSuperjump = 8, RowDash = 9;
-    private static readonly int[] RowFrameCounts = { 6, 5, 8, 7, 8, 10, 10, 3, 6, 3 };
+    private static readonly int[] RowFrameCounts = { 6, 5, 8, 8, 8, 10, 10, 3, 6, 3 };
     private float _animTimer;
 
     private (int row, int frame) GetSpriteAnim()
@@ -1598,10 +1598,10 @@ public class Player
         }
         if (IsCrouching) return (RowCrouch, ((int)(_animTimer * 3f)) % 5);
         if (!IsGrounded)
-            return Velocity.Y < 0 ? (RowJump, 1) : (RowJump, 5);
+            return Velocity.Y < 0 ? (RowJump, 1) : (RowJump, 3);
         if (MathF.Abs(Velocity.X) > 10f)
         {
-            int f = ((int)(_animTimer * 10f)) % 8;
+            int f = ((int)(_animTimer * 10f)) % 6;
             return (RowRun, f);
         }
         return (RowIdle, ((int)(_animTimer * 3f)) % 6);
