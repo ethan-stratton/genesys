@@ -1,12 +1,12 @@
 {
-  "currentLevel": "test-arena",
-  "spawnX": 462.00095,
-  "spawnY": 284,
+  "currentLevel": "debug-room",
+  "spawnX": 3012.8113,
+  "spawnY": 472,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 677.72864,
+  "playTime": 938.29834,
   "meleeInventory": [
     "Stick"
   ],
@@ -16,7 +16,8 @@
   "meleeIndex": 0,
   "rangedIndex": 0,
   "collectedItems": [
-    "stick-1"
+    "stick-1",
+    "debug_stick_639095526049298360"
   ],
   "windowSizeIndex": 0,
   "crtEnabled": false
