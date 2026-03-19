@@ -2404,6 +2404,30 @@ public class Game1 : Game
                 bestY = surfaceY;
         }
         
+        // Check tile grid surfaces
+        if (_level.TileGridInstance != null)
+        {
+            int ts = _level.TileGrid.TileSize;
+            int startCol = (int)(x / ts);
+            int endCol = (int)((x + entityW - 1) / ts);
+            int startRow = (int)(y / ts);
+            int endRow = (int)(bestY / ts) + 1;
+            for (int ty = startRow; ty <= endRow && ty < _level.TileGrid.Height; ty++)
+            {
+                for (int tx = startCol; tx <= endCol; tx++)
+                {
+                    if (tx < 0 || tx >= _level.TileGrid.Width) continue;
+                    var tile = _level.TileGridInstance.GetTileAt(tx, ty);
+                    if (TileProperties.IsSolid(tile))
+                    {
+                        float surfaceY = ty * ts - entityH;
+                        if (surfaceY >= y - 20 && surfaceY < bestY)
+                            bestY = surfaceY;
+                    }
+                }
+            }
+        }
+        
         return bestY;
     }
 
