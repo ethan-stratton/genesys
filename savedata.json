@@ -1,10 +1,12 @@
 {
-  "currentLevel": "the-summit",
-  "spawnX": -39,
-  "spawnY": 498,
+  "currentLevel": "test-arena",
+  "spawnX": 480,
+  "spawnY": 224,
   "unlockedAbilities": [],
-  "flags": {},
-  "playTime": 26.566437,
+  "flags": {
+    "eveOrbActive": true
+  },
+  "playTime": 5.250016,
   "meleeInventory": [],
   "rangedInventory": [],
   "meleeIndex": -1,

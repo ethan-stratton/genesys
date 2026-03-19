@@ -26,6 +26,11 @@
 
 ---
 
+## World Map
+- [ ] **Create biome/level scheme from map** — walk to any land tile, press a key to create a new biome entrance with a level set (like Eden Reach). Should support multiple levels per biome.
+- [ ] Expandable world — add new continents N/E/S/W of current island (fly or sail across ocean)
+- [ ] Walk-to-biome entrance placement workflow in overworld mode
+
 ## Physics / Movement
 - [ ] Ceiling slopes: slide and retain momentum without being sticky
 - [ ] Slide cancels too soon on floor slopes
