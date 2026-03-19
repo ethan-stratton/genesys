@@ -742,7 +742,8 @@ public class Player
                 _uppercutInputWindow -= dt;
                 if (_uppercutInputWindow <= 0) _uppercutInputReady = false;
             }
-            if (_uppercutInputReady && inputY < 0 && spacePressed && !_jumpHeld && !IsUppercutting)
+            if (_uppercutInputReady && inputY < 0 && spacePressed && !_jumpHeld && !IsUppercutting
+                && HasHeadroom(Height, ceilings, solidFloors, tileGrid))
             {
                 _uppercutInputReady = false;
                 IsUppercutting = true;
