@@ -1558,7 +1558,11 @@ public class Player
     private const int SpriteW = 48, SpriteH = 48;
     private const int RowIdle = 0, RowCrouch = 1, RowJump = 2, RowWalk = 3, RowRun = 4;
     private const int RowWhip = 5, RowBackflip = 6, RowDamaged = 7, RowSuperjump = 8, RowDash = 9;
-    private static readonly int[] RowFrameCounts = { 6, 5, 8, 8, 8, 10, 10, 3, 6, 3 };
+    private static readonly int[] RowFrameCounts = { 6, 6, 8, 8, 8, 10, 10, 3, 6, 3 };
+    private float _idleTimer; // tracks how long standing still
+    private bool _wasCrouching; // for crouch transition detection
+    private float _crouchTransTimer; // >0 = transitioning into/out of crouch
+    private bool _crouchTransDown; // true = going down, false = standing up
     private float _animTimer;
 
     private (int row, int frame) GetSpriteAnim()
@@ -1596,15 +1600,41 @@ public class Player
             int f = ((int)(_animTimer * 10f)) % 3;
             return (RowDash, f);
         }
-        if (IsCrouching) return (RowCrouch, ((int)(_animTimer * 3f)) % 5);
+        if (IsCrouching)
+        {
+            // Crouch transition: 3 frames going down (frames 0-2), hold frame 2
+            if (_crouchTransTimer > 0)
+            {
+                int f = Math.Min(2, (int)((1f - _crouchTransTimer / 0.15f) * 3));
+                return (RowCrouch, _crouchTransDown ? f : 2 - f);
+            }
+            return (RowCrouch, 2); // hold crouched pose
+        }
+        // Stand-up transition: frames 2,1,0 (reverse of crouch-down)
+        if (_crouchTransTimer > 0 && !_crouchTransDown)
+        {
+            int f = Math.Min(2, (int)((1f - _crouchTransTimer / 0.15f) * 3));
+            return (RowCrouch, 2 - f);
+        }
         if (!IsGrounded)
             return Velocity.Y < 0 ? (RowJump, 1) : (RowJump, 3);
         if (MathF.Abs(Velocity.X) > 10f)
         {
-            int f = ((int)(_animTimer * 10f)) % 6;
+            int f = ((int)(_animTimer * 10f)) % 8;
             return (RowRun, f);
         }
-        return (RowIdle, ((int)(_animTimer * 3f)) % 6);
+        // Idle: Stand A loops (frames 0-2), after 3 seconds plays Stand B (frames 3-5) once then holds frame 5
+        if (_idleTimer < 3f)
+        {
+            int f = ((int)(_animTimer * 3f)) % 3;
+            return (RowIdle, f);
+        }
+        else
+        {
+            float elapsed = _idleTimer - 3f;
+            int f = Math.Min(2, (int)(elapsed * 3f));
+            return (RowIdle, 3 + f);
+        }
     }
 
     public void Draw(SpriteBatch spriteBatch, Texture2D pixel, Texture2D spriteSheet = null)
@@ -1618,6 +1648,18 @@ public class Player
 
         // Accumulate animation timer
         _animTimer += 1f / 60f; // approximate
+
+        // Idle timer — reset when moving, crouch transitions
+        if (MathF.Abs(Velocity.X) > 10f || !IsGrounded || IsCrouching)
+            _idleTimer = 0f;
+        else
+            _idleTimer += 1f / 60f;
+
+        // Crouch transition timer
+        if (IsCrouching && !_wasCrouching) { _crouchTransTimer = 0.15f; _crouchTransDown = true; }
+        if (!IsCrouching && _wasCrouching) { _crouchTransTimer = 0.15f; _crouchTransDown = false; }
+        _wasCrouching = IsCrouching;
+        if (_crouchTransTimer > 0) _crouchTransTimer -= 1f / 60f;
 
         if (spriteSheet != null)
         {

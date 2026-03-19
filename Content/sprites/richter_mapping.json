@@ -5,7 +5,7 @@
   },
   "crouch": {
     "row": 1,
-    "frameCount": 5
+    "frameCount": 6
   },
   "jump": {
     "row": 2,
