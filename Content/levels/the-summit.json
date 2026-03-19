@@ -280,8 +280,8 @@
   ],
   "exits": [
     {
-      "x": 0,
-      "y": 496,
+      "x": -43,
+      "y": 498,
       "w": 40,
       "h": 48,
       "targetLevel": "the-gauntlet",
@@ -301,6 +301,14 @@
   "npcs": [],
   "items": [],
   "objects": [],
-  "enemies": [],
+  "enemies": [
+    {
+      "id": "bird-0",
+      "type": "bird",
+      "x": 271,
+      "y": 460,
+      "count": 1
+    }
+  ],
   "tileGrid": null
 }

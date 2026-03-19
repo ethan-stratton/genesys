@@ -3447,7 +3447,11 @@ public class Game1 : Game
         if (nx >= 0 && nx < WorldMapData.MapW && ny >= 0 && ny < WorldMapData.MapH)
         {
             var tile = _worldMap.GetTile(nx, ny);
-            if (tile != MapTileType.Ocean && tile != MapTileType.DeepOcean && tile != MapTileType.Mountain && tile != MapTileType.Volcano)
+            if (tile != MapTileType.Ocean && tile != MapTileType.DeepOcean &&
+                tile != MapTileType.ShallowOcean && tile != MapTileType.Reef &&
+                tile != MapTileType.HighMountain && tile != MapTileType.Volcano &&
+                tile != MapTileType.Lake && tile != MapTileType.FrozenLake &&
+                tile != MapTileType.Glacier)
             {
                 _worldMap.PlayerX = nx;
                 _worldMap.PlayerY = ny;
@@ -3701,25 +3705,55 @@ public class Game1 : Game
     {
         return tile switch
         {
-            MapTileType.DeepOcean => new Color(8, 15, 45),
-            MapTileType.Ocean => new Color(15, 25, 60),
-            MapTileType.Beach => new Color(190, 175, 130),
-            MapTileType.Plains => new Color(55, 95, 45),
-            MapTileType.Forest => new Color(25, 60, 22),
-            MapTileType.DenseForest => new Color(12, 40, 12),
-            MapTileType.Mountain => new Color(110, 100, 88),
-            MapTileType.Water => new Color(35, 60, 120),
-            MapTileType.Desert => new Color(170, 150, 85),
-            MapTileType.Swamp => new Color(55, 70, 38),
-            MapTileType.Snow => new Color(220, 225, 235),
-            MapTileType.SnowForest => new Color(140, 160, 150),
-            MapTileType.Tundra => new Color(160, 170, 165),
-            MapTileType.Cave => new Color(60, 50, 45),
-            MapTileType.Volcano => new Color(80, 30, 20),
-            MapTileType.Path => new Color(130, 115, 85),
-            MapTileType.BiomeEntrance => new Color(80, 70, 50),
+            // Water
+            MapTileType.DeepOcean => new Color(8, 12, 40),
+            MapTileType.Ocean => new Color(16, 28, 62),
+            MapTileType.ShallowOcean => new Color(25, 50, 90),
+            MapTileType.Reef => new Color(30, 75, 95),
+            MapTileType.Water => new Color(30, 55, 110),
+            MapTileType.Lake => new Color(35, 65, 120),
+            MapTileType.River => new Color(32, 58, 115),
+            MapTileType.FrozenLake => new Color(160, 180, 200),
+            // Coast
+            MapTileType.Beach => new Color(195, 180, 135),
+            MapTileType.RockyShore => new Color(130, 120, 100),
+            // Lowland
+            MapTileType.Plains => new Color(65, 105, 50),
+            MapTileType.Grassland => new Color(80, 120, 55),
+            MapTileType.Savanna => new Color(140, 135, 65),
+            MapTileType.Floodplain => new Color(55, 90, 45),
+            // Forest
+            MapTileType.Forest => new Color(30, 65, 25),
+            MapTileType.DenseForest => new Color(15, 42, 14),
+            MapTileType.Jungle => new Color(20, 55, 15),
+            // Wet
+            MapTileType.Swamp => new Color(50, 65, 35),
+            MapTileType.Marsh => new Color(60, 75, 50),
+            // Highland
+            MapTileType.Hills => new Color(95, 100, 65),
+            MapTileType.Foothills => new Color(110, 105, 78),
+            MapTileType.Mountain => new Color(120, 110, 95),
+            MapTileType.HighMountain => new Color(145, 140, 130),
+            MapTileType.Snow => new Color(225, 230, 240),
+            MapTileType.Glacier => new Color(180, 200, 220),
+            // Cold
+            MapTileType.Tundra => new Color(150, 160, 145),
+            MapTileType.Taiga => new Color(45, 60, 40),
+            MapTileType.SnowForest => new Color(100, 120, 105),
+            // Hot
+            MapTileType.Desert => new Color(180, 160, 95),
+            MapTileType.Dunes => new Color(200, 180, 110),
+            MapTileType.Wasteland => new Color(135, 115, 80),
+            // Special
+            MapTileType.Cave => new Color(55, 45, 40),
+            MapTileType.Volcano => new Color(75, 28, 18),
+            MapTileType.Ruins => new Color(90, 80, 70),
+            MapTileType.Oasis => new Color(50, 100, 55),
+            MapTileType.Path => new Color(140, 125, 90),
+            MapTileType.BiomeEntrance => new Color(90, 75, 55),
             _ => new Color(20, 20, 20),
         };
+    }
     }
 
 

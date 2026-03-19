@@ -141,61 +141,238 @@ public class WorldMapData
         var map = new WorldMapData();
         const int W = MapW, H = MapH;
         const int seed = 42;
+        var rng = new Random(seed);
 
-        // ── Step 1: Multi-layer fractal noise ──
+        // ═══════════════════════════════════════════════════
+        // STAGE 1: Base heightmap — multi-octave fractal noise
+        // ═══════════════════════════════════════════════════
         float[,] height = new float[W, H];
         float[,] moisture = new float[W, H];
-        float[,] temperature = new float[W, H]; // latitude-based + noise
-        float[,] ridgeNoise = new float[W, H];  // for mountain ridge lines
-
-        FractalNoise(height, W, H, seed, 7, 0.025f, 0.52f);
-        FractalNoise(moisture, W, H, seed + 100, 5, 0.035f, 0.48f);
-        FractalNoise(ridgeNoise, W, H, seed + 300, 4, 0.05f, 0.6f);
-
-        // Temperature: cold at top (north), warm at bottom (south), with noise
         float[,] tempNoise = new float[W, H];
-        FractalNoise(tempNoise, W, H, seed + 200, 3, 0.03f, 0.5f);
+        float[,] ridgeNoise = new float[W, H];
+
+        FractalNoise(height, W, H, seed, 7, 0.022f, 0.50f);
+        FractalNoise(moisture, W, H, seed + 100, 5, 0.030f, 0.45f);
+        FractalNoise(tempNoise, W, H, seed + 200, 3, 0.025f, 0.5f);
+        FractalNoise(ridgeNoise, W, H, seed + 300, 5, 0.045f, 0.55f);
+
+        // Temperature: latitude (cold north → warm south) + noise
+        float[,] temperature = new float[W, H];
         for (int y = 0; y < H; y++)
             for (int x = 0; x < W; x++)
-                temperature[x, y] = (float)y / H * 0.7f + tempNoise[x, y] * 0.3f;
+                temperature[x, y] = (float)y / H * 0.75f + tempNoise[x, y] * 0.25f;
 
-        // ── Step 2: Continental shaping ──
-        // Elliptical falloff — more generous vertically for tall map
+        // ═══════════════════════════════════════════════════
+        // STAGE 2: Island shaping — Wilbur Gaussian envelope
+        // curval * exp(-sqr(r/k)) - sqr(r), then cubic
+        // ═══════════════════════════════════════════════════
         for (int y = 0; y < H; y++)
         {
             for (int x = 0; x < W; x++)
             {
                 float nx = 2f * x / W - 1f;
                 float ny = 2f * y / H - 1f;
-                // Ellipse: x stretched less, y stretched more for vertical continent
-                float d = MathF.Sqrt(nx * nx * 1.3f + ny * ny * 0.8f) / 1.15f;
-                float falloff = 1f - MathF.Pow(MathHelper.Clamp(d, 0, 1), 2.2f);
-                height[x, y] = height[x, y] * falloff;
+                // Elliptical for vertical map
+                float r = MathF.Sqrt(nx * nx * 1.4f + ny * ny * 0.7f);
+                float curval = height[x, y];
+                float shaped = curval * MathF.Exp(-(r / 0.55f) * (r / 0.55f)) - r * r * 0.4f;
+                // Cubic modifier for flatter coasts
+                height[x, y] = shaped > 0 ? MathF.Pow(shaped, 0.6f) : shaped;
             }
         }
 
-        // ── Step 3: Mountain ridge injection ──
-        // Use ridge noise to create mountain spines (high ridgeNoise = ridge line)
+        // Normalize to 0-1
+        float hMin = float.MaxValue, hMax = float.MinValue;
+        for (int y = 0; y < H; y++)
+            for (int x = 0; x < W; x++)
+            {
+                if (height[x, y] < hMin) hMin = height[x, y];
+                if (height[x, y] > hMax) hMax = height[x, y];
+            }
+        float hRange = hMax - hMin;
+        if (hRange < 0.001f) hRange = 1f;
+        for (int y = 0; y < H; y++)
+            for (int x = 0; x < W; x++)
+                height[x, y] = (height[x, y] - hMin) / hRange;
+
+        // ═══════════════════════════════════════════════════
+        // STAGE 3: Mountain ridge injection
+        // ═══════════════════════════════════════════════════
         for (int y = 0; y < H; y++)
         {
             for (int x = 0; x < W; x++)
             {
                 float ridge = ridgeNoise[x, y];
-                // Ridge detection: values near 0.5 are ridge lines (zero crossings)
                 float ridgeFactor = 1f - MathF.Abs(ridge - 0.5f) * 2f;
-                ridgeFactor = MathF.Pow(MathHelper.Clamp(ridgeFactor, 0, 1), 3f);
-                // Boost height along ridges if already above sea level
-                if (height[x, y] > 0.3f)
-                    height[x, y] += ridgeFactor * 0.25f;
+                ridgeFactor = MathF.Pow(MathHelper.Clamp(ridgeFactor, 0, 1), 4f);
+                if (height[x, y] > 0.35f)
+                    height[x, y] += ridgeFactor * 0.2f;
             }
         }
 
-        // ── Step 4: Thermal erosion — smooth steep terrain ──
-        for (int pass = 0; pass < 5; pass++)
+        // ═══════════════════════════════════════════════════
+        // STAGE 4: Basin filling (simplified Planchon-Darboux)
+        // Ensures all drainage flows to ocean
+        // ═══════════════════════════════════════════════════
+        const float seaLevel = 0.35f;
+        float[,] filled = new float[W, H];
+        const float eps = 0.001f;
+
+        // Initialize: edges get original height, interior gets infinity
+        for (int y = 0; y < H; y++)
+            for (int x = 0; x < W; x++)
+            {
+                if (x == 0 || x == W - 1 || y == 0 || y == H - 1 || height[x, y] < seaLevel)
+                    filled[x, y] = height[x, y];
+                else
+                    filled[x, y] = 10f; // "infinity"
+            }
+
+        // Iterate until stable
+        bool changed = true;
+        int maxIter = 50;
+        while (changed && maxIter-- > 0)
         {
-            float[,] temp = (float[,])height.Clone();
+            changed = false;
             for (int y = 1; y < H - 1; y++)
             {
+                for (int x = 1; x < W - 1; x++)
+                {
+                    if (filled[x, y] <= height[x, y]) continue;
+                    for (int dy = -1; dy <= 1; dy++)
+                        for (int dx = -1; dx <= 1; dx++)
+                        {
+                            if (dx == 0 && dy == 0) continue;
+                            float nVal = filled[x + dx, y + dy] + eps;
+                            if (height[x, y] >= nVal)
+                            {
+                                filled[x, y] = height[x, y];
+                                changed = true;
+                            }
+                            else if (filled[x, y] > nVal)
+                            {
+                                filled[x, y] = nVal;
+                                changed = true;
+                            }
+                        }
+                }
+            }
+        }
+        // Use filled heightmap
+        for (int y = 0; y < H; y++)
+            for (int x = 0; x < W; x++)
+                height[x, y] = filled[x, y];
+
+        // Add small noise to break up flat filled areas
+        var noiseRng = new Random(seed + 500);
+        for (int y = 1; y < H - 1; y++)
+            for (int x = 1; x < W - 1; x++)
+                if (height[x, y] >= seaLevel)
+                    height[x, y] += (float)(noiseRng.NextDouble() - 0.5) * 0.005f;
+
+        // Re-fill after noise
+        for (int y = 0; y < H; y++)
+            for (int x = 0; x < W; x++)
+            {
+                if (x == 0 || x == W - 1 || y == 0 || y == H - 1 || height[x, y] < seaLevel)
+                    filled[x, y] = height[x, y];
+                else
+                    filled[x, y] = 10f;
+            }
+        changed = true;
+        maxIter = 30;
+        while (changed && maxIter-- > 0)
+        {
+            changed = false;
+            for (int y = 1; y < H - 1; y++)
+                for (int x = 1; x < W - 1; x++)
+                {
+                    if (filled[x, y] <= height[x, y]) continue;
+                    for (int dy = -1; dy <= 1; dy++)
+                        for (int dx = -1; dx <= 1; dx++)
+                        {
+                            if (dx == 0 && dy == 0) continue;
+                            float nVal = filled[x + dx, y + dy] + eps;
+                            if (height[x, y] >= nVal) { filled[x, y] = height[x, y]; changed = true; }
+                            else if (filled[x, y] > nVal) { filled[x, y] = nVal; changed = true; }
+                        }
+                }
+        }
+        for (int y = 0; y < H; y++)
+            for (int x = 0; x < W; x++)
+                height[x, y] = filled[x, y];
+
+        // ═══════════════════════════════════════════════════
+        // STAGE 5: Water flux accumulation + incise flow erosion
+        // ═══════════════════════════════════════════════════
+        // Compute downhill direction for each cell
+        int[,] flowDirX = new int[W, H];
+        int[,] flowDirY = new int[W, H];
+        for (int y = 0; y < H; y++)
+        {
+            for (int x = 0; x < W; x++)
+            {
+                float lowestH = height[x, y];
+                int bx = 0, by = 0;
+                for (int dy = -1; dy <= 1; dy++)
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        if (dx == 0 && dy == 0) continue;
+                        int nx = x + dx, ny = y + dy;
+                        if (nx >= 0 && nx < W && ny >= 0 && ny < H && height[nx, ny] < lowestH)
+                        { lowestH = height[nx, ny]; bx = dx; by = dy; }
+                    }
+                flowDirX[x, y] = bx;
+                flowDirY[x, y] = by;
+            }
+        }
+
+        // Sort cells by height descending, accumulate flux
+        var cells = new List<(int x, int y, float h)>();
+        for (int y = 0; y < H; y++)
+            for (int x = 0; x < W; x++)
+                cells.Add((x, y, height[x, y]));
+        cells.Sort((a, b) => b.h.CompareTo(a.h));
+
+        float[,] flux = new float[W, H];
+        for (int y = 0; y < H; y++)
+            for (int x = 0; x < W; x++)
+                flux[x, y] = 1f; // base rainfall
+
+        foreach (var (cx, cy, _) in cells)
+        {
+            int tx = cx + flowDirX[cx, cy];
+            int ty = cy + flowDirY[cx, cy];
+            if (tx >= 0 && tx < W && ty >= 0 && ty < H)
+                flux[tx, ty] += flux[cx, cy];
+        }
+
+        // Incise flow: erode proportional to slope × sqrt(flux)
+        float[,] eroded = (float[,])height.Clone();
+        for (int y = 1; y < H - 1; y++)
+        {
+            for (int x = 1; x < W - 1; x++)
+            {
+                if (height[x, y] < seaLevel) continue;
+                int tx = x + flowDirX[x, y];
+                int ty = y + flowDirY[x, y];
+                if (tx < 0 || tx >= W || ty < 0 || ty >= H) continue;
+                float slope = height[x, y] - height[tx, ty];
+                if (slope <= 0) continue;
+                float erosion = slope * MathF.Sqrt(flux[x, y]) * 0.015f;
+                erosion = MathF.Min(erosion, 0.03f); // cap
+                eroded[x, y] -= erosion;
+            }
+        }
+        Array.Copy(eroded, height, eroded.Length);
+
+        // ═══════════════════════════════════════════════════
+        // STAGE 6: Thermal erosion — smooth steep terrain
+        // ═══════════════════════════════════════════════════
+        for (int pass = 0; pass < 4; pass++)
+        {
+            var temp = (float[,])height.Clone();
+            for (int y = 1; y < H - 1; y++)
                 for (int x = 1; x < W - 1; x++)
                 {
                     float h = height[x, y];
@@ -207,20 +384,54 @@ public class WorldMapData
                             float diff = h - height[x + dx, y + dy];
                             if (diff > maxDiff) maxDiff = diff;
                         }
-                    if (maxDiff > 0.10f)
-                        temp[x, y] = h - maxDiff * 0.15f;
+                    if (maxDiff > 0.08f)
+                        temp[x, y] = h - maxDiff * 0.12f;
+                }
+            Array.Copy(temp, height, temp.Length);
+        }
+
+        // ═══════════════════════════════════════════════════
+        // STAGE 7: Coastline smoothing (majority-neighbor filter)
+        // Clean up jagged shoreline and 1-tile islands
+        // ═══════════════════════════════════════════════════
+        for (int pass = 0; pass < 3; pass++)
+        {
+            var temp = (float[,])height.Clone();
+            for (int y = 1; y < H - 1; y++)
+            {
+                for (int x = 1; x < W - 1; x++)
+                {
+                    int landNeighbors = 0, waterNeighbors = 0;
+                    for (int dy = -1; dy <= 1; dy++)
+                        for (int dx = -1; dx <= 1; dx++)
+                        {
+                            if (dx == 0 && dy == 0) continue;
+                            if (height[x + dx, y + dy] >= seaLevel) landNeighbors++;
+                            else waterNeighbors++;
+                        }
+                    // Pull isolated water tiles up and isolated land tiles down
+                    if (height[x, y] < seaLevel && landNeighbors >= 6)
+                        temp[x, y] = seaLevel + 0.02f;
+                    else if (height[x, y] >= seaLevel && waterNeighbors >= 6)
+                        temp[x, y] = seaLevel - 0.02f;
                 }
             }
             Array.Copy(temp, height, temp.Length);
         }
 
-        // ── Step 5: Assign biomes from height × temperature × moisture ──
-        const float deepSeaLevel = 0.22f;
-        const float seaLevel = 0.30f;
-        const float beachLevel = 0.33f;
-        const float hillLevel = 0.62f;
-        const float mountainLevel = 0.72f;
-        const float peakLevel = 0.82f;
+        // ═══════════════════════════════════════════════════
+        // STAGE 8: Biome assignment
+        // height × temperature × moisture → tile type
+        // ═══════════════════════════════════════════════════
+        const float deepSea = 0.20f;
+        const float shallowSea = 0.30f;
+        // seaLevel = 0.35f (already defined)
+        const float beachTop = 0.38f;
+        const float lowland = 0.50f;
+        const float hillStart = 0.58f;
+        const float mountainStart = 0.68f;
+        const float highMountain = 0.78f;
+        const float peakLevel = 0.88f;
 
         for (int y = 0; y < H; y++)
         {
@@ -228,187 +439,296 @@ public class WorldMapData
             {
                 float h = height[x, y];
                 float m = moisture[x, y];
-                float t = temperature[x, y]; // 0 = cold (north), ~0.7 = warm (south)
+                float t = temperature[x, y];
+                float f = flux[x, y];
 
                 MapTileType tile;
-                if (h < deepSeaLevel)
+
+                // ── WATER ──
+                if (h < deepSea)
                     tile = MapTileType.DeepOcean;
-                else if (h < seaLevel)
+                else if (h < shallowSea)
                     tile = MapTileType.Ocean;
-                else if (h < beachLevel)
-                    tile = MapTileType.Beach;
+                else if (h < seaLevel)
+                {
+                    // Shallow water — reef in warm areas
+                    tile = (t > 0.5f && m > 0.4f) ? MapTileType.Reef : MapTileType.ShallowOcean;
+                }
+                // ── COAST ──
+                else if (h < beachTop)
+                {
+                    if (t < 0.2f) tile = MapTileType.RockyShore;
+                    else if (m < 0.3f) tile = MapTileType.RockyShore;
+                    else tile = MapTileType.Beach;
+                }
+                // ── PEAKS ──
                 else if (h >= peakLevel)
-                    tile = MapTileType.Snow; // snow caps
-                else if (h >= mountainLevel)
                 {
-                    // Mountain with snow based on temperature
-                    tile = t < 0.35f ? MapTileType.Snow : MapTileType.Mountain;
+                    tile = t < 0.4f ? MapTileType.Glacier : MapTileType.Snow;
                 }
-                else if (h >= hillLevel)
+                else if (h >= highMountain)
                 {
-                    // Highland biomes
-                    if (t < 0.25f)
-                        tile = MapTileType.Tundra;
-                    else if (t < 0.4f)
-                        tile = m > 0.5f ? MapTileType.SnowForest : MapTileType.Tundra;
-                    else
-                        tile = m > 0.5f ? MapTileType.Forest : MapTileType.Plains;
+                    tile = t < 0.3f ? MapTileType.Snow : MapTileType.HighMountain;
                 }
-                else
+                else if (h >= mountainStart)
                 {
-                    // Lowland biomes: full temperature × moisture grid
+                    if (t < 0.25f) tile = MapTileType.Snow;
+                    else if (t < 0.4f) tile = MapTileType.Mountain;
+                    else tile = MapTileType.Mountain;
+                }
+                // ── HILLS ──
+                else if (h >= hillStart)
+                {
+                    if (t < 0.2f) tile = MapTileType.Tundra;
+                    else if (t < 0.35f) tile = m > 0.5f ? MapTileType.Taiga : MapTileType.Foothills;
+                    else if (t < 0.55f) tile = m > 0.5f ? MapTileType.Forest : MapTileType.Hills;
+                    else tile = m > 0.5f ? MapTileType.Forest : MapTileType.Hills;
+                }
+                // ── LOWLAND ──
+                else if (h >= lowland)
+                {
                     if (t < 0.2f)
-                    {
-                        // Arctic zone
                         tile = m > 0.55f ? MapTileType.SnowForest : MapTileType.Tundra;
-                    }
                     else if (t < 0.35f)
                     {
-                        // Cold zone
                         if (m > 0.6f) tile = MapTileType.DenseForest;
-                        else if (m > 0.4f) tile = MapTileType.Forest;
-                        else tile = MapTileType.Plains;
+                        else if (m > 0.4f) tile = MapTileType.Taiga;
+                        else tile = MapTileType.Grassland;
                     }
                     else if (t < 0.55f)
                     {
-                        // Temperate zone
                         if (m > 0.6f) tile = MapTileType.DenseForest;
                         else if (m > 0.4f) tile = MapTileType.Forest;
                         else if (m > 0.25f) tile = MapTileType.Plains;
-                        else tile = MapTileType.Desert;
+                        else tile = MapTileType.Wasteland;
                     }
                     else
                     {
-                        // Hot zone (southern)
-                        if (m > 0.6f) tile = MapTileType.Swamp;
+                        if (m > 0.6f) tile = MapTileType.Jungle;
                         else if (m > 0.45f) tile = MapTileType.Forest;
+                        else if (m > 0.3f) tile = MapTileType.Savanna;
+                        else tile = MapTileType.Desert;
+                    }
+                }
+                // ── FLAT LOWLAND (just above beach) ──
+                else
+                {
+                    if (t < 0.2f)
+                        tile = m > 0.5f ? MapTileType.SnowForest : MapTileType.Tundra;
+                    else if (t < 0.35f)
+                    {
+                        if (m > 0.6f) tile = MapTileType.DenseForest;
+                        else if (m > 0.45f) tile = MapTileType.Forest;
+                        else tile = MapTileType.Grassland;
+                    }
+                    else if (t < 0.55f)
+                    {
+                        if (m > 0.65f) tile = MapTileType.Swamp;
+                        else if (m > 0.5f) tile = MapTileType.Forest;
+                        else if (m > 0.35f) tile = MapTileType.Plains;
+                        else tile = MapTileType.Grassland;
+                    }
+                    else
+                    {
+                        if (m > 0.6f) tile = MapTileType.Marsh;
+                        else if (m > 0.45f) tile = MapTileType.Savanna;
                         else if (m > 0.3f) tile = MapTileType.Plains;
                         else tile = MapTileType.Desert;
                     }
                 }
+
+                // High-flux lowland areas → floodplain
+                if (f > 15f && h >= seaLevel && h < hillStart &&
+                    tile != MapTileType.Beach && tile != MapTileType.RockyShore)
+                {
+                    if (tile == MapTileType.Plains || tile == MapTileType.Grassland)
+                        tile = MapTileType.Floodplain;
+                }
+
                 map.SetTile(x, y, tile);
             }
         }
 
-        // ── Step 6: Rivers — trace from mountains to ocean ──
-        var rng = new Random(seed + 200);
-        var riverStarts = new List<(int x, int y)>();
-        // Find good mountain/high-ground start points
-        for (int y = 5; y < H - 5; y++)
-            for (int x = 5; x < W - 5; x++)
-                if (height[x, y] > 0.65f && height[x, y] < 0.85f)
-                    riverStarts.Add((x, y));
-
-        // Shuffle and pick best river starts (spaced apart)
-        var usedRiverStarts = new List<(int x, int y)>();
-        for (int i = riverStarts.Count - 1; i > 0; i--)
+        // ═══════════════════════════════════════════════════
+        // STAGE 9: Rivers — trace flux network
+        // Only render tiles with high flux as River tiles
+        // ═══════════════════════════════════════════════════
+        float riverThreshold = 25f;
+        for (int y = 0; y < H; y++)
         {
-            int j = rng.Next(i + 1);
-            (riverStarts[i], riverStarts[j]) = (riverStarts[j], riverStarts[i]);
-        }
-        foreach (var start in riverStarts)
-        {
-            if (usedRiverStarts.Count >= 12) break;
-            bool tooClose = false;
-            foreach (var used in usedRiverStarts)
+            for (int x = 0; x < W; x++)
             {
-                if (Math.Abs(start.x - used.x) + Math.Abs(start.y - used.y) < 15)
-                { tooClose = true; break; }
+                if (height[x, y] < seaLevel) continue;
+                if (flux[x, y] >= riverThreshold)
+                {
+                    var cur = map.GetTile(x, y);
+                    if (cur != MapTileType.BiomeEntrance && cur != MapTileType.Mountain &&
+                        cur != MapTileType.HighMountain && cur != MapTileType.Snow &&
+                        cur != MapTileType.Glacier)
+                    {
+                        // Wider rivers for higher flux
+                        map.SetTile(x, y, flux[x, y] > 80f ? MapTileType.Lake : MapTileType.River);
+                    }
+                }
             }
-            if (tooClose) continue;
-            usedRiverStarts.Add(start);
         }
 
-        foreach (var start in usedRiverStarts)
+        // ═══════════════════════════════════════════════════
+        // STAGE 10: Lakes — find local minima with high flux
+        // ═══════════════════════════════════════════════════
+        for (int y = 2; y < H - 2; y++)
         {
-            int rx = start.x, ry = start.y;
-            for (int step = 0; step < 120; step++)
+            for (int x = 2; x < W - 2; x++)
             {
-                if (rx < 1 || rx >= W - 1 || ry < 1 || ry >= H - 1) break;
-                if (height[rx, ry] < seaLevel) break;
-
-                var cur = map.GetTile(rx, ry);
-                if (cur != MapTileType.BiomeEntrance && cur != MapTileType.Mountain && cur != MapTileType.Snow)
-                    map.SetTile(rx, ry, MapTileType.Water);
-
-                // Find lowest neighbor
-                float lowestH = height[rx, ry];
-                int bestDx = 0, bestDy = 0;
+                if (height[x, y] < seaLevel) continue;
+                if (flux[x, y] < 60f) continue;
+                // Is this a local minimum?
+                bool isMin = true;
                 for (int dy = -1; dy <= 1; dy++)
                     for (int dx = -1; dx <= 1; dx++)
                     {
                         if (dx == 0 && dy == 0) continue;
-                        int nx = rx + dx, ny = ry + dy;
-                        if (nx >= 0 && nx < W && ny >= 0 && ny < H && height[nx, ny] < lowestH)
-                        {
-                            lowestH = height[nx, ny];
-                            bestDx = dx;
-                            bestDy = dy;
-                        }
+                        if (height[x + dx, y + dy] < height[x, y]) isMin = false;
                     }
-                if (bestDx == 0 && bestDy == 0)
-                {
-                    // Stuck — carve downhill
-                    int cdx = rng.Next(-1, 2), cdy = rng.Next(-1, 2);
-                    if (rx + cdx >= 0 && rx + cdx < W && ry + cdy >= 0 && ry + cdy < H)
-                        height[rx + cdx, ry + cdy] = height[rx, ry] - 0.01f;
-                    bestDx = cdx; bestDy = cdy;
-                }
-                rx += bestDx;
-                ry += bestDy;
+                if (!isMin) continue;
+                // Paint small lake
+                int lakeSize = flux[x, y] > 120f ? 2 : 1;
+                for (int dy = -lakeSize; dy <= lakeSize; dy++)
+                    for (int dx = -lakeSize; dx <= lakeSize; dx++)
+                    {
+                        int lx = x + dx, ly = y + dy;
+                        if (lx < 0 || lx >= W || ly < 0 || ly >= H) continue;
+                        if (height[lx, ly] < seaLevel) continue;
+                        var lt = temperature[lx, ly];
+                        map.SetTile(lx, ly, lt < 0.2f ? MapTileType.FrozenLake : MapTileType.Lake);
+                    }
             }
         }
 
-        // ── Step 7: Caves — place at mountain bases and cliff faces ──
-        for (int y = 3; y < H - 3; y++)
+        // ═══════════════════════════════════════════════════
+        // STAGE 11: Deserts get dunes + oases near water
+        // ═══════════════════════════════════════════════════
+        for (int y = 1; y < H - 1; y++)
         {
-            for (int x = 3; x < W - 3; x++)
+            for (int x = 1; x < W - 1; x++)
             {
                 var tile = map.GetTile(x, y);
-                if (tile != MapTileType.Plains && tile != MapTileType.Forest && tile != MapTileType.Tundra)
-                    continue;
-                // Check if adjacent to mountain
+                if (tile == MapTileType.Desert)
+                {
+                    // Dunes from ridge noise
+                    if (ridgeNoise[x, y] > 0.55f)
+                        map.SetTile(x, y, MapTileType.Dunes);
+                    // Oasis near rivers
+                    bool nearWater = false;
+                    for (int dy = -2; dy <= 2; dy++)
+                        for (int dx = -2; dx <= 2; dx++)
+                        {
+                            int nx = x + dx, ny = y + dy;
+                            if (nx >= 0 && nx < W && ny >= 0 && ny < H)
+                            {
+                                var adj = map.GetTile(nx, ny);
+                                if (adj == MapTileType.River || adj == MapTileType.Lake || adj == MapTileType.Water)
+                                    nearWater = true;
+                            }
+                        }
+                    if (nearWater && rng.NextDouble() < 0.3)
+                        map.SetTile(x, y, MapTileType.Oasis);
+                }
+            }
+        }
+
+        // ═══════════════════════════════════════════════════
+        // STAGE 12: Caves at mountain bases
+        // ═══════════════════════════════════════════════════
+        for (int y = 2; y < H - 2; y++)
+        {
+            for (int x = 2; x < W - 2; x++)
+            {
+                var tile = map.GetTile(x, y);
+                if (tile != MapTileType.Foothills && tile != MapTileType.Hills &&
+                    tile != MapTileType.Tundra && tile != MapTileType.RockyShore) continue;
                 bool nearMountain = false;
                 for (int dy = -1; dy <= 1; dy++)
                     for (int dx = -1; dx <= 1; dx++)
                     {
                         var adj = map.GetTile(x + dx, y + dy);
-                        if (adj == MapTileType.Mountain || adj == MapTileType.Snow)
+                        if (adj == MapTileType.Mountain || adj == MapTileType.HighMountain)
                             nearMountain = true;
                     }
-                if (!nearMountain) continue;
-                // Place caves sparingly
-                float caveChance = ridgeNoise[x, y] * moisture[x, y];
-                if (caveChance > 0.35f && rng.NextDouble() < 0.15)
+                if (nearMountain && ridgeNoise[x, y] * moisture[x, y] > 0.3f && rng.NextDouble() < 0.12)
                     map.SetTile(x, y, MapTileType.Cave);
             }
         }
 
-        // ── Step 8: Place biomes ──
-        // Eden Reach — find plains/forest in temperate zone near center-south
-        int biomeX = W / 2, biomeY = (int)(H * 0.55f);
+        // ═══════════════════════════════════════════════════
+        // STAGE 13: Ruins scattered in forests and wasteland
+        // ═══════════════════════════════════════════════════
+        for (int y = 3; y < H - 3; y++)
+        {
+            for (int x = 3; x < W - 3; x++)
+            {
+                var tile = map.GetTile(x, y);
+                if ((tile == MapTileType.DenseForest || tile == MapTileType.Wasteland ||
+                     tile == MapTileType.Jungle) && rng.NextDouble() < 0.02)
+                    map.SetTile(x, y, MapTileType.Ruins);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════
+        // STAGE 14: Volcano — one per map, in high mountains near hot zone
+        // ═══════════════════════════════════════════════════
+        for (int y = H / 2; y < H - 5; y++)
+        {
+            for (int x = 5; x < W - 5; x++)
+            {
+                if (map.GetTile(x, y) == MapTileType.HighMountain && temperature[x, y] > 0.45f)
+                {
+                    map.SetTile(x, y, MapTileType.Volcano);
+                    // Wasteland ring
+                    for (int dy = -1; dy <= 1; dy++)
+                        for (int dx = -1; dx <= 1; dx++)
+                        {
+                            if (dx == 0 && dy == 0) continue;
+                            var adj = map.GetTile(x + dx, y + dy);
+                            if (adj != MapTileType.HighMountain && adj != MapTileType.Mountain)
+                                map.SetTile(x + dx, y + dy, MapTileType.Wasteland);
+                        }
+                    goto volcanoPlaced;
+                }
+            }
+        }
+        volcanoPlaced:;
+
+        // ═══════════════════════════════════════════════════
+        // STAGE 15: Place biome entrance — Eden Reach
+        // ═══════════════════════════════════════════════════
+        int biomeX = W / 2, biomeY = (int)(H * 0.5f);
         float bestDist = float.MaxValue;
         for (int y = H / 3; y < 2 * H / 3; y++)
         {
             for (int x = W / 4; x < 3 * W / 4; x++)
             {
                 var t = map.GetTile(x, y);
-                if (t == MapTileType.Plains || t == MapTileType.Forest)
+                if (t == MapTileType.Plains || t == MapTileType.Grassland || t == MapTileType.Forest)
                 {
-                    float dist = (x - W / 2f) * (x - W / 2f) + (y - H * 0.55f) * (y - H * 0.55f);
+                    float dist = (x - W / 2f) * (x - W / 2f) + (y - H * 0.5f) * (y - H * 0.5f);
                     if (dist < bestDist) { bestDist = dist; biomeX = x; biomeY = y; }
                 }
             }
         }
 
-        // Clear area around entrance
         for (int dy = -2; dy <= 2; dy++)
             for (int dx = -2; dx <= 2; dx++)
             {
-                var cur = map.GetTile(biomeX + dx, biomeY + dy);
-                if (cur == MapTileType.Ocean || cur == MapTileType.DeepOcean ||
-                    cur == MapTileType.Mountain || cur == MapTileType.Water)
-                    map.SetTile(biomeX + dx, biomeY + dy, MapTileType.Plains);
+                int px = biomeX + dx, py = biomeY + dy;
+                if (px >= 0 && px < W && py >= 0 && py < H)
+                {
+                    var cur = map.GetTile(px, py);
+                    if (cur == MapTileType.DeepOcean || cur == MapTileType.Ocean ||
+                        cur == MapTileType.ShallowOcean || cur == MapTileType.HighMountain ||
+                        cur == MapTileType.River || cur == MapTileType.Lake)
+                        map.SetTile(px, py, MapTileType.Plains);
+                }
             }
         map.SetTile(biomeX, biomeY, MapTileType.BiomeEntrance);
 
@@ -425,15 +745,13 @@ public class WorldMapData
             }
         };
         map.Biomes.Add(edenReach);
-
         map.Points.Add(new MapPoint { X = biomeX, Y = biomeY, BiomeId = "eden-reach", Label = "Eden Reach" });
 
-        // Player starts at biome
         map.PlayerX = biomeX;
         map.PlayerY = biomeY + 2;
-        if (map.GetTile(map.PlayerX, map.PlayerY) == MapTileType.Ocean ||
-            map.GetTile(map.PlayerX, map.PlayerY) == MapTileType.DeepOcean ||
-            map.GetTile(map.PlayerX, map.PlayerY) == MapTileType.Mountain)
+        var spawnTile = map.GetTile(map.PlayerX, map.PlayerY);
+        if (spawnTile == MapTileType.Ocean || spawnTile == MapTileType.DeepOcean ||
+            spawnTile == MapTileType.HighMountain || spawnTile == MapTileType.Lake)
             map.SetTile(map.PlayerX, map.PlayerY, MapTileType.Plains);
 
         map.Reveal(map.PlayerX, map.PlayerY);
@@ -521,21 +839,41 @@ public class MapPoint
 
 public enum MapTileType
 {
-    Ocean = 0,
-    Plains = 1,
-    Forest = 2,
-    Mountain = 3,
-    Water = 4,
-    Desert = 5,
-    Swamp = 6,
-    Snow = 7,
-    DeepOcean = 8,
-    Beach = 9,
-    Path = 10,
-    Cave = 11,
-    DenseForest = 12,
-    SnowForest = 13,
-    Tundra = 14,
-    Volcano = 15,
-    BiomeEntrance = 20,
+    DeepOcean = 0,
+    Ocean = 1,
+    ShallowOcean = 2,
+    Reef = 3,
+    Beach = 4,
+    RockyShore = 5,
+    Plains = 6,
+    Grassland = 7,
+    Savanna = 8,
+    Forest = 9,
+    DenseForest = 10,
+    Jungle = 11,
+    Hills = 12,
+    Foothills = 13,
+    Mountain = 14,
+    HighMountain = 15,
+    Snow = 16,
+    Glacier = 17,
+    Tundra = 18,
+    Taiga = 19,
+    SnowForest = 20,
+    FrozenLake = 21,
+    Desert = 22,
+    Dunes = 23,
+    Wasteland = 24,
+    Swamp = 25,
+    Marsh = 26,
+    Floodplain = 27,
+    Water = 28,  // river/lake
+    Lake = 29,
+    River = 30,
+    Cave = 31,
+    Volcano = 32,
+    Ruins = 33,
+    Oasis = 34,
+    Path = 40,
+    BiomeEntrance = 50,
 }
