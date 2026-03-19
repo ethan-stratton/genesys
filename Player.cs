@@ -363,44 +363,53 @@ public class Player
         get
         {
             var center = Position + new Vector2(Width / 2f, Height / 2f);
+            // Live aim direction for all melee — respects current aim (updates during crouch)
+            int aimX = MathF.Abs(AimDir.X) > 0.1f ? Math.Sign(AimDir.X) : FacingDir;
+            float aimY = AimDir.Y; // -1 up, 0 neutral, +1 down
 
             if (CurrentWeapon == WeaponType.None)
             {
-                // Fist combo: narrow 14×14 hitboxes
-                float extend = _comboStep == 0 ? 20f : 26f;
-                float hbCenterX = center.X + FacingDir * extend;
-                float hbCenterY = Position.Y + 20f; // chest height
+                // Fist combo: SOTN-style rapid jabs, narrow but taller than before
+                int hw = 18, hh = 20;
+                float extend = _comboStep == 0 ? 18f : 24f;
+                // Aim up/down shifts the hitbox vertically
+                float hbCenterX = center.X + aimX * extend;
+                float hbCenterY = center.Y + aimY * 16f; // shift up/down with input
                 return new Rectangle(
-                    (int)(hbCenterX - 7f), (int)(hbCenterY - 7f), 14, 14);
+                    (int)(hbCenterX - hw / 2f), (int)(hbCenterY - hh / 2f), hw, hh);
             }
             else if (CurrentWeapon == WeaponType.Stick)
             {
-                // Stick combo
+                // Stick combo — all swings go FORWARD in facing direction
+                // Input direction tilts the hitbox up/down
+                float vertShift = aimY * 14f;
                 if (_comboStep == 0)
                 {
-                    // Hit 1 — left sweep: 28×16, biased behind (-12px from center)
-                    float offsetX = FacingDir * -12f;
+                    // Hit 1 — forward sweep, slightly closer: 36×22
+                    float offsetX = aimX * 10f;
                     return new Rectangle(
-                        (int)(center.X + offsetX - 14f), (int)(center.Y - 8f), 28, 16);
+                        (int)(center.X + offsetX - (aimX > 0 ? 4f : 32f)),
+                        (int)(center.Y - 11f + vertShift), 36, 22);
                 }
                 else if (_comboStep == 1)
                 {
-                    // Hit 2 — right sweep: 28×16, biased forward (+14px)
-                    float offsetX = FacingDir * 14f;
+                    // Hit 2 — forward sweep, extended reach: 36×22
+                    float offsetX = aimX * 18f;
                     return new Rectangle(
-                        (int)(center.X + offsetX - 14f), (int)(center.Y - 8f), 28, 16);
+                        (int)(center.X + offsetX - (aimX > 0 ? 4f : 32f)),
+                        (int)(center.Y - 11f + vertShift), 36, 22);
                 }
                 else
                 {
-                    // Hit 3 — downward slam: 22×24, extends forward + below
-                    float offsetX = FacingDir * 12f;
+                    // Hit 3 — downward slam: 30×28, forward + below
+                    float offsetX = aimX * 14f;
                     return new Rectangle(
-                        (int)(center.X + offsetX - 11f), (int)(center.Y - 4f), 22, 24);
+                        (int)(center.X + offsetX - 15f), (int)(center.Y + 2f), 30, 28);
                 }
             }
             else
             {
-                // Default melee hitbox for other weapons
+                // Default melee hitbox for other weapons — uses aim direction
                 var dir = MeleeDirection;
                 var hbCenter = center + dir * (MeleeRangeOverride * 0.6f);
                 return new Rectangle(

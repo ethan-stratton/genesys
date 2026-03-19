@@ -856,8 +856,8 @@ public class Game1 : Game
                     int dmg = (_player.CurrentWeapon == WeaponType.Stick && _player.ComboStep == 2) ? 2 : 1;
                     bool killed = c.TakeHit(dmg);
                     _player.RegisterComboHit();
-                    if (killed) { _hitStopTimer = 0.06f; _shakeTimer = 0.12f; _shakeIntensity = 4f; }
-                    else { _hitStopTimer = 0.03f; _shakeTimer = 0.08f; _shakeIntensity = 2f; }
+                    if (killed) { _hitStopTimer = 0.06f; _shakeTimer = 0.15f; _shakeIntensity = 8f; }
+                    else { _hitStopTimer = 0.03f; _shakeTimer = 0.1f; _shakeIntensity = 5f; }
                 }
             }
         }
@@ -878,8 +878,8 @@ public class Game1 : Game
                     int dmg = (_player.CurrentWeapon == WeaponType.Stick && _player.ComboStep == 2) ? 2 : 1;
                     bool killed = t.TakeHit(dmg);
                     _player.RegisterComboHit();
-                    if (killed) { _hitStopTimer = 0.06f; _shakeTimer = 0.12f; _shakeIntensity = 4f; }
-                    else { _hitStopTimer = 0.03f; _shakeTimer = 0.08f; _shakeIntensity = 2f; }
+                    if (killed) { _hitStopTimer = 0.06f; _shakeTimer = 0.15f; _shakeIntensity = 8f; }
+                    else { _hitStopTimer = 0.03f; _shakeTimer = 0.1f; _shakeIntensity = 5f; }
                 }
             }
         }
@@ -900,8 +900,8 @@ public class Game1 : Game
                     int dmg = (_player.CurrentWeapon == WeaponType.Stick && _player.ComboStep == 2) ? 2 : 1;
                     bool killed = h.TakeHit(dmg);
                     _player.RegisterComboHit();
-                    if (killed) { _hitStopTimer = 0.06f; _shakeTimer = 0.12f; _shakeIntensity = 4f; }
-                    else { _hitStopTimer = 0.03f; _shakeTimer = 0.08f; _shakeIntensity = 2f; }
+                    if (killed) { _hitStopTimer = 0.06f; _shakeTimer = 0.15f; _shakeIntensity = 8f; }
+                    else { _hitStopTimer = 0.03f; _shakeTimer = 0.1f; _shakeIntensity = 5f; }
                 }
             }
         }
