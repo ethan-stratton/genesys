@@ -1,7 +1,7 @@
 {
   "idle": {
     "row": 0,
-    "frameCount": 5
+    "frameCount": 6
   },
   "crouch": {
     "row": 1,

@@ -1559,7 +1559,7 @@ public class Player
     private const int SpriteW = 48, SpriteH = 48;
     private const int RowIdle = 0, RowCrouch = 1, RowJump = 2, RowWalk = 3, RowRun = 4;
     private const int RowWhip = 5, RowBackflip = 6, RowDamaged = 7, RowSuperjump = 8, RowDash = 9;
-    private static readonly int[] RowFrameCounts = { 5, 3, 8, 8, 8, 10, 10, 3, 6, 3 };
+    private static readonly int[] RowFrameCounts = { 6, 3, 8, 8, 8, 10, 10, 3, 6, 3 };
     private float _idleTimer; // tracks how long standing still
     private bool _wasCrouching; // for crouch transition detection
     private float _crouchTransTimer; // >0 = transitioning into/out of crouch
@@ -1635,17 +1635,21 @@ public class Player
             int wf = ((int)(_animTimer * 8f)) % 8;
             return (RowWalk, wf);
         }
-        // Idle: Stand A loops (frames 0-2), after 3 seconds plays Stand B (frames 3-4) once then holds frame 4
-        if (_idleTimer < 3f)
+        // Idle: Stand A (frames 0-3) loops 3 times, then Stand B (frames 4-5) plays once and holds frame 5
+        float standAFps = 3f; // 3 frames per second
+        float standACycleDuration = 4f / standAFps; // ~1.33s per cycle
+        float standATotal = standACycleDuration * 3f; // 3 full loops ~4s
+        if (_idleTimer < standATotal)
         {
-            int f = ((int)(_animTimer * 3f)) % 3;
+            int f = ((int)(_idleTimer * standAFps)) % 4;
             return (RowIdle, f);
         }
         else
         {
-            float elapsed = _idleTimer - 3f;
-            int f = Math.Min(1, (int)(elapsed * 3f));
-            return (RowIdle, 3 + f);
+            float elapsed = _idleTimer - standATotal;
+            float standBFps = 3f;
+            int f = Math.Min(1, (int)(elapsed * standBFps));
+            return (RowIdle, 4 + f);
         }
     }
 

@@ -1,15 +1,23 @@
 {
   "currentLevel": "test-arena",
-  "spawnX": 264.49957,
-  "spawnY": 116,
+  "spawnX": 340.00034,
+  "spawnY": 284,
   "unlockedAbilities": [],
-  "flags": {},
-  "playTime": 4.0333333,
-  "meleeInventory": [],
-  "rangedInventory": [],
-  "meleeIndex": -1,
-  "rangedIndex": -1,
-  "collectedItems": [],
+  "flags": {
+    "eveOrbActive": true
+  },
+  "playTime": 443.96906,
+  "meleeInventory": [
+    "Stick"
+  ],
+  "rangedInventory": [
+    "Gun"
+  ],
+  "meleeIndex": 0,
+  "rangedIndex": 0,
+  "collectedItems": [
+    "stick-1"
+  ],
   "windowSizeIndex": 0,
   "crtEnabled": false
 }
