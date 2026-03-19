@@ -3451,7 +3451,7 @@ public class Game1 : Game
                 tile != MapTileType.ShallowOcean && tile != MapTileType.Reef &&
                 tile != MapTileType.HighMountain && tile != MapTileType.Volcano &&
                 tile != MapTileType.Lake && tile != MapTileType.FrozenLake &&
-                tile != MapTileType.Glacier)
+                tile != MapTileType.Glacier && tile != MapTileType.VoidRift)
             {
                 _worldMap.PlayerX = nx;
                 _worldMap.PlayerY = ny;
@@ -3749,6 +3749,12 @@ public class Game1 : Game
             MapTileType.Volcano => new Color(75, 28, 18),
             MapTileType.Ruins => new Color(90, 80, 70),
             MapTileType.Oasis => new Color(50, 100, 55),
+            // Fantasy
+            MapTileType.CrystalForest => new Color(120, 160, 200),
+            MapTileType.Ashlands => new Color(60, 40, 35),
+            MapTileType.VoidRift => new Color(80, 20, 120),
+            MapTileType.Mushroom => new Color(140, 60, 140),
+            MapTileType.Petrified => new Color(110, 100, 85),
             MapTileType.Path => new Color(140, 125, 90),
             MapTileType.BiomeEntrance => new Color(90, 75, 55),
             _ => new Color(20, 20, 20),

@@ -1,23 +1,14 @@
 {
-  "currentLevel": "the-summit",
-  "spawnX": -39,
-  "spawnY": 498,
+  "currentLevel": "test-arena",
+  "spawnX": 480,
+  "spawnY": 224,
   "unlockedAbilities": [],
-  "flags": {
-    "eveOrbActive": true
-  },
-  "playTime": 2076.6697,
-  "meleeInventory": [
-    "Stick",
-    "Sword"
-  ],
-  "rangedInventory": [
-    "Gun"
-  ],
-  "meleeIndex": 1,
-  "rangedIndex": 0,
-  "collectedItems": [
-    "stick-1"
-  ],
-  "windowSizeIndex": 1
+  "flags": {},
+  "playTime": 0,
+  "meleeInventory": [],
+  "rangedInventory": [],
+  "meleeIndex": -1,
+  "rangedIndex": -1,
+  "collectedItems": [],
+  "windowSizeIndex": 0
 }
