@@ -12,7 +12,9 @@ public class Player
 
     public Vector2 Position { get; set; }
     public Vector2 Velocity { get; set; }
-    public const int Width = 32;
+    public const int Width = 32;  // Sprite width (visual)
+    public const int CollisionWidth = 21; // Hitbox width (narrower, centered)
+    public const int CollisionOffsetX = (Width - CollisionWidth) / 2; // 5px from left edge
     public const int Height = 48;
     private const float Speed = 250f;
     private const float Gravity = 900f;
@@ -296,6 +298,17 @@ public class Player
     }
 
     public int CurrentHeight => IsSliding ? SlideHeight : (IsCrouching ? CrouchHeight : Height);
+
+    /// <summary>Collision rect: narrower than sprite, centered horizontally.</summary>
+    public Rectangle CollisionRect
+    {
+        get
+        {
+            int h = CurrentHeight;
+            int y = (int)Position.Y + Height - h; // bottom-aligned
+            return new Rectangle((int)Position.X + CollisionOffsetX, y, CollisionWidth, h);
+        }
+    }
 
     public Rectangle VaultKickHitbox
     {

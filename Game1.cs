@@ -818,7 +818,7 @@ public class Game1 : Game
         if (_enemiesEnabled && !hitStopped)
         {
         var playerCenter2 = new Vector2(_player.Position.X + Player.Width / 2f, _player.Position.Y + Player.Height / 2f);
-        var playerRect2 = new Rectangle((int)_player.Position.X, (int)_player.Position.Y + Player.Height - _player.CurrentHeight, Player.Width, _player.CurrentHeight);
+        var playerRect2 = _player.CollisionRect;
         foreach (var swarm in _swarms)
         {
             swarm.Update(dt, playerCenter2, _rng);
@@ -1104,7 +1104,7 @@ public class Game1 : Game
         // Spike collision
         if (!_isDead)
         {
-            var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
+            var pRect = _player.CollisionRect;
             foreach (var spike in _level.AllSpikeRects)            {
                 if (pRect.Intersects(spike))
                 {
@@ -1121,7 +1121,7 @@ public class Game1 : Game
         // Tile-based spike collision
         if (!_isDead && _spawnInvincibility <= 0f && _level.TileGridInstance != null)
         {
-            var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
+            var pRect = _player.CollisionRect;
             var tgi = _level.TileGridInstance;
             int ts = tgi.TileSize;
             int ox = tgi.OriginX, oy = tgi.OriginY;
@@ -1166,7 +1166,7 @@ public class Game1 : Game
         // Effect tile collision (damage, knockback, speed boost, float)
         if (!_isDead)
         {
-            var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
+            var pRect = _player.CollisionRect;
             var tgi = _level.TileGridInstance;
             if (tgi != null)
             {
