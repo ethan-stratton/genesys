@@ -58,6 +58,13 @@ public class Game1 : Game
     private SpriteBatch _spriteBatch;
     private Camera _camera;
     private Texture2D _pixel;
+    private Texture2D _adamSheet; // player sprite sheet
+
+    // CRT effect
+    private RenderTarget2D _crtTarget;
+    private Effect _crtShader;
+    private bool _crtEnabled;
+    private Texture2D _scanlineTex; // fallback scanline overlay
     private FontSystem _fontSystem;
     private SpriteFontBase _font;
     private SpriteFontBase _fontSmall;
@@ -256,6 +263,7 @@ public class Game1 : Game
         _graphicsSettings = new SettingEntry[]
         {
             new() { Label = "Window Size", Get = () => true, Toggle = () => ApplyWindowSize(_windowSizeIndex + 1) },
+            new() { Label = "CRT Filter", Get = () => _crtEnabled, Toggle = () => _crtEnabled = !_crtEnabled },
         };
 
         Restart();
@@ -323,6 +331,7 @@ public class Game1 : Game
             _camera = MakeCamera();
             _camera.SnapTo(_player.Position, Player.Width, _player.CurrentHeight);
         }
+        _crtTarget = new RenderTarget2D(GraphicsDevice, ViewW, ViewH);
         // Persist
         if (_saveData != null) { _saveData.WindowSizeIndex = _windowSizeIndex; _saveData.Save(); }
     }
@@ -411,6 +420,23 @@ public class Game1 : Game
         _camera = MakeCamera();
         _pixel = new Texture2D(GraphicsDevice, 1, 1);
         _pixel.SetData(new[] { Color.White });
+        // Load player sprite sheet
+        if (File.Exists("Content/sprites/adam_sheet.png"))
+        {
+            using var fs = File.OpenRead("Content/sprites/adam_sheet.png");
+            _adamSheet = Texture2D.FromStream(GraphicsDevice, fs);
+        }
+
+        // CRT setup: render target + scanline overlay texture
+        _crtTarget = new RenderTarget2D(GraphicsDevice, ViewW, ViewH);
+        // Try loading compiled CRT shader
+        if (File.Exists("Content/shaders/CRT.xnb"))
+        {
+            try { _crtShader = Content.Load<Effect>("shaders/CRT"); } catch { _crtShader = null; }
+        }
+        // Build scanline overlay texture (fallback when no shader)
+        _scanlineTex = new Texture2D(GraphicsDevice, 1, 4);
+        _scanlineTex.SetData(new[] { Color.Transparent, new Color(0, 0, 0, 60), new Color(0, 0, 0, 80), Color.Transparent });
         _fontSystem = new FontSystem();
         _fontSystem.AddFont(File.ReadAllBytes("Content/Fonts/main.ttf"));
         _font = _fontSystem.GetFont(12);       // main text (was 16, too large for Press Start 2P)
@@ -4422,6 +4448,10 @@ public class Game1 : Game
 
     protected override void Draw(GameTime gameTime)
     {
+        // CRT: redirect all drawing to render target
+        if (_crtEnabled && _crtTarget != null)
+            GraphicsDevice.SetRenderTarget(_crtTarget);
+
         bool isDebugLevel = _editorSaveFile.Contains("debug", StringComparison.OrdinalIgnoreCase);
         GraphicsDevice.Clear(isDebugLevel ? new Color(25, 10, 35) : new Color(20, 20, 20));
 
@@ -4429,6 +4459,7 @@ public class Game1 : Game
         if (_gameState == GameState.Editing)
         {
             DrawEditor();
+            DrawCRT();
             base.Draw(gameTime);
             return;
         }
@@ -4436,6 +4467,7 @@ public class Game1 : Game
         if (_gameState == GameState.Overworld)
         {
             DrawOverworld();
+            DrawCRT();
             base.Draw(gameTime);
             return;
         }
@@ -4443,6 +4475,7 @@ public class Game1 : Game
         if (_gameState == GameState.SimMode)
         {
             DrawSimMode();
+            DrawCRT();
             base.Draw(gameTime);
             return;
         }
@@ -4486,6 +4519,7 @@ public class Game1 : Game
             }
 
             _spriteBatch.End();
+            DrawCRT();
             base.Draw(gameTime);
             return;
         }
@@ -4824,7 +4858,7 @@ public class Game1 : Game
         {
             bool visible = _spawnInvincibility <= 0f || MathF.Sin(_spawnInvincibility * 20f) > 0;
             if (visible)
-                _player.Draw(_spriteBatch, _pixel);
+                _player.Draw(_spriteBatch, _pixel, _adamSheet);
                 // Effect overlays
                 if (_player.SpeedBoostTimer > 0)
                     _spriteBatch.Draw(_pixel, new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height), Color.Lime * 0.2f);
@@ -4944,6 +4978,60 @@ public class Game1 : Game
             _spriteBatch.End();
         }
 
+        DrawCRT();
         base.Draw(gameTime);
+    }
+
+    private void DrawCRT()
+    {
+        if (!_crtEnabled || _crtTarget == null) return;
+
+        // Switch back to screen
+        GraphicsDevice.SetRenderTarget(null);
+        GraphicsDevice.Clear(Color.Black);
+
+        if (_crtShader != null)
+        {
+            // Full shader path
+            _crtShader.Parameters["TextureSize"]?.SetValue(new Vector2(_crtTarget.Width, _crtTarget.Height));
+            _crtShader.Parameters["OutputSize"]?.SetValue(new Vector2(ViewW, ViewH));
+            _crtShader.Parameters["ScanlineWeight"]?.SetValue(0.25f);
+            _crtShader.Parameters["Curvature"]?.SetValue(0.02f);
+            _crtShader.Parameters["VignetteStrength"]?.SetValue(0.3f);
+            _crtShader.Parameters["BleedAmount"]?.SetValue(0.001f);
+            _crtShader.Parameters["Brightness"]?.SetValue(1.15f);
+            _spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.Opaque,
+                SamplerState.PointClamp, null, null, _crtShader);
+            _spriteBatch.Draw(_crtTarget, new Rectangle(0, 0, ViewW, ViewH), Color.White);
+            _spriteBatch.End();
+        }
+        else
+        {
+            // Fallback: draw game frame + scanline overlay
+            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Opaque,
+                SamplerState.PointClamp);
+            _spriteBatch.Draw(_crtTarget, new Rectangle(0, 0, ViewW, ViewH), Color.White);
+            _spriteBatch.End();
+
+            // Scanline overlay with alpha blending
+            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend,
+                SamplerState.LinearWrap);
+            // Tile the scanline texture across the screen
+            _spriteBatch.Draw(_scanlineTex,
+                new Rectangle(0, 0, ViewW, ViewH),
+                new Rectangle(0, 0, 1, ViewH),
+                Color.White);
+            _spriteBatch.End();
+
+            // Vignette overlay
+            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend);
+            // Dark edges using 4 gradient rects
+            int vigSize = ViewW / 6;
+            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, vigSize, ViewH), Color.Black * 0.3f);
+            _spriteBatch.Draw(_pixel, new Rectangle(ViewW - vigSize, 0, vigSize, ViewH), Color.Black * 0.3f);
+            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, vigSize), Color.Black * 0.2f);
+            _spriteBatch.Draw(_pixel, new Rectangle(0, ViewH - vigSize, ViewW, vigSize), Color.Black * 0.2f);
+            _spriteBatch.End();
+        }
     }
 }

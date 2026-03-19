@@ -1552,15 +1552,85 @@ public class Player
         _prevKb = kb;
     }
 
-    public void Draw(SpriteBatch spriteBatch, Texture2D pixel)
+    // Sprite sheet frame indices (32x48 each)
+    private const int FrameIdle = 0, FrameRun1 = 1, FrameRun2 = 2, FrameRun3 = 3, FrameRun4 = 4;
+    private const int FrameJump = 5, FrameFall = 6, FrameSlide = 7, FrameCrouch = 8;
+    private const int FrameAttack1 = 9, FrameAttack2 = 10, FrameAttack3 = 11;
+    private float _animTimer;
+
+    private int GetSpriteFrame()
+    {
+        if (MeleeTimer > 0)
+        {
+            if (CurrentWeapon == WeaponType.Stick)
+            {
+                if (_comboStep == 2) return FrameAttack3; // slam
+                if (_comboStep == 1) return FrameAttack2; // overhead
+                return FrameAttack1;
+            }
+            return FrameAttack1; // fist
+        }
+        if (IsSliding) return FrameSlide;
+        if (IsCrouching) return FrameCrouch;
+        if (!IsGrounded)
+            return Velocity.Y < 0 ? FrameJump : FrameFall;
+        if (MathF.Abs(Velocity.X) > 10f)
+        {
+            int f = ((int)(_animTimer * 10f)) % 4; // 10fps run cycle
+            return f switch { 0 => FrameRun1, 1 => FrameRun2, 2 => FrameRun3, _ => FrameRun4 };
+        }
+        return FrameIdle;
+    }
+
+    public void Draw(SpriteBatch spriteBatch, Texture2D pixel, Texture2D spriteSheet = null)
     {
         // Flash during i-frames: skip drawing every other 4-frame chunk
         if (IsInvincible)
         {
-            int frame = (int)(DamageCooldown * 60f); // approx frame count
-            if ((frame / 4) % 2 == 0) return; // invisible for 4 frames, visible for 4
+            int frame = (int)(DamageCooldown * 60f);
+            if ((frame / 4) % 2 == 0) return;
         }
-        
+
+        // Accumulate animation timer
+        _animTimer += 1f / 60f; // approximate
+
+        if (spriteSheet != null)
+        {
+            int fi = GetSpriteFrame();
+            var srcRect = new Rectangle(fi * Width, 0, Width, Height);
+            var flip = FacingDir < 0 ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
+            var tint = Color.White;
+            if (IsVaulting || IsCartwheeling) tint = Color.CornflowerBlue;
+            else if (IsVaultKicking) tint = Color.Orange;
+            else if (IsUppercutting) tint = Color.Yellow;
+            else if (IsFlipping) tint = Color.Magenta * 0.85f;
+            else if (IsBladeDashing) tint = Color.White * 0.9f;
+            else if (IsDashing) tint = new Color(200, 200, 200);
+
+            var destRect = new Rectangle((int)Position.X, (int)Position.Y, Width, Height);
+            spriteBatch.Draw(spriteSheet, destRect, srcRect, tint, 0f, Vector2.Zero, flip, 0f);
+        }
+        else
+        {
+            // Fallback: colored rectangles (original code)
+            DrawFallback(spriteBatch, pixel);
+        }
+
+        // Melee/special hitbox overlays
+        if (IsSpinningMelee && MeleeTimer > 0)
+            spriteBatch.Draw(pixel, MeleeHitbox, Color.Red * 0.5f);
+        if (MeleeTimer > 0)
+            spriteBatch.Draw(pixel, MeleeHitbox, Color.Red * 0.5f);
+        if (IsVaultKicking)
+            spriteBatch.Draw(pixel, VaultKickHitbox, Color.Red * 0.4f);
+        if (IsUppercutting)
+            spriteBatch.Draw(pixel, UppercutHitbox, Color.Red * 0.4f);
+        if (IsBladeDashing)
+            spriteBatch.Draw(pixel, BladeDashHitbox, Color.Purple * 0.4f);
+    }
+
+    private void DrawFallback(SpriteBatch spriteBatch, Texture2D pixel)
+    {
         if (IsVaulting)
         {
             int size = (int)(Width * 0.8f);
@@ -1581,59 +1651,13 @@ public class Player
         }
         else if (IsOnRope)
         {
-            // Draw player on rope — slightly different color to indicate rope state
             spriteBatch.Draw(pixel,
                 new Rectangle((int)Position.X, (int)Position.Y, Width, Height),
                 IsCrouching ? Color.DarkGray : new Color(160, 120, 80));
-            // Draw grip indicator
             int gripY = (int)Position.Y + Height / 2 - 2;
             spriteBatch.Draw(pixel,
                 new Rectangle((int)Position.X + Width / 2 - 3, gripY, 6, 4),
                 Color.White * 0.7f);
-        }
-        else if (IsCartwheeling)
-        {
-            // Flash blue like a dash
-            spriteBatch.Draw(pixel,
-                new Rectangle((int)Position.X, (int)Position.Y, Width, Height),
-                Color.CornflowerBlue * 0.8f);
-        }
-        else if (IsVaultKicking)
-        {
-            spriteBatch.Draw(pixel,
-                new Rectangle((int)Position.X, (int)Position.Y, Width, Height),
-                Color.Orange * 0.9f);
-            var kickBox = VaultKickHitbox;
-            spriteBatch.Draw(pixel, kickBox, Color.Red * 0.6f);
-        }
-        else if (IsUppercutting)
-        {
-            // Yellow body with red hurtbox above head
-            spriteBatch.Draw(pixel,
-                new Rectangle((int)Position.X, (int)Position.Y, Width, Height),
-                Color.Yellow * 0.9f);
-            var ucBox = UppercutHitbox;
-            spriteBatch.Draw(pixel, ucBox, Color.Red * 0.6f);
-        }
-        else if (IsFlipping)
-        {
-            // Compact tuck — square shape, magenta tint
-            float t = 1f - (_flipTimer / FlipDuration);
-            int size = (int)(Width * 0.75f);
-            int cx = (int)Position.X + (Width - size) / 2;
-            int cy = (int)Position.Y + (Height - size) / 2;
-            spriteBatch.Draw(pixel,
-                new Rectangle(cx, cy, size, size),
-                Color.Magenta * 0.85f);
-        }
-        else if (IsBladeDashing)
-        {
-            // White/purple flash with wide hurtbox
-            spriteBatch.Draw(pixel,
-                new Rectangle((int)Position.X, (int)Position.Y, Width, Height),
-                Color.White * 0.9f);
-            var bdBox = BladeDashHitbox;
-            spriteBatch.Draw(pixel, bdBox, Color.Purple * 0.7f);
         }
         else if (IsSliding)
         {
@@ -1648,8 +1672,6 @@ public class Player
             spriteBatch.Draw(pixel,
                 new Rectangle((int)Position.X, drawY, Width, CrouchHeight),
                 Color.DarkGray);
-
-            // Aim line
             var center = new Vector2((int)Position.X + Width / 2f, drawY + CrouchHeight / 2f);
             for (int i = 0; i < 15; i++)
             {
@@ -1663,24 +1685,10 @@ public class Player
             spriteBatch.Draw(pixel,
                 new Rectangle((int)Position.X, (int)Position.Y, Width, Height),
                 bodyColor);
-
             int notchX = FacingDir == 1 ? (int)Position.X + Width - 4 : (int)Position.X;
             spriteBatch.Draw(pixel,
                 new Rectangle(notchX, (int)Position.Y + Height / 2 - 3, 4, 6),
                 Color.LightGray);
-        }
-
-        // Spinning melee overlay — draw the current melee hitbox in red
-        if (IsSpinningMelee && MeleeTimer > 0)
-        {
-            spriteBatch.Draw(pixel, MeleeHitbox, Color.Red * 0.5f);
-        }
-
-        // Draw melee hitbox when active
-        if (MeleeTimer > 0)
-        {
-            var box = MeleeHitbox;
-            spriteBatch.Draw(pixel, box, Color.Red * 0.5f);
         }
     }
 }
