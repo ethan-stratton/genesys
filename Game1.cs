@@ -633,6 +633,9 @@ public class Game1 : Game
         {
             _spawnMenuOpen = !_spawnMenuOpen;
             if (_spawnMenuOpen) _spawnMenuCursor = 0;
+            _prevKb = kb;
+            base.Update(gameTime);
+            return; // consume the keypress
         }
 
         if (_spawnMenuOpen)
@@ -650,7 +653,6 @@ public class Game1 : Game
             if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape) ||
                 kb.IsKeyDown(Keys.P) && _prevKb.IsKeyUp(Keys.P))
             {
-                // already toggled above, but Escape also closes
                 _spawnMenuOpen = false;
             }
             _prevKb = kb;
