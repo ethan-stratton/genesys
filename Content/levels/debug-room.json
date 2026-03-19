@@ -56,9 +56,9 @@
       "y": 296,
       "w": 30,
       "h": 48,
-      "targetLevel": "test-arena",
-      "id": "exit-left",
-      "targetExitId": "exit-debug"
+      "targetLevel": "__overworld__",
+      "id": "exit-overworld",
+      "targetExitId": ""
     },
     {
       "x": 2500,
@@ -67,7 +67,7 @@
       "h": 90,
       "targetLevel": "test-arena",
       "id": "exit-right",
-      "targetExitId": ""
+      "targetExitId": "exit-left"
     }
   ],
   "npcs": [],

@@ -1,12 +1,12 @@
 {
-  "currentLevel": "test-arena",
-  "spawnX": 370.16693,
-  "spawnY": 216,
+  "currentLevel": "the-descent",
+  "spawnX": 320,
+  "spawnY": 18.000336,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": false
   },
-  "playTime": 730.99896,
+  "playTime": 931.21674,
   "meleeInventory": [
     "Sword",
     "Stick",
@@ -25,5 +25,5 @@
     "debug_axe_639094935030423230",
     "debug_bow_639094935188767880"
   ],
-  "windowSizeIndex": 0
+  "windowSizeIndex": 2
 }

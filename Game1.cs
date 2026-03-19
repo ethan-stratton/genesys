@@ -318,7 +318,11 @@ public class Game1 : Game
         _graphics.PreferredBackBufferHeight = h;
         _graphics.ApplyChanges();
         if (_level != null)
+        {
+            var oldPos = _camera?.Position ?? Vector2.Zero;
             _camera = MakeCamera();
+            _camera.SnapTo(_player.Position, Player.Width, _player.CurrentHeight);
+        }
         // Persist
         if (_saveData != null) { _saveData.WindowSizeIndex = _windowSizeIndex; _saveData.Save(); }
     }
@@ -3607,7 +3611,10 @@ public class Game1 : Game
         // Backtick (`) — instant teleport to debug room
         if (kb.IsKeyDown(Keys.OemTilde) && _prevKb.IsKeyUp(Keys.OemTilde))
         {
-            LoadLevel("Content/Levels/debug-room.json");
+            LoadLevel("Content/levels/debug-room.json");
+            _editorSaveFile = "Content/levels/debug-room.json";
+            _camera = MakeCamera();
+            Restart();
             _gameState = GameState.Playing;
             return;
         }
