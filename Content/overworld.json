@@ -38,7 +38,7 @@
       "y": 350,
       "level": "the-gauntlet",
       "discovered": true,
-      "cleared": false,
+      "cleared": true,
       "connections": [
         "the-descent",
         "the-summit"
@@ -52,12 +52,12 @@
       "x": 650,
       "y": 200,
       "level": "the-summit",
-      "discovered": false,
-      "cleared": false,
+      "discovered": true,
+      "cleared": true,
       "connections": [
         "the-gauntlet"
       ],
-      "ShownName": "???"
+      "ShownName": "The Summit"
     },
     {
       "id": "debug-room",
@@ -67,7 +67,7 @@
       "y": 350,
       "level": "debug-room",
       "discovered": true,
-      "cleared": false,
+      "cleared": true,
       "connections": [
         "test-arena"
       ],

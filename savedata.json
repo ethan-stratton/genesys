@@ -1,29 +1,14 @@
 {
-  "currentLevel": "the-descent",
-  "spawnX": 320,
-  "spawnY": 18.000336,
+  "currentLevel": "test-arena",
+  "spawnX": 4,
+  "spawnY": 296,
   "unlockedAbilities": [],
-  "flags": {
-    "eveOrbActive": false
-  },
-  "playTime": 931.21674,
-  "meleeInventory": [
-    "Sword",
-    "Stick",
-    "Axe"
-  ],
-  "rangedInventory": [
-    "Gun",
-    "Bow"
-  ],
-  "meleeIndex": 2,
-  "rangedIndex": 1,
-  "collectedItems": [
-    "stick-1",
-    "debug_stick_639094927817930870",
-    "debug_sword_639094928042767450",
-    "debug_axe_639094935030423230",
-    "debug_bow_639094935188767880"
-  ],
-  "windowSizeIndex": 2
+  "flags": {},
+  "playTime": 65.5662,
+  "meleeInventory": [],
+  "rangedInventory": [],
+  "meleeIndex": -1,
+  "rangedIndex": -1,
+  "collectedItems": [],
+  "windowSizeIndex": 0
 }

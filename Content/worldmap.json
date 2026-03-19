@@ -12028,7 +12028,7 @@
           "id": "gauntlet",
           "name": "The Gauntlet",
           "level": "the-gauntlet",
-          "cleared": false,
+          "cleared": true,
           "discovered": true,
           "order": 2
         },
@@ -12036,16 +12036,16 @@
           "id": "summit",
           "name": "The Summit",
           "level": "the-summit",
-          "cleared": false,
-          "discovered": false,
+          "cleared": true,
+          "discovered": true,
           "order": 3
         }
       ],
-      "cleared": false
+      "cleared": true
     }
   ],
-  "playerX": 35,
-  "playerY": 47,
+  "playerX": 30,
+  "playerY": 45,
   "points": [
     {
       "x": 30,
