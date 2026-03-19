@@ -148,6 +148,11 @@ public class Game1 : Game
     private int _inventorySection; // 0=ranged, 1=melee
     private int _inventoryIndex; // index within current section
 
+    // Spawn weapon menu (P key)
+    private bool _spawnMenuOpen;
+    private int _spawnMenuCursor;
+    private static readonly string[] SpawnMenuItems = { "Stick", "Sword", "Axe", "Gun", "Bow", "Sling" };
+
     // --- Dialogue state ---
     private bool _dialogueOpen;
     private int _dialogueNpcIndex = -1;
@@ -246,12 +251,6 @@ public class Game1 : Game
                 else UnequipRanged(WeaponType.Gun);
             }},
             new() { Label = "EVE Orb", Get = () => _eveOrbActive, Toggle = () => _eveOrbActive = !_eveOrbActive },
-            new() { Label = "Spawn Stick", IsAction = true, Get = () => false, Toggle = () => SpawnItemAtPlayer("stick") },
-            new() { Label = "Spawn Sword", IsAction = true, Get = () => false, Toggle = () => SpawnItemAtPlayer("sword") },
-            new() { Label = "Spawn Gun", IsAction = true, Get = () => false, Toggle = () => SpawnItemAtPlayer("gun") },
-            new() { Label = "Spawn Bow", IsAction = true, Get = () => false, Toggle = () => SpawnItemAtPlayer("bow") },
-            new() { Label = "Spawn Sling", IsAction = true, Get = () => false, Toggle = () => SpawnItemAtPlayer("sling") },
-            new() { Label = "Spawn Axe", IsAction = true, Get = () => false, Toggle = () => SpawnItemAtPlayer("axe") },
         };
 
         _graphicsSettings = new SettingEntry[]
@@ -627,6 +626,36 @@ public class Game1 : Game
             _prevKb = kb;
             base.Update(gameTime);
             return; // game is paused while inventory is open
+        }
+
+        // Toggle spawn menu with P
+        if (kb.IsKeyDown(Keys.P) && _prevKb.IsKeyUp(Keys.P) && !_dialogueOpen)
+        {
+            _spawnMenuOpen = !_spawnMenuOpen;
+            if (_spawnMenuOpen) _spawnMenuCursor = 0;
+        }
+
+        if (_spawnMenuOpen)
+        {
+            if (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W))
+                _spawnMenuCursor = (_spawnMenuCursor - 1 + SpawnMenuItems.Length) % SpawnMenuItems.Length;
+            if (kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S))
+                _spawnMenuCursor = (_spawnMenuCursor + 1) % SpawnMenuItems.Length;
+            if (kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter) ||
+                kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space))
+            {
+                SpawnItemAtPlayer(SpawnMenuItems[_spawnMenuCursor].ToLower());
+                _spawnMenuOpen = false;
+            }
+            if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape) ||
+                kb.IsKeyDown(Keys.P) && _prevKb.IsKeyUp(Keys.P))
+            {
+                // already toggled above, but Escape also closes
+                _spawnMenuOpen = false;
+            }
+            _prevKb = kb;
+            base.Update(gameTime);
+            return;
         }
 
         if (_isDead)
@@ -3320,6 +3349,24 @@ public class Game1 : Game
             _inventoryOpen = false;
     }
 
+    private void DrawSpawnMenu()
+    {
+        // Small overlay
+        int menuW = 160, menuH = 30 + SpawnMenuItems.Length * 22;
+        int menuX = ViewW / 2 - menuW / 2, menuY = ViewH / 2 - menuH / 2;
+        _spriteBatch.Draw(_pixel, new Rectangle(menuX - 2, menuY - 2, menuW + 4, menuH + 4), Color.White * 0.3f);
+        _spriteBatch.Draw(_pixel, new Rectangle(menuX, menuY, menuW, menuH), Color.Black * 0.85f);
+
+        _spriteBatch.DrawString(_font, "SPAWN ITEM", new Vector2(menuX + 10, menuY + 6), Color.White);
+        for (int i = 0; i < SpawnMenuItems.Length; i++)
+        {
+            bool selected = i == _spawnMenuCursor;
+            string prefix = selected ? "> " : "  ";
+            Color color = selected ? Color.Yellow : Color.Gray;
+            _spriteBatch.DrawString(_font, prefix + SpawnMenuItems[i], new Vector2(menuX + 10, menuY + 26 + i * 22), color);
+        }
+    }
+
     private void DrawInventory()
     {
         // Semi-transparent overlay
@@ -4773,6 +4820,10 @@ public class Game1 : Game
         else if (_inventoryOpen)
         {
             DrawInventory();
+        }
+        else if (_spawnMenuOpen)
+        {
+            DrawSpawnMenu();
         }
         else if (!_isDead)
         {

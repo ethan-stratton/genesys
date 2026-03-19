@@ -1,10 +1,10 @@
 {
-  "currentLevel": "the-descent",
-  "spawnX": 4,
-  "spawnY": 496,
+  "currentLevel": "test-arena",
+  "spawnX": 1139,
+  "spawnY": 488,
   "unlockedAbilities": [],
   "flags": {},
-  "playTime": 384.18365,
+  "playTime": 386.2998,
   "meleeInventory": [
     "Sword"
   ],
