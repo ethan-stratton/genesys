@@ -3063,6 +3063,24 @@ public class Game1 : Game
             }
         }
 
+        // Draw spatial labels
+        foreach (var lbl in _level.Labels)
+        {
+            var lblFont = lbl.Size switch { "large" => _fontLarge, "normal" => _font, _ => _fontSmall };
+            var lblColor = lbl.Color switch
+            {
+                "Green" => Color.LimeGreen,
+                "Yellow" => Color.Yellow,
+                "Red" => Color.OrangeRed,
+                "Cyan" => Color.Cyan,
+                "Orange" => Color.Orange,
+                "Gray" => Color.Gray,
+                "Purple" => Color.MediumPurple,
+                _ => Color.White
+            };
+            _spriteBatch.DrawString(lblFont, SafeText(lbl.Text), new Vector2(lbl.X, lbl.Y), lblColor * 0.9f);
+        }
+
         // Draw drag preview
         if (_editorDragging)
         {
@@ -4808,6 +4826,24 @@ public class Game1 : Game
         {
             bool isOverworld = _level.ExitTargets.Length > i && _level.ExitTargets[i] == "__overworld__";
             _spriteBatch.Draw(_pixel, _level.ExitRects[i], isOverworld ? Color.CornflowerBlue * 0.5f : Color.LimeGreen * 0.5f);
+        }
+
+        // Draw spatial labels (gameplay)
+        foreach (var lbl in _level.Labels)
+        {
+            var lblFont = lbl.Size switch { "large" => _fontLarge, "normal" => _font, _ => _fontSmall };
+            var lblColor = lbl.Color switch
+            {
+                "Green" => Color.LimeGreen,
+                "Yellow" => Color.Yellow,
+                "Red" => Color.OrangeRed,
+                "Cyan" => Color.Cyan,
+                "Orange" => Color.Orange,
+                "Gray" => Color.Gray,
+                "Purple" => Color.MediumPurple,
+                _ => Color.White
+            };
+            _spriteBatch.DrawString(lblFont, SafeText(lbl.Text), new Vector2(lbl.X, lbl.Y), lblColor * 0.9f);
         }
 
         // Draw item pickups (gameplay)

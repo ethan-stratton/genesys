@@ -25,6 +25,7 @@ public class LevelData
     [JsonPropertyName("items")] public ItemData[] Items { get; set; } = Array.Empty<ItemData>();
     [JsonPropertyName("objects")] public EnvObjectData[] Objects { get; set; } = Array.Empty<EnvObjectData>();
     [JsonPropertyName("enemies")] public EnemySpawnData[] Enemies { get; set; } = Array.Empty<EnemySpawnData>();
+    [JsonPropertyName("labels")] public LabelData[] Labels { get; set; } = Array.Empty<LabelData>();
     [JsonPropertyName("tileGrid")] public TileGridData TileGrid { get; set; }
 
     [JsonIgnore] public TileGrid TileGridInstance { get; set; }
@@ -340,4 +341,13 @@ public class EnemySpawnData
     [JsonPropertyName("x")] public float X { get; set; }
     [JsonPropertyName("y")] public float Y { get; set; }
     [JsonPropertyName("count")] public int Count { get; set; } = 1;
+}
+
+public class LabelData
+{
+    [JsonPropertyName("text")] public string Text { get; set; } = "";
+    [JsonPropertyName("x")] public float X { get; set; }
+    [JsonPropertyName("y")] public float Y { get; set; }
+    [JsonPropertyName("color")] public string Color { get; set; } = "White";
+    [JsonPropertyName("size")] public string Size { get; set; } = "small"; // "small", "normal", "large"
 }
