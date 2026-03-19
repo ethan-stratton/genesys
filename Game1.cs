@@ -560,6 +560,38 @@ public class Game1 : Game
             return;
         }
 
+        // --- Spawn menu (P key, works in both editor and gameplay) ---
+        if (kb.IsKeyDown(Keys.P) && _prevKb.IsKeyUp(Keys.P) && !_dialogueOpen)
+        {
+            _spawnMenuOpen = !_spawnMenuOpen;
+            if (_spawnMenuOpen) _spawnMenuCursor = 0;
+            _prevKb = kb;
+            base.Update(gameTime);
+            return;
+        }
+
+        if (_spawnMenuOpen)
+        {
+            if (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W))
+                _spawnMenuCursor = (_spawnMenuCursor - 1 + SpawnMenuItems.Length) % SpawnMenuItems.Length;
+            if (kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S))
+                _spawnMenuCursor = (_spawnMenuCursor + 1) % SpawnMenuItems.Length;
+            if (kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter) ||
+                kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space))
+            {
+                SpawnItemAtPlayer(SpawnMenuItems[_spawnMenuCursor].ToLower());
+                _spawnMenuOpen = false;
+            }
+            if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape) ||
+                kb.IsKeyDown(Keys.P) && _prevKb.IsKeyUp(Keys.P))
+            {
+                _spawnMenuOpen = false;
+            }
+            _prevKb = kb;
+            base.Update(gameTime);
+            return;
+        }
+
         // --- Editor state ---
         if (_gameState == GameState.Editing)
         {
@@ -626,38 +658,6 @@ public class Game1 : Game
             _prevKb = kb;
             base.Update(gameTime);
             return; // game is paused while inventory is open
-        }
-
-        // Toggle spawn menu with P (editor only)
-        if (kb.IsKeyDown(Keys.P) && _prevKb.IsKeyUp(Keys.P) && !_dialogueOpen && _gameState == GameState.Editing)
-        {
-            _spawnMenuOpen = !_spawnMenuOpen;
-            if (_spawnMenuOpen) _spawnMenuCursor = 0;
-            _prevKb = kb;
-            base.Update(gameTime);
-            return; // consume the keypress
-        }
-
-        if (_spawnMenuOpen)
-        {
-            if (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W))
-                _spawnMenuCursor = (_spawnMenuCursor - 1 + SpawnMenuItems.Length) % SpawnMenuItems.Length;
-            if (kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S))
-                _spawnMenuCursor = (_spawnMenuCursor + 1) % SpawnMenuItems.Length;
-            if (kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter) ||
-                kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space))
-            {
-                SpawnItemAtPlayer(SpawnMenuItems[_spawnMenuCursor].ToLower());
-                _spawnMenuOpen = false;
-            }
-            if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape) ||
-                kb.IsKeyDown(Keys.P) && _prevKb.IsKeyUp(Keys.P))
-            {
-                _spawnMenuOpen = false;
-            }
-            _prevKb = kb;
-            base.Update(gameTime);
-            return;
         }
 
         if (_isDead)
