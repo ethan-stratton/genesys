@@ -1,11 +1,11 @@
 {
   "idle": {
     "row": 0,
-    "frameCount": 6
+    "frameCount": 5
   },
   "crouch": {
     "row": 1,
-    "frameCount": 6
+    "frameCount": 3
   },
   "jump": {
     "row": 2,

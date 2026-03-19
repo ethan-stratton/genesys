@@ -31,6 +31,7 @@ public class Player
 
     // Crouch / Aim lock
     public bool IsCrouching { get; private set; }
+    public bool Paused; // set by Game1 to freeze animations
     public const int CrouchHeight = 30;
 
     // Platform drop-through
@@ -1558,7 +1559,7 @@ public class Player
     private const int SpriteW = 48, SpriteH = 48;
     private const int RowIdle = 0, RowCrouch = 1, RowJump = 2, RowWalk = 3, RowRun = 4;
     private const int RowWhip = 5, RowBackflip = 6, RowDamaged = 7, RowSuperjump = 8, RowDash = 9;
-    private static readonly int[] RowFrameCounts = { 6, 6, 8, 8, 8, 10, 10, 3, 6, 3 };
+    private static readonly int[] RowFrameCounts = { 5, 3, 8, 8, 8, 10, 10, 3, 6, 3 };
     private float _idleTimer; // tracks how long standing still
     private bool _wasCrouching; // for crouch transition detection
     private float _crouchTransTimer; // >0 = transitioning into/out of crouch
@@ -1594,23 +1595,29 @@ public class Player
             int f = Math.Min((int)(progress * 10), 9);
             return (RowBackflip, f);
         }
-        // Slide / dash
-        if (IsSliding || IsDashing || IsBladeDashing)
+        // Slide
+        if (IsSliding)
+        {
+            int f = ((int)(_animTimer * 10f)) % 3;
+            return (RowDash, f);
+        }
+        // Blade dash — forward dash animation
+        if (IsBladeDashing)
         {
             int f = ((int)(_animTimer * 10f)) % 3;
             return (RowDash, f);
         }
         if (IsCrouching)
         {
-            // Crouch transition: 3 frames going down (frames 0-2), hold frame 2
-            if (_crouchTransTimer > 0)
+            // Crouch transition: 3 frames going down (0→1→2), hold frame 2
+            if (_crouchTransTimer > 0 && _crouchTransDown)
             {
                 int f = Math.Min(2, (int)((1f - _crouchTransTimer / 0.15f) * 3));
-                return (RowCrouch, _crouchTransDown ? f : 2 - f);
+                return (RowCrouch, f);
             }
             return (RowCrouch, 2); // hold crouched pose
         }
-        // Stand-up transition: frames 2,1,0 (reverse of crouch-down)
+        // Stand-up transition: reverse (2→1→0)
         if (_crouchTransTimer > 0 && !_crouchTransDown)
         {
             int f = Math.Min(2, (int)((1f - _crouchTransTimer / 0.15f) * 3));
@@ -1620,10 +1627,15 @@ public class Player
             return Velocity.Y < 0 ? (RowJump, 1) : (RowJump, 3);
         if (MathF.Abs(Velocity.X) > 10f)
         {
-            int f = ((int)(_animTimer * 10f)) % 8;
-            return (RowRun, f);
+            if (IsDashing)
+            {
+                int f = ((int)(_animTimer * 12f)) % 8;
+                return (RowRun, f);
+            }
+            int wf = ((int)(_animTimer * 8f)) % 8;
+            return (RowWalk, wf);
         }
-        // Idle: Stand A loops (frames 0-2), after 3 seconds plays Stand B (frames 3-5) once then holds frame 5
+        // Idle: Stand A loops (frames 0-2), after 3 seconds plays Stand B (frames 3-4) once then holds frame 4
         if (_idleTimer < 3f)
         {
             int f = ((int)(_animTimer * 3f)) % 3;
@@ -1632,7 +1644,7 @@ public class Player
         else
         {
             float elapsed = _idleTimer - 3f;
-            int f = Math.Min(2, (int)(elapsed * 3f));
+            int f = Math.Min(1, (int)(elapsed * 3f));
             return (RowIdle, 3 + f);
         }
     }
@@ -1646,20 +1658,23 @@ public class Player
             if ((frame / 4) % 2 == 0) return;
         }
 
-        // Accumulate animation timer
-        _animTimer += 1f / 60f; // approximate
+        // Accumulate animation timer (skip when paused)
+        if (!Paused)
+        {
+            _animTimer += 1f / 60f; // approximate
 
-        // Idle timer — reset when moving, crouch transitions
-        if (MathF.Abs(Velocity.X) > 10f || !IsGrounded || IsCrouching)
-            _idleTimer = 0f;
-        else
-            _idleTimer += 1f / 60f;
+            // Idle timer — reset when moving, crouch transitions
+            if (MathF.Abs(Velocity.X) > 10f || !IsGrounded || IsCrouching)
+                _idleTimer = 0f;
+            else
+                _idleTimer += 1f / 60f;
 
-        // Crouch transition timer
-        if (IsCrouching && !_wasCrouching) { _crouchTransTimer = 0.15f; _crouchTransDown = true; }
-        if (!IsCrouching && _wasCrouching) { _crouchTransTimer = 0.15f; _crouchTransDown = false; }
-        _wasCrouching = IsCrouching;
-        if (_crouchTransTimer > 0) _crouchTransTimer -= 1f / 60f;
+            // Crouch transition timer
+            if (IsCrouching && !_wasCrouching) { _crouchTransTimer = 0.15f; _crouchTransDown = true; }
+            if (!IsCrouching && _wasCrouching) { _crouchTransTimer = 0.15f; _crouchTransDown = false; }
+            _wasCrouching = IsCrouching;
+            if (_crouchTransTimer > 0) _crouchTransTimer -= 1f / 60f;
+        }
 
         if (spriteSheet != null)
         {

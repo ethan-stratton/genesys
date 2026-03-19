@@ -731,6 +731,7 @@ public class Game1 : Game
             if (kb.IsKeyDown(Keys.B) && _prevKb.IsKeyUp(Keys.B))
             {
                 _isPaused = !_isPaused;
+                _player.Paused = _isPaused;
             }
             if (_isPaused) { _prevKb = kb; return; }
 
