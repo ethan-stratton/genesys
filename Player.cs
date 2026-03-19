@@ -18,6 +18,7 @@ public class Player
     public const int Height = 48;
     private const float Speed = 250f;
     private const float Gravity = 900f;
+    private const float JumpCutMultiplier = 0.4f; // velocity multiplied by this on early jump release
     private const float JumpForce = -420f;
     public bool IsGrounded { get; set; }
     private bool _wasGrounded;
@@ -299,6 +300,59 @@ public class Player
     }
 
     public int CurrentHeight => IsSliding ? SlideHeight : (IsCrouching ? CrouchHeight : Height);
+
+    /// <summary>Check if there's headroom to expand to the given height at current position.</summary>
+    private bool HasHeadroom(int targetHeight, Rectangle[] ceilings, Rectangle[] solidFloors, TileGrid tileGrid)
+    {
+        int currentH = CurrentHeight;
+        if (targetHeight <= currentH) return true;
+
+        // The top of the player if they stood to targetHeight (bottom-aligned)
+        int newTop = (int)Position.Y + Height - targetHeight;
+        int left = (int)Position.X + CollisionOffsetX;
+        int right = left + CollisionWidth - 1;
+
+        // Check ceiling rects
+        if (ceilings != null)
+        {
+            var testRect = new Rectangle(left, newTop, CollisionWidth, targetHeight);
+            foreach (var c in ceilings)
+                if (testRect.Intersects(c)) return false;
+        }
+        if (solidFloors != null)
+        {
+            var testRect = new Rectangle(left, newTop, CollisionWidth, targetHeight);
+            foreach (var sf in solidFloors)
+                if (testRect.Intersects(sf)) return false;
+        }
+
+        // Check tile grid
+        if (tileGrid != null)
+        {
+            int ts = tileGrid.TileSize;
+            int topRow = newTop / ts;
+            int bottomRow = ((int)Position.Y + Height - 1) / ts;
+            int leftCol = left / ts;
+            int rightCol = right / ts;
+            for (int ty = topRow; ty <= bottomRow; ty++)
+            {
+                for (int tx = leftCol; tx <= rightCol; tx++)
+                {
+                    if (tx < 0 || tx >= tileGrid.Width || ty < 0 || ty >= tileGrid.Height) continue;
+                    if (TileProperties.IsSolid(tileGrid.GetTileAt(tx, ty)))
+                    {
+                        // Check if this tile actually overlaps the new head area
+                        int tileTop = ty * ts;
+                        int tileBottom = tileTop + ts;
+                        if (tileBottom > newTop && tileTop < newTop + (Height - currentH))
+                            return false;
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
 
     /// <summary>Collision rect: narrower than sprite, centered horizontally.</summary>
     public Rectangle CollisionRect
@@ -627,7 +681,16 @@ public class Player
         }
 
         // --- Crouch (shift while grounded, not sliding) ---
-        IsCrouching = shift && (_wasGrounded || IsOnRope || IsOnWall) && !IsSliding;
+        bool wantsCrouch = shift && (_wasGrounded || IsOnRope || IsOnWall) && !IsSliding;
+        if (wantsCrouch)
+            IsCrouching = true;
+        else if (IsCrouching)
+        {
+            // Releasing crouch — check if there's headroom to stand
+            if (HasHeadroom(Height, ceilings, solidFloors, tileGrid))
+                IsCrouching = false;
+            // else stay crouched until there's room
+        }
 
         // --- Drop through platform (double-tap S only) ---
         _dropIgnoreTimer -= dt;
@@ -1110,8 +1173,24 @@ public class Player
                 vel.Y = 0;
                 if (_slideTimer <= 0)
                 {
-                    IsSliding = false;
-                    vel.X = _slideDir * SlideEndSpeed;
+                    // Check if there's headroom to stand up
+                    if (HasHeadroom(Height, ceilings, solidFloors, tileGrid))
+                    {
+                        IsSliding = false;
+                        vel.X = _slideDir * SlideEndSpeed;
+                    }
+                    else if (HasHeadroom(CrouchHeight, ceilings, solidFloors, tileGrid))
+                    {
+                        // Can't stand, but can crouch — force crouch
+                        IsSliding = false;
+                        IsCrouching = true;
+                        vel.X = 0;
+                    }
+                    else
+                    {
+                        // Can't even crouch — keep sliding (extend timer)
+                        _slideTimer = 0.05f; // re-check shortly
+                    }
                 }
             }
         }
@@ -1177,7 +1256,14 @@ public class Player
                 IsGrounded = false;
                 _wasGrounded = false;
             }
+            bool wasHoldingJump = _jumpHeld;
             _jumpHeld = spacePressed;
+
+            // Variable jump height: cut upward velocity on the frame Space is released mid-air
+            if (wasHoldingJump && !spacePressed && vel.Y < 0 && !IsGrounded && !IsFlipping && !IsUppercutting && !IsVaultKicking)
+            {
+                vel.Y *= JumpCutMultiplier;
+            }
 
             vel.Y += Gravity * dt;
         }
