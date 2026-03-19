@@ -22,6 +22,7 @@ public class SaveData
     [JsonPropertyName("rangedIndex")] public int RangedIndex { get; set; } = 0;
     [JsonPropertyName("collectedItems")] public HashSet<string> CollectedItems { get; set; } = new(); // item IDs picked up
     [JsonPropertyName("windowSizeIndex")] public int WindowSizeIndex { get; set; } = 0;
+    [JsonPropertyName("crtEnabled")] public bool CrtEnabled { get; set; } = false;
 
     public void Save()
     {

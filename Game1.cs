@@ -263,7 +263,7 @@ public class Game1 : Game
         _graphicsSettings = new SettingEntry[]
         {
             new() { Label = "Window Size", Get = () => true, Toggle = () => ApplyWindowSize(_windowSizeIndex + 1) },
-            new() { Label = "CRT Filter", Get = () => _crtEnabled, Toggle = () => _crtEnabled = !_crtEnabled },
+            new() { Label = "CRT Filter", Get = () => _crtEnabled, Toggle = () => { _crtEnabled = !_crtEnabled; var s = _saveData ?? SaveData.Load(); if (s != null) { s.CrtEnabled = _crtEnabled; s.Save(); } } },
         };
 
         Restart();
@@ -280,6 +280,8 @@ public class Game1 : Game
             if (_level != null)
                 _camera = MakeCamera();
         }
+        if (tempSave != null)
+            _crtEnabled = tempSave.CrtEnabled;
 
         if (System.IO.File.Exists(OverworldPath))
             _overworld = OverworldData.Load(OverworldPath);
@@ -332,8 +334,9 @@ public class Game1 : Game
             _camera.SnapTo(_player.Position, Player.Width, _player.CurrentHeight);
         }
         _crtTarget = new RenderTarget2D(GraphicsDevice, ViewW, ViewH);
-        // Persist
-        if (_saveData != null) { _saveData.WindowSizeIndex = _windowSizeIndex; _saveData.Save(); }
+        // Persist window size
+        var saveForPersist = _saveData ?? SaveData.Load();
+        if (saveForPersist != null) { saveForPersist.WindowSizeIndex = _windowSizeIndex; saveForPersist.Save(); }
     }
 
     private Camera MakeCamera() => new Camera(ViewW, ViewH, _level.Bounds.Left, _level.Bounds.Right, _level.Bounds.Top, _level.Bounds.Bottom);
@@ -3304,14 +3307,31 @@ public class Game1 : Game
 
             if (_settingsActiveCategory == SettingsCategory.Graphics)
             {
-                // Show window size with current value
-                var (cw, ch, clabel) = WindowSizes[_windowSizeIndex];
-                string prefix = "> ";
-                string sizeStr = $"{prefix}Window Size: {clabel}";
-                var color = Color.Yellow;
-                var sizeMs = _font.MeasureString(sizeStr);
-                _spriteBatch.DrawString(_font, SafeText(sizeStr), new Vector2(cx - sizeMs.X / 2, startY), color);
-                { var hint = "(Enter to cycle)"; var hs2 = _font.MeasureString(hint); _spriteBatch.DrawString(_font, SafeText(hint), new Vector2(cx - hs2.X / 2, startY + lineHeight), Color.Gray * 0.6f); }
+                // Show window size as first item, then remaining graphics settings
+                int totalItems = 1 + _graphicsSettings.Length; // window size + CRT etc
+                for (int i = 0; i < totalItems; i++)
+                {
+                    bool selected = i == _settingsItemCursor;
+                    string prefix = selected ? "> " : "  ";
+                    Color color;
+                    string txt;
+                    if (i == 0)
+                    {
+                        var (cw, ch, clabel) = WindowSizes[_windowSizeIndex];
+                        txt = $"{prefix}Window Size: {clabel}";
+                        color = selected ? Color.Yellow : Color.Gray;
+                    }
+                    else
+                    {
+                        var s = _graphicsSettings[i - 1];
+                        string value = s.Get() ? "  ON" : "  OFF";
+                        color = selected ? Color.Yellow : Color.Gray;
+                        if (s.Get()) color = selected ? Color.Yellow : Color.LightGreen;
+                        txt = $"{prefix}{s.Label}{value}";
+                    }
+                    var ts = _font.MeasureString(txt);
+                    _spriteBatch.DrawString(_font, SafeText(txt), new Vector2(cx - ts.X / 2, startY + i * lineHeight), color);
+                }
             }
             else
             {
@@ -3523,9 +3543,15 @@ public class Game1 : Game
             // In a submenu
             if (_settingsActiveCategory == SettingsCategory.Graphics)
             {
+                int totalItems = 1 + _graphicsSettings.Length;
+                if (up) _settingsItemCursor = (_settingsItemCursor - 1 + totalItems) % totalItems;
+                if (down) _settingsItemCursor = (_settingsItemCursor + 1) % totalItems;
                 if (confirm)
                 {
-                    ApplyWindowSize(_windowSizeIndex + 1);
+                    if (_settingsItemCursor == 0)
+                        ApplyWindowSize(_windowSizeIndex + 1);
+                    else
+                        _graphicsSettings[_settingsItemCursor - 1].Toggle();
                 }
                 if (esc) _settingsActiveCategory = null;
                 return;
