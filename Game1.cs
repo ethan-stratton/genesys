@@ -2684,7 +2684,7 @@ public class Game1 : Game
             float sy = (float)(_shakeRng.NextDouble() * 2 - 1) * _shakeIntensity;
             shakeOffset = Matrix.CreateTranslation(sx, sy, 0);
         }
-        _spriteBatch.Begin(transformMatrix: _camera.TransformMatrix * shakeOffset);
+        _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.NonPremultiplied, SamplerState.PointClamp, transformMatrix: _camera.TransformMatrix * shakeOffset);
 
         // Draw floor
         int floorY = _level.Floor.Y;

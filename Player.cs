@@ -1683,7 +1683,7 @@ public class Player
 
             // Center the 48x48 sprite frame on the 32x48 collision box
             int drawX = (int)Position.X - (SpriteW - Width) / 2;
-            int drawY = (int)Position.Y + Height - SpriteH - 2; // bottom-aligned, nudged up 2px
+            int drawY = (int)Position.Y + Height - SpriteH + 1; // bottom-aligned, nudged down 1px
             var destRect = new Rectangle(drawX, drawY, SpriteW, SpriteH);
             spriteBatch.Draw(spriteSheet, destRect, srcRect, tint, 0f, Vector2.Zero, flip, 0f);
         }
