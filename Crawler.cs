@@ -7,19 +7,23 @@ namespace ArenaShooter;
 public class Crawler
 {
     public Vector2 Position;
+    public Vector2 Velocity;
     public bool Alive = true;
     public int Hp = 3;
     public const int Width = 16, Height = 10;
     public float PatrolLeft, PatrolRight;
-    public float SurfaceLeft, SurfaceRight; // hard edges — crawler won't walk off
+    public float SurfaceLeft, SurfaceRight;
     public int Dir = 1;
     public bool Aggroed;
     public float AggroRange = 200f;
     public float Speed = 60f;
     public float ChaseSpeed = 100f;
     public float DamageCooldown;
-    public float MeleeHitCooldown; // prevents being hit multiple times by same melee swing
+    public float MeleeHitCooldown;
     public float HitFlash;
+    private bool _onGround;
+
+    private const float Gravity = 600f;
 
     public Crawler(Vector2 pos, float patrolLeft, float patrolRight, float surfaceLeft, float surfaceRight)
     {
@@ -32,7 +36,12 @@ public class Crawler
 
     public Rectangle Rect => new((int)Position.X, (int)Position.Y, Width, Height);
 
-    public void Update(float dt, Vector2 playerCenter)
+    /// <summary>
+    /// Update with tile-aware physics. Call UpdateSurfaceEdges after spawning or when surface changes.
+    /// </summary>
+    public void Update(float dt, Vector2 playerCenter,
+        TileGrid tileGrid, int tileSize,
+        Rectangle[] platforms, Rectangle[] solidFloors, float floorY)
     {
         if (!Alive) return;
         if (DamageCooldown > 0) DamageCooldown -= dt;
@@ -46,16 +55,23 @@ public class Crawler
         {
             float dx = playerCenter.X - (Position.X + Width / 2f);
             Dir = dx > 0 ? 1 : -1;
-            Position.X += Dir * ChaseSpeed * dt;
+            Velocity.X = Dir * ChaseSpeed;
         }
         else
         {
-            Position.X += Dir * Speed * dt;
+            Velocity.X = Dir * Speed;
             if (Position.X <= PatrolLeft) { Position.X = PatrolLeft; Dir = 1; }
             if (Position.X + Width >= PatrolRight) { Position.X = PatrolRight - Width; Dir = -1; }
         }
 
-        // Clamp to surface edges — never walk off platforms
+        // Apply gravity and tile collision
+        _onGround = EnemyPhysics.ApplyGravityAndCollision(
+            ref Position, ref Velocity,
+            Width, Height, Gravity, dt,
+            tileGrid, tileSize,
+            platforms, solidFloors, floorY);
+
+        // Clamp to surface edges
         if (Position.X < SurfaceLeft)
         {
             Position.X = SurfaceLeft;
@@ -66,6 +82,25 @@ public class Crawler
             Position.X = SurfaceRight - Width;
             if (!Aggroed) Dir = -1;
         }
+    }
+
+    /// <summary>
+    /// Refresh surface edge detection using tile-aware method.
+    /// </summary>
+    public void UpdateSurfaceEdges(TileGrid tileGrid, int tileSize,
+        Rectangle[] platforms, Rectangle[] solidFloors,
+        float boundsLeft, float boundsRight)
+    {
+        float footY = Position.Y + Height;
+        var edges = EnemyPhysics.FindSurfaceEdges(
+            Position.X, footY, Width,
+            tileGrid, tileSize,
+            platforms, solidFloors,
+            boundsLeft, boundsRight);
+        SurfaceLeft = edges.Left;
+        SurfaceRight = edges.Right;
+        PatrolLeft = MathF.Max(PatrolLeft, SurfaceLeft);
+        PatrolRight = MathF.Min(PatrolRight, SurfaceRight);
     }
 
     public int CheckPlayerDamage(Rectangle playerRect)

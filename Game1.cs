@@ -389,6 +389,16 @@ public class Game1 : Game
         _thornbacks.Clear();
         _birds.Clear();
         if (_rng == null) _rng = new Random();
+
+        var tg = _level.TileGridInstance;
+        int ts = _level.TileGrid?.TileSize ?? 32;
+        var plats = _level.AllPlatforms;
+        var sFloors = _level.SolidFloorRects;
+        var walls = _level.WallRects;
+        float mainFloor = _level.Floor.Y;
+        float bLeft = _level.Bounds.Left;
+        float bRight = _level.Bounds.Right;
+
         foreach (var e in _level.Enemies)
         {
             switch (e.Type)
@@ -397,22 +407,24 @@ public class Game1 : Game
                     _swarms.Add(new InsectSwarm(new Vector2(e.X, e.Y), e.Count > 0 ? e.Count : 10, _rng));
                     break;
                 case "crawler":
-                    float snapY = SnapToSurface(e.X, e.Y, Crawler.Width, Crawler.Height);
-                    var surfaceEdges = FindSurfaceEdges(e.X, snapY + Crawler.Height);
-                    _crawlers.Add(new Crawler(new Vector2(e.X, snapY), e.X - 100, e.X + 100, surfaceEdges.Item1, surfaceEdges.Item2));
+                    float snapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Crawler.Width, Crawler.Height, tg, ts, plats, sFloors, walls, mainFloor);
+                    var c = new Crawler(new Vector2(e.X, snapY), e.X - 100, e.X + 100, 0, 0);
+                    c.UpdateSurfaceEdges(tg, ts, plats, sFloors, bLeft, bRight);
+                    _crawlers.Add(c);
                     break;
                 case "thornback":
-                    float tSnapY = SnapToSurface(e.X, e.Y, Thornback.Width, Thornback.Height);
+                    float tSnapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Thornback.Width, Thornback.Height, tg, ts, plats, sFloors, walls, mainFloor);
                     _thornbacks.Add(new Thornback(new Vector2(e.X, tSnapY)));
                     break;
                 case "hopper":
-                    float hSnapY = SnapToSurface(e.X, e.Y, Hopper.Width, Hopper.Height);
+                    float hSnapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Hopper.Width, Hopper.Height, tg, ts, plats, sFloors, walls, mainFloor);
                     _hoppers.Add(new Hopper(new Vector2(e.X, hSnapY), hSnapY + Hopper.Height));
                     break;
                 case "bird":
-                    float bSnapY = SnapToSurface(e.X, e.Y, Bird.Width, Bird.Height);
-                    var bEdges = FindSurfaceEdges(e.X, bSnapY + Bird.Height);
-                    _birds.Add(new Bird(new Vector2(e.X, bSnapY), bEdges.Item1, bEdges.Item2, _rng));
+                    float bSnapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Bird.Width, Bird.Height, tg, ts, plats, sFloors, walls, mainFloor);
+                    var bird = new Bird(new Vector2(e.X, bSnapY), 0, 0, _rng);
+                    bird.UpdateSurfaceEdges(tg, ts, plats, sFloors, bLeft, bRight);
+                    _birds.Add(bird);
                     break;
             }
         }
@@ -916,7 +928,9 @@ public class Game1 : Game
         // Update crawlers
         foreach (var c in _crawlers)
         {
-            c.Update(dt, playerCenter2);
+            c.Update(dt, playerCenter2,
+                _level.TileGridInstance, _level.TileGrid?.TileSize ?? 32,
+                _level.AllPlatforms, _level.SolidFloorRects, _level.Floor.Y);
             if (_spawnInvincibility <= 0 && !_isDead)
             {
                 int dmg = c.CheckPlayerDamage(playerRect2);
@@ -976,7 +990,9 @@ public class Game1 : Game
         // Update hoppers
         foreach (var h in _hoppers)
         {
-            h.Update(dt, playerCenter2, _level.SolidFloorRects, _level.AllPlatforms, _level.Floor.Y);
+            h.Update(dt, playerCenter2,
+                _level.TileGridInstance, _level.TileGrid?.TileSize ?? 32,
+                _level.AllPlatforms, _level.SolidFloorRects, _level.Floor.Y);
             if (_spawnInvincibility <= 0 && !_isDead)
             {
                 int dmg = h.CheckPlayerDamage(playerRect2);
@@ -1005,7 +1021,9 @@ public class Game1 : Game
 
         // Update birds (non-hostile ambient creatures)
         foreach (var bird in _birds)
-            bird.Update(dt, playerCenter2);
+            bird.Update(dt, playerCenter2,
+                _level.TileGridInstance, _level.TileGrid?.TileSize ?? 32,
+                _level.AllPlatforms, _level.SolidFloorRects, _level.Floor.Y);
         _birds.RemoveAll(b => !b.Alive);
 
         // Bullets vs crawlers and thornbacks

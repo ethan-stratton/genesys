@@ -7,29 +7,29 @@ namespace ArenaShooter;
 public class Bird
 {
     public Vector2 Position;
+    public Vector2 Velocity;
     public bool Alive = true;
     public const int Width = 10, Height = 8;
 
-    // Behavior
     private enum State { Perched, Pecking, Hopping, Fleeing, Flying }
     private State _state = State.Perched;
     private float _stateTimer;
     private float _peckTimer;
-    private int _peckFrame; // 0 = head up, 1 = head down
-    private int _dir = 1; // facing direction
+    private int _peckFrame;
+    private int _dir = 1;
     private float _fleeSpeed = 180f;
     private float _hopSpeed = 30f;
-    private float _flyVelX, _flyVelY;
     private float _flightTime;
     private readonly Random _rng;
+    private bool _onGround;
 
-    // Awareness
     public float FleeRange = 80f;
     public float AlertRange = 140f;
 
-    // Ground tracking
     public float GroundY;
     public float SurfaceLeft, SurfaceRight;
+
+    private const float FlyGravity = 100f;
 
     public Bird(Vector2 pos, float surfaceLeft, float surfaceRight, Random rng)
     {
@@ -38,12 +38,14 @@ public class Bird
         SurfaceLeft = surfaceLeft;
         SurfaceRight = surfaceRight;
         _rng = rng;
-        _stateTimer = 1f + (float)rng.NextDouble() * 3f; // stagger initial behavior
+        _stateTimer = 1f + (float)rng.NextDouble() * 3f;
     }
 
     public Rectangle Rect => new((int)Position.X, (int)Position.Y, Width, Height);
 
-    public void Update(float dt, Vector2 playerPos)
+    public void Update(float dt, Vector2 playerPos,
+        TileGrid tileGrid, int tileSize,
+        Rectangle[] platforms, Rectangle[] solidFloors, float floorY)
     {
         if (!Alive) return;
 
@@ -53,20 +55,18 @@ public class Bird
         // React to player proximity
         if (_state != State.Flying && _state != State.Fleeing && dist < FleeRange)
         {
-            // Panic — take flight!
             _state = State.Flying;
-            _flyVelX = dx > 0 ? -_fleeSpeed : _fleeSpeed; // fly away from player
-            _flyVelY = -200f; // launch upward
+            Velocity.X = dx > 0 ? -_fleeSpeed : _fleeSpeed;
+            Velocity.Y = -200f;
             _flightTime = 0;
-            _dir = _flyVelX > 0 ? 1 : -1;
+            _dir = Velocity.X > 0 ? 1 : -1;
         }
         else if (_state != State.Flying && _state != State.Fleeing && dist < AlertRange)
         {
-            // Alert — hop away nervously
             if (_state != State.Fleeing)
             {
                 _state = State.Fleeing;
-                _dir = dx > 0 ? -1 : 1; // face away from player
+                _dir = dx > 0 ? -1 : 1;
                 _stateTimer = 0.8f + (float)_rng.NextDouble() * 0.5f;
             }
         }
@@ -76,10 +76,8 @@ public class Bird
         switch (_state)
         {
             case State.Perched:
-                // Just sitting there looking around
                 if (_stateTimer <= 0)
                 {
-                    // Transition to pecking or hopping
                     float roll = (float)_rng.NextDouble();
                     if (roll < 0.5f)
                     {
@@ -95,7 +93,6 @@ public class Bird
                     }
                     else
                     {
-                        // Just turn around
                         _dir = -_dir;
                         _stateTimer = 1f + (float)_rng.NextDouble() * 2f;
                     }
@@ -104,7 +101,7 @@ public class Bird
 
             case State.Pecking:
                 _peckTimer += dt;
-                _peckFrame = ((int)(_peckTimer * 4f)) % 2; // bob head 4 times/sec
+                _peckFrame = ((int)(_peckTimer * 4f)) % 2;
                 if (_stateTimer <= 0)
                 {
                     _state = State.Perched;
@@ -114,8 +111,13 @@ public class Bird
                 break;
 
             case State.Hopping:
-                Position.X += _dir * _hopSpeed * dt;
-                // Clamp to surface
+                Velocity.X = _dir * _hopSpeed;
+                Velocity.Y = 0;
+                _onGround = EnemyPhysics.ApplyGravityAndCollision(
+                    ref Position, ref Velocity, Width, Height, 600f, dt,
+                    tileGrid, tileSize, platforms, solidFloors, floorY);
+
+                // Clamp to surface edges
                 if (Position.X < SurfaceLeft) { Position.X = SurfaceLeft; _dir = 1; }
                 if (Position.X + Width > SurfaceRight) { Position.X = SurfaceRight - Width; _dir = -1; }
                 if (_stateTimer <= 0)
@@ -126,24 +128,23 @@ public class Bird
                 break;
 
             case State.Fleeing:
-                // Nervous hop away from player
-                Position.X += _dir * _fleeSpeed * 0.5f * dt;
+                Velocity.X = _dir * _fleeSpeed * 0.5f;
+                Velocity.Y = 0;
+                _onGround = EnemyPhysics.ApplyGravityAndCollision(
+                    ref Position, ref Velocity, Width, Height, 600f, dt,
+                    tileGrid, tileSize, platforms, solidFloors, floorY);
+
                 if (Position.X < SurfaceLeft || Position.X + Width > SurfaceRight)
                 {
-                    // Ran out of ground — take flight!
                     _state = State.Flying;
-                    _flyVelX = _dir * _fleeSpeed;
-                    _flyVelY = -180f;
+                    Velocity.X = _dir * _fleeSpeed;
+                    Velocity.Y = -180f;
                     _flightTime = 0;
                 }
                 else if (_stateTimer <= 0)
                 {
-                    // Check if player is still close
                     if (dist < AlertRange)
-                    {
-                        // Still nervous, keep fleeing
                         _stateTimer = 0.3f;
-                    }
                     else
                     {
                         _state = State.Perched;
@@ -154,30 +155,45 @@ public class Bird
 
             case State.Flying:
                 _flightTime += dt;
-                Position.X += _flyVelX * dt;
-                Position.Y += _flyVelY * dt;
-                _flyVelY += 100f * dt; // gentle gravity — birds don't fall like rocks
+                // Flying uses direct position movement (birds defy tile physics)
+                Position.X += Velocity.X * dt;
+                Position.Y += Velocity.Y * dt;
+                Velocity.Y += FlyGravity * dt;
+                Velocity.Y += MathF.Sin(_flightTime * 12f) * 8f * dt;
 
-                // Slight sinusoidal flutter
-                _flyVelY += MathF.Sin(_flightTime * 12f) * 8f * dt;
-
-                // Despawn if off-screen for a while or flew too far
                 if (_flightTime > 4f)
                     Alive = false;
 
-                // Can land back if far enough from where they spooked
-                if (_flightTime > 1.5f && Position.Y >= GroundY && _flyVelY > 0)
+                if (_flightTime > 1.5f && Position.Y >= GroundY && Velocity.Y > 0)
                 {
                     Position.Y = GroundY;
+                    Velocity = Vector2.Zero;
                     _state = State.Perched;
                     _stateTimer = 2f + (float)_rng.NextDouble() * 3f;
                 }
                 break;
         }
 
-        // Keep on ground when not flying
-        if (_state != State.Flying)
+        // Keep on ground when not flying (snap to ground Y)
+        if (_state != State.Flying && _state != State.Hopping && _state != State.Fleeing)
             Position.Y = GroundY;
+    }
+
+    /// <summary>
+    /// Refresh surface edge detection using tile-aware method.
+    /// </summary>
+    public void UpdateSurfaceEdges(TileGrid tileGrid, int tileSize,
+        Rectangle[] platforms, Rectangle[] solidFloors,
+        float boundsLeft, float boundsRight)
+    {
+        float footY = Position.Y + Height;
+        var edges = EnemyPhysics.FindSurfaceEdges(
+            Position.X, footY, Width,
+            tileGrid, tileSize,
+            platforms, solidFloors,
+            boundsLeft, boundsRight);
+        SurfaceLeft = edges.Left;
+        SurfaceRight = edges.Right;
     }
 
     public void Draw(SpriteBatch sb, Texture2D pixel)
@@ -189,10 +205,7 @@ public class Bird
 
         if (_state == State.Flying)
         {
-            // Flying bird — V shape wings
-            // Body
             sb.Draw(pixel, new Rectangle((int)(ox + 3), (int)(oy + 3), 4, 3), new Color(80, 60, 40));
-            // Wings — flap based on time
             bool wingsUp = ((int)(_flightTime * 8f)) % 2 == 0;
             if (wingsUp)
             {
@@ -207,31 +220,24 @@ public class Bird
         }
         else
         {
-            // Grounded bird
-            Color bodyColor = new Color(110, 85, 55); // brown sparrow
+            Color bodyColor = new Color(110, 85, 55);
             Color headColor = new Color(90, 70, 45);
-            Color beakColor = new Color(180, 140, 40); // yellow beak
+            Color beakColor = new Color(180, 140, 40);
 
             bool facingRight = _dir > 0;
 
-            // Body (oval-ish)
             sb.Draw(pixel, new Rectangle((int)(ox + 2), (int)(oy + 3), 6, 5), bodyColor);
-            // Head
             int headX = facingRight ? 7 : -1;
-            int headY = _peckFrame == 1 ? 4 : 1; // pecking lowers head
+            int headY = _peckFrame == 1 ? 4 : 1;
             sb.Draw(pixel, new Rectangle((int)(ox + headX), (int)(oy + headY), 4, 4), headColor);
-            // Beak
             int beakX = facingRight ? 10 : -2;
             int beakY = headY + 1;
             sb.Draw(pixel, new Rectangle((int)(ox + beakX), (int)(oy + beakY), 2, 1), beakColor);
-            // Eye
             int eyeX = facingRight ? 9 : 0;
             int eyeY = headY + 1;
             sb.Draw(pixel, new Rectangle((int)(ox + eyeX), (int)(oy + eyeY), 1, 1), Color.Black);
-            // Legs
             sb.Draw(pixel, new Rectangle((int)(ox + 3), (int)(oy + 7), 1, 2), new Color(160, 120, 40));
             sb.Draw(pixel, new Rectangle((int)(ox + 6), (int)(oy + 7), 1, 2), new Color(160, 120, 40));
-            // Tail
             int tailX = facingRight ? 0 : 8;
             sb.Draw(pixel, new Rectangle((int)(ox + tailX), (int)(oy + 2), 2, 2), bodyColor * 0.8f);
         }
