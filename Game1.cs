@@ -246,6 +246,12 @@ public class Game1 : Game
                 else UnequipRanged(WeaponType.Gun);
             }},
             new() { Label = "EVE Orb", Get = () => _eveOrbActive, Toggle = () => _eveOrbActive = !_eveOrbActive },
+            new() { Label = "Spawn Stick", IsAction = true, Get = () => false, Toggle = () => SpawnItemAtPlayer("stick") },
+            new() { Label = "Spawn Sword", IsAction = true, Get = () => false, Toggle = () => SpawnItemAtPlayer("sword") },
+            new() { Label = "Spawn Gun", IsAction = true, Get = () => false, Toggle = () => SpawnItemAtPlayer("gun") },
+            new() { Label = "Spawn Bow", IsAction = true, Get = () => false, Toggle = () => SpawnItemAtPlayer("bow") },
+            new() { Label = "Spawn Sling", IsAction = true, Get = () => false, Toggle = () => SpawnItemAtPlayer("sling") },
+            new() { Label = "Spawn Axe", IsAction = true, Get = () => false, Toggle = () => SpawnItemAtPlayer("axe") },
         };
 
         _graphicsSettings = new SettingEntry[]
@@ -1413,6 +1419,20 @@ public class Game1 : Game
 
     private WeaponType CurrentMelee => _meleeIndex >= 0 && _meleeIndex < _meleeInventory.Length ? _meleeInventory[_meleeIndex] : WeaponType.None;
     private WeaponType CurrentRanged => _rangedIndex >= 0 && _rangedIndex < _rangedInventory.Length ? _rangedInventory[_rangedIndex] : WeaponType.None;
+
+    private void SpawnItemAtPlayer(string itemType)
+    {
+        _itemPickups.Add(new ItemPickup
+        {
+            Id = $"debug_{itemType}_{System.DateTime.UtcNow.Ticks}",
+            X = _player.Position.X + Player.Width / 2f - 12,
+            Y = _player.Position.Y - 20,
+            W = 24, H = 12,
+            ItemType = itemType,
+            HasGravity = true,
+            VelY = -100f // pop up slightly
+        });
+    }
 
     private static Color ParseNpcColor(string name)
     {

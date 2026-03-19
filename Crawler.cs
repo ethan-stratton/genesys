@@ -18,6 +18,7 @@ public class Crawler
     public float Speed = 60f;
     public float ChaseSpeed = 100f;
     public float DamageCooldown;
+    public float MeleeHitCooldown; // prevents being hit multiple times by same melee swing
     public float HitFlash;
 
     public Crawler(Vector2 pos, float patrolLeft, float patrolRight, float surfaceLeft, float surfaceRight)
@@ -35,6 +36,7 @@ public class Crawler
     {
         if (!Alive) return;
         if (DamageCooldown > 0) DamageCooldown -= dt;
+        if (MeleeHitCooldown > 0) MeleeHitCooldown -= dt;
         if (HitFlash > 0) HitFlash -= dt;
 
         float dist = Vector2.Distance(playerCenter, Position + new Vector2(Width / 2f, Height / 2f));
@@ -79,9 +81,10 @@ public class Crawler
 
     public bool TakeHit(int damage)
     {
-        if (!Alive) return false;
+        if (!Alive || MeleeHitCooldown > 0) return false;
         Hp -= damage;
         HitFlash = 0.15f;
+        MeleeHitCooldown = 0.2f;
         if (Hp <= 0) { Alive = false; return true; }
         return false;
     }

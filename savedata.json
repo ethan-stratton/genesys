@@ -1,14 +1,18 @@
 {
   "currentLevel": "the-descent",
-  "spawnX": 800,
-  "spawnY": 284,
+  "spawnX": 4,
+  "spawnY": 496,
   "unlockedAbilities": [],
   "flags": {},
-  "playTime": 247.18376,
-  "meleeInventory": [],
-  "rangedInventory": [],
-  "meleeIndex": -1,
-  "rangedIndex": -1,
+  "playTime": 384.18365,
+  "meleeInventory": [
+    "Sword"
+  ],
+  "rangedInventory": [
+    "Gun"
+  ],
+  "meleeIndex": 0,
+  "rangedIndex": 0,
   "collectedItems": [
     "stick-1"
   ],

@@ -20,6 +20,7 @@ public class Hopper
     public bool Aggroed;
     public float DamageCooldown;
     public float HitFlash;
+    public float MeleeHitCooldown;
 
     // Hop state machine
     private enum State { Grounded, Winding, Airborne, Landing }
@@ -57,6 +58,7 @@ public class Hopper
         if (!Alive) return;
         if (DamageCooldown > 0) DamageCooldown -= dt;
         if (HitFlash > 0) HitFlash -= dt;
+        if (MeleeHitCooldown > 0) MeleeHitCooldown -= dt;
 
         float dist = Vector2.Distance(playerCenter, Position + new Vector2(Width / 2f, Height / 2f));
         Aggroed = dist < AggroRange;
@@ -171,9 +173,10 @@ public class Hopper
 
     public bool TakeHit(int damage)
     {
-        if (!Alive) return false;
+        if (!Alive || MeleeHitCooldown > 0) return false;
         Hp -= damage;
         HitFlash = 0.15f;
+        MeleeHitCooldown = 0.2f;
         if (Hp <= 0) { Alive = false; return true; }
         return false;
     }

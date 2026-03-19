@@ -12,6 +12,7 @@ public class Thornback
     public const int Width = 32, Height = 28;
     public float DamageCooldown;
     public float HitFlash;
+    public float MeleeHitCooldown;
 
     public Thornback(Vector2 pos)
     {
@@ -25,6 +26,7 @@ public class Thornback
         if (!Alive) return;
         if (DamageCooldown > 0) DamageCooldown -= dt;
         if (HitFlash > 0) HitFlash -= dt;
+        if (MeleeHitCooldown > 0) MeleeHitCooldown -= dt;
     }
 
     public int CheckPlayerDamage(Rectangle playerRect)
@@ -40,9 +42,10 @@ public class Thornback
 
     public bool TakeHit(int damage)
     {
-        if (!Alive) return false;
+        if (!Alive || MeleeHitCooldown > 0) return false;
         Hp -= damage;
-        HitFlash = 0.1f;
+        HitFlash = 0.15f;
+        MeleeHitCooldown = 0.2f;
         if (Hp <= 0) { Alive = false; return true; }
         return false;
     }
