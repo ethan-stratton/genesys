@@ -43,6 +43,7 @@ public class Game1 : Game
     // World map
     private WorldMapData _worldMap;
     private bool _worldMapGridVisible = false;
+    private bool _worldMapLegendVisible = false;
     private float _worldMapZoom = 1f;
     private string _worldMapBiomeMenuId; // non-null = showing biome level list
     private int _worldMapBiomeMenuCursor;
@@ -3494,6 +3495,9 @@ public class Game1 : Game
         if (kb.IsKeyDown(Keys.G) && _prevKb.IsKeyUp(Keys.G))
             _worldMapGridVisible = !_worldMapGridVisible;
 
+        if (kb.IsKeyDown(Keys.L) && _prevKb.IsKeyUp(Keys.L))
+            _worldMapLegendVisible = !_worldMapLegendVisible;
+
         // Debug: reveal all fog
         if (kb.IsKeyDown(Keys.F) && _prevKb.IsKeyUp(Keys.F))
         {
@@ -3660,9 +3664,69 @@ public class Game1 : Game
         }
 
         // Controls
-        string hint = "[WASD] Move  [Q/E] Zoom  [Enter] Enter  [G] Grid  [F] Reveal  [M] Close  [Esc] Title";
+        string hint = "[WASD] Move  [Q/E] Zoom  [Enter] Enter  [G] Grid  [F] Reveal  [L] Legend  [M] Close  [Esc] Title";
         var hintSize = _fontSmall.MeasureString(hint);
         _spriteBatch.DrawString(_fontSmall, hint, new Vector2(ViewW / 2f - hintSize.X / 2, ViewH - 25), Color.Gray * 0.4f);
+
+        // Tile legend (toggle with L)
+        if (_worldMapLegendVisible)
+        {
+            var legendTiles = new (MapTileType type, string name)[]
+            {
+                (MapTileType.DeepOcean, "Deep Ocean"),
+                (MapTileType.Ocean, "Ocean"),
+                (MapTileType.ShallowOcean, "Shallow"),
+                (MapTileType.Reef, "Reef"),
+                (MapTileType.Beach, "Beach"),
+                (MapTileType.RockyShore, "Rocky Shore"),
+                (MapTileType.Plains, "Plains"),
+                (MapTileType.Grassland, "Grassland"),
+                (MapTileType.Savanna, "Savanna"),
+                (MapTileType.Floodplain, "Floodplain"),
+                (MapTileType.Forest, "Forest"),
+                (MapTileType.DenseForest, "Dense Forest"),
+                (MapTileType.Jungle, "Jungle"),
+                (MapTileType.Swamp, "Swamp"),
+                (MapTileType.Marsh, "Marsh"),
+                (MapTileType.Hills, "Hills"),
+                (MapTileType.Foothills, "Foothills"),
+                (MapTileType.Mountain, "Mountain"),
+                (MapTileType.HighMountain, "High Mountain"),
+                (MapTileType.Snow, "Snow"),
+                (MapTileType.Glacier, "Glacier"),
+                (MapTileType.Tundra, "Tundra"),
+                (MapTileType.Taiga, "Taiga"),
+                (MapTileType.SnowForest, "Snow Forest"),
+                (MapTileType.FrozenLake, "Frozen Lake"),
+                (MapTileType.Desert, "Desert"),
+                (MapTileType.Dunes, "Dunes"),
+                (MapTileType.Wasteland, "Wasteland"),
+                (MapTileType.River, "River"),
+                (MapTileType.Lake, "Lake"),
+                (MapTileType.Cave, "Cave"),
+                (MapTileType.Volcano, "Volcano"),
+                (MapTileType.Ruins, "Ruins"),
+                (MapTileType.Oasis, "Oasis"),
+                (MapTileType.CrystalForest, "Crystal Forest"),
+                (MapTileType.Ashlands, "Ashlands"),
+                (MapTileType.VoidRift, "Void Rift"),
+                (MapTileType.Mushroom, "Mushroom"),
+                (MapTileType.Petrified, "Petrified"),
+                (MapTileType.BiomeEntrance, "Biome Entrance"),
+            };
+            int legendX = ViewW - 160;
+            int legendY = 30;
+            int rowH = 14;
+            // Background panel
+            _spriteBatch.Draw(_pixel, new Rectangle(legendX - 6, legendY - 4, 164, legendTiles.Length * rowH + 8), Color.Black * 0.75f);
+            for (int i = 0; i < legendTiles.Length; i++)
+            {
+                int ly = legendY + i * rowH;
+                Color c = GetWorldTileColor(legendTiles[i].type);
+                _spriteBatch.Draw(_pixel, new Rectangle(legendX, ly + 1, 10, 10), c);
+                _spriteBatch.DrawString(_fontSmall, legendTiles[i].name, new Vector2(legendX + 14, ly), Color.White * 0.8f);
+            }
+        }
 
         // Biome menu overlay
         if (_worldMapBiomeMenuId != null)

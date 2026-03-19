@@ -143,48 +143,45 @@ public class WorldMapData
         const int seed = 42;
         var rng = new Random(seed);
 
-        // ═══════════════════════════════════════════════════
-        // STAGE 1: Base heightmap — multi-octave fractal noise
-        // ═══════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════
+        // STAGE 1: Multiple noise layers
+        // ═══════════════════════════════════════════════
         float[,] height = new float[W, H];
         float[,] moisture = new float[W, H];
         float[,] tempNoise = new float[W, H];
         float[,] ridgeNoise = new float[W, H];
+        float[,] warpX = new float[W, H];  // domain warping for organic shapes
+        float[,] warpY = new float[W, H];
+        float[,] detail = new float[W, H]; // high-freq detail noise
 
         FractalNoise(height, W, H, seed, 7, 0.022f, 0.50f);
         FractalNoise(moisture, W, H, seed + 100, 5, 0.030f, 0.45f);
         FractalNoise(tempNoise, W, H, seed + 200, 3, 0.025f, 0.5f);
         FractalNoise(ridgeNoise, W, H, seed + 300, 5, 0.045f, 0.55f);
+        FractalNoise(warpX, W, H, seed + 400, 4, 0.035f, 0.5f);
+        FractalNoise(warpY, W, H, seed + 500, 4, 0.035f, 0.5f);
+        FractalNoise(detail, W, H, seed + 600, 6, 0.06f, 0.5f);
 
-        // Temperature: latitude gradient (cold north → warm south) + noise
         float[,] temperature = new float[W, H];
         for (int y = 0; y < H; y++)
             for (int x = 0; x < W; x++)
                 temperature[x, y] = (float)y / H * 0.75f + tempNoise[x, y] * 0.25f;
 
-        // ═══════════════════════════════════════════════════
-        // STAGE 2: Multi-continent shaping
-        // Instead of one ellipse, scatter multiple landmass blobs
-        // with irregular shapes and channels between them
-        // ═══════════════════════════════════════════════════
-        
-        // Define continent centers (normalized 0-1 coords)
+        // ═══════════════════════════════════════════════
+        // STAGE 2: Continent shapes with domain warping
+        // Blobs are warped by noise so edges are organic,
+        // then combined additively (not max) for land bridges
+        // ═══════════════════════════════════════════════
         var continents = new (float cx, float cy, float rx, float ry, float strength)[]
         {
-            // Main continent (large, center-north)
-            (0.45f, 0.30f, 0.28f, 0.22f, 1.0f),
-            // Eastern landmass
-            (0.75f, 0.45f, 0.18f, 0.20f, 0.85f),
-            // Southern continent (larger)
-            (0.40f, 0.72f, 0.25f, 0.18f, 0.90f),
-            // Western islands chain
-            (0.15f, 0.55f, 0.12f, 0.15f, 0.70f),
-            // Small northern island
-            (0.65f, 0.12f, 0.10f, 0.08f, 0.60f),
-            // Peninsula connecting main + south
-            (0.50f, 0.52f, 0.10f, 0.14f, 0.65f),
-            // Far south tropical island
-            (0.60f, 0.88f, 0.11f, 0.08f, 0.55f),
+            (0.42f, 0.28f, 0.26f, 0.20f, 1.0f),   // Main continent NW
+            (0.72f, 0.38f, 0.16f, 0.18f, 0.80f),   // Eastern landmass
+            (0.38f, 0.68f, 0.22f, 0.16f, 0.85f),   // Southern continent
+            (0.12f, 0.50f, 0.10f, 0.22f, 0.65f),   // Western archipelago (tall/thin)
+            (0.60f, 0.10f, 0.12f, 0.07f, 0.55f),   // Northern island
+            (0.55f, 0.52f, 0.08f, 0.12f, 0.50f),   // Peninsula bridge
+            (0.65f, 0.85f, 0.10f, 0.07f, 0.50f),   // Tropical island SE
+            (0.25f, 0.88f, 0.08f, 0.06f, 0.40f),   // Small SW island
         };
 
         float[,] landMask = new float[W, H];
@@ -194,218 +191,97 @@ public class WorldMapData
             {
                 float nx = (float)x / W;
                 float ny = (float)y / H;
-                float best = 0f;
+                // Domain warping — shift sample point by noise for organic shapes
+                float wnx = nx + (warpX[x, y] - 0.5f) * 0.12f;
+                float wny = ny + (warpY[x, y] - 0.5f) * 0.12f;
+
+                float sum = 0f;
                 foreach (var (cx, cy, rx, ry, str) in continents)
                 {
-                    float dx = (nx - cx) / rx;
-                    float dy = (ny - cy) / ry;
+                    float dx = (wnx - cx) / rx;
+                    float dy = (wny - cy) / ry;
                     float dist = dx * dx + dy * dy;
-                    // Gaussian blob with noise perturbation for irregular coastlines
-                    float noiseWarp = height[x, y] * 0.4f; // use base noise to warp shape
-                    float val = str * MathF.Exp(-(dist * (1.8f - noiseWarp)));
-                    if (val > best) best = val;
+                    float val = str * MathF.Exp(-dist * 2.0f);
+                    sum += val; // additive — creates land bridges where blobs overlap
                 }
-                landMask[x, y] = best;
+                // Multiply by detail noise for coastline complexity
+                float coastNoise = 0.6f + detail[x, y] * 0.8f;
+                landMask[x, y] = sum * coastNoise;
             }
         }
 
-        // Combine: height = noise * landmask, with land mask dominating shape
+        // Combine landmask with height noise
         for (int y = 0; y < H; y++)
         {
             for (int x = 0; x < W; x++)
             {
                 float mask = landMask[x, y];
                 float h = height[x, y];
-                // Blend: landmask controls whether it's land, noise adds detail
-                float combined = mask * 0.65f + h * mask * 0.35f;
-                // Force ocean at map edges (2-tile border)
+                float combined = mask * 0.55f + h * mask * 0.45f;
+                // Edge fade (3 tiles)
                 float edgeDist = MathF.Min(MathF.Min(x, W - 1 - x), MathF.Min(y, H - 1 - y));
-                float edgeFade = MathHelper.Clamp(edgeDist / 4f, 0f, 1f);
+                float edgeFade = MathHelper.Clamp(edgeDist / 3f, 0f, 1f);
                 height[x, y] = combined * edgeFade;
             }
         }
 
-        // Normalize to 0-1
-        float hMin = float.MaxValue, hMax = float.MinValue;
-        for (int y = 0; y < H; y++)
-            for (int x = 0; x < W; x++)
-            {
-                if (height[x, y] < hMin) hMin = height[x, y];
-                if (height[x, y] > hMax) hMax = height[x, y];
-            }
-        float hRange = hMax - hMin;
-        if (hRange < 0.001f) hRange = 1f;
-        for (int y = 0; y < H; y++)
-            for (int x = 0; x < W; x++)
-                height[x, y] = (height[x, y] - hMin) / hRange;
+        // Normalize
+        Normalize(height, W, H);
 
-        // ═══════════════════════════════════════════════════
-        // STAGE 3: Mountain ridges — use ridge noise to create
-        // visible mountain chains, not just random peaks
-        // ═══════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════
+        // STAGE 3: Mountain ridges — ridge noise creates
+        // visible chains, stronger effect
+        // ═══════════════════════════════════════════════
         for (int y = 0; y < H; y++)
         {
             for (int x = 0; x < W; x++)
             {
-                // Ridge = narrow band where ridgeNoise crosses 0.5
                 float ridge = ridgeNoise[x, y];
                 float ridgeFactor = 1f - MathF.Abs(ridge - 0.5f) * 2f;
-                ridgeFactor = MathF.Pow(MathHelper.Clamp(ridgeFactor, 0, 1), 2.5f); // sharper ridges
-                // Only inject ridges on existing land (above 30% height)
-                if (height[x, y] > 0.30f)
-                    height[x, y] += ridgeFactor * 0.30f; // stronger ridges
+                ridgeFactor = MathF.Pow(MathHelper.Clamp(ridgeFactor, 0, 1), 2.0f);
+                if (height[x, y] > 0.28f)
+                    height[x, y] += ridgeFactor * 0.35f;
             }
         }
-        
-        // Re-normalize after ridge injection
-        hMin = float.MaxValue; hMax = float.MinValue;
-        for (int y = 0; y < H; y++)
-            for (int x = 0; x < W; x++)
-            {
-                if (height[x, y] < hMin) hMin = height[x, y];
-                if (height[x, y] > hMax) hMax = height[x, y];
-            }
-        hRange = hMax - hMin;
-        if (hRange < 0.001f) hRange = 1f;
-        for (int y = 0; y < H; y++)
-            for (int x = 0; x < W; x++)
-                height[x, y] = (height[x, y] - hMin) / hRange;
+        Normalize(height, W, H);
 
-        // ═══════════════════════════════════════════════════
-        // STAGE 4: Basin filling (simplified Planchon-Darboux)
-        // ═══════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════
+        // STAGE 4: Basin filling (Planchon-Darboux)
+        // ═══════════════════════════════════════════════
         const float seaLevel = 0.38f;
-        float[,] filled = new float[W, H];
-        const float eps = 0.001f;
-
-        for (int y = 0; y < H; y++)
-            for (int x = 0; x < W; x++)
-            {
-                if (x == 0 || x == W - 1 || y == 0 || y == H - 1 || height[x, y] < seaLevel)
-                    filled[x, y] = height[x, y];
-                else
-                    filled[x, y] = 10f;
-            }
-
-        bool changed = true;
-        int maxIter = 50;
-        while (changed && maxIter-- > 0)
-        {
-            changed = false;
-            for (int y = 1; y < H - 1; y++)
-                for (int x = 1; x < W - 1; x++)
-                {
-                    if (filled[x, y] <= height[x, y]) continue;
-                    for (int dy = -1; dy <= 1; dy++)
-                        for (int dx = -1; dx <= 1; dx++)
-                        {
-                            if (dx == 0 && dy == 0) continue;
-                            float nVal = filled[x + dx, y + dy] + eps;
-                            if (height[x, y] >= nVal)
-                            { filled[x, y] = height[x, y]; changed = true; }
-                            else if (filled[x, y] > nVal)
-                            { filled[x, y] = nVal; changed = true; }
-                        }
-                }
-        }
-        for (int y = 0; y < H; y++)
-            for (int x = 0; x < W; x++)
-                height[x, y] = filled[x, y];
+        FillBasins(height, W, H, seaLevel);
 
         // Noise + refill cycle
-        var noiseRng = new Random(seed + 500);
+        var noiseRng = new Random(seed + 700);
         for (int y = 1; y < H - 1; y++)
             for (int x = 1; x < W - 1; x++)
                 if (height[x, y] >= seaLevel)
                     height[x, y] += (float)(noiseRng.NextDouble() - 0.5) * 0.004f;
+        FillBasins(height, W, H, seaLevel);
 
-        for (int y = 0; y < H; y++)
-            for (int x = 0; x < W; x++)
-                filled[x, y] = (x == 0 || x == W - 1 || y == 0 || y == H - 1 || height[x, y] < seaLevel)
-                    ? height[x, y] : 10f;
-        changed = true; maxIter = 30;
-        while (changed && maxIter-- > 0)
-        {
-            changed = false;
-            for (int y = 1; y < H - 1; y++)
-                for (int x = 1; x < W - 1; x++)
-                {
-                    if (filled[x, y] <= height[x, y]) continue;
-                    for (int dy = -1; dy <= 1; dy++)
-                        for (int dx = -1; dx <= 1; dx++)
-                        {
-                            if (dx == 0 && dy == 0) continue;
-                            float nVal = filled[x + dx, y + dy] + eps;
-                            if (height[x, y] >= nVal) { filled[x, y] = height[x, y]; changed = true; }
-                            else if (filled[x, y] > nVal) { filled[x, y] = nVal; changed = true; }
-                        }
-                }
-        }
-        for (int y = 0; y < H; y++)
-            for (int x = 0; x < W; x++)
-                height[x, y] = filled[x, y];
+        // ═══════════════════════════════════════════════
+        // STAGE 5: Water flux + incise flow
+        // ═══════════════════════════════════════════════
+        float[,] flux = ComputeFlux(height, W, H);
 
-        // ═══════════════════════════════════════════════════
-        // STAGE 5: Water flux + incise flow erosion
-        // ═══════════════════════════════════════════════════
-        int[,] flowDirX = new int[W, H];
-        int[,] flowDirY = new int[W, H];
-        for (int y = 0; y < H; y++)
-            for (int x = 0; x < W; x++)
-            {
-                float lowestH = height[x, y];
-                int bx = 0, by = 0;
-                for (int dy = -1; dy <= 1; dy++)
-                    for (int dx = -1; dx <= 1; dx++)
-                    {
-                        if (dx == 0 && dy == 0) continue;
-                        int nx = x + dx, ny = y + dy;
-                        if (nx >= 0 && nx < W && ny >= 0 && ny < H && height[nx, ny] < lowestH)
-                        { lowestH = height[nx, ny]; bx = dx; by = dy; }
-                    }
-                flowDirX[x, y] = bx;
-                flowDirY[x, y] = by;
-            }
-
-        var cells = new List<(int x, int y, float h)>();
-        for (int y = 0; y < H; y++)
-            for (int x = 0; x < W; x++)
-                cells.Add((x, y, height[x, y]));
-        cells.Sort((a, b) => b.h.CompareTo(a.h));
-
-        float[,] flux = new float[W, H];
-        for (int y = 0; y < H; y++)
-            for (int x = 0; x < W; x++)
-                flux[x, y] = 1f;
-
-        foreach (var (cx, cy, _) in cells)
-        {
-            int tx = cx + flowDirX[cx, cy];
-            int ty = cy + flowDirY[cx, cy];
-            if (tx >= 0 && tx < W && ty >= 0 && ty < H)
-                flux[tx, ty] += flux[cx, cy];
-        }
-
-        // Incise flow
-        float[,] eroded = (float[,])height.Clone();
+        // Incise flow erosion
+        int[,] flowDirX = new int[W, H], flowDirY = new int[W, H];
+        ComputeFlowDirs(height, W, H, flowDirX, flowDirY);
         for (int y = 1; y < H - 1; y++)
             for (int x = 1; x < W - 1; x++)
             {
                 if (height[x, y] < seaLevel) continue;
-                int tx = x + flowDirX[x, y];
-                int ty = y + flowDirY[x, y];
+                int tx = x + flowDirX[x, y], ty = y + flowDirY[x, y];
                 if (tx < 0 || tx >= W || ty < 0 || ty >= H) continue;
                 float slope = height[x, y] - height[tx, ty];
                 if (slope <= 0) continue;
-                float erosion = slope * MathF.Sqrt(flux[x, y]) * 0.012f;
-                erosion = MathF.Min(erosion, 0.025f);
-                eroded[x, y] -= erosion;
+                float erosion = MathF.Min(slope * MathF.Sqrt(flux[x, y]) * 0.012f, 0.025f);
+                height[x, y] -= erosion;
             }
-        Array.Copy(eroded, height, eroded.Length);
 
-        // ═══════════════════════════════════════════════════
-        // STAGE 6: Thermal erosion
-        // ═══════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════
+        // STAGE 6: Thermal erosion (3 passes)
+        // ═══════════════════════════════════════════════
         for (int pass = 0; pass < 3; pass++)
         {
             var temp = (float[,])height.Clone();
@@ -421,15 +297,14 @@ public class WorldMapData
                             float diff = h - height[x + dx, y + dy];
                             if (diff > maxDiff) maxDiff = diff;
                         }
-                    if (maxDiff > 0.08f)
-                        temp[x, y] = h - maxDiff * 0.10f;
+                    if (maxDiff > 0.08f) temp[x, y] = h - maxDiff * 0.10f;
                 }
             Array.Copy(temp, height, temp.Length);
         }
 
-        // ═══════════════════════════════════════════════════
-        // STAGE 7: Coastline smoothing
-        // ═══════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════
+        // STAGE 7: Coastline smoothing (3 passes)
+        // ═══════════════════════════════════════════════
         for (int pass = 0; pass < 3; pass++)
         {
             var temp = (float[,])height.Clone();
@@ -443,17 +318,15 @@ public class WorldMapData
                             if (dx == 0 && dy == 0) continue;
                             if (height[x + dx, y + dy] >= seaLevel) land++; else water++;
                         }
-                    if (height[x, y] < seaLevel && land >= 6)
-                        temp[x, y] = seaLevel + 0.02f;
-                    else if (height[x, y] >= seaLevel && water >= 6)
-                        temp[x, y] = seaLevel - 0.02f;
+                    if (height[x, y] < seaLevel && land >= 6) temp[x, y] = seaLevel + 0.02f;
+                    else if (height[x, y] >= seaLevel && water >= 6) temp[x, y] = seaLevel - 0.02f;
                 }
             Array.Copy(temp, height, temp.Length);
         }
 
-        // ═══════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════
         // STAGE 8: Biome assignment
-        // ═══════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════
         const float deepSea = 0.18f;
         const float shallowSea = 0.30f;
         const float beachTop = 0.41f;
@@ -499,8 +372,7 @@ public class WorldMapData
                 }
                 else if (h >= lowland)
                 {
-                    if (t < 0.2f)
-                        tile = m > 0.55f ? MapTileType.SnowForest : MapTileType.Tundra;
+                    if (t < 0.2f) tile = m > 0.55f ? MapTileType.SnowForest : MapTileType.Tundra;
                     else if (t < 0.35f)
                     {
                         if (m > 0.6f) tile = MapTileType.DenseForest;
@@ -522,10 +394,9 @@ public class WorldMapData
                         else tile = MapTileType.Desert;
                     }
                 }
-                else // flat lowland just above beach
+                else
                 {
-                    if (t < 0.2f)
-                        tile = m > 0.5f ? MapTileType.SnowForest : MapTileType.Tundra;
+                    if (t < 0.2f) tile = m > 0.5f ? MapTileType.SnowForest : MapTileType.Tundra;
                     else if (t < 0.35f)
                     {
                         if (m > 0.6f) tile = MapTileType.DenseForest;
@@ -548,7 +419,6 @@ public class WorldMapData
                     }
                 }
 
-                // High flux lowland → floodplain
                 if (flux[x, y] > 20f && h >= seaLevel && h < hillStart &&
                     (tile == MapTileType.Plains || tile == MapTileType.Grassland))
                     tile = MapTileType.Floodplain;
@@ -557,15 +427,13 @@ public class WorldMapData
             }
         }
 
-        // ═══════════════════════════════════════════════════
-        // STAGE 9: Rivers — MUCH higher threshold (fewer rivers)
-        // ═══════════════════════════════════════════════════
-        float riverThreshold = 60f; // was 25, way too many
+        // ═══════════════════════════════════════════════
+        // STAGE 9: Rivers
+        // ═══════════════════════════════════════════════
         for (int y = 0; y < H; y++)
             for (int x = 0; x < W; x++)
             {
-                if (height[x, y] < seaLevel) continue;
-                if (flux[x, y] < riverThreshold) continue;
+                if (height[x, y] < seaLevel || flux[x, y] < 60f) continue;
                 var cur = map.GetTile(x, y);
                 if (cur == MapTileType.BiomeEntrance || cur == MapTileType.Mountain ||
                     cur == MapTileType.HighMountain || cur == MapTileType.Snow ||
@@ -573,9 +441,9 @@ public class WorldMapData
                 map.SetTile(x, y, flux[x, y] > 150f ? MapTileType.Lake : MapTileType.River);
             }
 
-        // ═══════════════════════════════════════════════════
-        // STAGE 10: Lakes at local minima
-        // ═══════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════
+        // STAGE 10: Lakes
+        // ═══════════════════════════════════════════════
         for (int y = 2; y < H - 2; y++)
             for (int x = 2; x < W - 2; x++)
             {
@@ -593,40 +461,36 @@ public class WorldMapData
                     for (int dx = -sz; dx <= sz; dx++)
                     {
                         int lx = x + dx, ly = y + dy;
-                        if (lx < 0 || lx >= W || ly < 0 || ly >= H) continue;
-                        if (height[lx, ly] < seaLevel) continue;
+                        if (lx < 0 || lx >= W || ly < 0 || ly >= H || height[lx, ly] < seaLevel) continue;
                         map.SetTile(lx, ly, temperature[lx, ly] < 0.2f ? MapTileType.FrozenLake : MapTileType.Lake);
                     }
             }
 
-        // ═══════════════════════════════════════════════════
-        // STAGE 11: Desert detail — dunes + oases
-        // ═══════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════
+        // STAGE 11: Desert detail
+        // ═══════════════════════════════════════════════
         for (int y = 1; y < H - 1; y++)
             for (int x = 1; x < W - 1; x++)
             {
                 if (map.GetTile(x, y) != MapTileType.Desert) continue;
-                if (ridgeNoise[x, y] > 0.55f)
-                    map.SetTile(x, y, MapTileType.Dunes);
+                if (ridgeNoise[x, y] > 0.55f) map.SetTile(x, y, MapTileType.Dunes);
                 bool nearWater = false;
                 for (int dy = -2; dy <= 2 && !nearWater; dy++)
                     for (int dx = -2; dx <= 2 && !nearWater; dx++)
                     {
-                        int nx = x + dx, ny = y + dy;
-                        if (nx >= 0 && nx < W && ny >= 0 && ny < H)
+                        int nx2 = x + dx, ny2 = y + dy;
+                        if (nx2 >= 0 && nx2 < W && ny2 >= 0 && ny2 < H)
                         {
-                            var a = map.GetTile(nx, ny);
-                            if (a == MapTileType.River || a == MapTileType.Lake || a == MapTileType.Water)
-                                nearWater = true;
+                            var a = map.GetTile(nx2, ny2);
+                            if (a == MapTileType.River || a == MapTileType.Lake) nearWater = true;
                         }
                     }
-                if (nearWater && rng.NextDouble() < 0.3)
-                    map.SetTile(x, y, MapTileType.Oasis);
+                if (nearWater && rng.NextDouble() < 0.3) map.SetTile(x, y, MapTileType.Oasis);
             }
 
-        // ═══════════════════════════════════════════════════
-        // STAGE 12: Caves at mountain bases
-        // ═══════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════
+        // STAGE 12: Caves
+        // ═══════════════════════════════════════════════
         for (int y = 2; y < H - 2; y++)
             for (int x = 2; x < W - 2; x++)
             {
@@ -644,9 +508,9 @@ public class WorldMapData
                     map.SetTile(x, y, MapTileType.Cave);
             }
 
-        // ═══════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════
         // STAGE 13: Ruins
-        // ═══════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════
         for (int y = 3; y < H - 3; y++)
             for (int x = 3; x < W - 3; x++)
             {
@@ -656,9 +520,9 @@ public class WorldMapData
                     map.SetTile(x, y, MapTileType.Ruins);
             }
 
-        // ═══════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════
         // STAGE 14: Volcano
-        // ═══════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════
         for (int y = H / 2; y < H - 5; y++)
             for (int x = 5; x < W - 5; x++)
             {
@@ -678,13 +542,11 @@ public class WorldMapData
             }
         volcanoPlaced:;
 
-        // ═══════════════════════════════════════════════════
-        // STAGE 15: Fantasy / mystery biomes
-        // Placed as rare clusters in specific conditions
-        // ═══════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════
+        // STAGE 15: Fantasy biomes
+        // ═══════════════════════════════════════════════
 
-        // Crystal Forest — cold + very high moisture + forest/dense forest
-        // Eerie crystallized trees, appears in northern regions
+        // Crystal Forest — cold + moist
         int crystalCount = 0;
         for (int y = 3; y < H / 3 && crystalCount < 12; y++)
             for (int x = 3; x < W - 3 && crystalCount < 12; x++)
@@ -695,27 +557,23 @@ public class WorldMapData
                 {
                     map.SetTile(x, y, MapTileType.CrystalForest);
                     crystalCount++;
-                    // Spread to 1-2 neighbors
                     for (int dy = -1; dy <= 1; dy++)
                         for (int dx = -1; dx <= 1; dx++)
-                        {
                             if (rng.NextDouble() < 0.4)
                             {
-                                int nx = x + dx, ny = y + dy;
-                                if (nx > 0 && nx < W && ny > 0 && ny < H)
+                                int nx2 = x + dx, ny2 = y + dy;
+                                if (nx2 > 0 && nx2 < W && ny2 > 0 && ny2 < H)
                                 {
-                                    var a = map.GetTile(nx, ny);
+                                    var a = map.GetTile(nx2, ny2);
                                     if (a == MapTileType.DenseForest || a == MapTileType.SnowForest ||
                                         a == MapTileType.Forest || a == MapTileType.Taiga)
-                                    { map.SetTile(nx, ny, MapTileType.CrystalForest); crystalCount++; }
+                                    { map.SetTile(nx2, ny2, MapTileType.CrystalForest); crystalCount++; }
                                 }
                             }
-                        }
                 }
             }
 
-        // Ashlands — near volcano, spreads as a dead zone
-        // Find the volcano and paint a wider Ashlands region
+        // Ashlands — ring around volcano
         for (int y = 5; y < H - 5; y++)
             for (int x = 5; x < W - 5; x++)
             {
@@ -723,31 +581,30 @@ public class WorldMapData
                 for (int dy = -4; dy <= 4; dy++)
                     for (int dx = -4; dx <= 4; dx++)
                     {
-                        if (dx * dx + dy * dy > 18) continue; // circular
-                        int nx = x + dx, ny = y + dy;
-                        if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
-                        var a = map.GetTile(nx, ny);
+                        if (dx * dx + dy * dy > 18) continue;
+                        int nx2 = x + dx, ny2 = y + dy;
+                        if (nx2 < 0 || nx2 >= W || ny2 < 0 || ny2 >= H) continue;
+                        var a = map.GetTile(nx2, ny2);
                         if (a == MapTileType.Volcano || a == MapTileType.HighMountain ||
                             a == MapTileType.DeepOcean || a == MapTileType.Ocean) continue;
                         if (rng.NextDouble() < 0.7)
-                            map.SetTile(nx, ny, MapTileType.Ashlands);
+                            map.SetTile(nx2, ny2, MapTileType.Ashlands);
                     }
             }
 
-        // Mushroom — deep swamp/jungle clusters
-        int mushroomCount = 0;
-        for (int y = H / 2; y < H - 3 && mushroomCount < 10; y++)
-            for (int x = 3; x < W - 3 && mushroomCount < 10; x++)
+        // Mushroom — deep swamp/jungle
+        int mushCount = 0;
+        for (int y = H / 2; y < H - 3 && mushCount < 10; y++)
+            for (int x = 3; x < W - 3 && mushCount < 10; x++)
             {
                 var tile = map.GetTile(x, y);
                 if ((tile == MapTileType.Swamp || tile == MapTileType.Jungle || tile == MapTileType.Marsh) &&
                     moisture[x, y] > 0.65f && rng.NextDouble() < 0.06)
                 {
                     map.SetTile(x, y, MapTileType.Mushroom);
-                    mushroomCount++;
+                    mushCount++;
                     for (int dy = -1; dy <= 1; dy++)
                         for (int dx = -1; dx <= 1; dx++)
-                        {
                             if (rng.NextDouble() < 0.35)
                             {
                                 int nx2 = x + dx, ny2 = y + dy;
@@ -756,14 +613,13 @@ public class WorldMapData
                                     var a = map.GetTile(nx2, ny2);
                                     if (a == MapTileType.Swamp || a == MapTileType.Jungle ||
                                         a == MapTileType.Marsh || a == MapTileType.DenseForest)
-                                    { map.SetTile(nx2, ny2, MapTileType.Mushroom); mushroomCount++; }
+                                    { map.SetTile(nx2, ny2, MapTileType.Mushroom); mushCount++; }
                                 }
                             }
-                        }
                 }
             }
 
-        // Petrified — wasteland/desert areas with ancient stone trees
+        // Petrified — wasteland/desert
         int petCount = 0;
         for (int y = H / 3; y < 2 * H / 3 && petCount < 8; y++)
             for (int x = 3; x < W - 3 && petCount < 8; x++)
@@ -771,45 +627,37 @@ public class WorldMapData
                 var tile = map.GetTile(x, y);
                 if ((tile == MapTileType.Wasteland || tile == MapTileType.Desert) &&
                     ridgeNoise[x, y] > 0.45f && ridgeNoise[x, y] < 0.55f && rng.NextDouble() < 0.05)
-                {
-                    map.SetTile(x, y, MapTileType.Petrified);
-                    petCount++;
-                }
+                { map.SetTile(x, y, MapTileType.Petrified); petCount++; }
             }
 
-        // Void Rift — one single anomaly, far from player start, on an island or mountain
-        bool voidPlaced = false;
-        for (int attempt = 0; attempt < 50 && !voidPlaced; attempt++)
+        // Void Rift — single anomaly far from center
+        for (int attempt = 0; attempt < 50; attempt++)
         {
-            int vx = rng.Next(5, W - 5);
-            int vy = rng.Next(5, H - 5);
-            float dist = MathF.Sqrt((vx - W / 2f) * (vx - W / 2f) + (vy - H / 2f) * (vy - H / 2f));
-            if (dist < 15) continue; // must be far from center
+            int vx = rng.Next(5, W - 5), vy = rng.Next(5, H - 5);
+            if (MathF.Sqrt((vx - W / 2f) * (vx - W / 2f) + (vy - H / 2f) * (vy - H / 2f)) < 15) continue;
             var tile = map.GetTile(vx, vy);
             if (tile == MapTileType.Mountain || tile == MapTileType.HighMountain ||
                 tile == MapTileType.Wasteland || tile == MapTileType.Tundra)
             {
                 map.SetTile(vx, vy, MapTileType.VoidRift);
-                // Small ring of wasteland around it
                 for (int dy = -1; dy <= 1; dy++)
                     for (int dx = -1; dx <= 1; dx++)
                     {
-                        int nx = vx + dx, ny = vy + dy;
-                        if (nx > 0 && nx < W && ny > 0 && ny < H && !(dx == 0 && dy == 0))
+                        int nx2 = vx + dx, ny2 = vy + dy;
+                        if (nx2 > 0 && nx2 < W && ny2 > 0 && ny2 < H && !(dx == 0 && dy == 0))
                         {
-                            var a = map.GetTile(nx, ny);
-                            if (a != MapTileType.DeepOcean && a != MapTileType.Ocean &&
-                                a != MapTileType.Volcano)
-                                map.SetTile(nx, ny, MapTileType.Wasteland);
+                            var a = map.GetTile(nx2, ny2);
+                            if (a != MapTileType.DeepOcean && a != MapTileType.Ocean && a != MapTileType.Volcano)
+                                map.SetTile(nx2, ny2, MapTileType.Wasteland);
                         }
                     }
-                voidPlaced = true;
+                break;
             }
         }
 
-        // ═══════════════════════════════════════════════════
-        // STAGE 16: Place biome entrance — Eden Reach
-        // ═══════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════
+        // STAGE 16: Place Eden Reach
+        // ═══════════════════════════════════════════════
         int biomeX = W / 2, biomeY = (int)(H * 0.45f);
         float bestDist = float.MaxValue;
         for (int y = H / 4; y < 3 * H / 4; y++)
@@ -823,7 +671,6 @@ public class WorldMapData
                 }
             }
 
-        // Clear area around biome entrance
         for (int dy = -2; dy <= 2; dy++)
             for (int dx = -2; dx <= 2; dx++)
             {
@@ -841,14 +688,13 @@ public class WorldMapData
 
         var edenReach = new BiomeData
         {
-            Id = "eden-reach",
-            Name = "Eden Reach",
+            Id = "eden-reach", Name = "Eden Reach",
             Levels = new List<BiomeLevel>
             {
                 new() { Id = "garden", Name = "The Garden", LevelFile = "test-arena", Order = 0, Discovered = true, Cleared = false },
-                new() { Id = "descent", Name = "The Descent", LevelFile = "the-descent", Order = 1, Discovered = false, Cleared = false },
-                new() { Id = "gauntlet", Name = "The Gauntlet", LevelFile = "the-gauntlet", Order = 2, Discovered = false, Cleared = false },
-                new() { Id = "summit", Name = "The Summit", LevelFile = "the-summit", Order = 3, Discovered = false, Cleared = false },
+                new() { Id = "descent", Name = "The Descent", LevelFile = "the-descent", Order = 1 },
+                new() { Id = "gauntlet", Name = "The Gauntlet", LevelFile = "the-gauntlet", Order = 2 },
+                new() { Id = "summit", Name = "The Summit", LevelFile = "the-summit", Order = 3 },
             }
         };
         map.Biomes.Add(edenReach);
@@ -856,9 +702,8 @@ public class WorldMapData
 
         map.PlayerX = biomeX;
         map.PlayerY = biomeY + 2;
-        var spawnTile = map.GetTile(map.PlayerX, map.PlayerY);
-        if (spawnTile == MapTileType.Ocean || spawnTile == MapTileType.DeepOcean ||
-            spawnTile == MapTileType.HighMountain || spawnTile == MapTileType.Lake)
+        if (map.GetTile(map.PlayerX, map.PlayerY) == MapTileType.Ocean ||
+            map.GetTile(map.PlayerX, map.PlayerY) == MapTileType.DeepOcean)
             map.SetTile(map.PlayerX, map.PlayerY, MapTileType.Plains);
 
         map.Reveal(map.PlayerX, map.PlayerY);
@@ -866,6 +711,94 @@ public class WorldMapData
         return map;
     }
 
+
+
+    // ── Helper: normalize height to 0-1 ──
+    private static void Normalize(float[,] h, int w, int hh)
+    {
+        float min = float.MaxValue, max = float.MinValue;
+        for (int y = 0; y < hh; y++)
+            for (int x = 0; x < w; x++)
+            { if (h[x, y] < min) min = h[x, y]; if (h[x, y] > max) max = h[x, y]; }
+        float range = max - min;
+        if (range < 0.001f) range = 1f;
+        for (int y = 0; y < hh; y++)
+            for (int x = 0; x < w; x++)
+                h[x, y] = (h[x, y] - min) / range;
+    }
+
+    // ── Helper: Planchon-Darboux basin filling ──
+    private static void FillBasins(float[,] height, int w, int h, float sea)
+    {
+        float[,] filled = new float[w, h];
+        const float eps = 0.001f;
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                filled[x, y] = (x == 0 || x == w - 1 || y == 0 || y == h - 1 || height[x, y] < sea)
+                    ? height[x, y] : 10f;
+        bool changed = true;
+        int maxIter = 50;
+        while (changed && maxIter-- > 0)
+        {
+            changed = false;
+            for (int y = 1; y < h - 1; y++)
+                for (int x = 1; x < w - 1; x++)
+                {
+                    if (filled[x, y] <= height[x, y]) continue;
+                    for (int dy = -1; dy <= 1; dy++)
+                        for (int dx = -1; dx <= 1; dx++)
+                        {
+                            if (dx == 0 && dy == 0) continue;
+                            float nVal = filled[x + dx, y + dy] + eps;
+                            if (height[x, y] >= nVal) { filled[x, y] = height[x, y]; changed = true; }
+                            else if (filled[x, y] > nVal) { filled[x, y] = nVal; changed = true; }
+                        }
+                }
+        }
+        Array.Copy(filled, height, filled.Length);
+    }
+
+    // ── Helper: compute flow directions ──
+    private static void ComputeFlowDirs(float[,] height, int w, int h, int[,] fdx, int[,] fdy)
+    {
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                float lowest = height[x, y]; int bx = 0, by = 0;
+                for (int dy = -1; dy <= 1; dy++)
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        if (dx == 0 && dy == 0) continue;
+                        int nx = x + dx, ny = y + dy;
+                        if (nx >= 0 && nx < w && ny >= 0 && ny < h && height[nx, ny] < lowest)
+                        { lowest = height[nx, ny]; bx = dx; by = dy; }
+                    }
+                fdx[x, y] = bx; fdy[x, y] = by;
+            }
+    }
+
+    // ── Helper: compute water flux ──
+    private static float[,] ComputeFlux(float[,] height, int w, int h)
+    {
+        int[,] fdx = new int[w, h], fdy = new int[w, h];
+        ComputeFlowDirs(height, w, h, fdx, fdy);
+        var cells = new List<(int x, int y, float h)>();
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                cells.Add((x, y, height[x, y]));
+        cells.Sort((a, b) => b.h.CompareTo(a.h));
+        float[,] flux = new float[w, h];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                flux[x, y] = 1f;
+        foreach (var (cx, cy, _) in cells)
+        {
+            int tx = cx + fdx[cx, cy], ty = cy + fdy[cx, cy];
+            if (tx >= 0 && tx < w && ty >= 0 && ty < h)
+                flux[tx, ty] += flux[cx, cy];
+        }
+        return flux;
+    }
 
     // ── Fractal Brownian Motion noise ──
     private static void FractalNoise(float[,] grid, int w, int h, int seed, int octaves, float baseFreq, float persistence)
