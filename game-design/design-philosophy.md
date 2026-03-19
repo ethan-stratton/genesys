@@ -238,4 +238,42 @@ Instead of drawing 47 tiles for every terrain type, use a dual-grid system: one 
 
 ---
 
-*These aren't rules to follow rigidly. They're lenses to evaluate every design decision through. When in doubt: Does this serve a Core pillar? Does it have a unique silhouette? Does it deepen the mystery? Does it reward mastery? Does it preserve soul?*
+## 16. SPINE BEFORE MUSCLES
+
+**From Ethan's realization (2026-03-19):**
+
+Building systems without a story spine leads to stagnation. Combat is tight, movement is great — but *why* does it exist? What story does it serve? Without a progression map from start to finish, development is a series of disconnected cool things.
+
+**The anti-pattern:**
+- Bloodstained: crafting + quests feel like chores because they're gates, not rewards. Silver bromide quest = locked behind a boss, serves nothing
+- SOTN: you find cool stuff because exploring is fun. Grinding is optional because the action itself is the reward
+
+**The principle:**
+- Know the ending before building the middle
+- Every system must justify itself against the story chain
+- Never require the player to do something they wouldn't do for fun
+- Chains (interconnected systems), not loops (repetitive cycles)
+- **If you can't explain why a mechanic exists in terms of story progression, it's a feature without a home**
+
+**For Genesis:**
+- Build the progression map FIRST: story beat → gameplay milestone → system unlock
+- Test everything against: "Does this serve the next story beat?"
+- See: `game-design/eve-and-quests.md` for full quest/progression design
+
+## 17. OPTIONAL DEPTH, MANDATORY FUN
+
+**From Ethan's EVE/exploration design:**
+
+The player chooses engagement depth. Everything interesting is examinable but nothing is required. Rewards curiosity without punishing speed.
+
+**Rules:**
+- No pauses in gameplay — story happens DURING play
+- Examine something? Rewarded. Skip it? That's fine too
+- Sometimes examining reveals nothing — keeps it honest, prevents "scan everything" muscle memory
+- EVE prompts subtly ("That's unusual..."), never intrusively
+- NPCs can be talked to directly OR delegated to EVE for a summary — both valid playstyles
+- Scientific accuracy as bonus flavor (real chemistry for crafting), not as requirement
+
+---
+
+*These aren't rules to follow rigidly. They're lenses to evaluate every design decision through. When in doubt: Does this serve a Core pillar? Does it have a unique silhouette? Does it deepen the mystery? Does it reward mastery? Does it preserve soul? Does it serve the story spine?*
