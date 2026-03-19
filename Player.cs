@@ -706,10 +706,11 @@ public class Player
         }
         WantsDropThrough = EnableDropThrough && _dropIgnoreTimer > 0f;
 
-        // --- Slide (S + Space while grounded, OR Shift + Space with no direction from crouch — one per crouch hold) ---
+        // --- Slide (S + Space while grounded, OR Shift + Space with no direction from crouch, OR Space when stuck crouching) ---
         bool spacePressed = kb.IsKeyDown(Keys.Space);
+        bool stuckCrouching = IsCrouching && !HasHeadroom(Height, ceilings, solidFloors, tileGrid);
         bool wantsCrouchSlide = IsCrouching && inputX == 0;
-        bool wantsSlide = (inputY > 0 && !IsCrouching) || wantsCrouchSlide;
+        bool wantsSlide = (inputY > 0 && !IsCrouching) || wantsCrouchSlide || stuckCrouching;
         if (EnableSlide && wantsSlide && spacePressed && !_jumpHeld && _wasGrounded && !IsSliding && !IsCartwheeling && _slideCooldownTimer <= 0f)
         {
             IsSliding = true;
@@ -782,6 +783,7 @@ public class Player
                 _qcfStage = 2;
             }
             else if (_qcfStage == 2 && pressingFwd && !pressingDown && kDown)
+            if (HasHeadroom(Height, ceilings, solidFloors, tileGrid))
             {
                 // QCF + K complete!
                 _qcfStage = 0;
