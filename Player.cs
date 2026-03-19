@@ -1494,13 +1494,15 @@ public class Player
         // Ceiling collision (bonk head) — skip if near ceiling slope tiles
         if (ceilings != null && vel.Y < 0)
         {
+            int collLeft = (int)pos.X + CollisionOffsetX;
+            int collRight = collLeft + CollisionWidth;
             foreach (var ceil in ceilings)
             {
                 float slideOffset = Height - CurrentHeight;
                 float prevTop = Position.Y + slideOffset;
                 float newTop = pos.Y + slideOffset;
                 if (prevTop >= ceil.Bottom - 2 && newTop < ceil.Bottom &&
-                    pos.X + Width > ceil.X && pos.X < ceil.X + ceil.Width)
+                    collRight > ceil.X && collLeft < ceil.X + ceil.Width)
                 {
                     // Check if there's a ceiling slope tile near the player's head
                     bool nearCeilSlope = false;
@@ -1531,9 +1533,11 @@ public class Player
         // Solid floor collision (stand on top + block from below)
         if (solidFloors != null)
         {
+            int collLeft = (int)pos.X + CollisionOffsetX;
+            int collRight = collLeft + CollisionWidth;
             foreach (var sf in solidFloors)
             {
-                bool xOverlap = pos.X + Width > sf.X && pos.X < sf.X + sf.Width;
+                bool xOverlap = collRight > sf.X && collLeft < sf.X + sf.Width;
                 if (xOverlap)
                 {
                     // Landing on top
@@ -1566,8 +1570,9 @@ public class Player
                     }
                     // Push out horizontally if inside
                     // Skip push-out only if a slope tile is actually adjacent to this solid block's edge
+                    float slideOff2 = Height - CurrentHeight;
                     float playerBottom = pos.Y + Height;
-                    float playerTop = pos.Y;
+                    float playerTop = pos.Y + slideOff2;
                     bool slopeAdjacent = false;
                     if (tileGrid != null)
                     {
@@ -1584,12 +1589,12 @@ public class Player
                     }
                     if (!slopeAdjacent && playerBottom > sf.Y + 4 && playerTop < sf.Bottom - 4)
                     {
-                        float playerCenterX = pos.X + Width / 2f;
+                        float playerCenterX = pos.X + CollisionOffsetX + CollisionWidth / 2f;
                         float sfCenterX = sf.X + sf.Width / 2f;
                         if (playerCenterX < sfCenterX)
-                            pos.X = sf.X - Width;
+                            pos.X = sf.X - CollisionOffsetX - CollisionWidth;
                         else
-                            pos.X = sf.X + sf.Width;
+                            pos.X = sf.X + sf.Width - CollisionOffsetX;
                         vel.X = 0;
                     }
                 }
@@ -1607,18 +1612,18 @@ public class Player
         // --- Wall solid collision (can't walk through walls) ---
         if (solidWalls != null)
         {
-            var pRect = new Rectangle((int)pos.X, (int)pos.Y + Height - CurrentHeight, Width, CurrentHeight);
+            var pRect = new Rectangle((int)pos.X + CollisionOffsetX, (int)pos.Y + Height - CurrentHeight, CollisionWidth, CurrentHeight);
             foreach (var w in solidWalls)
             {
                 if (pRect.Intersects(w))
                 {
                     // Push out horizontally
-                    float playerCenter = pos.X + Width / 2f;
+                    float playerCenter = pos.X + CollisionOffsetX + CollisionWidth / 2f;
                     float wallCenter = w.X + w.Width / 2f;
                     if (playerCenter < wallCenter)
-                        pos.X = w.Left - Width;
+                        pos.X = w.Left - CollisionOffsetX - CollisionWidth;
                     else
-                        pos.X = w.Right;
+                        pos.X = w.Right - CollisionOffsetX;
                     vel.X = 0;
                 }
             }
