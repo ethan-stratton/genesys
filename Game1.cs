@@ -2113,6 +2113,18 @@ public class Game1 : Game
         return text;
     }
 
+    private void DrawOutlinedString(SpriteFontBase font, string text, Vector2 position, Color color, Color outline = default)
+    {
+        if (string.IsNullOrEmpty(text)) return;
+        text = SafeText(text);
+        if (outline == default) outline = new Color(0, 0, 0, 200);
+        for (int ox = -1; ox <= 1; ox++)
+            for (int oy = -1; oy <= 1; oy++)
+                if (ox != 0 || oy != 0)
+                    _spriteBatch.DrawString(font, text, position + new Vector2(ox, oy), outline);
+        _spriteBatch.DrawString(font, text, position, color);
+    }
+
     private void DrawWrappedText(SpriteFontBase font, string text, Vector2 position, Color color, float maxWidth)
     {
         if (string.IsNullOrEmpty(text)) return;
@@ -3669,7 +3681,7 @@ public class Game1 : Game
                 "Purple" => Color.MediumPurple,
                 _ => Color.White
             };
-            _spriteBatch.DrawString(lblFont, SafeText(lbl.Text), new Vector2(lbl.X, lbl.Y), lblColor * 0.9f);
+            DrawOutlinedString(lblFont, lbl.Text, new Vector2(lbl.X, lbl.Y), lblColor * 0.9f);
         }
 
         // Draw drag preview
@@ -4486,7 +4498,7 @@ public class Game1 : Game
             _spriteBatch.Draw(_pixel, new Rectangle(px + ts / 2 - markerSize / 2, py + ts / 2 - markerSize / 2, markerSize, markerSize), markerColor);
 
             var labelSize = _fontSmall.MeasureString(point.Label);
-            _spriteBatch.DrawString(_fontSmall, point.Label, new Vector2(px + ts / 2f - labelSize.X / 2, py - 14), Color.White * 0.8f);
+            DrawOutlinedString(_fontSmall, point.Label, new Vector2(px + ts / 2f - labelSize.X / 2, py - 14), Color.White * 0.8f);
         }
 
         // Draw player
@@ -5447,7 +5459,7 @@ public class Game1 : Game
                 "Purple" => Color.MediumPurple,
                 _ => Color.White
             };
-            _spriteBatch.DrawString(lblFont, SafeText(lbl.Text), new Vector2(lbl.X, lbl.Y), lblColor * 0.9f);
+            DrawOutlinedString(lblFont, lbl.Text, new Vector2(lbl.X, lbl.Y), lblColor * 0.9f);
         }
 
         // Draw item pickups (gameplay)
@@ -5642,7 +5654,7 @@ public class Game1 : Game
             _spriteBatch.Draw(_pixel, new Rectangle(hpBarX, hpBarY, (int)(hpBarW * hpPct), hpBarH),
                 hpPct > 0.5f ? Color.LimeGreen : (hpPct > 0.25f ? Color.Yellow : Color.Red));
             DrawHollowRect(hpBarX, hpBarY, hpBarW, hpBarH, Color.White * 0.3f);
-            _spriteBatch.DrawString(_font, SafeText($"HP {_player.Hp}/{_player.MaxHp}"), new Vector2(hpBarX + hpBarW + 8, hpBarY - 2), Color.White * 0.7f);
+            DrawOutlinedString(_font, $"HP {_player.Hp}/{_player.MaxHp}", new Vector2(hpBarX + hpBarW + 8, hpBarY - 2), Color.White * 0.7f);
 
             // Weapon HUD
             {
@@ -5659,7 +5671,7 @@ public class Game1 : Game
                 {
                     float alpha = MathHelper.Clamp(_deathLogTimers[i] / 2f, 0f, 1f); // fade in last 2s
                     int y = ViewH - 50 - (_deathLog.Count - i) * 16;
-                    _spriteBatch.DrawString(_font, SafeText(_deathLog[i]), new Vector2(10, y), Color.White * 0.6f * alpha);
+                    DrawOutlinedString(_font, _deathLog[i], new Vector2(10, y), Color.White * 0.6f * alpha);
                 }
             }
         }

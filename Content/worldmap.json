@@ -12012,7 +12012,7 @@
           "id": "garden",
           "name": "The Garden",
           "level": "test-arena",
-          "cleared": false,
+          "cleared": true,
           "discovered": true,
           "order": 0
         },
@@ -12021,7 +12021,7 @@
           "name": "The Descent",
           "level": "the-descent",
           "cleared": false,
-          "discovered": false,
+          "discovered": true,
           "order": 1
         },
         {
@@ -12045,7 +12045,7 @@
     }
   ],
   "playerX": 30,
-  "playerY": 44,
+  "playerY": 45,
   "points": [
     {
       "x": 30,
