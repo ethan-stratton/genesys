@@ -495,15 +495,35 @@ public class Game1 : Game
         _pixel = new Texture2D(GraphicsDevice, 1, 1);
         _pixel.SetData(new[] { Color.White });
 
-        // Load parallax background layers (Content/backgrounds/parallax_0.png through parallax_3.png)
+        // Load parallax background layers
+        // Supports: Content/backgrounds/parallax_0..3.png OR Content/backgrounds/bg_1/bg_1_layer_3..1.png + bg_1.png
         var layers = new List<Texture2D>();
+        string bgDir = "Content/backgrounds";
+        // Try numbered parallax_N.png first
+        bool foundNumbered = false;
         for (int i = 0; i < 4; i++)
         {
-            string path = $"Content/backgrounds/parallax_{i}.png";
-            if (File.Exists(path))
+            string path = Path.Combine(bgDir, $"parallax_{i}.png");
+            if (File.Exists(path)) { foundNumbered = true; using var fs = File.OpenRead(path); layers.Add(Texture2D.FromStream(GraphicsDevice, fs)); }
+        }
+        if (!foundNumbered)
+        {
+            // Try bg_1 subfolder: layer_3 (sky/far) → layer_2 (mid) → layer_1 (near ground) → bg_1 (composite fallback)
+            var subDirs = Directory.Exists(bgDir) ? Directory.GetDirectories(bgDir) : Array.Empty<string>();
+            if (subDirs.Length > 0)
             {
-                using var fs = File.OpenRead(path);
-                layers.Add(Texture2D.FromStream(GraphicsDevice, fs));
+                string sub = subDirs[0];
+                string baseName = Path.GetFileName(sub);
+                // Load back-to-front: layer_3 = furthest, layer_1 = nearest
+                string[] layerFiles = {
+                    Path.Combine(sub, $"{baseName}_layer_3.png"),
+                    Path.Combine(sub, $"{baseName}_layer_2.png"),
+                    Path.Combine(sub, $"{baseName}_layer_1.png"),
+                };
+                foreach (var lf in layerFiles)
+                {
+                    if (File.Exists(lf)) { using var fs = File.OpenRead(lf); layers.Add(Texture2D.FromStream(GraphicsDevice, fs)); }
+                }
             }
         }
         _parallaxLayers = layers.ToArray();
@@ -1203,22 +1223,49 @@ public class Game1 : Game
         {
             if (b.IsDead) continue;
             var bRect = new Rectangle((int)b.Position.X, (int)b.Position.Y, Bullet.Size, Bullet.Size);
+            float bDir = b.Direction.X >= 0 ? 1f : -1f;
+            float bulletKb = 120f; // light knockback
+            float bulletKbUp = -60f;
             foreach (var c in _crawlers)
             {
                 if (c.Alive && bRect.Intersects(c.Rect))
-                { c.TakeHit(2); b.IsDead = true; break; }
+                {
+                    bool killed = _knockbackEnabled
+                        ? c.TakeHit(2, bDir * bulletKb, bulletKbUp)
+                        : c.TakeHit(2);
+                    var hitPt = new Vector2(c.Position.X + c.EffectiveWidth/2f, c.Position.Y + c.EffectiveHeight/2f);
+                    SpawnHitSpray(hitPt, (int)bDir, GetEnemyHitColor(c.IsDummy ? "dummy" : "crawler"), 1, false);
+                    if (killed && _deathParticlesEnabled) SpawnDeathParticles(hitPt, new Color(120, 60, 20));
+                    if (_hitStopEnabled) _hitStopTimer = 0.02f;
+                    b.IsDead = true; break;
+                }
             }
             if (b.IsDead) continue;
             foreach (var t in _thornbacks)
             {
                 if (t.Alive && bRect.Intersects(t.Rect))
-                { t.TakeHit(1); b.IsDead = true; break; }
+                {
+                    t.TakeHit(1);
+                    var hitPt = new Vector2(t.Position.X + Thornback.Width/2f, t.Position.Y + Thornback.Height/2f);
+                    SpawnHitSpray(hitPt, (int)bDir, GetEnemyHitColor("thornback"), 1, false);
+                    if (_hitStopEnabled) _hitStopTimer = 0.02f;
+                    b.IsDead = true; break;
+                }
             }
             if (b.IsDead) continue;
             foreach (var h in _hoppers)
             {
                 if (h.Alive && bRect.Intersects(h.Rect))
-                { h.TakeHit(2); b.IsDead = true; break; }
+                {
+                    bool killed = _knockbackEnabled
+                        ? h.TakeHit(2, bDir * bulletKb, bulletKbUp)
+                        : h.TakeHit(2);
+                    var hitPt = new Vector2(h.Position.X + Hopper.Width/2f, h.Position.Y + Hopper.Height/2f);
+                    SpawnHitSpray(hitPt, (int)bDir, GetEnemyHitColor("hopper"), 1, false);
+                    if (killed && _deathParticlesEnabled) SpawnDeathParticles(hitPt, new Color(60, 120, 40));
+                    if (_hitStopEnabled) _hitStopTimer = 0.02f;
+                    b.IsDead = true; break;
+                }
             }
             // Bullet vs breakable tiles
             if (!b.IsDead && _level.TileGridInstance != null)
@@ -1917,20 +1964,28 @@ public class Game1 : Game
     {
         if (_parallaxLayers == null || _parallaxLayers.Length == 0) return;
         float camX = _camera.Position.X;
-        float[] factors = { 0.05f, 0.15f, 0.35f, 0.6f };
+        float[] factors = _parallaxLayers.Length switch
+        {
+            1 => new[] { 0.1f },
+            2 => new[] { 0.1f, 0.4f },
+            3 => new[] { 0.05f, 0.25f, 0.5f },
+            _ => new[] { 0.05f, 0.15f, 0.35f, 0.6f },
+        };
         for (int i = 0; i < _parallaxLayers.Length && i < factors.Length; i++)
         {
             var tex = _parallaxLayers[i];
             if (tex == null) continue;
             float px = camX * factors[i];
-            // Tile the texture across the screen
             int tw = tex.Width;
+            int th = tex.Height;
+            // Anchor layer to bottom of screen
+            int drawY = ViewH - th;
             int startX = (int)(-px % tw);
             if (startX > 0) startX -= tw;
-            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
+            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.NonPremultiplied, SamplerState.PointClamp);
             for (int x = startX; x < ViewW; x += tw)
             {
-                _spriteBatch.Draw(tex, new Rectangle(x, 0, tw, ViewH), Color.White);
+                _spriteBatch.Draw(tex, new Rectangle(x, drawY, tw, th), Color.White);
             }
             _spriteBatch.End();
         }

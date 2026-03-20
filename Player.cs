@@ -652,6 +652,8 @@ public class Player
                     {
                         IsOnWall = true;
                         IsDashing = false; // cancel dash on wall grab
+                        _visualScale = Vector2.One; // reset squash/stretch
+                        _squashHoldTimer = 0;
                         _currentWall = w;
                         _currentWallClimbSide = effectiveSide;
                         FacingDir = effectiveSide; // face away from wall
@@ -1020,6 +1022,21 @@ public class Player
             else
             {
                 if (inputY != 0) vel.Y = inputY * WallClimbSpeed;
+            }
+
+            // Block climbing up through solid floors / platforms
+            if (vel.Y < 0 && solidFloors != null)
+            {
+                foreach (var sf in solidFloors)
+                {
+                    if (Position.X + Width > sf.X && Position.X < sf.X + sf.Width &&
+                        Position.Y >= sf.Y + sf.Height && Position.Y + vel.Y * dt < sf.Y + sf.Height)
+                    {
+                        Position = new Vector2(Position.X, sf.Y + sf.Height);
+                        vel.Y = 0;
+                        break;
+                    }
+                }
             }
 
             // Drop off bottom of wall (holding S at the bottom edge OR reaching floor)
