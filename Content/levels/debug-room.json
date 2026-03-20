@@ -45,36 +45,6 @@
       "y": 704,
       "w": 32,
       "h": 12
-    },
-    {
-      "x": 6400,
-      "y": 600,
-      "w": 64,
-      "h": 12
-    },
-    {
-      "x": 6656,
-      "y": 600,
-      "w": 64,
-      "h": 12
-    },
-    {
-      "x": 6750,
-      "y": 560,
-      "w": 64,
-      "h": 12
-    },
-    {
-      "x": 6870,
-      "y": 600,
-      "w": 64,
-      "h": 12
-    },
-    {
-      "x": 6960,
-      "y": 440,
-      "w": 64,
-      "h": 12
     }
   ],
   "ropes": [],
@@ -85,13 +55,6 @@
       "w": 32,
       "h": 352,
       "climbSide": 99
-    },
-    {
-      "x": 5120,
-      "y": 340,
-      "w": 32,
-      "h": 300,
-      "climbSide": 0
     },
     {
       "x": 5600,
@@ -115,31 +78,10 @@
       "climbSide": 0
     },
     {
-      "x": 6200,
-      "y": 440,
-      "w": 32,
-      "h": 200,
-      "climbSide": 0
-    },
-    {
       "x": 5750,
       "y": 440,
       "w": 32,
       "h": 200,
-      "climbSide": 0
-    },
-    {
-      "x": 7200,
-      "y": 384,
-      "w": 32,
-      "h": 256,
-      "climbSide": 0
-    },
-    {
-      "x": 7328,
-      "y": 384,
-      "w": 32,
-      "h": 256,
       "climbSide": 0
     },
     {
@@ -207,12 +149,6 @@
       "h": 96
     },
     {
-      "x": 7050,
-      "y": 608,
-      "w": 128,
-      "h": 12
-    },
-    {
       "x": 5088,
       "y": 640,
       "w": 600,
@@ -222,12 +158,6 @@
       "x": 5700,
       "y": 640,
       "w": 650,
-      "h": 160
-    },
-    {
-      "x": 6300,
-      "y": 640,
-      "w": 800,
       "h": 160
     },
     {
@@ -322,61 +252,71 @@
       "id": "crit-dummy-p1",
       "type": "crit-dummy",
       "x": 5850,
-      "y": 620
+      "y": 620,
+      "count": 1
     },
     {
       "id": "crit-dummy-p2",
       "type": "crit-dummy",
       "x": 5950,
-      "y": 620
+      "y": 620,
+      "count": 1
     },
     {
       "id": "dummy-p1",
       "type": "dummy",
       "x": 6050,
-      "y": 620
+      "y": 620,
+      "count": 1
     },
     {
       "id": "dummy-p2",
       "type": "dummy",
       "x": 6150,
-      "y": 620
+      "y": 620,
+      "count": 1
     },
     {
       "id": "dummy-w1",
       "type": "dummy",
       "x": 7550,
-      "y": 620
+      "y": 620,
+      "count": 1
     },
     {
       "id": "dummy-w2",
       "type": "dummy",
       "x": 7680,
-      "y": 620
+      "y": 620,
+      "count": 1
     },
     {
       "id": "dummy-w3",
       "type": "dummy",
       "x": 7810,
-      "y": 620
+      "y": 620,
+      "count": 1
     },
     {
       "id": "dummy-w4",
       "type": "dummy",
       "x": 7940,
-      "y": 620
+      "y": 620,
+      "count": 1
     },
     {
       "id": "dummy-w5",
       "type": "dummy",
       "x": 8070,
-      "y": 620
+      "y": 620,
+      "count": 1
     },
     {
       "id": "dummy-w6",
       "type": "dummy",
       "x": 8200,
-      "y": 620
+      "y": 620,
+      "count": 1
     }
   ],
   "labels": [
@@ -605,74 +545,60 @@
       "size": "small"
     },
     {
+      "text": "== PARTICLE GYM ==",
       "x": 5800,
       "y": 480,
-      "text": "== PARTICLE GYM =="
+      "color": "White",
+      "size": "small"
     },
     {
+      "text": "Crit dummies (every hit = finisher)",
       "x": 5800,
       "y": 500,
-      "text": "Crit dummies (every hit = finisher)"
+      "color": "White",
+      "size": "small"
     },
     {
+      "text": "Try different weapons with P",
       "x": 5800,
       "y": 520,
-      "text": "Try different weapons with P"
+      "color": "White",
+      "size": "small"
     },
     {
-      "x": 6400,
-      "y": 480,
-      "text": "== MOVEMENT GYM =="
-    },
-    {
-      "x": 6420,
-      "y": 540,
-      "text": "Dash"
-    },
-    {
-      "x": 6550,
-      "y": 500,
-      "text": "Coyote"
-    },
-    {
-      "x": 6700,
-      "y": 400,
-      "text": "Double Jump"
-    },
-    {
-      "x": 6820,
-      "y": 540,
-      "text": "Slide"
-    },
-    {
-      "x": 6950,
-      "y": 400,
-      "text": "Wall Jump"
-    },
-    {
+      "text": "== WEAPON GYM ==",
       "x": 7500,
       "y": 480,
-      "text": "== WEAPON GYM =="
+      "color": "White",
+      "size": "small"
     },
     {
+      "text": "Equip weapons with P, test feel differences",
       "x": 7500,
       "y": 500,
-      "text": "Equip weapons with P, test feel differences"
+      "color": "White",
+      "size": "small"
     },
     {
+      "text": "Light",
       "x": 7520,
       "y": 540,
-      "text": "Light"
+      "color": "White",
+      "size": "small"
     },
     {
+      "text": "Medium",
       "x": 7780,
       "y": 540,
-      "text": "Medium"
+      "color": "White",
+      "size": "small"
     },
     {
+      "text": "Heavy",
       "x": 8040,
       "y": 540,
-      "text": "Heavy"
+      "color": "White",
+      "size": "small"
     }
   ],
   "tileGrid": {
@@ -4038,6 +3964,9 @@
       0,
       0,
       2,
+      1,
+      1,
+      1,
       0,
       0,
       0,
@@ -4140,9 +4069,6 @@
       0,
       0,
       0,
-      0,
-      0,
-      0,
       2,
       2,
       2,
@@ -4198,6 +4124,9 @@
       0,
       0,
       2,
+      1,
+      1,
+      1,
       0,
       0,
       0,
@@ -4309,9 +4238,6 @@
       0,
       0,
       0,
-      0,
-      0,
-      0,
       2,
       2,
       2,
@@ -4358,7 +4284,9 @@
       2,
       2,
       2,
-      0,
+      1,
+      1,
+      1,
       0,
       0,
       0,
@@ -4442,8 +4370,6 @@
       0,
       0,
       0,
-      0,
-      0,
       2,
       2,
       2,
@@ -4518,8 +4444,9 @@
       2,
       2,
       2,
-      0,
-      0,
+      1,
+      1,
+      1,
       0,
       0,
       0,
@@ -4603,7 +4530,6 @@
       0,
       0,
       0,
-      0,
       2,
       2,
       2,
@@ -4678,9 +4604,9 @@
       2,
       2,
       2,
-      0,
-      0,
-      0,
+      1,
+      1,
+      1,
       0
     ]
   }

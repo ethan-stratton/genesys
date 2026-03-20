@@ -797,6 +797,12 @@ public class Player
                 IsCartwheeling = false;
                 IsVaultKicking = false;
                 IsCrouching = false;
+                // Detach from wall if on one
+                if (IsOnWall)
+                {
+                    IsOnWall = false;
+                    _wallDisengaged = true;
+                }
                 _jumpHeld = true;
             }
         }
@@ -947,6 +953,16 @@ public class Player
             }
             _meleeHeld = kOnRope;
 
+            // Decay afterimages even while on rope
+            for (int i = 0; i < MaxAfterimages; i++)
+            {
+                if (_afterimages[i].TimeLeft > 0)
+                {
+                    _afterimages[i].TimeLeft -= dt;
+                    _afterimages[i].Alpha = 0.8f * (_afterimages[i].TimeLeft / AfterimageLifetime);
+                }
+            }
+
             _prevKb = kb;
             return; // skip normal physics
         }
@@ -977,6 +993,15 @@ public class Player
                 IsGrounded = true;
                 _wasGrounded = true;
                 _jumpsLeft = MaxJumps;
+            }
+            // Decay afterimages during vault
+            for (int i = 0; i < MaxAfterimages; i++)
+            {
+                if (_afterimages[i].TimeLeft > 0)
+                {
+                    _afterimages[i].TimeLeft -= dt;
+                    _afterimages[i].Alpha = 0.8f * (_afterimages[i].TimeLeft / AfterimageLifetime);
+                }
             }
             _prevKb = kb;
             return;
@@ -1116,6 +1141,16 @@ public class Player
                 MeleeTimer = MeleeActiveTime;
             }
             _meleeHeld = kOnWall;
+
+            // Decay afterimages even while on wall
+            for (int i = 0; i < MaxAfterimages; i++)
+            {
+                if (_afterimages[i].TimeLeft > 0)
+                {
+                    _afterimages[i].TimeLeft -= dt;
+                    _afterimages[i].Alpha = 0.8f * (_afterimages[i].TimeLeft / AfterimageLifetime);
+                }
+            }
 
             _prevKb = kb;
             return;
