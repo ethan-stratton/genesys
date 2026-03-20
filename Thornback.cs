@@ -13,7 +13,6 @@ public class Thornback
     public float DamageCooldown;
     public float HitFlash;
     public float MeleeHitCooldown;
-    public Vector2 KnockbackVel;
     public Vector2 VisualScale = Vector2.One;
     public float SquashResistance = 0.7f;
     private float _squashHoldTimer;
@@ -31,12 +30,6 @@ public class Thornback
         if (DamageCooldown > 0) DamageCooldown -= dt;
         if (HitFlash > 0) HitFlash -= dt;
         if (MeleeHitCooldown > 0) MeleeHitCooldown -= dt;
-
-        if (KnockbackVel.LengthSquared() > 1f)
-        {
-            Position += KnockbackVel * dt;
-            KnockbackVel *= 0.85f;
-        }
 
         if (_squashHoldTimer > 0) _squashHoldTimer -= dt;
         else VisualScale = Vector2.Lerp(VisualScale, Vector2.One, 8f * dt);
@@ -59,7 +52,7 @@ public class Thornback
         Hp -= damage;
         HitFlash = 0.15f;
         MeleeHitCooldown = 0.2f;
-        KnockbackVel = new Vector2(knockbackX, knockbackY);
+        // Ignore knockback — thornback is stationary
         float squashAmount = 1f - SquashResistance;
         VisualScale = new Vector2(1f + 0.3f * squashAmount, 1f - 0.25f * squashAmount);
         _squashHoldTimer = 0.05f;

@@ -97,6 +97,7 @@ public class Game1 : Game
     }
     private List<Particle> _particles = new();
     private bool _playerWasGrounded;
+    private float _playerPrevVelY;
     private bool _playerWasDashing;
     private Random _shakeRng = new();
 
@@ -270,16 +271,6 @@ public class Game1 : Game
             new() { Label = "Spin Melee", Get = () => _enableSpinMelee, Toggle = () => _enableSpinMelee = !_enableSpinMelee },
             new() { Label = "Flip", Get = () => _enableFlip, Toggle = () => _enableFlip = !_enableFlip },
             new() { Label = "Blade Dash", Get = () => _enableBladeDash, Toggle = () => _enableBladeDash = !_enableBladeDash },
-            new() { Label = "Debug Sword", Get = () => _debugSword, Toggle = () => {
-                _debugSword = !_debugSword;
-                if (_debugSword) EquipMelee(WeaponType.Sword);
-                else UnequipMelee(WeaponType.Sword);
-            }},
-            new() { Label = "Debug Gun", Get = () => _debugGun, Toggle = () => {
-                _debugGun = !_debugGun;
-                if (_debugGun) EquipRanged(WeaponType.Gun);
-                else UnequipRanged(WeaponType.Gun);
-            }},
             new() { Label = "EVE Orb", Get = () => _eveOrbActive, Toggle = () => _eveOrbActive = !_eveOrbActive },
             new() { Label = "Hit Stop", Get = () => _hitStopEnabled, Toggle = () => _hitStopEnabled = !_hitStopEnabled },
             new() { Label = "Screen Shake", Get = () => _screenShakeEnabled, Toggle = () => _screenShakeEnabled = !_screenShakeEnabled },
@@ -827,6 +818,7 @@ public class Game1 : Game
 
         if (!hitStopped)
         {
+        _playerPrevVelY = _player.Velocity.Y;
         _player.Update(dt, kb, _level.Floor.Y, _level.AllPlatforms, ropesToPass, ropeTopsToPass, ropeBottomsToPass, wallsToPass, wallSidesToPass, _level.WallRects, _level.CeilingRects, _level.SolidFloorRects, _level.TileGridInstance);
         _player.UpdateRegen(dt);
         }
@@ -1166,6 +1158,103 @@ public class Game1 : Game
                 }
             }
         }
+        // Wall-splat check for knocked enemies
+        if (_knockbackEnabled)
+        {
+            foreach (var c in _crawlers)
+            {
+                if (!c.Alive || c.KnockbackVel.LengthSquared() < 100f) continue;
+                float kbSpeed = c.KnockbackVel.Length();
+                bool hitWall = false;
+                if (c.Position.X < _level.Bounds.Left) { c.Position.X = _level.Bounds.Left; hitWall = true; }
+                if (c.Position.X + Crawler.Width > _level.Bounds.Right) { c.Position.X = _level.Bounds.Right - Crawler.Width; hitWall = true; }
+                var cRect = c.Rect;
+                foreach (var wall in _level.WallRects)
+                {
+                    if (cRect.Intersects(wall))
+                    {
+                        if (c.KnockbackVel.X > 0) c.Position.X = wall.Left - Crawler.Width;
+                        else c.Position.X = wall.Right;
+                        hitWall = true;
+                    }
+                }
+                if (hitWall)
+                {
+                    int splatDmg = (int)(kbSpeed / 100f);
+                    if (splatDmg > 0)
+                    {
+                        bool killed = c.TakeHit(splatDmg);
+                        if (_hitStopEnabled) _hitStopTimer = MathF.Max(_hitStopTimer, 0.08f);
+                        if (_screenShakeEnabled) { _shakeTimer = 0.12f; _shakeIntensity = 8f; }
+                        if (_deathParticlesEnabled && killed) SpawnDeathParticles(new Vector2(c.Position.X + Crawler.Width/2f, c.Position.Y + Crawler.Height/2f), new Color(120, 60, 20));
+                        SpawnDustParticles(new Vector2(c.Position.X + (c.KnockbackVel.X > 0 ? Crawler.Width : 0), c.Position.Y + Crawler.Height / 2f), 6);
+                    }
+                    c.KnockbackVel = Vector2.Zero;
+                }
+            }
+            foreach (var h in _hoppers)
+            {
+                if (!h.Alive || h.KnockbackVel.LengthSquared() < 100f) continue;
+                float kbSpeed = h.KnockbackVel.Length();
+                bool hitWall = false;
+                if (h.Position.X < _level.Bounds.Left) { h.Position.X = _level.Bounds.Left; hitWall = true; }
+                if (h.Position.X + Hopper.Width > _level.Bounds.Right) { h.Position.X = _level.Bounds.Right - Hopper.Width; hitWall = true; }
+                var hRect = h.Rect;
+                foreach (var wall in _level.WallRects)
+                {
+                    if (hRect.Intersects(wall))
+                    {
+                        if (h.KnockbackVel.X > 0) h.Position.X = wall.Left - Hopper.Width;
+                        else h.Position.X = wall.Right;
+                        hitWall = true;
+                    }
+                }
+                if (hitWall)
+                {
+                    int splatDmg = (int)(kbSpeed / 100f);
+                    if (splatDmg > 0)
+                    {
+                        bool killed = h.TakeHit(splatDmg);
+                        if (_hitStopEnabled) _hitStopTimer = MathF.Max(_hitStopTimer, 0.08f);
+                        if (_screenShakeEnabled) { _shakeTimer = 0.12f; _shakeIntensity = 8f; }
+                        if (_deathParticlesEnabled && killed) SpawnDeathParticles(new Vector2(h.Position.X + Hopper.Width/2f, h.Position.Y + Hopper.Height/2f), new Color(100, 80, 60));
+                        SpawnDustParticles(new Vector2(h.Position.X + (h.KnockbackVel.X > 0 ? Hopper.Width : 0), h.Position.Y + Hopper.Height / 2f), 6);
+                    }
+                    h.KnockbackVel = Vector2.Zero;
+                }
+            }
+            foreach (var b in _birds)
+            {
+                if (!b.Alive || b.KnockbackVel.LengthSquared() < 100f) continue;
+                float kbSpeed = b.KnockbackVel.Length();
+                bool hitWall = false;
+                if (b.Position.X < _level.Bounds.Left) { b.Position.X = _level.Bounds.Left; hitWall = true; }
+                if (b.Position.X + Bird.Width > _level.Bounds.Right) { b.Position.X = _level.Bounds.Right - Bird.Width; hitWall = true; }
+                var bRect = b.Rect;
+                foreach (var wall in _level.WallRects)
+                {
+                    if (bRect.Intersects(wall))
+                    {
+                        if (b.KnockbackVel.X > 0) b.Position.X = wall.Left - Bird.Width;
+                        else b.Position.X = wall.Right;
+                        hitWall = true;
+                    }
+                }
+                if (hitWall)
+                {
+                    int splatDmg = (int)(kbSpeed / 100f);
+                    if (splatDmg > 0)
+                    {
+                        bool killed = b.TakeHit(splatDmg);
+                        if (_hitStopEnabled) _hitStopTimer = MathF.Max(_hitStopTimer, 0.08f);
+                        if (_screenShakeEnabled) { _shakeTimer = 0.12f; _shakeIntensity = 8f; }
+                        if (_deathParticlesEnabled && killed) SpawnDeathParticles(new Vector2(b.Position.X + Bird.Width/2f, b.Position.Y + Bird.Height/2f), new Color(80, 120, 160));
+                        SpawnDustParticles(new Vector2(b.Position.X + (b.KnockbackVel.X > 0 ? Bird.Width : 0), b.Position.Y + Bird.Height / 2f), 6);
+                    }
+                    b.KnockbackVel = Vector2.Zero;
+                }
+            }
+        }
         } // end _enemiesEnabled
 
         // Check HP death
@@ -1186,11 +1275,16 @@ public class Game1 : Game
         }
 
         // Dust on landing
+        // Dust on landing — scaled by fall speed
         if (_dustParticlesEnabled && _player.IsGrounded && !_playerWasGrounded)
-            SpawnDustParticles(new Vector2(_player.Position.X + Player.Width / 2f, _player.Position.Y + Player.Height));
+        {
+            float fallSpeed = MathF.Abs(_playerPrevVelY);
+            int dustCount = (int)MathHelper.Clamp(fallSpeed / 40f, 4, 20);
+            SpawnDustParticles(new Vector2(_player.Position.X + Player.Width / 2f, _player.Position.Y + Player.Height), dustCount);
+        }
         // Dust on dash start
         if (_dustParticlesEnabled && _player.IsDashing && !_playerWasDashing)
-            SpawnDustParticles(new Vector2(_player.Position.X + Player.Width / 2f, _player.Position.Y + Player.Height));
+            SpawnDustParticles(new Vector2(_player.Position.X + Player.Width / 2f, _player.Position.Y + Player.Height), 6);
         _playerWasGrounded = _player.IsGrounded;
         _playerWasDashing = _player.IsDashing;
 
@@ -1689,13 +1783,13 @@ public class Game1 : Game
         }
     }
 
-    private void SpawnDustParticles(Vector2 position, int count = 4)
+    private void SpawnDustParticles(Vector2 position, int count = 6)
     {
         for (int i = 0; i < count; i++)
         {
-            float vx = (float)(_rng.NextDouble() * 80 - 40);
-            float vy = -(float)(_rng.NextDouble() * 60 + 20);
-            float life = 0.2f + (float)(_rng.NextDouble() * 0.2f);
+            float vx = (float)(_rng.NextDouble() * 120 - 60);
+            float vy = -(float)(_rng.NextDouble() * 80 + 30);
+            float life = 0.25f + (float)(_rng.NextDouble() * 0.3f);
             _particles.Add(new Particle
             {
                 Position = position,
@@ -1703,7 +1797,7 @@ public class Game1 : Game
                 Life = life,
                 MaxLife = life,
                 Color = new Color(180, 170, 150),
-                Size = 2
+                Size = 2 + _rng.Next(2)
             });
         }
     }
