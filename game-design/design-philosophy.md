@@ -274,6 +274,50 @@ The player chooses engagement depth. Everything interesting is examinable but no
 - NPCs can be talked to directly OR delegated to EVE for a summary — both valid playstyles
 - Scientific accuracy as bonus flavor (real chemistry for crafting), not as requirement
 
+## 18. MYSTERY THROUGH CONCEALMENT (Four Types)
+
+**From GMTK — "What Makes a Game Feel Mysterious?":**
+
+Mystery = withholding information intentionally. Four types of concealment:
+
+1. **Locked doors** — Player sees the barrier, wonders what's behind it. Limit how many you dangle at once (mental load). Animal Well designer: "conscious of how many things I am dangling"
+2. **Hidden rules** — Don't explain every mechanic. Rain World: alien landscape where you LEARN by observation. But be intentional about what stays unexplained — confusing ≠ mysterious
+3. **Unexplored landscape** — Elden Ring: tells you nothing about what's over the horizon. No compass, no markers. Mystery lives in the space between the player and the unknown
+4. **Narrative enigma** — The central question that drives the entire game. Outer Wilds: "why are we in a time loop?" White Lotus: "who died?" Show the mystery box in the first 10 minutes
+
+**The Metroidbrainia insight:** The best keys are KNOWLEDGE, not items. Tunic's locked doors open when you understand something, not when you find a key. This means players who pay close attention can sequence-break. EVE's scanning = knowledge keys.
+
+**Critical warnings:**
+- Don't undercut mystery with a chatty companion who over-explains everything (Talos Principle 2's yapping explorers). EVE must hint, not narrate
+- Establish patterns, then break them. Elden Ring catacombs get predictable → mystery dies. Throw in something completely unique periodically
+- Have at least one mystery that may never be solved. The game should always be a little bit unknowable
+
+**For Genesis:**
+- The Dragon's motive is the central narrative enigma (mystery box, first 10 min)
+- EVE scanning = knowledge keys, not item keys
+- Invisible scannable tiles = hidden rules (the player discovers a new way to interact)
+- Ancient ruins = unexplored landscape + locked doors
+- Limit open mysteries to 3-5 at any time. Resolve some before introducing new ones
+
+## 19. SIX ANTI-MISTAKES
+
+**From Thomas Brush — "6 Game Design Mistakes You MUST Avoid":**
+
+1. **Show the lock before the key.** Player must see the problem before finding the solution. Otherwise they don't feel like they solved anything
+2. **Your level is 5x more complex than you think.** You see the bird's eye view. Players don't. Simplify, especially early. Cut in half if needed
+3. **Mechanical choices > world choices.** Secondary fire, different jump types, weapon swaps = more value than "go left or right." Mechanical choices persist across the entire game
+4. **If the player doesn't learn something usable, they get bored.** Telegraph enemies. Let players learn patterns and exploit them. Randomized enemies = not fun
+5. **It's okay to just TELL the player.** Half-Life-style environmental teaching is ideal, but overlays are fine for critical mechanics. Confusion stacks → frustration → quit
+6. **When in doubt, surprise the player.** Break your own loops. An enemy waves instead of attacks. A vending machine explodes. Pattern → break
+7. **(Bonus) Throw in funsies.** Smashable pinwheels, readable newspapers, punchable objects. Zero function, pure serotonin. Place in dry spots
+
+**For Genesis:**
+- The PROLOGUE is the lock (Dragon attack, crash). The entire game is finding the key
+- First hour must be simpler than we think. Wreckage area = linear, safe, learn-by-doing
+- Weapon specials and combat options = mechanical choices (our strength)
+- EVE's scanning IS the "tell the player" system — wrapped in worldbuilding
+- Funsies: smashable ship debris, sparking consoles, weird alien plants that react to touch
+
 ---
 
 *These aren't rules to follow rigidly. They're lenses to evaluate every design decision through. When in doubt: Does this serve a Core pillar? Does it have a unique silhouette? Does it deepen the mystery? Does it reward mastery? Does it preserve soul? Does it serve the story spine?*
