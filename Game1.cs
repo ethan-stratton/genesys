@@ -96,6 +96,14 @@ public class Game1 : Game
         public int Size;
     }
     private List<Particle> _particles = new();
+
+    private struct Splatter
+    {
+        public Vector2 Position;
+        public float Life;
+        public Color Color;
+    }
+    private List<Splatter> _splatters = new();
     private bool _playerWasGrounded;
     private float _playerPrevVelY;
     private bool _playerWasDashing;
@@ -232,7 +240,7 @@ public class Game1 : Game
     private Vector2 _editorMoveOffset; // offset from entity origin to grab point
     private bool _entityPaletteOpen;
     private int _entityPaletteCursor;
-    private enum EntityType { Swarm, Crawler, Thornback, Hopper, Tree, Bird, Dummy }
+    private enum EntityType { Swarm, Crawler, Thornback, Hopper, Tree, Bird, Dummy, CritDummy }
 
     // Tile paint state
     private int _tilePaletteCursor;
@@ -452,6 +460,15 @@ public class Game1 : Game
                     dummy.Hp = 9999;
                     dummy.UpdateSurfaceEdges(tg, ts, plats, sFloors, bLeft, bRight);
                     _crawlers.Add(dummy);
+                    break;
+                case "crit-dummy":
+                    float cdSnapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Crawler.Width, Crawler.Height, tg, ts, plats, sFloors, walls, mainFloor);
+                    var critDummy = new Crawler(new Vector2(e.X, cdSnapY), e.X - 10, e.X + 10, 0, 0);
+                    critDummy.IsDummy = true;
+                    critDummy.AlwaysCrit = true;
+                    critDummy.Hp = 9999;
+                    critDummy.UpdateSurfaceEdges(tg, ts, plats, sFloors, bLeft, bRight);
+                    _crawlers.Add(critDummy);
                     break;
             }
         }
@@ -976,6 +993,7 @@ public class Game1 : Game
                 if (_player.MeleeHitbox.Intersects(c.Rect))
                 {
                     bool finisher = _player.IsComboFinisher;
+                    if (c.IsDummy && c.AlwaysCrit) finisher = true;
                     int prevHp = c.Hp;
                     var ws = WeaponStats.Get(_player.CurrentWeapon);
                     int dmg = finisher ? ws.FinisherDamage : ws.Damage;
@@ -988,6 +1006,8 @@ public class Game1 : Game
                     {
                         _player.RegisterComboHit();
                         if (finisher) c.MeleeHitCooldown = 0.055f;
+                        var hitPt = new Vector2(c.Position.X + Crawler.Width/2f, c.Position.Y + Crawler.Height/2f);
+                        SpawnHitSpray(hitPt, _player.FacingDir, GetEnemyHitColor(c.IsDummy ? "dummy" : "crawler"), ws.Weight, finisher);
                         if (killed)
                         {
                             if (_hitStopEnabled) _hitStopTimer = ws.HitStopKill;
@@ -1035,6 +1055,8 @@ public class Game1 : Game
                     {
                         _player.RegisterComboHit();
                         if (finisher) t.MeleeHitCooldown = 0.055f;
+                        var hitPt = new Vector2(t.Position.X + Thornback.Width/2f, t.Position.Y + Thornback.Height/2f);
+                        SpawnHitSpray(hitPt, _player.FacingDir, GetEnemyHitColor("thornback"), ws.Weight, finisher);
                         if (killed)
                         {
                             if (_hitStopEnabled) _hitStopTimer = ws.HitStopKill;
@@ -1084,6 +1106,8 @@ public class Game1 : Game
                     {
                         _player.RegisterComboHit();
                         if (finisher) h.MeleeHitCooldown = 0.055f;
+                        var hitPt = new Vector2(h.Position.X + Hopper.Width/2f, h.Position.Y + Hopper.Height/2f);
+                        SpawnHitSpray(hitPt, _player.FacingDir, GetEnemyHitColor("hopper"), ws.Weight, finisher);
                         if (killed)
                         {
                             if (_hitStopEnabled) _hitStopTimer = ws.HitStopKill;
@@ -1276,10 +1300,29 @@ public class Game1 : Game
         {
             var p = _particles[i];
             p.Life -= dt;
-            if (p.Life <= 0) { _particles.RemoveAt(i); continue; }
             p.Velocity.Y += 400f * dt;
             p.Position += p.Velocity * dt;
+
+            // Hit floor — leave splatter and remove
+            if (p.Position.Y >= _level.Floor.Y)
+            {
+                if (_splatters.Count < 200)
+                    _splatters.Add(new Splatter { Position = new Vector2(p.Position.X, _level.Floor.Y - 1), Life = 3.5f, Color = p.Color });
+                _particles.RemoveAt(i);
+                continue;
+            }
+
+            if (p.Life <= 0) { _particles.RemoveAt(i); continue; }
             _particles[i] = p;
+        }
+
+        // Update splatters
+        for (int i = _splatters.Count - 1; i >= 0; i--)
+        {
+            var s = _splatters[i];
+            s.Life -= dt;
+            if (s.Life <= 0) { _splatters.RemoveAt(i); continue; }
+            _splatters[i] = s;
         }
 
         // Dust on landing
@@ -1810,6 +1853,65 @@ public class Game1 : Game
         }
     }
 
+    private static Color GetEnemyHitColor(string type) => type switch
+    {
+        "crawler" => new Color(120, 60, 20),
+        "dummy" => new Color(140, 100, 160),
+        "hopper" => new Color(100, 80, 60),
+        "thornback" => new Color(60, 100, 30),
+        "bird" => new Color(80, 120, 160),
+        "swarm" => Color.OrangeRed,
+        _ => new Color(200, 50, 50)
+    };
+
+    private void SpawnHitSpray(Vector2 hitPoint, int facingDir, Color color, float weaponWeight, bool isFinisher)
+    {
+        int count = (int)MathHelper.Clamp(3 + weaponWeight * 5, 3, 8);
+        if (isFinisher) count *= 2;
+        float baseSpeed = 120f + weaponWeight * 180f;
+
+        for (int i = 0; i < count; i++)
+        {
+            float angle = facingDir > 0 ? 0f : MathF.PI;
+            angle += (float)(_rng.NextDouble() - 0.5) * MathF.PI * 0.5f;
+            float speed = baseSpeed * (0.6f + (float)_rng.NextDouble() * 0.8f);
+            float life = 0.15f + (float)_rng.NextDouble() * 0.15f;
+            if (isFinisher) life *= 1.3f;
+
+            _particles.Add(new Particle
+            {
+                Position = hitPoint + new Vector2((float)(_rng.NextDouble() * 6 - 3), (float)(_rng.NextDouble() * 6 - 3)),
+                Velocity = new Vector2(MathF.Cos(angle) * speed, MathF.Sin(angle) * speed - 40f),
+                Life = life,
+                MaxLife = life,
+                Color = color,
+                Size = 1 + _rng.Next(isFinisher ? 3 : 2)
+            });
+        }
+
+        int sparkCount = isFinisher ? 3 : 1 + _rng.Next(2);
+        for (int i = 0; i < sparkCount; i++)
+        {
+            float angle = (float)(_rng.NextDouble() * MathF.PI * 2);
+            float speed = 60f + (float)(_rng.NextDouble() * 100f);
+            float life = 0.08f + (float)(_rng.NextDouble() * 0.07f);
+            _particles.Add(new Particle
+            {
+                Position = hitPoint,
+                Velocity = new Vector2(MathF.Cos(angle) * speed, MathF.Sin(angle) * speed - 50f),
+                Life = life,
+                MaxLife = life,
+                Color = new Color(255, 255, (int)(180 + _rng.NextDouble() * 75)),
+                Size = 1 + _rng.Next(2)
+            });
+        }
+
+        // Crush weapons spawn dust cloud
+        bool isCrush = _player.CurrentWeapon is WeaponType.Club or WeaponType.GreatClub or WeaponType.Hammer;
+        if (isCrush)
+            SpawnDustParticles(hitPoint, isFinisher ? 6 : 3);
+    }
+
     private static Color ParseNpcColor(string name)
     {
         return name switch
@@ -2030,6 +2132,12 @@ public class Game1 : Game
                         dummyList.Add(new EnemySpawnData { Id = $"dummy-{dummyList.Count}", Type = "dummy", X = cx, Y = cy });
                         _level.Enemies = dummyList.ToArray();
                         SetEditorStatus($"Placed dummy at ({(int)cx}, {(int)cy})");
+                        break;
+                    case EntityType.CritDummy:
+                        var cdList = new List<EnemySpawnData>(_level.Enemies);
+                        cdList.Add(new EnemySpawnData { Id = $"crit-dummy-{cdList.Count}", Type = "crit-dummy", X = cx, Y = cy });
+                        _level.Enemies = cdList.ToArray();
+                        SetEditorStatus($"Placed crit-dummy at ({(int)cx}, {(int)cy})");
                         break;
                 }
             }
@@ -3553,6 +3661,7 @@ public class Game1 : Game
                     EntityType.Thornback => new Color(60, 100, 30),
                     EntityType.Tree => Color.ForestGreen,
                     EntityType.Dummy => new Color(140, 100, 160),
+                    EntityType.CritDummy => new Color(200, 60, 200),
                     _ => Color.White
                 };
                 _spriteBatch.Draw(_pixel, new Rectangle((int)epalX + 10, (int)itemY + 8, 10, 10), iconColor);
@@ -5269,6 +5378,13 @@ public class Game1 : Game
             foreach (var h in _hoppers) { if (!_enemySquashEnabled) h.VisualScale = Vector2.One; h.Draw(_spriteBatch, _pixel); }
             foreach (var t in _thornbacks) { if (!_enemySquashEnabled) t.VisualScale = Vector2.One; t.Draw(_spriteBatch, _pixel); }
             foreach (var bird in _birds) { if (!_enemySquashEnabled) bird.VisualScale = Vector2.One; bird.Draw(_spriteBatch, _pixel); }
+        }
+
+        // Draw splatters
+        foreach (var s in _splatters)
+        {
+            float alpha = MathHelper.Clamp(s.Life / 1.5f, 0, 1);
+            _spriteBatch.Draw(_pixel, new Rectangle((int)s.Position.X, (int)s.Position.Y, 2, 1), s.Color * alpha);
         }
 
         // Draw particles

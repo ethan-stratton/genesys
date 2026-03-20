@@ -30,6 +30,7 @@ public class Crawler
 
     // Dummy mode: high HP, no aggro, respawns at original position
     public bool IsDummy;
+    public bool AlwaysCrit;
     private Vector2 _spawnPos;
     private float _respawnTimer;
     private const float RespawnDelay = 2f;
