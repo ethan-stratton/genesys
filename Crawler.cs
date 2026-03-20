@@ -28,11 +28,18 @@ public class Crawler
     public float SquashResistance = 0f;
     private float _squashHoldTimer;
 
+    // Dummy mode: high HP, no aggro, respawns at original position
+    public bool IsDummy;
+    private Vector2 _spawnPos;
+    private float _respawnTimer;
+    private const float RespawnDelay = 2f;
+
     private const float Gravity = 600f;
 
     public Crawler(Vector2 pos, float patrolLeft, float patrolRight, float surfaceLeft, float surfaceRight)
     {
         Position = pos;
+        _spawnPos = pos;
         PatrolLeft = patrolLeft;
         PatrolRight = patrolRight;
         SurfaceLeft = surfaceLeft;
@@ -48,7 +55,25 @@ public class Crawler
         TileGrid tileGrid, int tileSize,
         Rectangle[] platforms, Rectangle[] solidFloors, float floorY)
     {
-        if (!Alive) return;
+        if (!Alive)
+        {
+            // Dummy respawn
+            if (IsDummy)
+            {
+                _respawnTimer -= dt;
+                if (_respawnTimer <= 0)
+                {
+                    Alive = true;
+                    Hp = 9999;
+                    Position = _spawnPos;
+                    Velocity = Vector2.Zero;
+                    KnockbackVel = Vector2.Zero;
+                    VisualScale = Vector2.One;
+                    HitFlash = 0;
+                }
+            }
+            return;
+        }
         if (DamageCooldown > 0) DamageCooldown -= dt;
         if (MeleeHitCooldown > 0) MeleeHitCooldown -= dt;
         if (HitFlash > 0) HitFlash -= dt;
@@ -62,6 +87,13 @@ public class Crawler
         if (_squashHoldTimer > 0) _squashHoldTimer -= dt;
         else VisualScale = Vector2.Lerp(VisualScale, Vector2.One, 8f * dt);
 
+        // Dummies don't aggro or move
+        if (IsDummy)
+        {
+            Velocity.X = 0;
+        }
+        else
+        {
         float dist = Vector2.Distance(playerCenter, Position + new Vector2(Width / 2f, Height / 2f));
         Aggroed = dist < AggroRange;
 
@@ -77,6 +109,7 @@ public class Crawler
             if (Position.X <= PatrolLeft) { Position.X = PatrolLeft; Dir = 1; }
             if (Position.X + Width >= PatrolRight) { Position.X = PatrolRight - Width; Dir = -1; }
         }
+        } // end non-dummy movement
 
         // Apply gravity and tile collision
         _onGround = EnemyPhysics.ApplyGravityAndCollision(
@@ -138,14 +171,14 @@ public class Crawler
         float squashAmount = 1f - SquashResistance;
         VisualScale = new Vector2(1f + 0.3f * squashAmount, 1f - 0.25f * squashAmount);
         _squashHoldTimer = 0.05f;
-        if (Hp <= 0) { Alive = false; return true; }
+        if (Hp <= 0) { Alive = false; if (IsDummy) _respawnTimer = RespawnDelay; return true; }
         return false;
     }
 
     public void Draw(SpriteBatch sb, Texture2D pixel)
     {
         if (!Alive) return;
-        Color bodyColor = HitFlash > 0 ? Color.Red : (Aggroed ? new Color(120, 60, 20) : new Color(80, 50, 20));
+        Color bodyColor = HitFlash > 0 ? Color.Red : IsDummy ? new Color(140, 100, 160) : (Aggroed ? new Color(120, 60, 20) : new Color(80, 50, 20));
         int scaledW = (int)(Width * VisualScale.X);
         int scaledH = (int)(Height * VisualScale.Y);
         int drawX = (int)Position.X + Width / 2 - scaledW / 2;

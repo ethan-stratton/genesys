@@ -232,7 +232,7 @@ public class Game1 : Game
     private Vector2 _editorMoveOffset; // offset from entity origin to grab point
     private bool _entityPaletteOpen;
     private int _entityPaletteCursor;
-    private enum EntityType { Swarm, Crawler, Thornback, Hopper, Tree, Bird }
+    private enum EntityType { Swarm, Crawler, Thornback, Hopper, Tree, Bird, Dummy }
 
     // Tile paint state
     private int _tilePaletteCursor;
@@ -444,6 +444,14 @@ public class Game1 : Game
                     var bird = new Bird(new Vector2(e.X, bSnapY), 0, 0, _rng);
                     bird.UpdateSurfaceEdges(tg, ts, plats, sFloors, bLeft, bRight);
                     _birds.Add(bird);
+                    break;
+                case "dummy":
+                    float dSnapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Crawler.Width, Crawler.Height, tg, ts, plats, sFloors, walls, mainFloor);
+                    var dummy = new Crawler(new Vector2(e.X, dSnapY), e.X - 10, e.X + 10, 0, 0);
+                    dummy.IsDummy = true;
+                    dummy.Hp = 9999;
+                    dummy.UpdateSurfaceEdges(tg, ts, plats, sFloors, bLeft, bRight);
+                    _crawlers.Add(dummy);
                     break;
             }
         }
@@ -2017,6 +2025,12 @@ public class Game1 : Game
                         _level.Enemies = birdList.ToArray();
                         SetEditorStatus($"Placed bird at ({(int)cx}, {(int)cy})");
                         break;
+                    case EntityType.Dummy:
+                        var dummyList = new List<EnemySpawnData>(_level.Enemies);
+                        dummyList.Add(new EnemySpawnData { Id = $"dummy-{dummyList.Count}", Type = "dummy", X = cx, Y = cy });
+                        _level.Enemies = dummyList.ToArray();
+                        SetEditorStatus($"Placed dummy at ({(int)cx}, {(int)cy})");
+                        break;
                 }
             }
 
@@ -3327,6 +3341,7 @@ public class Game1 : Game
                 "crawler" => new Color(120, 60, 20),
                 "hopper" => new Color(80, 140, 60),
                 "thornback" => new Color(60, 100, 30),
+                "dummy" => new Color(140, 100, 160),
                 _ => Color.White
             };
             int size = e.Type == "thornback" ? 32 : (e.Type == "hopper" ? 20 : (e.Type == "swarm" ? 20 : 16));
@@ -3537,6 +3552,7 @@ public class Game1 : Game
                     EntityType.Crawler => new Color(120, 60, 20),
                     EntityType.Thornback => new Color(60, 100, 30),
                     EntityType.Tree => Color.ForestGreen,
+                    EntityType.Dummy => new Color(140, 100, 160),
                     _ => Color.White
                 };
                 _spriteBatch.Draw(_pixel, new Rectangle((int)epalX + 10, (int)itemY + 8, 10, 10), iconColor);
@@ -4897,8 +4913,15 @@ public class Game1 : Game
 
         if (_isDead) GraphicsDevice.Clear(Color.DarkRed);
 
-        // --- World rendering (camera transform) ---
-        _spriteBatch.Begin(transformMatrix: _camera.TransformMatrix);
+        // --- World rendering (camera transform + screen shake) ---
+        var shakeOff = Matrix.Identity;
+        if (_shakeTimer > 0)
+        {
+            float sx = (float)(_shakeRng.NextDouble() * 2 - 1) * _shakeIntensity;
+            float sy = (float)(_shakeRng.NextDouble() * 2 - 1) * _shakeIntensity;
+            shakeOff = Matrix.CreateTranslation(sx, sy, 0);
+        }
+        _spriteBatch.Begin(transformMatrix: _camera.TransformMatrix * shakeOff);
 
         // Draw floor (extended across world)
         int floorY = _level.Floor.Y;
