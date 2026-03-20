@@ -211,6 +211,21 @@ public class Game1 : Game
     private bool _eveDialogueExhausted; // used later for quest tracking
     #pragma warning restore CS0414
 
+    // EVE Scan System
+    private Dictionary<string, int> _scanProgress = new(); // "crawler" -> scan count (0-3)
+    private float _scanTimer;
+    private const float ScanDuration = 1.0f;
+    private bool _isScanning;
+    private string _scanTarget;
+    private Vector2 _scanTargetPos;
+    private float _scanPulseTimer;
+    private float _scanRevealTimer;
+    private string _scanRevealText;
+
+    // Ecosystem interaction timers
+    private float _birdHuntTimer;
+    private float _swarmDamageTimer;
+
     // --- Weapon system ---
 
 
@@ -886,6 +901,70 @@ public class Game1 : Game
             }
         }
 
+        // --- EVE Scan System input ---
+        if (_gameState == GameState.Playing && !_isDead && !_menuOpen && !_dialogueOpen && !_spawnMenuOpen)
+        {
+            if (kb.IsKeyDown(Keys.E))
+            {
+                var pc = PlayerCenter;
+                if (!_isScanning && _prevKb.IsKeyUp(Keys.E))
+                {
+                    // Find nearest alive enemy within 200px
+                    float bestDist = 200f;
+                    string bestType = null;
+                    Vector2 bestPos = Vector2.Zero;
+                    foreach (var c in _crawlers) { if (!c.Alive) continue; var ep = c.Position + new Vector2(c.EffectiveWidth/2f, c.EffectiveHeight/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestType = "crawler"; bestPos = ep; } }
+                    foreach (var h in _hoppers) { if (!h.Alive) continue; var ep = h.Position + new Vector2(Hopper.Width/2f, Hopper.Height/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestType = "hopper"; bestPos = ep; } }
+                    foreach (var t in _thornbacks) { if (!t.Alive) continue; var ep = t.Position + new Vector2(Thornback.Width/2f, Thornback.Height/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestType = "thornback"; bestPos = ep; } }
+                    foreach (var b in _birds) { if (!b.Alive) continue; var ep = b.Position + new Vector2(Bird.Width/2f, Bird.Height/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestType = "bird"; bestPos = ep; } }
+                    if (bestType != null)
+                    {
+                        _isScanning = true;
+                        _scanTimer = ScanDuration;
+                        _scanTarget = bestType;
+                        _scanTargetPos = bestPos;
+                    }
+                }
+                else if (_isScanning)
+                {
+                    // Update target position and check distance
+                    float bestDist = 250f;
+                    Vector2 bestPos = _scanTargetPos;
+                    bool found = false;
+                    if (_scanTarget == "crawler") { foreach (var c in _crawlers) { if (!c.Alive) continue; var ep = c.Position + new Vector2(c.EffectiveWidth/2f, c.EffectiveHeight/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestPos = ep; found = true; } } }
+                    else if (_scanTarget == "hopper") { foreach (var h in _hoppers) { if (!h.Alive) continue; var ep = h.Position + new Vector2(Hopper.Width/2f, Hopper.Height/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestPos = ep; found = true; } } }
+                    else if (_scanTarget == "thornback") { foreach (var t in _thornbacks) { if (!t.Alive) continue; var ep = t.Position + new Vector2(Thornback.Width/2f, Thornback.Height/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestPos = ep; found = true; } } }
+                    else if (_scanTarget == "bird") { foreach (var b in _birds) { if (!b.Alive) continue; var ep = b.Position + new Vector2(Bird.Width/2f, Bird.Height/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestPos = ep; found = true; } } }
+                    if (!found) _isScanning = false;
+                    else
+                    {
+                        _scanTargetPos = bestPos;
+                        _scanTimer -= dt;
+                        _scanPulseTimer += dt;
+                        // Spawn green scan particles
+                        if (_rng.NextDouble() < 0.3)
+                            _particles.Add(new Particle { Position = bestPos + new Vector2(_rng.Next(-10, 10), _rng.Next(-10, 10)), Velocity = new Vector2(0, -20), Life = 0.5f, MaxLife = 0.5f, Color = Color.LimeGreen, Size = 2 });
+                        if (_scanTimer <= 0)
+                        {
+                            _isScanning = false;
+                            if (!_scanProgress.ContainsKey(_scanTarget)) _scanProgress[_scanTarget] = 0;
+                            if (_scanProgress[_scanTarget] < 3) _scanProgress[_scanTarget]++;
+                            int lvl = _scanProgress[_scanTarget];
+                            string reveal = lvl switch { 1 => $"Identified: {_scanTarget.ToUpper()}", 2 => $"Vitals scanned: {_scanTarget.ToUpper()}", 3 => $"Weak point found: {_scanTarget.ToUpper()} (+25% DMG)", _ => "" };
+                            _scanRevealText = reveal;
+                            _scanRevealTimer = 2f;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                _isScanning = false;
+            }
+        }
+        // Update scan reveal timer
+        if (_scanRevealTimer > 0) _scanRevealTimer -= dt;
+
         var wallsToPass = _enableWallClimb ? _level.WallRects : null;
         var wallSidesToPass = _enableWallClimb ? _level.WallClimbSides : null;
         var ropesToPass = _enableRopeClimb ? _level.RopeXPositions : null;
@@ -1054,6 +1133,7 @@ public class Game1 : Game
                     int prevHp = c.Hp;
                     var ws = WeaponStats.Get(_player.CurrentWeapon);
                     int dmg = finisher ? ws.FinisherDamage : ws.Damage;
+                    dmg = ApplyScanBonus(dmg, c.IsDummy ? "dummy" : "crawler");
                     float kbDir = _player.FacingDir;
                     bool killed = _knockbackEnabled
                         ? c.TakeHit(dmg, kbDir * ws.KnockbackForce, ws.KnockbackUp)
@@ -1104,6 +1184,7 @@ public class Game1 : Game
                     var ws = WeaponStats.Get(_player.CurrentWeapon);
                     int dmg = finisher ? ws.FinisherDamage : ws.Damage;
                     float kbDir = _player.FacingDir;
+                    dmg = ApplyScanBonus(dmg, "thornback");
                     bool killed = _knockbackEnabled
                         ? t.TakeHit(dmg, kbDir * ws.KnockbackForce, ws.KnockbackUp)
                         : t.TakeHit(dmg);
@@ -1155,6 +1236,7 @@ public class Game1 : Game
                     var ws = WeaponStats.Get(_player.CurrentWeapon);
                     int dmg = finisher ? ws.FinisherDamage : ws.Damage;
                     float kbDir = _player.FacingDir;
+                    dmg = ApplyScanBonus(dmg, "hopper");
                     bool killed = _knockbackEnabled
                         ? h.TakeHit(dmg, kbDir * ws.KnockbackForce, ws.KnockbackUp)
                         : h.TakeHit(dmg);
@@ -1217,6 +1299,51 @@ public class Game1 : Game
         }
 
         _birds.RemoveAll(b => !b.Alive);
+
+        // --- Ecosystem: Trophic Interactions ---
+        _birdHuntTimer -= dt;
+        if (_birdHuntTimer <= 0)
+        {
+            _birdHuntTimer = 2f; // check every 2s
+            foreach (var bird in _birds)
+            {
+                if (!bird.Alive) continue;
+                var bCenter = bird.Position + new Vector2(Bird.Width / 2f, Bird.Height / 2f);
+                Crawler nearestPrey = null;
+                float nearestDist = 200f;
+                foreach (var c in _crawlers)
+                {
+                    if (!c.Alive || c.IsDummy) continue;
+                    var cCenter = c.Position + new Vector2(c.EffectiveWidth / 2f, c.EffectiveHeight / 2f);
+                    float d = Vector2.Distance(bCenter, cCenter);
+                    if (d < nearestDist) { nearestDist = d; nearestPrey = c; }
+                }
+                if (nearestPrey != null)
+                {
+                    // Bird dive-kills the crawler
+                    nearestPrey.TakeHit(999);
+                    var killPos = nearestPrey.Position + new Vector2(nearestPrey.EffectiveWidth / 2f, nearestPrey.EffectiveHeight / 2f);
+                    SpawnDeathParticles(killPos, GetEnemyHitColor("crawler"), 6);
+                }
+            }
+        }
+        // Crawlers flee from nearby birds
+        foreach (var c in _crawlers)
+        {
+            if (!c.Alive || c.IsDummy) continue;
+            var cCenter = c.Position + new Vector2(c.EffectiveWidth / 2f, c.EffectiveHeight / 2f);
+            foreach (var bird in _birds)
+            {
+                if (!bird.Alive) continue;
+                var bCenter = bird.Position + new Vector2(Bird.Width / 2f, Bird.Height / 2f);
+                if (Vector2.Distance(cCenter, bCenter) < 150f)
+                {
+                    // Flee: reverse direction away from bird
+                    c.Dir = bCenter.X > cCenter.X ? -1 : 1;
+                    break;
+                }
+            }
+        }
 
         // Bullets vs crawlers and thornbacks
         foreach (var b in _bullets)
@@ -2039,6 +2166,13 @@ public class Game1 : Game
         "swarm" => Color.OrangeRed,
         _ => new Color(200, 50, 50)
     };
+
+    private int ApplyScanBonus(int dmg, string enemyType)
+    {
+        if (_scanProgress.TryGetValue(enemyType, out int lvl) && lvl >= 3)
+            return (int)(dmg * 1.25f);
+        return dmg;
+    }
 
     private void SpawnHitSpray(Vector2 hitPoint, int facingDir, Color color, float weaponWeight, bool isFinisher)
     {
@@ -5572,6 +5706,62 @@ public class Game1 : Game
             foreach (var bird in _birds) { if (!_enemySquashEnabled) bird.VisualScale = Vector2.One; bird.Draw(_spriteBatch, _pixel); }
         }
 
+        // --- EVE Scan overlays (world-space) ---
+        // Scan beam during scanning
+        if (_isScanning)
+        {
+            float beamAlpha = 0.4f + 0.3f * MathF.Sin(_scanPulseTimer * 8f);
+            var pc = PlayerCenter;
+            // Draw a line from player to target using thin rectangles
+            var diff = _scanTargetPos - pc;
+            float len = diff.Length();
+            if (len > 1)
+            {
+                float angle = MathF.Atan2(diff.Y, diff.X);
+                _spriteBatch.Draw(_pixel, pc, null, Color.LimeGreen * beamAlpha, angle, Vector2.Zero, new Vector2(len, 1), Microsoft.Xna.Framework.Graphics.SpriteEffects.None, 0);
+            }
+            // Scan progress bar above target
+            float progress = 1f - _scanTimer / ScanDuration;
+            int barW = 24, barH = 3;
+            int barX = (int)(_scanTargetPos.X - barW / 2f);
+            int barY = (int)(_scanTargetPos.Y - 16);
+            _spriteBatch.Draw(_pixel, new Rectangle(barX, barY, barW, barH), Color.Black * 0.5f);
+            _spriteBatch.Draw(_pixel, new Rectangle(barX, barY, (int)(barW * progress), barH), Color.LimeGreen);
+        }
+        // Enemy labels and HP bars based on scan level
+        void DrawScanOverlay(string type, Vector2 pos, int w, int h, int hp, int maxHp)
+        {
+            if (!_scanProgress.TryGetValue(type, out int lvl) || lvl < 1) return;
+            // Level 1+: name label
+            string name = char.ToUpper(type[0]) + type[1..];
+            var nameSize = _fontSmall.MeasureString(SafeText(name));
+            DrawOutlinedString(_fontSmall, name, new Vector2(pos.X + w / 2f - nameSize.X / 2, pos.Y - 14), Color.White * 0.8f);
+            if (lvl >= 2 && maxHp > 0)
+            {
+                // Level 2+: HP bar
+                int hbW = w + 4, hbH = 2;
+                int hbX = (int)(pos.X + w / 2f - hbW / 2f);
+                int hbY = (int)(pos.Y - 6);
+                _spriteBatch.Draw(_pixel, new Rectangle(hbX, hbY, hbW, hbH), Color.DarkRed * 0.7f);
+                float ratio = MathHelper.Clamp((float)hp / maxHp, 0f, 1f);
+                _spriteBatch.Draw(_pixel, new Rectangle(hbX, hbY, (int)(hbW * ratio), hbH), Color.Red);
+            }
+            if (lvl >= 3)
+            {
+                // Level 3: yellow pulsing outline
+                float pulse = 0.4f + 0.3f * MathF.Sin((float)_totalTime * 6f);
+                var c = Color.Yellow * pulse;
+                _spriteBatch.Draw(_pixel, new Rectangle((int)pos.X - 1, (int)pos.Y - 1, w + 2, 1), c);
+                _spriteBatch.Draw(_pixel, new Rectangle((int)pos.X - 1, (int)pos.Y + h, w + 2, 1), c);
+                _spriteBatch.Draw(_pixel, new Rectangle((int)pos.X - 1, (int)pos.Y, 1, h), c);
+                _spriteBatch.Draw(_pixel, new Rectangle((int)pos.X + w, (int)pos.Y, 1, h), c);
+            }
+        }
+        foreach (var c in _crawlers) { if (c.Alive && !c.IsDummy) DrawScanOverlay("crawler", c.Position, c.EffectiveWidth, c.EffectiveHeight, c.Hp, 3); }
+        foreach (var h in _hoppers) { if (h.Alive) DrawScanOverlay("hopper", h.Position, Hopper.Width, Hopper.Height, h.Hp, 5); }
+        foreach (var t in _thornbacks) { if (t.Alive) DrawScanOverlay("thornback", t.Position, Thornback.Width, Thornback.Height, t.Hp, 8); }
+        foreach (var b in _birds) { if (b.Alive) DrawScanOverlay("bird", b.Position, Bird.Width, Bird.Height, b.Hp, 1); }
+
         // Draw splatters
         foreach (var s in _splatters)
         {
@@ -5673,6 +5863,29 @@ public class Game1 : Game
                     int y = ViewH - 50 - (_deathLog.Count - i) * 16;
                     DrawOutlinedString(_font, _deathLog[i], new Vector2(10, y), Color.White * 0.6f * alpha);
                 }
+            }
+        }
+
+        // --- EVE Scan HUD ---
+        // Scan reveal text (centered, fading)
+        if (_scanRevealTimer > 0 && !string.IsNullOrEmpty(_scanRevealText))
+        {
+            float alpha = MathHelper.Clamp(_scanRevealTimer / 0.5f, 0f, 1f);
+            var size = _font.MeasureString(SafeText(_scanRevealText));
+            DrawOutlinedString(_font, _scanRevealText, new Vector2(ViewW / 2f - size.X / 2, ViewH / 3f), Color.LimeGreen * alpha);
+        }
+
+        // Scan progress counters (top-right)
+        if (_scanProgress.Count > 0)
+        {
+            int sy = 10;
+            DrawOutlinedString(_fontSmall, "EVE SCAN", new Vector2(ViewW - 130, sy), Color.LimeGreen * 0.8f);
+            sy += 14;
+            foreach (var kv in _scanProgress)
+            {
+                string name = char.ToUpper(kv.Key[0]) + kv.Key[1..];
+                DrawOutlinedString(_fontSmall, $"{name} {kv.Value}/3", new Vector2(ViewW - 130, sy), kv.Value >= 3 ? Color.Yellow * 0.9f : Color.White * 0.7f);
+                sy += 12;
             }
         }
 

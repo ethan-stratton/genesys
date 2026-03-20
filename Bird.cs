@@ -9,6 +9,7 @@ public class Bird
     public Vector2 Position;
     public Vector2 Velocity;
     public bool Alive = true;
+    public int Hp = 1;
     public const int Width = 10, Height = 8;
     public Vector2 KnockbackVel;
     public Vector2 VisualScale = Vector2.One;

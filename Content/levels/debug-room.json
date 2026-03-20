@@ -7,7 +7,7 @@
   },
   "bounds": {
     "left": -32,
-    "right": 9600,
+    "right": 11200,
     "top": -400,
     "bottom": 800
   },
@@ -181,6 +181,48 @@
       "w": 16,
       "h": 200,
       "climbSide": 99
+    },
+    {
+      "x": 8600,
+      "y": 640,
+      "w": 16,
+      "h": 96,
+      "climbSide": 0
+    },
+    {
+      "x": 8716,
+      "y": 640,
+      "w": 16,
+      "h": 96,
+      "climbSide": 0
+    },
+    {
+      "x": 8832,
+      "y": 640,
+      "w": 16,
+      "h": 96,
+      "climbSide": 0
+    },
+    {
+      "x": 8948,
+      "y": 640,
+      "w": 16,
+      "h": 96,
+      "climbSide": 0
+    },
+    {
+      "x": 8976,
+      "y": 592,
+      "w": 16,
+      "h": 48,
+      "climbSide": 0
+    },
+    {
+      "x": 9750,
+      "y": 640,
+      "w": 16,
+      "h": 96,
+      "climbSide": 0
     }
   ],
   "spikes": [],
@@ -244,6 +286,18 @@
       "x": 7520,
       "y": 144,
       "w": 700,
+      "h": 160
+    },
+    {
+      "x": 8500,
+      "y": 640,
+      "w": 800,
+      "h": 160
+    },
+    {
+      "x": 9400,
+      "y": 640,
+      "w": 900,
       "h": 160
     }
   ],
@@ -463,6 +517,160 @@
       "y": 109,
       "count": 1,
       "scale": 3.5
+    },
+    {
+      "id": "scan-crawler",
+      "type": "crawler",
+      "x": 8640,
+      "y": 730,
+      "patrolLeft": 8616,
+      "patrolRight": 8716
+    },
+    {
+      "id": "scan-hopper",
+      "type": "hopper",
+      "x": 8760,
+      "y": 720,
+      "patrolLeft": 8732,
+      "patrolRight": 8832
+    },
+    {
+      "id": "scan-bird",
+      "type": "bird",
+      "x": 8870,
+      "y": 680
+    },
+    {
+      "id": "scan-eco-crawler",
+      "type": "crawler",
+      "x": 9050,
+      "y": 730,
+      "patrolLeft": 9000,
+      "patrolRight": 9200
+    },
+    {
+      "id": "scan-eco-bird",
+      "type": "bird",
+      "x": 9100,
+      "y": 680
+    },
+    {
+      "id": "eco-crawler-1",
+      "type": "crawler",
+      "x": 9450,
+      "y": 730,
+      "patrolLeft": 9416,
+      "patrolRight": 9750
+    },
+    {
+      "id": "eco-crawler-2",
+      "type": "crawler",
+      "x": 9490,
+      "y": 730,
+      "patrolLeft": 9416,
+      "patrolRight": 9750
+    },
+    {
+      "id": "eco-crawler-3",
+      "type": "crawler",
+      "x": 9530,
+      "y": 730,
+      "patrolLeft": 9416,
+      "patrolRight": 9750
+    },
+    {
+      "id": "eco-crawler-4",
+      "type": "crawler",
+      "x": 9570,
+      "y": 730,
+      "patrolLeft": 9416,
+      "patrolRight": 9750
+    },
+    {
+      "id": "eco-crawler-5",
+      "type": "crawler",
+      "x": 9610,
+      "y": 730,
+      "patrolLeft": 9416,
+      "patrolRight": 9750
+    },
+    {
+      "id": "eco-crawler-6",
+      "type": "crawler",
+      "x": 9650,
+      "y": 730,
+      "patrolLeft": 9416,
+      "patrolRight": 9750
+    },
+    {
+      "id": "eco-bird-1",
+      "type": "bird",
+      "x": 9550,
+      "y": 670
+    },
+    {
+      "id": "swarm-crawler-1",
+      "type": "crawler",
+      "x": 9780,
+      "y": 730,
+      "patrolLeft": 9766,
+      "patrolRight": 9950
+    },
+    {
+      "id": "swarm-crawler-2",
+      "type": "crawler",
+      "x": 9795,
+      "y": 730,
+      "patrolLeft": 9766,
+      "patrolRight": 9950
+    },
+    {
+      "id": "swarm-crawler-3",
+      "type": "crawler",
+      "x": 9810,
+      "y": 730,
+      "patrolLeft": 9766,
+      "patrolRight": 9950
+    },
+    {
+      "id": "swarm-crawler-4",
+      "type": "crawler",
+      "x": 9825,
+      "y": 730,
+      "patrolLeft": 9766,
+      "patrolRight": 9950
+    },
+    {
+      "id": "swarm-crawler-5",
+      "type": "crawler",
+      "x": 9840,
+      "y": 730,
+      "patrolLeft": 9766,
+      "patrolRight": 9950
+    },
+    {
+      "id": "swarm-crawler-6",
+      "type": "crawler",
+      "x": 9855,
+      "y": 730,
+      "patrolLeft": 9766,
+      "patrolRight": 9950
+    },
+    {
+      "id": "swarm-crawler-7",
+      "type": "crawler",
+      "x": 9870,
+      "y": 730,
+      "patrolLeft": 9766,
+      "patrolRight": 9950
+    },
+    {
+      "id": "swarm-crawler-8",
+      "type": "crawler",
+      "x": 9885,
+      "y": 730,
+      "patrolLeft": 9766,
+      "patrolRight": 9950
     }
   ],
   "labels": [
@@ -836,6 +1044,48 @@
       "y": 89,
       "color": "White",
       "size": "small"
+    },
+    {
+      "text": "== SCAN GYM ==",
+      "x": 8700,
+      "y": 610,
+      "size": "normal",
+      "color": "Green"
+    },
+    {
+      "text": "[E] to scan",
+      "x": 8550,
+      "y": 620,
+      "size": "small",
+      "color": "Gray"
+    },
+    {
+      "text": "ECOLOGY 2/3",
+      "x": 8980,
+      "y": 610,
+      "size": "small",
+      "color": "Yellow"
+    },
+    {
+      "text": "== ECOSYSTEM GYM ==",
+      "x": 9550,
+      "y": 610,
+      "size": "normal",
+      "color": "Green"
+    },
+    {
+      "text": "HUNT ZONE",
+      "x": 9450,
+      "y": 620,
+      "size": "small",
+      "color": "Red"
+    },
+    {
+      "text": "SWARM ZONE",
+      "x": 9850,
+      "y": 620,
+      "size": "small",
+      "color": "Orange"
     }
   ],
   "tileGrid": {
