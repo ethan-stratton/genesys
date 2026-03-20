@@ -58,6 +58,7 @@ public class Game1 : Game
     private SpriteBatch _spriteBatch;
     private Camera _camera;
     private Texture2D _pixel;
+    private Texture2D[] _parallaxLayers;
     private Texture2D _adamSheet; // player sprite sheet
 
     // CRT effect
@@ -467,6 +468,7 @@ public class Game1 : Game
                     dummy.Hp = 9999;
                     dummy.DummyScale = e.Scale;
                     dummy.Position.Y -= (dummy.EffectiveHeight - Crawler.Height);
+                    dummy.SetSpawnPos(dummy.Position);
                     dummy.UpdateSurfaceEdges(tg, ts, plats, sFloors, bLeft, bRight);
                     _crawlers.Add(dummy);
                     break;
@@ -478,6 +480,7 @@ public class Game1 : Game
                     critDummy.Hp = 9999;
                     critDummy.DummyScale = e.Scale;
                     critDummy.Position.Y -= (critDummy.EffectiveHeight - Crawler.Height);
+                    critDummy.SetSpawnPos(critDummy.Position);
                     critDummy.UpdateSurfaceEdges(tg, ts, plats, sFloors, bLeft, bRight);
                     _crawlers.Add(critDummy);
                     break;
@@ -491,6 +494,20 @@ public class Game1 : Game
         _camera = MakeCamera();
         _pixel = new Texture2D(GraphicsDevice, 1, 1);
         _pixel.SetData(new[] { Color.White });
+
+        // Load parallax background layers (Content/backgrounds/parallax_0.png through parallax_3.png)
+        var layers = new List<Texture2D>();
+        for (int i = 0; i < 4; i++)
+        {
+            string path = $"Content/backgrounds/parallax_{i}.png";
+            if (File.Exists(path))
+            {
+                using var fs = File.OpenRead(path);
+                layers.Add(Texture2D.FromStream(GraphicsDevice, fs));
+            }
+        }
+        _parallaxLayers = layers.ToArray();
+
         // Load player sprite sheet (prefer richter, fall back to adam)
         string[] sheetPaths = { "Content/sprites/richter_sheet.png", "Content/sprites/adam_sheet.png" };
         foreach (var sp in sheetPaths)
@@ -522,7 +539,8 @@ public class Game1 : Game
     }
 
     private Vector2 PlayerCenter =>
-        _player.Position + new Vector2(Player.Width / 2f, _player.CurrentHeight / 2f);
+        _player.Position + new Vector2(Player.Width / 2f, 
+            _player.IsCrouching ? Player.Height - Player.CrouchHeight / 2f : Player.Height / 2f);
 
     protected override void Update(GameTime gameTime)
     {
@@ -1337,13 +1355,7 @@ public class Game1 : Game
         if (_player.Hp <= 0 && !_isDead)
         {
             _isDead = true;
-            if (_deathLogEnabled)
-            {
-                string levelName = _level?.Name ?? "unknown";
-                _deathLog.Add($"Player was slain by {_lastDamageSource} in {levelName}");
-                _deathLogTimers.Add(8f);
-                if (_deathLog.Count > 5) { _deathLog.RemoveAt(0); _deathLogTimers.RemoveAt(0); }
-            }
+            LogDeath();
         }
 
         // Update particles (outside hitstop so they animate during freeze)
@@ -1524,7 +1536,7 @@ public class Game1 : Game
                     {
                         _lastDamageSource = "Spikes";
                         _player.TakeDamage(33, _player.Position.X - spike.Center.X);
-                        if (_player.Hp <= 0) _isDead = true;
+                        if (_player.Hp <= 0) { _isDead = true; LogDeath(); }
                     }
                     break;
                 }
@@ -1570,7 +1582,7 @@ public class Game1 : Game
                     {
                         _lastDamageSource = "Spikes";
                         _player.TakeDamage(33, _player.Position.X - spikeRect.Center.X);
-                        if (_player.Hp <= 0) _isDead = true;
+                        if (_player.Hp <= 0) { _isDead = true; LogDeath(); }
                         hit = true;
                     }
                 }
@@ -1606,7 +1618,7 @@ public class Game1 : Game
                                 {
                                     _lastDamageSource = "Hazard";
                                     _player.TakeDamage(5, _player.Position.X - tileRect.Center.X);
-                                    if (_player.Hp <= 0) _isDead = true;
+                                    if (_player.Hp <= 0) { _isDead = true; LogDeath(); }
                                 }
                                 break;
                             case TileType.DamageNoKBTile:
@@ -1619,7 +1631,7 @@ public class Game1 : Game
                                         _lastDamageSource = "Hazard";
                                         _player.Hp -= 5;
                                         _player.DamageCooldown = 1.0f;
-                                        if (_player.Hp <= 0) { _player.Hp = 0; _isDead = true; }
+                                        if (_player.Hp <= 0) { _player.Hp = 0; _isDead = true; LogDeath(); }
                                     }
                                 }
                                 break;
@@ -1892,81 +1904,33 @@ public class Game1 : Game
         });
     }
 
+    private void LogDeath()
+    {
+        if (!_deathLogEnabled) return;
+        string levelName = _level?.Name ?? "unknown";
+        _deathLog.Add($"Player was slain by {_lastDamageSource} in {levelName}");
+        _deathLogTimers.Add(8f);
+        if (_deathLog.Count > 5) { _deathLog.RemoveAt(0); _deathLogTimers.RemoveAt(0); }
+    }
+
     private void DrawParallaxBackground(Matrix shakeOff)
     {
+        if (_parallaxLayers == null || _parallaxLayers.Length == 0) return;
         float camX = _camera.Position.X;
-        float camY = _camera.Position.Y;
-        int vw = ViewW, vh = ViewH;
-
-        // Layer 0: gradient sky (barely moves)
+        float[] factors = { 0.05f, 0.15f, 0.35f, 0.6f };
+        for (int i = 0; i < _parallaxLayers.Length && i < factors.Length; i++)
         {
-            float px = camX * 0.05f;
-            var mat = Matrix.CreateTranslation(-px, 0, 0) * shakeOff;
-            _spriteBatch.Begin(transformMatrix: mat);
-            for (int y = 0; y < vh; y += 4)
+            var tex = _parallaxLayers[i];
+            if (tex == null) continue;
+            float px = camX * factors[i];
+            // Tile the texture across the screen
+            int tw = tex.Width;
+            int startX = (int)(-px % tw);
+            if (startX > 0) startX -= tw;
+            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
+            for (int x = startX; x < ViewW; x += tw)
             {
-                float t = y / (float)vh;
-                var c = new Color(
-                    (int)(10 + t * 20),
-                    (int)(12 + t * 25),
-                    (int)(30 + t * 35));
-                _spriteBatch.Draw(_pixel, new Rectangle((int)px - 100, y, vw + 200, 4), c);
-            }
-            _spriteBatch.End();
-        }
-
-        // Layer 1: distant mountains (dark silhouettes)
-        {
-            float px = camX * 0.15f;
-            var mat = Matrix.CreateTranslation(-px, 0, 0) * shakeOff;
-            _spriteBatch.Begin(transformMatrix: mat);
-            var col = new Color(40, 45, 55);
-            int baseY = vh - 80;
-            for (int x = -200; x < vw + (int)px + 400; x += 120)
-            {
-                float seed = (x + (int)px / 120 * 120) * 0.013f;
-                int h = (int)(40 + 60 * MathF.Abs(MathF.Sin(seed)) + 30 * MathF.Abs(MathF.Sin(seed * 2.7f)));
-                _spriteBatch.Draw(_pixel, new Rectangle(x, baseY - h, 120, h + 80), col);
-                // Peak triangle effect
-                _spriteBatch.Draw(_pixel, new Rectangle(x + 30, baseY - h - 15, 60, 15), col);
-            }
-            _spriteBatch.End();
-        }
-
-        // Layer 2: mid-ground hills (smoother)
-        {
-            float px = camX * 0.35f;
-            var mat = Matrix.CreateTranslation(-px, 0, 0) * shakeOff;
-            _spriteBatch.Begin(transformMatrix: mat);
-            var col = new Color(55, 60, 70);
-            int baseY = vh - 50;
-            for (int x = -200; x < vw + (int)px + 400; x += 80)
-            {
-                float seed = (x + (int)px / 80 * 80) * 0.021f;
-                int h = (int)(25 + 35 * MathF.Abs(MathF.Sin(seed)));
-                _spriteBatch.Draw(_pixel, new Rectangle(x, baseY - h, 80, h + 50), col);
-            }
-            _spriteBatch.End();
-        }
-
-        // Layer 3: near-ground details (tall tree/pillar silhouettes)
-        {
-            float px = camX * 0.6f;
-            var mat = Matrix.CreateTranslation(-px, 0, 0) * shakeOff;
-            _spriteBatch.Begin(transformMatrix: mat);
-            var col = new Color(70, 75, 85);
-            int baseY = vh - 30;
-            for (int x = -200; x < vw + (int)px + 400; x += 45)
-            {
-                float seed = (x + (int)px / 45 * 45) * 0.037f;
-                if (MathF.Sin(seed * 3.1f) > 0.2f) // sparse — not every slot gets a tree
-                {
-                    int h = (int)(30 + 50 * MathF.Abs(MathF.Sin(seed)));
-                    int w = 6 + (int)(4 * MathF.Abs(MathF.Sin(seed * 1.7f)));
-                    _spriteBatch.Draw(_pixel, new Rectangle(x, baseY - h, w, h), col);
-                    // Canopy
-                    _spriteBatch.Draw(_pixel, new Rectangle(x - 4, baseY - h - 6, w + 8, 8), col);
-                }
+                _spriteBatch.Draw(tex, new Rectangle(x, 0, tw, ViewH), Color.White);
             }
             _spriteBatch.End();
         }

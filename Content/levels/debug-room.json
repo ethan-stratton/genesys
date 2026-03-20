@@ -8,7 +8,7 @@
   "bounds": {
     "left": -32,
     "right": 9600,
-    "top": -256,
+    "top": -400,
     "bottom": 800
   },
   "floor": {
@@ -48,13 +48,13 @@
     },
     {
       "x": 5968,
-      "y": 80,
+      "y": -16,
       "w": 64,
       "h": 8
     },
     {
       "x": 6168,
-      "y": 0,
+      "y": -96,
       "w": 64,
       "h": 8
     }
@@ -62,18 +62,18 @@
   "ropes": [
     {
       "x": 5888,
-      "top": -100,
-      "bottom": 220
+      "top": -196,
+      "bottom": 124
     },
     {
       "x": 6088,
-      "top": -200,
-      "bottom": 120
+      "top": -296,
+      "bottom": 24
     },
     {
       "x": 6288,
-      "top": -50,
-      "bottom": 200
+      "top": -146,
+      "bottom": 104
     }
   ],
   "walls": [
@@ -155,38 +155,38 @@
       "climbSide": 0
     },
     {
-      "x": 5238,
-      "y": 112,
+      "x": 5270,
+      "y": 16,
       "w": 32,
       "h": 128,
       "climbSide": 0
     },
     {
-      "x": 5488,
-      "y": 40,
+      "x": 5520,
+      "y": -56,
       "w": 32,
       "h": 200,
       "climbSide": 0
     },
     {
       "x": 6488,
-      "y": 40,
+      "y": -56,
       "w": 16,
       "h": 200,
       "climbSide": 99
     },
     {
       "x": 7372,
-      "y": 40,
+      "y": -56,
       "w": 16,
       "h": 200,
       "climbSide": 99
     },
     {
       "x": 5050,
-      "y": 240,
+      "y": 144,
       "w": 24,
-      "h": 400,
+      "h": 496,
       "climbSide": 0
     }
   ],
@@ -226,30 +226,30 @@
     {
       "x": 7350,
       "y": 640,
-      "w": 800,
+      "w": 950,
       "h": 160
     },
     {
-      "x": 5088,
-      "y": 240,
+      "x": 5120,
+      "y": 144,
       "w": 600,
       "h": 160
     },
     {
       "x": 5788,
-      "y": 240,
+      "y": 144,
       "w": 600,
       "h": 160
     },
     {
       "x": 6488,
-      "y": 240,
+      "y": 144,
       "w": 900,
       "h": 160
     },
     {
-      "x": 7488,
-      "y": 240,
+      "x": 7520,
+      "y": 144,
       "w": 700,
       "h": 160
     }
@@ -427,7 +427,7 @@
       "id": "ranged-near",
       "type": "dummy",
       "x": 6688,
-      "y": 230,
+      "y": 134,
       "count": 1,
       "scale": 1
     },
@@ -435,7 +435,7 @@
       "id": "ranged-mid",
       "type": "dummy",
       "x": 6888,
-      "y": 230,
+      "y": 134,
       "count": 1,
       "scale": 1
     },
@@ -443,31 +443,31 @@
       "id": "ranged-far",
       "type": "dummy",
       "x": 7238,
-      "y": 230,
+      "y": 134,
       "count": 1,
       "scale": 1
     },
     {
       "id": "size-small",
       "type": "dummy",
-      "x": 7588,
-      "y": 230,
+      "x": 7620,
+      "y": 134,
       "count": 1,
       "scale": 1
     },
     {
       "id": "size-medium",
       "type": "dummy",
-      "x": 7788,
-      "y": 220,
+      "x": 7820,
+      "y": 124,
       "count": 1,
       "scale": 2
     },
     {
       "id": "size-large",
       "type": "dummy",
-      "x": 8038,
-      "y": 205,
+      "x": 8070,
+      "y": 109,
       "count": 1,
       "scale": 3.5
     }
@@ -755,92 +755,92 @@
     },
     {
       "text": "== WALL GYM ==",
-      "x": 5088,
-      "y": 180,
+      "x": 5120,
+      "y": 84,
       "color": "Cyan",
       "size": "small"
     },
     {
       "text": "short",
-      "x": 5228,
-      "y": 100,
+      "x": 5260,
+      "y": 4,
       "color": "White",
       "size": "small"
     },
     {
       "text": "tall",
-      "x": 5478,
-      "y": 28,
+      "x": 5510,
+      "y": -68,
       "color": "White",
       "size": "small"
     },
     {
       "text": "== ROPE GYM ==",
       "x": 5788,
-      "y": 180,
+      "y": 84,
       "color": "Cyan",
       "size": "small"
     },
     {
       "text": "== RANGED GYM ==",
       "x": 6488,
-      "y": 180,
+      "y": 84,
       "color": "Cyan",
       "size": "small"
     },
     {
       "text": "FIRE",
       "x": 6538,
-      "y": 220,
+      "y": 124,
       "color": "Red",
       "size": "small"
     },
     {
       "text": "near",
       "x": 6678,
-      "y": 210,
+      "y": 114,
       "color": "White",
       "size": "small"
     },
     {
       "text": "mid",
       "x": 6878,
-      "y": 210,
+      "y": 114,
       "color": "White",
       "size": "small"
     },
     {
       "text": "far",
       "x": 7228,
-      "y": 210,
+      "y": 114,
       "color": "White",
       "size": "small"
     },
     {
       "text": "== SIZE GYM ==",
-      "x": 7488,
-      "y": 180,
+      "x": 7520,
+      "y": 84,
       "color": "Cyan",
       "size": "small"
     },
     {
       "text": "small",
-      "x": 7573,
-      "y": 210,
+      "x": 7605,
+      "y": 114,
       "color": "White",
       "size": "small"
     },
     {
       "text": "medium",
-      "x": 7773,
-      "y": 200,
+      "x": 7805,
+      "y": 104,
       "color": "White",
       "size": "small"
     },
     {
       "text": "large",
-      "x": 8023,
-      "y": 185,
+      "x": 8055,
+      "y": 89,
       "color": "White",
       "size": "small"
     }

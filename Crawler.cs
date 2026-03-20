@@ -35,6 +35,7 @@ public class Crawler
     public int EffectiveWidth => IsDummy ? (int)(Width * DummyScale) : Width;
     public int EffectiveHeight => IsDummy ? (int)(Height * DummyScale) : Height;
     private Vector2 _spawnPos;
+    public void SetSpawnPos(Vector2 pos) => _spawnPos = pos;
     private float _respawnTimer;
     private const float RespawnDelay = 2f;
 
@@ -118,7 +119,7 @@ public class Crawler
         // Apply gravity and tile collision
         _onGround = EnemyPhysics.ApplyGravityAndCollision(
             ref Position, ref Velocity,
-            Width, Height, Gravity, dt,
+            EffectiveWidth, EffectiveHeight, Gravity, dt,
             tileGrid, tileSize,
             platforms, solidFloors, floorY);
 
@@ -128,7 +129,7 @@ public class Crawler
             Position.X = SurfaceLeft;
             if (!Aggroed) Dir = 1;
         }
-        if (Position.X + Width > SurfaceRight)
+        if (Position.X + EffectiveWidth > SurfaceRight)
         {
             Position.X = SurfaceRight - Width;
             if (!Aggroed) Dir = -1;
@@ -142,9 +143,9 @@ public class Crawler
         Rectangle[] platforms, Rectangle[] solidFloors,
         float boundsLeft, float boundsRight)
     {
-        float footY = Position.Y + Height;
+        float footY = Position.Y + EffectiveHeight;
         var edges = EnemyPhysics.FindSurfaceEdges(
-            Position.X, footY, Width,
+            Position.X, footY, EffectiveWidth,
             tileGrid, tileSize,
             platforms, solidFloors,
             boundsLeft, boundsRight);
