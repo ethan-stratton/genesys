@@ -572,6 +572,8 @@ public class Game1 : Game
                             }
                             _camera = MakeCamera();
                             _gameState = GameState.Playing;
+                            _rng = new Random();
+                            SpawnEnemiesFromLevel();
                             _player = new Player(new Microsoft.Xna.Framework.Vector2(_saveData.SpawnX, _saveData.SpawnY));
                             _camera.SnapTo(_player.Position, Player.Width, Player.Height);
                             _bullets = new List<Bullet>();
