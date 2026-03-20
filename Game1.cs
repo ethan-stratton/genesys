@@ -120,6 +120,12 @@ public class Game1 : Game
 
     private bool _isDead;
     private bool _isPaused;
+
+    // Death log (Terraria-style)
+    private List<string> _deathLog = new();
+    private List<float> _deathLogTimers = new();
+    private bool _deathLogEnabled = true;
+    private string _lastDamageSource = "Unknown";
     private float _spawnInvincibility;
     private bool[] _prevInExit = Array.Empty<bool>();
     private KeyboardState _prevKb;
@@ -286,6 +292,7 @@ public class Game1 : Game
             new() { Label = "Knockback", Get = () => _knockbackEnabled, Toggle = () => _knockbackEnabled = !_knockbackEnabled },
             new() { Label = "Death Particles", Get = () => _deathParticlesEnabled, Toggle = () => _deathParticlesEnabled = !_deathParticlesEnabled },
             new() { Label = "Dust Particles", Get = () => _dustParticlesEnabled, Toggle = () => _dustParticlesEnabled = !_dustParticlesEnabled },
+            new() { Label = "Death Log", Get = () => _deathLogEnabled, Toggle = () => _deathLogEnabled = !_deathLogEnabled },
         };
 
         _graphicsSettings = new SettingEntry[]
@@ -459,6 +466,7 @@ public class Game1 : Game
                     dummy.IsDummy = true;
                     dummy.Hp = 9999;
                     dummy.DummyScale = e.Scale;
+                    dummy.Position.Y -= (dummy.EffectiveHeight - Crawler.Height);
                     dummy.UpdateSurfaceEdges(tg, ts, plats, sFloors, bLeft, bRight);
                     _crawlers.Add(dummy);
                     break;
@@ -469,6 +477,7 @@ public class Game1 : Game
                     critDummy.AlwaysCrit = true;
                     critDummy.Hp = 9999;
                     critDummy.DummyScale = e.Scale;
+                    critDummy.Position.Y -= (critDummy.EffectiveHeight - Crawler.Height);
                     critDummy.UpdateSurfaceEdges(tg, ts, plats, sFloors, bLeft, bRight);
                     _crawlers.Add(critDummy);
                     break;
@@ -513,7 +522,7 @@ public class Game1 : Game
     }
 
     private Vector2 PlayerCenter =>
-        _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
+        _player.Position + new Vector2(Player.Width / 2f, _player.CurrentHeight / 2f);
 
     protected override void Update(GameTime gameTime)
     {
@@ -964,7 +973,7 @@ public class Game1 : Game
             if (_spawnInvincibility <= 0 && !_isDead)
             {
                 int dmg = swarm.CheckPlayerDamage(playerRect2);
-                if (dmg > 0) _player.TakeDamage(dmg, _player.Position.X - swarm.HomePosition.X);
+                if (dmg > 0) { _lastDamageSource = "Swarm"; _player.TakeDamage(dmg, _player.Position.X - swarm.HomePosition.X); }
             }
 
             if (_player.MeleeTimer > 0)
@@ -996,7 +1005,7 @@ public class Game1 : Game
             if (_spawnInvincibility <= 0 && !_isDead)
             {
                 int dmg = c.CheckPlayerDamage(playerRect2);
-                if (dmg > 0) _player.TakeDamage(dmg, _player.Position.X - c.Position.X);
+                if (dmg > 0) { _lastDamageSource = "Crawler"; _player.TakeDamage(dmg, _player.Position.X - c.Position.X); }
             }
             if (_player.MeleeTimer > 0 && c.Alive)
             {
@@ -1046,7 +1055,7 @@ public class Game1 : Game
             if (_spawnInvincibility <= 0 && !_isDead)
             {
                 int dmg = t.CheckPlayerDamage(playerRect2);
-                if (dmg > 0) _player.TakeDamage(dmg, _player.Position.X - t.Position.X);
+                if (dmg > 0) { _lastDamageSource = "Thornback"; _player.TakeDamage(dmg, _player.Position.X - t.Position.X); }
             }
             if (_player.MeleeTimer > 0 && t.Alive)
             {
@@ -1097,7 +1106,7 @@ public class Game1 : Game
             if (_spawnInvincibility <= 0 && !_isDead)
             {
                 int dmg = h.CheckPlayerDamage(playerRect2);
-                if (dmg > 0) _player.TakeDamage(dmg, _player.Position.X - h.Position.X);
+                if (dmg > 0) { _lastDamageSource = "Hopper"; _player.TakeDamage(dmg, _player.Position.X - h.Position.X); }
             }
             if (_player.MeleeTimer > 0 && h.Alive)
             {
@@ -1328,6 +1337,13 @@ public class Game1 : Game
         if (_player.Hp <= 0 && !_isDead)
         {
             _isDead = true;
+            if (_deathLogEnabled)
+            {
+                string levelName = _level?.Name ?? "unknown";
+                _deathLog.Add($"Player was slain by {_lastDamageSource} in {levelName}");
+                _deathLogTimers.Add(8f);
+                if (_deathLog.Count > 5) { _deathLog.RemoveAt(0); _deathLogTimers.RemoveAt(0); }
+            }
         }
 
         // Update particles (outside hitstop so they animate during freeze)
@@ -1376,7 +1392,13 @@ public class Game1 : Game
             _splatters[i] = s;
         }
 
-        // Dust on landing
+        // Death log timers
+        for (int i = _deathLogTimers.Count - 1; i >= 0; i--)
+        {
+            _deathLogTimers[i] -= dt;
+            if (_deathLogTimers[i] <= 0) { _deathLog.RemoveAt(i); _deathLogTimers.RemoveAt(i); }
+        }
+
         // Dust on landing — scaled by fall speed
         if (_dustParticlesEnabled && _player.IsGrounded && !_playerWasGrounded)
         {
@@ -1500,6 +1522,7 @@ public class Game1 : Game
                 {
                     if (_spawnInvincibility <= 0f)
                     {
+                        _lastDamageSource = "Spikes";
                         _player.TakeDamage(33, _player.Position.X - spike.Center.X);
                         if (_player.Hp <= 0) _isDead = true;
                     }
@@ -1545,6 +1568,7 @@ public class Game1 : Game
                     
                     if (pRect.Intersects(spikeRect))
                     {
+                        _lastDamageSource = "Spikes";
                         _player.TakeDamage(33, _player.Position.X - spikeRect.Center.X);
                         if (_player.Hp <= 0) _isDead = true;
                         hit = true;
@@ -1580,6 +1604,7 @@ public class Game1 : Game
                             case TileType.DamageTile:
                                 if (_spawnInvincibility <= 0f)
                                 {
+                                    _lastDamageSource = "Hazard";
                                     _player.TakeDamage(5, _player.Position.X - tileRect.Center.X);
                                     if (_player.Hp <= 0) _isDead = true;
                                 }
@@ -1591,6 +1616,7 @@ public class Game1 : Game
                                     // Damage without knockback — just reduce HP directly
                                     if (_player.DamageCooldown <= 0)
                                     {
+                                        _lastDamageSource = "Hazard";
                                         _player.Hp -= 5;
                                         _player.DamageCooldown = 1.0f;
                                         if (_player.Hp <= 0) { _player.Hp = 0; _isDead = true; }
@@ -1864,6 +1890,86 @@ public class Game1 : Game
             HasGravity = true,
             VelY = -100f // pop up slightly
         });
+    }
+
+    private void DrawParallaxBackground(Matrix shakeOff)
+    {
+        float camX = _camera.Position.X;
+        float camY = _camera.Position.Y;
+        int vw = ViewW, vh = ViewH;
+
+        // Layer 0: gradient sky (barely moves)
+        {
+            float px = camX * 0.05f;
+            var mat = Matrix.CreateTranslation(-px, 0, 0) * shakeOff;
+            _spriteBatch.Begin(transformMatrix: mat);
+            for (int y = 0; y < vh; y += 4)
+            {
+                float t = y / (float)vh;
+                var c = new Color(
+                    (int)(10 + t * 20),
+                    (int)(12 + t * 25),
+                    (int)(30 + t * 35));
+                _spriteBatch.Draw(_pixel, new Rectangle((int)px - 100, y, vw + 200, 4), c);
+            }
+            _spriteBatch.End();
+        }
+
+        // Layer 1: distant mountains (dark silhouettes)
+        {
+            float px = camX * 0.15f;
+            var mat = Matrix.CreateTranslation(-px, 0, 0) * shakeOff;
+            _spriteBatch.Begin(transformMatrix: mat);
+            var col = new Color(40, 45, 55);
+            int baseY = vh - 80;
+            for (int x = -200; x < vw + (int)px + 400; x += 120)
+            {
+                float seed = (x + (int)px / 120 * 120) * 0.013f;
+                int h = (int)(40 + 60 * MathF.Abs(MathF.Sin(seed)) + 30 * MathF.Abs(MathF.Sin(seed * 2.7f)));
+                _spriteBatch.Draw(_pixel, new Rectangle(x, baseY - h, 120, h + 80), col);
+                // Peak triangle effect
+                _spriteBatch.Draw(_pixel, new Rectangle(x + 30, baseY - h - 15, 60, 15), col);
+            }
+            _spriteBatch.End();
+        }
+
+        // Layer 2: mid-ground hills (smoother)
+        {
+            float px = camX * 0.35f;
+            var mat = Matrix.CreateTranslation(-px, 0, 0) * shakeOff;
+            _spriteBatch.Begin(transformMatrix: mat);
+            var col = new Color(55, 60, 70);
+            int baseY = vh - 50;
+            for (int x = -200; x < vw + (int)px + 400; x += 80)
+            {
+                float seed = (x + (int)px / 80 * 80) * 0.021f;
+                int h = (int)(25 + 35 * MathF.Abs(MathF.Sin(seed)));
+                _spriteBatch.Draw(_pixel, new Rectangle(x, baseY - h, 80, h + 50), col);
+            }
+            _spriteBatch.End();
+        }
+
+        // Layer 3: near-ground details (tall tree/pillar silhouettes)
+        {
+            float px = camX * 0.6f;
+            var mat = Matrix.CreateTranslation(-px, 0, 0) * shakeOff;
+            _spriteBatch.Begin(transformMatrix: mat);
+            var col = new Color(70, 75, 85);
+            int baseY = vh - 30;
+            for (int x = -200; x < vw + (int)px + 400; x += 45)
+            {
+                float seed = (x + (int)px / 45 * 45) * 0.037f;
+                if (MathF.Sin(seed * 3.1f) > 0.2f) // sparse — not every slot gets a tree
+                {
+                    int h = (int)(30 + 50 * MathF.Abs(MathF.Sin(seed)));
+                    int w = 6 + (int)(4 * MathF.Abs(MathF.Sin(seed * 1.7f)));
+                    _spriteBatch.Draw(_pixel, new Rectangle(x, baseY - h, w, h), col);
+                    // Canopy
+                    _spriteBatch.Draw(_pixel, new Rectangle(x - 4, baseY - h - 6, w + 8, 8), col);
+                }
+            }
+            _spriteBatch.End();
+        }
     }
 
     private void SpawnDeathParticles(Vector2 center, Color color, int count = 12)
@@ -5081,6 +5187,10 @@ public class Game1 : Game
             float sy = (float)(_shakeRng.NextDouble() * 2 - 1) * _shakeIntensity;
             shakeOff = Matrix.CreateTranslation(sx, sy, 0);
         }
+
+        // --- Parallax background layers ---
+        DrawParallaxBackground(shakeOff);
+
         _spriteBatch.Begin(transformMatrix: _camera.TransformMatrix * shakeOff);
 
         // Draw floor (extended across world)
@@ -5521,6 +5631,17 @@ public class Game1 : Game
                 string meleeName = CurrentMelee != WeaponType.None ? CurrentMelee.ToString() : "Fists";
                 _spriteBatch.DrawString(_font, SafeText($"[1] {rangedName}"), new Vector2(10, ViewH - 30), Color.White * 0.7f);
                 _spriteBatch.DrawString(_font, SafeText($"[2] {meleeName}"), new Vector2(130, ViewH - 30), Color.White * 0.7f);
+            }
+
+            // Death log (bottom-left, above weapon HUD)
+            if (_deathLogEnabled)
+            {
+                for (int i = 0; i < _deathLog.Count; i++)
+                {
+                    float alpha = MathHelper.Clamp(_deathLogTimers[i] / 2f, 0f, 1f); // fade in last 2s
+                    int y = ViewH - 50 - (_deathLog.Count - i) * 16;
+                    _spriteBatch.DrawString(_font, SafeText(_deathLog[i]), new Vector2(10, y), Color.White * 0.6f * alpha);
+                }
             }
         }
 
