@@ -458,6 +458,7 @@ public class Game1 : Game
                     var dummy = new Crawler(new Vector2(e.X, dSnapY), e.X - 10, e.X + 10, 0, 0);
                     dummy.IsDummy = true;
                     dummy.Hp = 9999;
+                    dummy.DummyScale = e.Scale;
                     dummy.UpdateSurfaceEdges(tg, ts, plats, sFloors, bLeft, bRight);
                     _crawlers.Add(dummy);
                     break;
@@ -467,6 +468,7 @@ public class Game1 : Game
                     critDummy.IsDummy = true;
                     critDummy.AlwaysCrit = true;
                     critDummy.Hp = 9999;
+                    critDummy.DummyScale = e.Scale;
                     critDummy.UpdateSurfaceEdges(tg, ts, plats, sFloors, bLeft, bRight);
                     _crawlers.Add(critDummy);
                     break;
@@ -789,6 +791,12 @@ public class Game1 : Game
             _ => Player.MeleeRange
         };
 
+        var currentWs = WeaponStats.Get(CurrentMelee);
+        _player.CurrentMeleeRate = currentWs.AttackSpeed;
+        _player.CurrentMeleeActiveTime = currentWs.ActiveTime;
+        _player.CurrentComboWindow = currentWs.ComboWindow;
+        _player.CurrentComboCooldown = currentWs.ComboCooldown;
+
         // Weapon cycling (only during gameplay, not editor)
         if (!_menuOpen && !_dialogueOpen && _gameState == GameState.Playing)
         {
@@ -1008,13 +1016,13 @@ public class Game1 : Game
                     {
                         _player.RegisterComboHit();
                         if (finisher) c.MeleeHitCooldown = 0.055f;
-                        var hitPt = new Vector2(c.Position.X + Crawler.Width/2f, c.Position.Y + Crawler.Height/2f);
+                        var hitPt = new Vector2(c.Position.X + c.EffectiveWidth/2f, c.Position.Y + c.EffectiveHeight/2f);
                         SpawnHitSpray(hitPt, _player.FacingDir, GetEnemyHitColor(c.IsDummy ? "dummy" : "crawler"), ws.Weight, finisher);
                         if (killed)
                         {
                             if (_hitStopEnabled) _hitStopTimer = ws.HitStopKill;
                             if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration * 1.5f; _shakeIntensity = ws.ShakeIntensity * 1.2f; }
-                            if (_deathParticlesEnabled) SpawnDeathParticles(new Vector2(c.Position.X + Crawler.Width / 2f, c.Position.Y + Crawler.Height / 2f), new Color(120, 60, 20));
+                            if (_deathParticlesEnabled) SpawnDeathParticles(new Vector2(c.Position.X + c.EffectiveWidth / 2f, c.Position.Y + c.EffectiveHeight / 2f), new Color(120, 60, 20));
                         }
                         else if (finisher)
                         {
@@ -1136,6 +1144,31 @@ public class Game1 : Game
             bird.Update(dt, playerCenter2,
                 _level.TileGridInstance, _level.TileGrid?.TileSize ?? 32,
                 _level.AllPlatforms, _level.SolidFloorRects, _level.Floor.Y);
+
+        // Melee hit detection for birds
+        if (_player.MeleeTimer > 0)
+        {
+            foreach (var bird in _birds)
+            {
+                if (!bird.Alive) continue;
+                if (_player.MeleeHitbox.Intersects(bird.Rect))
+                {
+                    var ws = WeaponStats.Get(_player.CurrentWeapon);
+                    float kbDir = _player.FacingDir;
+                    bool killed = bird.TakeHit(ws.Damage, kbDir * ws.KnockbackForce, ws.KnockbackUp);
+                    if (killed)
+                    {
+                        _player.RegisterComboHit();
+                        var hitPt = new Vector2(bird.Position.X + Bird.Width / 2f, bird.Position.Y + Bird.Height / 2f);
+                        SpawnHitSpray(hitPt, _player.FacingDir, GetEnemyHitColor("bird"), ws.Weight, true);
+                        if (_hitStopEnabled) _hitStopTimer = ws.HitStopKill;
+                        if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration * 1.5f; _shakeIntensity = ws.ShakeIntensity * 1.2f; }
+                        if (_deathParticlesEnabled) SpawnDeathParticles(new Vector2(bird.Position.X + Bird.Width / 2f, bird.Position.Y + Bird.Height / 2f), new Color(110, 85, 55));
+                    }
+                }
+            }
+        }
+
         _birds.RemoveAll(b => !b.Alive);
 
         // Bullets vs crawlers and thornbacks
@@ -1201,13 +1234,13 @@ public class Game1 : Game
                 float kbSpeed = c.KnockbackVel.Length();
                 bool hitWall = false;
                 if (c.Position.X < _level.Bounds.Left) { c.Position.X = _level.Bounds.Left; hitWall = true; }
-                if (c.Position.X + Crawler.Width > _level.Bounds.Right) { c.Position.X = _level.Bounds.Right - Crawler.Width; hitWall = true; }
+                if (c.Position.X + c.EffectiveWidth > _level.Bounds.Right) { c.Position.X = _level.Bounds.Right - c.EffectiveWidth; hitWall = true; }
                 var cRect = c.Rect;
                 foreach (var wall in _level.WallRects)
                 {
                     if (cRect.Intersects(wall))
                     {
-                        if (c.KnockbackVel.X > 0) c.Position.X = wall.Left - Crawler.Width;
+                        if (c.KnockbackVel.X > 0) c.Position.X = wall.Left - c.EffectiveWidth;
                         else c.Position.X = wall.Right;
                         hitWall = true;
                     }
@@ -1220,8 +1253,8 @@ public class Game1 : Game
                         bool killed = c.TakeHit(splatDmg);
                         if (_hitStopEnabled) _hitStopTimer = MathF.Max(_hitStopTimer, 0.08f);
                         if (_screenShakeEnabled) { _shakeTimer = 0.12f; _shakeIntensity = 8f; }
-                        if (_deathParticlesEnabled && killed) SpawnDeathParticles(new Vector2(c.Position.X + Crawler.Width/2f, c.Position.Y + Crawler.Height/2f), new Color(120, 60, 20));
-                        SpawnDustParticles(new Vector2(c.Position.X + (c.KnockbackVel.X > 0 ? Crawler.Width : 0), c.Position.Y + Crawler.Height / 2f), 6);
+                        if (_deathParticlesEnabled && killed) SpawnDeathParticles(new Vector2(c.Position.X + c.EffectiveWidth/2f, c.Position.Y + c.EffectiveHeight/2f), new Color(120, 60, 20));
+                        SpawnDustParticles(new Vector2(c.Position.X + (c.KnockbackVel.X > 0 ? Crawler.Width : 0), c.Position.Y + c.EffectiveHeight / 2f), 6);
                     }
                     c.KnockbackVel = Vector2.Zero;
                 }
@@ -1305,7 +1338,23 @@ public class Game1 : Game
             p.Velocity.Y += 400f * dt;
             p.Position += p.Velocity * dt;
 
-            // Hit floor — leave splatter and remove
+            // Hit floor — leave splatter and remove (check solid floors first)
+            bool splatted = false;
+            foreach (var sf in _level.SolidFloorRects)
+            {
+                if (p.Position.Y >= sf.Top && p.Position.X >= sf.Left && p.Position.X <= sf.Right)
+                {
+                    if (_rng.NextDouble() < 0.6)
+                    {
+                        if (_splatters.Count < 200)
+                            _splatters.Add(new Splatter { Position = new Vector2(p.Position.X, sf.Top - 1), Life = 3.5f, Color = p.Color });
+                        _particles.RemoveAt(i);
+                        splatted = true;
+                        break;
+                    }
+                }
+            }
+            if (splatted) continue;
             if (p.Position.Y >= _level.Floor.Y)
             {
                 if (_splatters.Count < 200)

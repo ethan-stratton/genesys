@@ -65,13 +65,17 @@ public class Player
 
     // Left hand - melee (K)
     private float _meleeCooldown;
-    private const float MeleeRate = 0.3f;
     private bool _meleeHeld;
     public bool WantsToMelee { get; private set; }
     public Vector2 MeleeDirection { get; private set; }
     public float MeleeTimer { get; private set; }
-    private const float MeleeActiveTime = 0.12f; // how long the hitbox stays out
     public const int MeleeRange = 40;
+
+    // Weapon stats driven by Game1 each frame
+    public float CurrentMeleeRate { get; set; } = 0.3f;
+    public float CurrentMeleeActiveTime { get; set; } = 0.12f;
+    public float CurrentComboWindow { get; set; } = 0.4f;
+    public float CurrentComboCooldown { get; set; } = 0.35f;
 
     // Combo chain system
     private int _comboStep; // 0, 1, 2 — current position in combo chain
@@ -79,7 +83,7 @@ public class Player
     private float _comboCooldown; // cooldown after combo ends
     private bool[] _comboHit = new bool[3]; // tracks whether each hit connected
     public int ComboStep => _comboStep;
-    public bool IsComboFinisher => CurrentWeapon == WeaponType.Stick && _comboStep == 2 && MeleeTimer > 0;
+    public bool IsComboFinisher => _comboStep == 2 && MeleeTimer > 0;
     public WeaponType CurrentWeapon { get; set; }
     private float _prevMeleeTimer; // for detecting melee active→inactive transition
 
@@ -472,77 +476,74 @@ public class Player
         get
         {
             var center = Position + new Vector2(Width / 2f, Height / 2f);
-            // Live aim direction for all melee — respects current aim (updates during crouch)
             int aimX = MathF.Abs(AimDir.X) > 0.1f ? Math.Sign(AimDir.X) : FacingDir;
-            float aimY = AimDir.Y; // -1 up, 0 neutral, +1 down
+            float aimY = AimDir.Y;
+            float range = MeleeRangeOverride;
+            bool isGreat = CurrentWeapon == WeaponType.GreatSword || CurrentWeapon == WeaponType.GreatClub;
+            int baseH = isGreat ? 36 : 28;
 
             if (CurrentWeapon == WeaponType.None)
             {
-                // Fist combo: SOTN-style rapid jabs, narrow but taller than before
+                // Fist combo: SOTN-style rapid jabs
                 int hw = 18, hh = 20;
                 float extend = _comboStep == 0 ? 18f : 24f;
-                // Aim up/down shifts the hitbox vertically
                 float hbCenterX = center.X + aimX * extend;
-                float hbCenterY = center.Y + aimY * 16f; // shift up/down with input
+                float hbCenterY = center.Y + aimY * 16f;
                 return new Rectangle(
                     (int)(hbCenterX - hw / 2f), (int)(hbCenterY - hh / 2f), hw, hh);
             }
-            else if (CurrentWeapon == WeaponType.Stick)
+
+            // All other melee weapons use combo-aware hitboxes
+            float vertShift = aimY * 14f;
+            float w, h;
+            if (_comboStep == 0)
             {
-                // Stick combo — all swings go FORWARD in facing direction
-                // Input direction tilts the hitbox up/down
-                float vertShift = aimY * 14f;
-                if (_comboStep == 0)
-                {
-                    // Hit 1 — forward sweep, slightly closer: 36×22
-                    float offsetX = aimX * 10f;
-                    return new Rectangle(
-                        (int)(center.X + offsetX - (aimX > 0 ? 4f : 32f)),
-                        (int)(center.Y - 11f + vertShift), 36, 22);
-                }
-                else if (_comboStep == 1)
-                {
-                    // Hit 2 — forward sweep, extended reach: 36×22
-                    float offsetX = aimX * 18f;
-                    return new Rectangle(
-                        (int)(center.X + offsetX - (aimX > 0 ? 4f : 32f)),
-                        (int)(center.Y - 11f + vertShift), 36, 22);
-                }
-                else
-                {
-                    // Hit 3 — overhead slam: cascading 3-phase sweep (top → mid → low)
-                    // MeleeTimer counts down from 0.18s. Phase based on remaining time.
-                    float offsetX = aimX * 16f;
-                    float phase = MeleeTimer; // counts down
-                    if (phase > 0.12f)
-                    {
-                        // Phase 1: overhead — above and forward
-                        return new Rectangle(
-                            (int)(center.X + offsetX - 16f), (int)(Position.Y - 20f), 32, 22);
-                    }
-                    else if (phase > 0.06f)
-                    {
-                        // Phase 2: mid-level — forward at chest height
-                        return new Rectangle(
-                            (int)(center.X + offsetX - 16f), (int)(center.Y - 12f), 34, 24);
-                    }
-                    else
-                    {
-                        // Phase 3: low finisher — forward and below, wider
-                        return new Rectangle(
-                            (int)(center.X + offsetX - 18f), (int)(center.Y + 8f), 36, 26);
-                    }
-                }
+                // Hit 1: narrow forward
+                w = range * 0.8f;
+                h = baseH;
+                float offsetX = aimX * (range * 0.3f);
+                return new Rectangle(
+                    (int)(center.X + offsetX - (aimX > 0 ? w * 0.15f : w * 0.85f)),
+                    (int)(center.Y - h / 2f + vertShift), (int)w, (int)h);
+            }
+            else if (_comboStep == 1)
+            {
+                // Hit 2: wider sweep
+                w = range * 1.0f;
+                h = baseH + 4;
+                float offsetX = aimX * (range * 0.45f);
+                return new Rectangle(
+                    (int)(center.X + offsetX - (aimX > 0 ? w * 0.15f : w * 0.85f)),
+                    (int)(center.Y - h / 2f + vertShift), (int)w, (int)h);
             }
             else
             {
-                // Default melee hitbox for other weapons — uses aim direction
-                var dir = MeleeDirection;
-                var hbCenter = center + dir * (MeleeRangeOverride * 0.6f);
-                return new Rectangle(
-                    (int)(hbCenter.X - MeleeWidth / 2f),
-                    (int)(hbCenter.Y - MeleeWidth / 2f),
-                    MeleeWidth, MeleeWidth);
+                // Hit 3: big finisher — cascading 3-phase sweep
+                w = range * 1.2f;
+                h = baseH + 8;
+                float offsetX = aimX * (range * 0.4f);
+                float phase = MeleeTimer;
+                float totalTime = MeleeTimer; // already counting down
+                // 3-phase sweep based on remaining time
+                float thirdTime = CurrentMeleeActiveTime / 3f;
+                if (phase > thirdTime * 2f)
+                {
+                    // Phase 1: overhead
+                    return new Rectangle(
+                        (int)(center.X + offsetX - w / 2f), (int)(Position.Y - 20f), (int)w, (int)h - 4);
+                }
+                else if (phase > thirdTime)
+                {
+                    // Phase 2: mid-level
+                    return new Rectangle(
+                        (int)(center.X + offsetX - w / 2f), (int)(center.Y - h / 2f), (int)w, (int)h);
+                }
+                else
+                {
+                    // Phase 3: low finisher
+                    return new Rectangle(
+                        (int)(center.X + offsetX - w / 2f), (int)(center.Y + 4f), (int)(w * 1.1f), (int)h + 4);
+                }
             }
         }
     }
@@ -946,10 +947,10 @@ public class Player
             bool kOnRope = kb.IsKeyDown(Keys.K);
             if (HasMeleeWeapon && kOnRope && !_meleeHeld && _meleeCooldown <= 0f)
             {
-                _meleeCooldown = MeleeRate;
+                _meleeCooldown = CurrentMeleeRate;
                 WantsToMelee = true;
                 MeleeDirection = AimDir;
-                MeleeTimer = MeleeActiveTime;
+                MeleeTimer = CurrentMeleeActiveTime;
             }
             _meleeHeld = kOnRope;
 
@@ -1135,10 +1136,10 @@ public class Player
             bool kOnWall = kb.IsKeyDown(Keys.K);
             if (HasMeleeWeapon && kOnWall && !_meleeHeld && _meleeCooldown <= 0f)
             {
-                _meleeCooldown = MeleeRate;
+                _meleeCooldown = CurrentMeleeRate;
                 WantsToMelee = true;
                 MeleeDirection = AimDir;
-                MeleeTimer = MeleeActiveTime;
+                MeleeTimer = CurrentMeleeActiveTime;
             }
             _meleeHeld = kOnWall;
 
@@ -1410,92 +1411,84 @@ public class Player
 
         if (HasMeleeWeapon && !IsSpinningMelee && kPressed && !_meleeHeld && _comboCooldown <= 0f)
         {
-            if (CurrentWeapon == WeaponType.None)
+            int maxCombo = CurrentWeapon == WeaponType.None ? 1 : 2; // Fists=2-hit, all others=3-hit
+            if (_comboStep == 0 && _comboWindow <= 0 && MeleeTimer <= 0)
             {
-                // Fist combo: 2-hit chain
-                if (_comboStep == 0 && _comboWindow <= 0 && MeleeTimer <= 0)
-                {
-                    // Jab 1
-                    WantsToMelee = true;
-                    MeleeDirection = new Vector2(FacingDir, 0);
-                    MeleeTimer = 0.06f;
-                    _comboWindow = 0; // window starts after active time ends (handled below)
-                }
-                else if (_comboStep == 0 && _comboWindow > 0)
-                {
-                    // Advance to jab 2
-                    _comboStep = 1;
-                    WantsToMelee = true;
-                    MeleeDirection = new Vector2(FacingDir, 0);
-                    MeleeTimer = 0.06f;
-                    _comboWindow = 0; // will set after active ends
-                }
+                // First hit
+                WantsToMelee = true;
+                MeleeDirection = new Vector2(FacingDir, 0);
+                MeleeTimer = CurrentMeleeActiveTime;
+                _comboWindow = 0;
             }
-            else if (CurrentWeapon == WeaponType.Stick)
+            else if (_comboStep == 0 && _comboWindow > 0)
             {
-                // Stick combo: 3-hit chain
-                if (_comboStep == 0 && _comboWindow <= 0 && MeleeTimer <= 0)
-                {
-                    WantsToMelee = true;
-                    MeleeDirection = new Vector2(FacingDir, 0);
-                    MeleeTimer = 0.1f;
-                    _comboWindow = 0;
-                }
-                else if (_comboStep == 0 && _comboWindow > 0)
-                {
-                    _comboStep = 1;
-                    WantsToMelee = true;
-                    MeleeDirection = new Vector2(FacingDir, 0);
-                    MeleeTimer = 0.1f;
-                    _comboWindow = 0;
-                }
-                else if (_comboStep == 1 && _comboWindow > 0 && _comboHit[0] && _comboHit[1])
-                {
-                    // Hit 3 only if hits 1 and 2 both connected
-                    _comboStep = 2;
-                    WantsToMelee = true;
-                    MeleeDirection = new Vector2(FacingDir, 0);
-                    MeleeTimer = 0.18f; // 3 phases × 0.06s each (top → mid → low)
-                    _comboWindow = 0;
-                    // Forward burst
-                    var v = Velocity;
-                    v.X += FacingDir * 150f;
-                    Velocity = v;
-                    vel = Velocity;
-                }
+                // Advance to hit 2
+                _comboStep = 1;
+                WantsToMelee = true;
+                MeleeDirection = new Vector2(FacingDir, 0);
+                MeleeTimer = CurrentMeleeActiveTime;
+                _comboWindow = 0;
             }
-            else
+            else if (_comboStep == 1 && _comboWindow > 0 && _comboHit[0] && _comboHit[1] && maxCombo >= 2)
             {
-                // Other weapons: single hit, no combo
-                if (_meleeCooldown <= 0f)
+                // Hit 3 (finisher) — only if hits 1 and 2 connected
+                _comboStep = 2;
+                WantsToMelee = true;
+                MeleeDirection = new Vector2(FacingDir, 0);
+                // Finisher active time scales with weapon weight
+                float finisherTime = CurrentWeapon switch
                 {
-                    _meleeCooldown = MeleeRate;
-                    WantsToMelee = true;
-                    MeleeDirection = AimDir;
-                    MeleeTimer = MeleeActiveTime;
-                }
+                    WeaponType.None => 0.08f,
+                    WeaponType.Dagger => 0.12f,
+                    WeaponType.Stick => 0.14f,
+                    WeaponType.Whip => 0.14f,
+                    WeaponType.Sword => 0.16f,
+                    WeaponType.Axe => 0.18f,
+                    WeaponType.Club => 0.18f,
+                    WeaponType.Hammer => 0.2f,
+                    WeaponType.GreatSword => 0.2f,
+                    WeaponType.GreatClub => 0.2f,
+                    _ => 0.16f
+                };
+                MeleeTimer = finisherTime;
+                _comboWindow = 0;
+                // Forward burst scales by weapon
+                float burst = CurrentWeapon switch
+                {
+                    WeaponType.Dagger => 100f,
+                    WeaponType.Stick => 150f,
+                    WeaponType.Sword => 180f,
+                    WeaponType.GreatSword => 200f,
+                    WeaponType.Club => 120f,
+                    WeaponType.GreatClub => 120f,
+                    WeaponType.Axe => 120f,
+                    WeaponType.Hammer => 120f,
+                    WeaponType.Whip => 100f,
+                    _ => 100f
+                };
+                var v = Velocity;
+                v.X += FacingDir * burst;
+                Velocity = v;
+                vel = Velocity;
             }
         }
         _meleeHeld = kPressed;
 
         // Set combo window when melee active time ends (transition from active to waiting)
-        if (MeleeTimer <= 0 && _comboWindow <= 0 && _comboCooldown <= 0 && 
-            (CurrentWeapon == WeaponType.None || CurrentWeapon == WeaponType.Stick))
+        if (MeleeTimer <= 0 && _comboWindow <= 0 && _comboCooldown <= 0)
         {
             // Check if we just finished an active hit
             if (_prevMeleeTimer > 0)
             {
                 int maxStep = CurrentWeapon == WeaponType.None ? 1 : 2;
-                float window = CurrentWeapon == WeaponType.None ? 0.35f : 0.4f;
                 if (_comboStep < maxStep)
                 {
-                    _comboWindow = window;
+                    _comboWindow = CurrentComboWindow;
                 }
                 else
                 {
                     // Combo finished
-                    float cd = CurrentWeapon == WeaponType.Stick ? 0.35f : 0.25f;
-                    _comboCooldown = cd;
+                    _comboCooldown = CurrentComboCooldown;
                     ResetCombo();
                 }
             }

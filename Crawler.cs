@@ -31,6 +31,9 @@ public class Crawler
     // Dummy mode: high HP, no aggro, respawns at original position
     public bool IsDummy;
     public bool AlwaysCrit;
+    public float DummyScale = 1f;
+    public int EffectiveWidth => IsDummy ? (int)(Width * DummyScale) : Width;
+    public int EffectiveHeight => IsDummy ? (int)(Height * DummyScale) : Height;
     private Vector2 _spawnPos;
     private float _respawnTimer;
     private const float RespawnDelay = 2f;
@@ -47,7 +50,7 @@ public class Crawler
         SurfaceRight = surfaceRight;
     }
 
-    public Rectangle Rect => new((int)Position.X, (int)Position.Y, Width, Height);
+    public Rectangle Rect => new((int)Position.X, (int)Position.Y, EffectiveWidth, EffectiveHeight);
 
     /// <summary>
     /// Update with tile-aware physics. Call UpdateSurfaceEdges after spawning or when surface changes.
@@ -179,13 +182,15 @@ public class Crawler
     public void Draw(SpriteBatch sb, Texture2D pixel)
     {
         if (!Alive) return;
+        int ew = EffectiveWidth;
+        int eh = EffectiveHeight;
         Color bodyColor = HitFlash > 0 ? Color.Red : IsDummy ? new Color(140, 100, 160) : (Aggroed ? new Color(120, 60, 20) : new Color(80, 50, 20));
-        int scaledW = (int)(Width * VisualScale.X);
-        int scaledH = (int)(Height * VisualScale.Y);
-        int drawX = (int)Position.X + Width / 2 - scaledW / 2;
-        int drawY = (int)Position.Y + Height - scaledH;
+        int scaledW = (int)(ew * VisualScale.X);
+        int scaledH = (int)(eh * VisualScale.Y);
+        int drawX = (int)Position.X + ew / 2 - scaledW / 2;
+        int drawY = (int)Position.Y + eh - scaledH;
         sb.Draw(pixel, new Rectangle(drawX, drawY, scaledW, scaledH), bodyColor);
-        sb.Draw(pixel, new Rectangle((int)Position.X + 2, (int)Position.Y + Height, 2, 3), new Color(60, 30, 10));
-        sb.Draw(pixel, new Rectangle((int)Position.X + Width - 4, (int)Position.Y + Height, 2, 3), new Color(60, 30, 10));
+        sb.Draw(pixel, new Rectangle((int)Position.X + 2, (int)Position.Y + eh, 2, 3), new Color(60, 30, 10));
+        sb.Draw(pixel, new Rectangle((int)Position.X + ew - 4, (int)Position.Y + eh, 2, 3), new Color(60, 30, 10));
     }
 }

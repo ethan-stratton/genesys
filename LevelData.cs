@@ -341,6 +341,7 @@ public class EnemySpawnData
     [JsonPropertyName("x")] public float X { get; set; }
     [JsonPropertyName("y")] public float Y { get; set; }
     [JsonPropertyName("count")] public int Count { get; set; } = 1;
+    [JsonPropertyName("scale")] public float Scale { get; set; } = 1f;
 }
 
 public class LabelData

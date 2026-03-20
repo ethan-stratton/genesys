@@ -7,7 +7,7 @@
   },
   "bounds": {
     "left": -32,
-    "right": 9600,
+    "right": 12000,
     "top": -128,
     "bottom": 800
   },
@@ -45,9 +45,37 @@
       "y": 704,
       "w": 32,
       "h": 12
+    },
+    {
+      "x": 9680,
+      "y": 480,
+      "w": 64,
+      "h": 8
+    },
+    {
+      "x": 9880,
+      "y": 400,
+      "w": 64,
+      "h": 8
     }
   ],
-  "ropes": [],
+  "ropes": [
+    {
+      "x": 9600,
+      "yTop": 300,
+      "yBottom": 620
+    },
+    {
+      "x": 9800,
+      "yTop": 200,
+      "yBottom": 520
+    },
+    {
+      "x": 10000,
+      "yTop": 350,
+      "yBottom": 600
+    }
+  ],
   "walls": [
     {
       "x": -32,
@@ -125,6 +153,34 @@
       "w": 32,
       "h": 100,
       "climbSide": 0
+    },
+    {
+      "x": 8950,
+      "y": 512,
+      "w": 32,
+      "h": 128,
+      "climbSide": 0
+    },
+    {
+      "x": 9200,
+      "y": 440,
+      "w": 32,
+      "h": 200,
+      "climbSide": 0
+    },
+    {
+      "x": 10200,
+      "y": 440,
+      "w": 16,
+      "h": 200,
+      "climbSide": 99
+    },
+    {
+      "x": 11084,
+      "y": 440,
+      "w": 16,
+      "h": 200,
+      "climbSide": 99
     }
   ],
   "spikes": [],
@@ -164,6 +220,30 @@
       "x": 7350,
       "y": 640,
       "w": 800,
+      "h": 160
+    },
+    {
+      "x": 8800,
+      "y": 640,
+      "w": 600,
+      "h": 160
+    },
+    {
+      "x": 9500,
+      "y": 640,
+      "w": 600,
+      "h": 160
+    },
+    {
+      "x": 10200,
+      "y": 640,
+      "w": 900,
+      "h": 160
+    },
+    {
+      "x": 11200,
+      "y": 640,
+      "w": 700,
       "h": 160
     }
   ],
@@ -317,6 +397,48 @@
       "x": 8200,
       "y": 620,
       "count": 1
+    },
+    {
+      "id": "ranged-near",
+      "type": "dummy",
+      "x": 10400,
+      "y": 630,
+      "scale": 1.0
+    },
+    {
+      "id": "ranged-mid",
+      "type": "dummy",
+      "x": 10600,
+      "y": 630,
+      "scale": 1.0
+    },
+    {
+      "id": "ranged-far",
+      "type": "dummy",
+      "x": 10950,
+      "y": 630,
+      "scale": 1.0
+    },
+    {
+      "id": "size-small",
+      "type": "dummy",
+      "x": 11300,
+      "y": 630,
+      "scale": 1.0
+    },
+    {
+      "id": "size-medium",
+      "type": "dummy",
+      "x": 11500,
+      "y": 620,
+      "scale": 2.0
+    },
+    {
+      "id": "size-large",
+      "type": "dummy",
+      "x": 11750,
+      "y": 605,
+      "scale": 3.5
     }
   ],
   "labels": [
@@ -599,6 +721,84 @@
       "y": 540,
       "color": "White",
       "size": "small"
+    },
+    {
+      "x": 8800,
+      "y": 580,
+      "text": "== WALL GYM ==",
+      "color": "Cyan"
+    },
+    {
+      "x": 8940,
+      "y": 500,
+      "text": "short",
+      "color": "White"
+    },
+    {
+      "x": 9190,
+      "y": 428,
+      "text": "tall",
+      "color": "White"
+    },
+    {
+      "x": 9500,
+      "y": 580,
+      "text": "== ROPE GYM ==",
+      "color": "Cyan"
+    },
+    {
+      "x": 10200,
+      "y": 580,
+      "text": "== RANGED GYM ==",
+      "color": "Cyan"
+    },
+    {
+      "x": 10250,
+      "y": 620,
+      "text": "FIRE",
+      "color": "Red"
+    },
+    {
+      "x": 10390,
+      "y": 610,
+      "text": "near",
+      "color": "White"
+    },
+    {
+      "x": 10590,
+      "y": 610,
+      "text": "mid",
+      "color": "White"
+    },
+    {
+      "x": 10940,
+      "y": 610,
+      "text": "far",
+      "color": "White"
+    },
+    {
+      "x": 11200,
+      "y": 580,
+      "text": "== SIZE GYM ==",
+      "color": "Cyan"
+    },
+    {
+      "x": 11285,
+      "y": 610,
+      "text": "small",
+      "color": "White"
+    },
+    {
+      "x": 11485,
+      "y": 600,
+      "text": "medium",
+      "color": "White"
+    },
+    {
+      "x": 11735,
+      "y": 585,
+      "text": "large",
+      "color": "White"
     }
   ],
   "tileGrid": {
