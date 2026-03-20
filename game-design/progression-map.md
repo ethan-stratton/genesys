@@ -387,3 +387,79 @@ Every system feeds at least 2 others. No dead ends.
 
 *"Why is the combat system developed at all? What story purpose does it serve?"*
 *Now we know: Adam fights because he fell. He crafts because technology failed. He explores because he's stranded. He grows because that's the entire point — the Dragon made sure of it.*
+
+---
+
+## OPEN DESIGN QUESTIONS (2026-03-20)
+
+### 1. The Cycle / EVE's Discovery
+- Maybe the cycle exists to preserve life on planets throughout the system
+- The Dragon as a mechanism for seeding/forcing growth on worlds — crashes are deliberate cultivation
+- Still exploring what's believable. The revelation needs to feel earned, not contrived
+- Key tension: what truth could EVE find that would genuinely shake Adam (and the player)?
+
+### 2. Ending B — Taking the Dragon's Place
+- Ethan notes it feels Dragon's Dogma-esque (that game literally has this ending)
+- Core question: HOW and WHY would Adam become the Dragon? What transformation makes that plausible?
+- Fun idea, but needs mechanical/narrative justification beyond "someone has to do it"
+- Might need a different hidden ending that's more unique to Genesis's identity
+- Don't discard yet — iterate on it
+
+### 3. The Natives
+- Intentionally vague. Mystery preserved.
+- They have their own creation myth explaining their existence — possibly conflicting accounts between settlements
+- Maybe we're NOT meant to know their true origin. Players theory-craft
+- This aligns with principle: "the game should always be a little bit unknowable"
+- Different native groups might have contradictory origin stories — all plausible, none confirmed
+
+### 4. Dragon's Dialogue Arc
+- **Early (Prologue):** Silent. Pure destruction. No communication
+- **Mid (Act 2D, first return):** Speaks, but terrifying and cryptic. Multiple tones. Feels alien and deceitful. The player doesn't trust anything it says
+- **Late (Act 3-4):** Increasingly articulate and melancholy as Adam grows "spiritually." The terror recedes and tragedy emerges. The player starts to pity it
+- This mirrors Adam's growth — the Dragon doesn't change, Adam's ability to understand it does
+
+### 5. Story Beat Chain (Next Step)
+- Need ~20-30 sequential story beats from inciting incident to conclusion
+- Not a book — a chain of events, each one a sentence or two
+- Each beat ties to a gameplay milestone
+- Leaves interesting ambiguity (good stories don't answer everything)
+- Goal: development never stalls because the next beat always tells you what to build next
+
+---
+
+## STORY BEAT CHAIN (Draft — needs Ethan's input)
+
+*Target: ~25 beats. Each beat = 1-2 sentences + what gameplay it requires.*
+
+1. **Adam's ship attacked by the Dragon. Crash landing.** (Prologue level)
+2. **Adam wakes in destroyed ship. EVE running on backup. Technology degrading.** (Wreckage area, basic movement/scavenging)
+3. **First contact with wildlife. Adam fights to survive with bare hands, then scavenged tools.** (First enemies, crafting tutorial)
+4. **Discovers native settlement nearby — they found him during recovery.** (First NPCs, hub area, gesture communication)
+5. **Natives gesture toward the mountains. Something concerns them.** (Lock: mountain path, motivation to explore)
+6. **Explores surrounding wilderness. EVE catalogs the planet obsessively.** (Open exploration, scanning, environmental crafting)
+7. **Discovers ancient ruins in caves — predating the natives by millennia. Dragon imagery.** (Moldy worldbuilding, lore fragments)
+8. **Defeats the Guardian blocking the mountain pass.** (First boss, tests all Act 1 mechanics)
+9. **Behind the Guardian: a larger ancient structure. The ancients KNEW about the Dragon.** (Puzzle area, knowledge keys)
+10. **EVE becomes obsessed with ruins. First real disagreement with Adam.** (EVE character development, tension)
+11. **Beyond the mountains: larger world. More settlements, different cultures.** (World opens, sim mode begins)
+12. **Technology nearly gone. Adam adapts — hybrid warrior using native + ancient tech.** (Weapon progression, durability, special moves)
+13. **EVE's translation improving. Fragments of native dialogue emerge.** (NPC interaction deepens, quests become possible)
+14. **EVE detects a technological signal. Not from Adam's ship. Not ancient. Current.** (Mid-game pivot, new mystery)
+15. **Journey toward the signal through corrupted territory. Something is spreading.** (Corruption biome, environmental storytelling)
+16. **Finds the signal source: another crashed ship. Much older. They didn't survive.** (The cycle revealed indirectly)
+17. **The Dragon returns. It SPEAKS. Cryptic, terrifying, multi-toned.** (Scripted encounter, not a fight)
+18. **"You are not the first. You will not be the last. But you might be the one who understands."** (Dragon's first words)
+19. **Among the wreckage: a data core. EVE can read it.** (Revelation system begins)
+20. **EVE processes the data core over time. Feeds Adam fragments during gameplay.** (Story delivered during exploration, not cutscenes)
+21. **Revelation: this crash was deliberate. Someone was SENT here. Many have been sent. None survived long-term.** (Cycle confirmed)
+22. **EVE finds something about Adam specifically. She's shaken. Won't say what.** (EVE hiding knowledge = building to temptation)
+23. **EVE confronts Adam: "I found something about you. Do you want to know?"** (Player choice: accept knowledge or defer)
+24. **Armed with or ignorant of the truth, Adam pushes into the Dragon's territory.** (Hardest areas, full gear, all systems tested)
+25. **The Dragon's domain isn't corrupted — it's TRANSFORMED. Not destruction, forced evolution.** (Recontextualization of the "villain")
+26. **Final confrontation with the Dragon. It speaks freely. Sad, articulate, resigned.** (Final boss, multi-phase)
+27. **The Dragon falls. Its last words recontextualize everything.** (Ending trigger)
+28. **Ending A: Adam stays. Builds a new world. EVE remains.** (Standard ending — satisfying but incomplete)
+29. **Ending B: [TBD — needs to feel unique to Genesis, not Dragon's Dogma]** (Hidden ending)
+30. **Ending C: [TBD — ultra-hidden, possibly unsolvable community puzzle]** (The unknowable)
+
+*These beats are the development roadmap. Each one tells us what to build next.*
