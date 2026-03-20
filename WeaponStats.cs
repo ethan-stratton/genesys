@@ -1,0 +1,40 @@
+namespace ArenaShooter;
+
+public static class WeaponStats
+{
+    public struct Stats
+    {
+        public float HitStopNormal;
+        public float HitStopFinisher;
+        public float HitStopKill;
+        public float ShakeIntensity;
+        public float ShakeDuration;
+        public float KnockbackForce;
+        public float KnockbackUp;
+        public int Damage;
+        public int FinisherDamage;
+        public float AttackSpeed;
+        public float ComboWindow;
+        public float ComboCooldown;
+        public bool IsRanged;
+        public string DisplayName;
+    }
+
+    public static Stats Get(WeaponType type) => type switch
+    {
+        WeaponType.None => new Stats { HitStopNormal = 0.02f, HitStopFinisher = 0.04f, HitStopKill = 0.05f, ShakeIntensity = 3f, ShakeDuration = 0.06f, KnockbackForce = 80f, KnockbackUp = -40f, Damage = 1, FinisherDamage = 2, AttackSpeed = 0.06f, ComboWindow = 0.35f, ComboCooldown = 0.25f, DisplayName = "Fists" },
+        WeaponType.Stick => new Stats { HitStopNormal = 0.03f, HitStopFinisher = 0.05f, HitStopKill = 0.07f, ShakeIntensity = 4f, ShakeDuration = 0.08f, KnockbackForce = 120f, KnockbackUp = -50f, Damage = 1, FinisherDamage = 2, AttackSpeed = 0.1f, ComboWindow = 0.4f, ComboCooldown = 0.35f, DisplayName = "Stick" },
+        WeaponType.Dagger => new Stats { HitStopNormal = 0.015f, HitStopFinisher = 0.03f, HitStopKill = 0.04f, ShakeIntensity = 2f, ShakeDuration = 0.05f, KnockbackForce = 40f, KnockbackUp = -20f, Damage = 1, FinisherDamage = 2, AttackSpeed = 0.04f, ComboWindow = 0.25f, ComboCooldown = 0.15f, DisplayName = "Dagger" },
+        WeaponType.Whip => new Stats { HitStopNormal = 0.025f, HitStopFinisher = 0.04f, HitStopKill = 0.06f, ShakeIntensity = 3f, ShakeDuration = 0.07f, KnockbackForce = 60f, KnockbackUp = -30f, Damage = 1, FinisherDamage = 2, AttackSpeed = 0.12f, ComboWindow = 0.45f, ComboCooldown = 0.3f, DisplayName = "Whip" },
+        WeaponType.Sword => new Stats { HitStopNormal = 0.04f, HitStopFinisher = 0.06f, HitStopKill = 0.08f, ShakeIntensity = 5f, ShakeDuration = 0.1f, KnockbackForce = 150f, KnockbackUp = -60f, Damage = 2, FinisherDamage = 3, AttackSpeed = 0.1f, ComboWindow = 0.4f, ComboCooldown = 0.3f, DisplayName = "Sword" },
+        WeaponType.Axe => new Stats { HitStopNormal = 0.05f, HitStopFinisher = 0.07f, HitStopKill = 0.1f, ShakeIntensity = 6f, ShakeDuration = 0.12f, KnockbackForce = 180f, KnockbackUp = -80f, Damage = 2, FinisherDamage = 4, AttackSpeed = 0.14f, ComboWindow = 0.5f, ComboCooldown = 0.4f, DisplayName = "Axe" },
+        WeaponType.Club => new Stats { HitStopNormal = 0.05f, HitStopFinisher = 0.08f, HitStopKill = 0.1f, ShakeIntensity = 7f, ShakeDuration = 0.12f, KnockbackForce = 200f, KnockbackUp = -70f, Damage = 2, FinisherDamage = 4, AttackSpeed = 0.14f, ComboWindow = 0.45f, ComboCooldown = 0.4f, DisplayName = "Club" },
+        WeaponType.Hammer => new Stats { HitStopNormal = 0.06f, HitStopFinisher = 0.08f, HitStopKill = 0.12f, ShakeIntensity = 8f, ShakeDuration = 0.14f, KnockbackForce = 220f, KnockbackUp = -90f, Damage = 3, FinisherDamage = 5, AttackSpeed = 0.16f, ComboWindow = 0.5f, ComboCooldown = 0.45f, DisplayName = "Hammer" },
+        WeaponType.GreatSword => new Stats { HitStopNormal = 0.07f, HitStopFinisher = 0.1f, HitStopKill = 0.15f, ShakeIntensity = 9f, ShakeDuration = 0.15f, KnockbackForce = 280f, KnockbackUp = -100f, Damage = 3, FinisherDamage = 5, AttackSpeed = 0.2f, ComboWindow = 0.6f, ComboCooldown = 0.5f, DisplayName = "Great Sword" },
+        WeaponType.GreatClub => new Stats { HitStopNormal = 0.08f, HitStopFinisher = 0.12f, HitStopKill = 0.18f, ShakeIntensity = 10f, ShakeDuration = 0.18f, KnockbackForce = 350f, KnockbackUp = -120f, Damage = 4, FinisherDamage = 6, AttackSpeed = 0.22f, ComboWindow = 0.6f, ComboCooldown = 0.55f, DisplayName = "Great Club" },
+        WeaponType.Sling => new Stats { HitStopNormal = 0.01f, HitStopFinisher = 0.02f, HitStopKill = 0.03f, ShakeIntensity = 2f, ShakeDuration = 0.05f, KnockbackForce = 60f, KnockbackUp = -30f, Damage = 1, FinisherDamage = 2, IsRanged = true, DisplayName = "Sling" },
+        WeaponType.Bow => new Stats { HitStopNormal = 0.02f, HitStopFinisher = 0.03f, HitStopKill = 0.04f, ShakeIntensity = 3f, ShakeDuration = 0.06f, KnockbackForce = 80f, KnockbackUp = -40f, Damage = 2, FinisherDamage = 3, IsRanged = true, DisplayName = "Bow" },
+        WeaponType.Gun => new Stats { HitStopNormal = 0.03f, HitStopFinisher = 0.05f, HitStopKill = 0.06f, ShakeIntensity = 5f, ShakeDuration = 0.08f, KnockbackForce = 100f, KnockbackUp = -50f, Damage = 3, FinisherDamage = 4, IsRanged = true, DisplayName = "Gun" },
+        _ => new Stats { HitStopNormal = 0.03f, HitStopFinisher = 0.05f, HitStopKill = 0.06f, ShakeIntensity = 5f, ShakeDuration = 0.1f, KnockbackForce = 100f, KnockbackUp = -50f, Damage = 1, FinisherDamage = 2, DisplayName = "Unknown" }
+    };
+}

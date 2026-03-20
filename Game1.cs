@@ -10,7 +10,7 @@ using FontStashSharp;
 
 namespace ArenaShooter;
 
-public enum WeaponType { None, Stick, Sword, Axe, Sling, Bow, Gun }
+public enum WeaponType { None, Stick, Whip, Dagger, Sword, GreatSword, Axe, Club, GreatClub, Hammer, Sling, Bow, Gun }
 
 public class ItemPickup
 {
@@ -76,6 +76,28 @@ public class Game1 : Game
     private float _hitStopTimer;
     private float _shakeTimer;
     private float _shakeIntensity;
+
+    // Hit feedback toggles
+    private bool _hitStopEnabled = true;
+    private bool _screenShakeEnabled = true;
+    private bool _enemySquashEnabled = true;
+    private bool _knockbackEnabled = true;
+    private bool _deathParticlesEnabled = true;
+    private bool _dustParticlesEnabled = true;
+
+    // Particles
+    private struct Particle
+    {
+        public Vector2 Position;
+        public Vector2 Velocity;
+        public float Life;
+        public float MaxLife;
+        public Color Color;
+        public int Size;
+    }
+    private List<Particle> _particles = new();
+    private bool _playerWasGrounded;
+    private bool _playerWasDashing;
     private Random _shakeRng = new();
 
     private List<Bullet> _bullets;
@@ -159,7 +181,7 @@ public class Game1 : Game
     // Spawn weapon menu (P key)
     private bool _spawnMenuOpen;
     private int _spawnMenuCursor;
-    private static readonly string[] SpawnMenuItems = { "Stick", "Sword", "Axe", "Gun", "Bow", "Sling" };
+    private static readonly string[] SpawnMenuItems = { "Stick", "Whip", "Dagger", "Sword", "GreatSword", "Axe", "Club", "GreatClub", "Hammer", "Gun", "Bow", "Sling" };
 
     // --- Dialogue state ---
     private bool _dialogueOpen;
@@ -259,6 +281,12 @@ public class Game1 : Game
                 else UnequipRanged(WeaponType.Gun);
             }},
             new() { Label = "EVE Orb", Get = () => _eveOrbActive, Toggle = () => _eveOrbActive = !_eveOrbActive },
+            new() { Label = "Hit Stop", Get = () => _hitStopEnabled, Toggle = () => _hitStopEnabled = !_hitStopEnabled },
+            new() { Label = "Screen Shake", Get = () => _screenShakeEnabled, Toggle = () => _screenShakeEnabled = !_screenShakeEnabled },
+            new() { Label = "Enemy Squash", Get = () => _enemySquashEnabled, Toggle = () => _enemySquashEnabled = !_enemySquashEnabled },
+            new() { Label = "Knockback", Get = () => _knockbackEnabled, Toggle = () => _knockbackEnabled = !_knockbackEnabled },
+            new() { Label = "Death Particles", Get = () => _deathParticlesEnabled, Toggle = () => _deathParticlesEnabled = !_deathParticlesEnabled },
+            new() { Label = "Dust Particles", Get = () => _dustParticlesEnabled, Toggle = () => _dustParticlesEnabled = !_dustParticlesEnabled },
         };
 
         _graphicsSettings = new SettingEntry[]
@@ -730,9 +758,16 @@ public class Game1 : Game
         _player.CurrentWeapon = CurrentMelee;
         _player.MeleeRangeOverride = CurrentMelee switch
         {
-            WeaponType.Sword => 60,
+            WeaponType.None => 28,
             WeaponType.Stick => 30,
-            WeaponType.None => 28, // fists: fast but short range
+            WeaponType.Dagger => 24,
+            WeaponType.Whip => 50,
+            WeaponType.Sword => 60,
+            WeaponType.Axe => 40,
+            WeaponType.Club => 35,
+            WeaponType.Hammer => 45,
+            WeaponType.GreatSword => 70,
+            WeaponType.GreatClub => 50,
             _ => Player.MeleeRange
         };
 
@@ -942,16 +977,33 @@ public class Game1 : Game
                 {
                     bool finisher = _player.IsComboFinisher;
                     int prevHp = c.Hp;
-                    int dmg = finisher ? 2 : 1;
-                    bool killed = c.TakeHit(dmg);
+                    var ws = WeaponStats.Get(_player.CurrentWeapon);
+                    int dmg = finisher ? ws.FinisherDamage : ws.Damage;
+                    float kbDir = _player.FacingDir;
+                    bool killed = _knockbackEnabled
+                        ? c.TakeHit(dmg, kbDir * ws.KnockbackForce, ws.KnockbackUp)
+                        : c.TakeHit(dmg);
                     bool didHit = c.Hp < prevHp || killed;
                     if (didHit)
                     {
                         _player.RegisterComboHit();
-                        if (finisher) c.MeleeHitCooldown = 0.055f; // short cooldown so next phase can hit
-                        if (killed) { _hitStopTimer = 0.06f; _shakeTimer = 0.15f; _shakeIntensity = 8f; }
-                        else if (finisher) { _hitStopTimer = 0.05f; _shakeTimer = 0.12f; _shakeIntensity = 6f; }
-                        else { _hitStopTimer = 0.03f; _shakeTimer = 0.1f; _shakeIntensity = 5f; }
+                        if (finisher) c.MeleeHitCooldown = 0.055f;
+                        if (killed)
+                        {
+                            if (_hitStopEnabled) _hitStopTimer = ws.HitStopKill;
+                            if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration * 1.5f; _shakeIntensity = ws.ShakeIntensity * 1.2f; }
+                            if (_deathParticlesEnabled) SpawnDeathParticles(new Vector2(c.Position.X + Crawler.Width / 2f, c.Position.Y + Crawler.Height / 2f), new Color(120, 60, 20));
+                        }
+                        else if (finisher)
+                        {
+                            if (_hitStopEnabled) _hitStopTimer = ws.HitStopFinisher;
+                            if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration * 1.2f; _shakeIntensity = ws.ShakeIntensity; }
+                        }
+                        else
+                        {
+                            if (_hitStopEnabled) _hitStopTimer = ws.HitStopNormal;
+                            if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration; _shakeIntensity = ws.ShakeIntensity * 0.8f; }
+                        }
                     }
                 }
             }
@@ -972,16 +1024,33 @@ public class Game1 : Game
                 {
                     bool finisher = _player.IsComboFinisher;
                     int prevHp = t.Hp;
-                    int dmg = finisher ? 2 : 1;
-                    bool killed = t.TakeHit(dmg);
+                    var ws = WeaponStats.Get(_player.CurrentWeapon);
+                    int dmg = finisher ? ws.FinisherDamage : ws.Damage;
+                    float kbDir = _player.FacingDir;
+                    bool killed = _knockbackEnabled
+                        ? t.TakeHit(dmg, kbDir * ws.KnockbackForce, ws.KnockbackUp)
+                        : t.TakeHit(dmg);
                     bool didHit = t.Hp < prevHp || killed;
                     if (didHit)
                     {
                         _player.RegisterComboHit();
                         if (finisher) t.MeleeHitCooldown = 0.055f;
-                        if (killed) { _hitStopTimer = 0.06f; _shakeTimer = 0.15f; _shakeIntensity = 8f; }
-                        else if (finisher) { _hitStopTimer = 0.05f; _shakeTimer = 0.12f; _shakeIntensity = 6f; }
-                        else { _hitStopTimer = 0.03f; _shakeTimer = 0.1f; _shakeIntensity = 5f; }
+                        if (killed)
+                        {
+                            if (_hitStopEnabled) _hitStopTimer = ws.HitStopKill;
+                            if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration * 1.5f; _shakeIntensity = ws.ShakeIntensity * 1.2f; }
+                            if (_deathParticlesEnabled) SpawnDeathParticles(new Vector2(t.Position.X + Thornback.Width / 2f, t.Position.Y + Thornback.Height / 2f), new Color(60, 100, 40));
+                        }
+                        else if (finisher)
+                        {
+                            if (_hitStopEnabled) _hitStopTimer = ws.HitStopFinisher;
+                            if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration * 1.2f; _shakeIntensity = ws.ShakeIntensity; }
+                        }
+                        else
+                        {
+                            if (_hitStopEnabled) _hitStopTimer = ws.HitStopNormal;
+                            if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration; _shakeIntensity = ws.ShakeIntensity * 0.8f; }
+                        }
                     }
                 }
             }
@@ -1004,16 +1073,33 @@ public class Game1 : Game
                 {
                     bool finisher = _player.IsComboFinisher;
                     int prevHp = h.Hp;
-                    int dmg = finisher ? 2 : 1;
-                    bool killed = h.TakeHit(dmg);
+                    var ws = WeaponStats.Get(_player.CurrentWeapon);
+                    int dmg = finisher ? ws.FinisherDamage : ws.Damage;
+                    float kbDir = _player.FacingDir;
+                    bool killed = _knockbackEnabled
+                        ? h.TakeHit(dmg, kbDir * ws.KnockbackForce, ws.KnockbackUp)
+                        : h.TakeHit(dmg);
                     bool didHit = h.Hp < prevHp || killed;
                     if (didHit)
                     {
                         _player.RegisterComboHit();
                         if (finisher) h.MeleeHitCooldown = 0.055f;
-                        if (killed) { _hitStopTimer = 0.06f; _shakeTimer = 0.15f; _shakeIntensity = 8f; }
-                        else if (finisher) { _hitStopTimer = 0.05f; _shakeTimer = 0.12f; _shakeIntensity = 6f; }
-                        else { _hitStopTimer = 0.03f; _shakeTimer = 0.1f; _shakeIntensity = 5f; }
+                        if (killed)
+                        {
+                            if (_hitStopEnabled) _hitStopTimer = ws.HitStopKill;
+                            if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration * 1.5f; _shakeIntensity = ws.ShakeIntensity * 1.2f; }
+                            if (_deathParticlesEnabled) SpawnDeathParticles(new Vector2(h.Position.X + Hopper.Width / 2f, h.Position.Y + Hopper.Height / 2f), new Color(100, 80, 60));
+                        }
+                        else if (finisher)
+                        {
+                            if (_hitStopEnabled) _hitStopTimer = ws.HitStopFinisher;
+                            if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration * 1.2f; _shakeIntensity = ws.ShakeIntensity; }
+                        }
+                        else
+                        {
+                            if (_hitStopEnabled) _hitStopTimer = ws.HitStopNormal;
+                            if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration; _shakeIntensity = ws.ShakeIntensity * 0.8f; }
+                        }
                     }
                 }
             }
@@ -1087,6 +1173,26 @@ public class Game1 : Game
         {
             _isDead = true;
         }
+
+        // Update particles (outside hitstop so they animate during freeze)
+        for (int i = _particles.Count - 1; i >= 0; i--)
+        {
+            var p = _particles[i];
+            p.Life -= dt;
+            if (p.Life <= 0) { _particles.RemoveAt(i); continue; }
+            p.Velocity.Y += 400f * dt;
+            p.Position += p.Velocity * dt;
+            _particles[i] = p;
+        }
+
+        // Dust on landing
+        if (_dustParticlesEnabled && _player.IsGrounded && !_playerWasGrounded)
+            SpawnDustParticles(new Vector2(_player.Position.X + Player.Width / 2f, _player.Position.Y + Player.Height));
+        // Dust on dash start
+        if (_dustParticlesEnabled && _player.IsDashing && !_playerWasDashing)
+            SpawnDustParticles(new Vector2(_player.Position.X + Player.Width / 2f, _player.Position.Y + Player.Height));
+        _playerWasGrounded = _player.IsGrounded;
+        _playerWasDashing = _player.IsDashing;
 
         // Update item physics (gravity for dropped items)
         foreach (var item in _itemPickups)
@@ -1169,8 +1275,14 @@ public class Game1 : Game
                     switch (item.ItemType)
                     {
                         case "stick": EquipMelee(WeaponType.Stick); break;
+                        case "whip": EquipMelee(WeaponType.Whip); break;
+                        case "dagger": EquipMelee(WeaponType.Dagger); break;
                         case "sword": EquipMelee(WeaponType.Sword); break;
+                        case "greatsword": EquipMelee(WeaponType.GreatSword); break;
                         case "axe": EquipMelee(WeaponType.Axe); break;
+                        case "club": EquipMelee(WeaponType.Club); break;
+                        case "greatclub": EquipMelee(WeaponType.GreatClub); break;
+                        case "hammer": EquipMelee(WeaponType.Hammer); break;
                         case "sling": EquipRanged(WeaponType.Sling); break;
                         case "bow": EquipRanged(WeaponType.Bow); break;
                         case "gun": EquipRanged(WeaponType.Gun); break;
@@ -1556,6 +1668,44 @@ public class Game1 : Game
             HasGravity = true,
             VelY = -100f // pop up slightly
         });
+    }
+
+    private void SpawnDeathParticles(Vector2 center, Color color, int count = 12)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            float angle = (float)(_rng.NextDouble() * Math.PI * 2);
+            float speed = 80f + (float)(_rng.NextDouble() * 200f);
+            float life = 0.3f + (float)(_rng.NextDouble() * 0.4f);
+            _particles.Add(new Particle
+            {
+                Position = center,
+                Velocity = new Vector2(MathF.Cos(angle) * speed, MathF.Sin(angle) * speed - 100f),
+                Life = life,
+                MaxLife = life,
+                Color = color,
+                Size = 2 + _rng.Next(3)
+            });
+        }
+    }
+
+    private void SpawnDustParticles(Vector2 position, int count = 4)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            float vx = (float)(_rng.NextDouble() * 80 - 40);
+            float vy = -(float)(_rng.NextDouble() * 60 + 20);
+            float life = 0.2f + (float)(_rng.NextDouble() * 0.2f);
+            _particles.Add(new Particle
+            {
+                Position = position,
+                Velocity = new Vector2(vx, vy),
+                Life = life,
+                MaxLife = life,
+                Color = new Color(180, 170, 150),
+                Size = 2
+            });
+        }
     }
 
     private static Color ParseNpcColor(string name)
@@ -3036,9 +3186,15 @@ public class Game1 : Game
                 var itemColor = item.ItemType switch
                 {
                     "stick" => new Color(139, 90, 43),
+                    "whip" => new Color(100, 60, 30),
+                    "dagger" => new Color(180, 180, 200),
                     "sling" => Color.DarkKhaki,
                     "sword" => Color.Silver,
+                    "greatsword" => new Color(200, 200, 220),
                     "axe" => Color.DarkGray,
+                    "club" => new Color(110, 70, 35),
+                    "greatclub" => new Color(90, 55, 25),
+                    "hammer" => new Color(160, 160, 170),
                     "bow" => new Color(160, 120, 60),
                     "gun" => Color.SlateGray,
                     _ => Color.White
@@ -4897,9 +5053,15 @@ public class Game1 : Game
                 var itemColor = item.ItemType switch
                 {
                     "stick" => new Color(139, 90, 43),
+                    "whip" => new Color(100, 60, 30),
+                    "dagger" => new Color(180, 180, 200),
                     "sling" => Color.DarkKhaki,
                     "sword" => Color.Silver,
+                    "greatsword" => new Color(200, 200, 220),
                     "axe" => Color.DarkGray,
+                    "club" => new Color(110, 70, 35),
+                    "greatclub" => new Color(90, 55, 25),
+                    "hammer" => new Color(160, 160, 170),
                     "bow" => new Color(160, 120, 60),
                     "gun" => Color.SlateGray,
                     "heart" => Color.Red,
@@ -4986,10 +5148,17 @@ public class Game1 : Game
         if (_enemiesEnabled)
         {
             foreach (var swarm in _swarms) swarm.Draw(_spriteBatch, _pixel);
-            foreach (var c in _crawlers) c.Draw(_spriteBatch, _pixel);
-            foreach (var h in _hoppers) h.Draw(_spriteBatch, _pixel);
-            foreach (var t in _thornbacks) t.Draw(_spriteBatch, _pixel);
-            foreach (var bird in _birds) bird.Draw(_spriteBatch, _pixel);
+            foreach (var c in _crawlers) { if (!_enemySquashEnabled) c.VisualScale = Vector2.One; c.Draw(_spriteBatch, _pixel); }
+            foreach (var h in _hoppers) { if (!_enemySquashEnabled) h.VisualScale = Vector2.One; h.Draw(_spriteBatch, _pixel); }
+            foreach (var t in _thornbacks) { if (!_enemySquashEnabled) t.VisualScale = Vector2.One; t.Draw(_spriteBatch, _pixel); }
+            foreach (var bird in _birds) { if (!_enemySquashEnabled) bird.VisualScale = Vector2.One; bird.Draw(_spriteBatch, _pixel); }
+        }
+
+        // Draw particles
+        foreach (var p in _particles)
+        {
+            float alpha = p.Life / p.MaxLife;
+            _spriteBatch.Draw(_pixel, new Rectangle((int)p.Position.X, (int)p.Position.Y, p.Size, p.Size), p.Color * alpha);
         }
 
         // Draw player

@@ -23,6 +23,11 @@ public class Crawler
     public float HitFlash;
     private bool _onGround;
 
+    public Vector2 KnockbackVel;
+    public Vector2 VisualScale = Vector2.One;
+    public float SquashResistance = 0f;
+    private float _squashHoldTimer;
+
     private const float Gravity = 600f;
 
     public Crawler(Vector2 pos, float patrolLeft, float patrolRight, float surfaceLeft, float surfaceRight)
@@ -47,6 +52,15 @@ public class Crawler
         if (DamageCooldown > 0) DamageCooldown -= dt;
         if (MeleeHitCooldown > 0) MeleeHitCooldown -= dt;
         if (HitFlash > 0) HitFlash -= dt;
+
+        if (KnockbackVel.LengthSquared() > 1f)
+        {
+            Position += KnockbackVel * dt;
+            KnockbackVel *= 0.85f;
+        }
+
+        if (_squashHoldTimer > 0) _squashHoldTimer -= dt;
+        else VisualScale = Vector2.Lerp(VisualScale, Vector2.One, 8f * dt);
 
         float dist = Vector2.Distance(playerCenter, Position + new Vector2(Width / 2f, Height / 2f));
         Aggroed = dist < AggroRange;
@@ -114,12 +128,16 @@ public class Crawler
         return 0;
     }
 
-    public bool TakeHit(int damage)
+    public bool TakeHit(int damage, float knockbackX = 0, float knockbackY = 0)
     {
         if (!Alive || MeleeHitCooldown > 0) return false;
         Hp -= damage;
         HitFlash = 0.15f;
         MeleeHitCooldown = 0.2f;
+        KnockbackVel = new Vector2(knockbackX, knockbackY);
+        float squashAmount = 1f - SquashResistance;
+        VisualScale = new Vector2(1f + 0.3f * squashAmount, 1f - 0.25f * squashAmount);
+        _squashHoldTimer = 0.05f;
         if (Hp <= 0) { Alive = false; return true; }
         return false;
     }
@@ -128,7 +146,11 @@ public class Crawler
     {
         if (!Alive) return;
         Color bodyColor = HitFlash > 0 ? Color.Red : (Aggroed ? new Color(120, 60, 20) : new Color(80, 50, 20));
-        sb.Draw(pixel, Rect, bodyColor);
+        int scaledW = (int)(Width * VisualScale.X);
+        int scaledH = (int)(Height * VisualScale.Y);
+        int drawX = (int)Position.X + Width / 2 - scaledW / 2;
+        int drawY = (int)Position.Y + Height - scaledH;
+        sb.Draw(pixel, new Rectangle(drawX, drawY, scaledW, scaledH), bodyColor);
         sb.Draw(pixel, new Rectangle((int)Position.X + 2, (int)Position.Y + Height, 2, 3), new Color(60, 30, 10));
         sb.Draw(pixel, new Rectangle((int)Position.X + Width - 4, (int)Position.Y + Height, 2, 3), new Color(60, 30, 10));
     }

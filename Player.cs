@@ -225,6 +225,12 @@ public class Player
         _knockbackTimer = duration;
     }
 
+    private void SetSquash(float scaleX, float scaleY)
+    {
+        _visualScale = new Vector2(scaleX, scaleY);
+        _squashHoldTimer = 0.05f; // hold for 3 frames before lerping back
+    }
+
     public void TakeDamage(int amount, float knockbackDirX = 0f)
     {
         if (DamageCooldown > 0) return;
@@ -241,6 +247,7 @@ public class Player
         vel.Y = KnockbackUpSpeed;
         Velocity = vel;
         _knockbackTimer = KnockbackDuration;
+        SetSquash(1.3f, 0.75f);
         
         // Cancel any active special states
         IsSliding = false;
@@ -287,6 +294,39 @@ public class Player
     public bool HasMeleeWeapon { get; set; }
     public bool HasRangedWeapon { get; set; }
     public int MeleeRangeOverride { get; set; } = MeleeRange;
+
+    // Asymmetric fall gravity
+    private const float FallGravityMultiplier = 1.4f;
+
+    // Coyote time
+    private float _coyoteTimer;
+    private const float CoyoteTime = 0.08f;
+
+    // Jump buffering
+    private float _jumpBufferTimer;
+    private const float JumpBufferTime = 0.1f;
+
+    // Squash & stretch
+    private Vector2 _visualScale = Vector2.One;
+    private const float ScaleLerpSpeed = 5f;
+    private float _squashHoldTimer; // hold squash before lerping back
+
+    // Afterimage trail
+    private struct Afterimage
+    {
+        public Vector2 Position;
+        public int SpriteRow;
+        public int SpriteFrame;
+        public int FacingDir;
+        public float Alpha;
+        public float TimeLeft;
+    }
+    private const int MaxAfterimages = 8;
+    private Afterimage[] _afterimages = new Afterimage[MaxAfterimages];
+    private int _afterimageIndex;
+    private float _afterimageSpawnTimer;
+    private const float AfterimageSpawnRate = 0.03f;
+    private const float AfterimageLifetime = 0.35f;
 
     private KeyboardState _prevKb;
 
@@ -661,7 +701,7 @@ public class Player
         {
             _aWasUp = false;
             if (now_dash - _lastATapTime < DashDoubleTapWindow && _wasGrounded)
-            { IsDashing = true; _dashDir = -1; }
+            { IsDashing = true; _dashDir = -1; SetSquash(1.25f, 0.8f); }
             _lastATapTime = now_dash;
         }
         if (!dDown) _dWasUp = true;
@@ -669,7 +709,7 @@ public class Player
         {
             _dWasUp = false;
             if (now_dash - _lastDTapTime < DashDoubleTapWindow && _wasGrounded)
-            { IsDashing = true; _dashDir = 1; }
+            { IsDashing = true; _dashDir = 1; SetSquash(1.25f, 0.8f); }
             _lastDTapTime = now_dash;
         }
         // Stop dashing when you release the dash direction key or press opposite
@@ -716,6 +756,7 @@ public class Player
             IsSliding = true;
             _slideTimer = SlideDuration;
             _slideCooldownTimer = SlideCooldown;
+            SetSquash(1.4f, 0.7f);
             _slideDir = FacingDir;
         }
 
@@ -727,6 +768,7 @@ public class Player
             _cartwheelCooldownTimer = CartwheelCooldown;
             _cartwheelDir = inputX;
             IsCrouching = false; // override crouch
+            SetSquash(1.2f, 0.85f);
         }
 
         // --- Uppercut input detection (down → up + jump) ---
@@ -749,6 +791,7 @@ public class Player
                 _uppercutInputReady = false;
                 IsUppercutting = true;
                 _uppercutTimer = UppercutDuration;
+                SetSquash(0.65f, 1.4f);
                 // Cancel any active move
                 IsSliding = false;
                 IsCartwheeling = false;
@@ -790,6 +833,7 @@ public class Player
                 IsBladeDashing = true;
                 _bladeDashTimer = BladeDashDuration;
                 _bladeDashDir = fwd;
+                SetSquash(1.4f, 0.7f);
                 // Cancel other states
                 IsSliding = false;
                 IsCartwheeling = false;
@@ -867,6 +911,7 @@ public class Player
                 vel.Y = JumpForce;
                 if (inputX != 0) vel.X = inputX * Speed;
                 _jumpsLeft = MaxJumps - 1;
+                SetSquash(0.7f, 1.3f);
                 IsGrounded = false;
                 _wasGrounded = false;
                 _jumpHeld = true;
@@ -1008,6 +1053,7 @@ public class Player
                     vel.Y = JumpForce;
                     vel.X = _currentWallClimbSide * Speed;
                     _jumpsLeft = MaxJumps - 1;
+                    SetSquash(0.7f, 1.3f);
                     IsGrounded = false;
                     _wasGrounded = false;
                 }
@@ -1081,7 +1127,7 @@ public class Player
             float t = 1f - (_cartwheelTimer / CartwheelDuration);
             vel.X = _cartwheelDir * CartwheelSpeed;
             if (t < 0.15f) vel.Y = CartwheelJumpForce; // initial pop
-            else vel.Y += Gravity * dt;
+            else vel.Y += Gravity * (vel.Y > 0 ? FallGravityMultiplier : 1f) * dt;
             if (_cartwheelTimer <= 0)
             {
                 IsCartwheeling = false;
@@ -1092,7 +1138,7 @@ public class Player
         {
             _vaultKickTimer -= dt;
             vel.X = _vaultKickDir * VaultKickSpeed;
-            vel.Y += Gravity * dt;
+            vel.Y += Gravity * (vel.Y > 0 ? FallGravityMultiplier : 1f) * dt;
             _jumpHeld = kb.IsKeyDown(Keys.Space); // track space so uppercut can trigger
             if (_vaultKickTimer <= 0)
             {
@@ -1111,7 +1157,7 @@ public class Player
             }
             else
             {
-                vel.Y += Gravity * dt;
+                vel.Y += Gravity * (vel.Y > 0 ? FallGravityMultiplier : 1f) * dt;
                 vel.X = inputX * UppercutHSpeed;
             }
             IsGrounded = false;
@@ -1126,7 +1172,7 @@ public class Player
         {
             _flipTimer -= dt;
             vel.X = _flipDir * FlipSpeed;
-            vel.Y += Gravity * dt;
+            vel.Y += Gravity * (vel.Y > 0 ? FallGravityMultiplier : 1f) * dt;
             if (_flipTimer <= 0)
             {
                 IsFlipping = false;
@@ -1160,6 +1206,7 @@ public class Player
                 IsVaultKicking = true;
                 _vaultKickTimer = VaultKickDuration;
                 _vaultKickDir = _slideDir;
+                SetSquash(1.3f, 0.75f);
                 vel.X = _vaultKickDir * VaultKickSpeed;
                 vel.Y = VaultKickJumpForce;
                 IsGrounded = false;
@@ -1212,14 +1259,14 @@ public class Player
             float drag = 1f - dt * 3f; // ~3x per second decay
             _ceilDeflectVelX *= drag;
             vel.X = _ceilDeflectVelX + inputX * Speed * 0.3f;
-            vel.Y += Gravity * dt;
+            vel.Y += Gravity * (vel.Y > 0 ? FallGravityMultiplier : 1f) * dt;
             if (IsGrounded) _ceilDeflectTimer = 0; // landing cancels deflect state
         }
         else if (_knockbackTimer > 0)
         {
             _knockbackTimer -= dt;
             // Don't override vel.X — let knockback velocity play out
-            vel.Y += Gravity * dt;
+            vel.Y += Gravity * (vel.Y > 0 ? FallGravityMultiplier : 1f) * dt;
         }
         else
         {
@@ -1239,6 +1286,7 @@ public class Player
                 {
                     IsFlipping = true;
                     _flipTimer = FlipDuration;
+                    SetSquash(0.75f, 1.3f);
                     // Frontflip if pressing facing dir, backflip otherwise
                     if (inputX == FacingDir)
                         _flipDir = FacingDir;
@@ -1255,10 +1303,17 @@ public class Player
                     // Normal jump
                     vel.Y = JumpForce;
                     _jumpsLeft--;
+                    SetSquash(0.7f, 1.3f);
                     if (!isSecondJump) _firstJumpTime = now_flip;
                 }
                 IsGrounded = false;
                 _wasGrounded = false;
+                _coyoteTimer = 0;
+            }
+            else if (spacePressed && !_jumpHeld && inputY <= 0)
+            {
+                // Can't jump — buffer the input
+                _jumpBufferTimer = JumpBufferTime;
             }
             bool wasHoldingJump = _jumpHeld;
             _jumpHeld = spacePressed;
@@ -1269,7 +1324,7 @@ public class Player
                 vel.Y *= JumpCutMultiplier;
             }
 
-            vel.Y += Gravity * dt;
+            vel.Y += Gravity * (vel.Y > 0 ? FallGravityMultiplier : 1f) * dt;
         }
 
         // --- Right hand / Ranged (J) ---
@@ -1426,10 +1481,10 @@ public class Player
             _jumpsLeft = MaxJumps;
         }
 
-        // Slope floor collision
+        // Slope floor collision (skip if player is actively jumping upward — don't snap back to slope)
         bool _onSlope = false;
         float _slopeFloorY = float.MaxValue;
-        if (tileGrid != null)
+        if (tileGrid != null && vel.Y >= 0)
         {
             float slopeY = tileGrid.GetSlopeFloorY(pos.X, pos.Y, Width, Height);
             if (slopeY < float.MaxValue && pos.Y + Height >= slopeY - 6)
@@ -1442,7 +1497,7 @@ public class Player
                 _slopeFloorY = slopeY;
             }
             // Slope sticking: when was grounded and moving, probe below for slope/ground continuity
-            else if (_wasGrounded && vel.Y >= 0)
+            else if ((_wasGrounded || _coyoteTimer > 0) && vel.Y >= -50f)
             {
                 // Probe further below based on horizontal speed (faster = bigger gap to bridge)
                 float probeDepth = MathHelper.Clamp(MathF.Abs(vel.X) * 0.06f, 4f, 24f);
@@ -1643,6 +1698,75 @@ public class Player
 
         Position = pos;
         Velocity = vel;
+
+        // Landing squash
+        if (!_wasGrounded && IsGrounded)
+            SetSquash(1.3f, 0.7f);
+
+        // Coyote time: grace period after leaving ground
+        if (_wasGrounded && !IsGrounded && vel.Y >= 0 && !_jumpHeld)
+            _coyoteTimer = CoyoteTime;
+        if (_coyoteTimer > 0)
+        {
+            _coyoteTimer -= dt;
+            if (_coyoteTimer > 0) _jumpsLeft = MaxJumps;
+        }
+
+        // Jump buffering: auto-jump on landing
+        if (_jumpBufferTimer > 0)
+            _jumpBufferTimer -= dt;
+        if (!_wasGrounded && IsGrounded && _jumpBufferTimer > 0)
+        {
+            vel.Y = JumpForce;
+            _jumpsLeft = MaxJumps - 1;
+            IsGrounded = false;
+            _jumpBufferTimer = 0;
+            SetSquash(0.7f, 1.3f);
+            Velocity = vel;
+        }
+
+        // Squash & stretch lerp back to normal
+        if (_squashHoldTimer > 0)
+            _squashHoldTimer -= dt;
+        else if (!IsGrounded && vel.Y > 300)
+            _visualScale = Vector2.Lerp(_visualScale, new Vector2(0.9f, 1.1f), ScaleLerpSpeed * dt);
+        else
+            _visualScale = Vector2.Lerp(_visualScale, Vector2.One, ScaleLerpSpeed * dt);
+
+        // Afterimage trail
+        bool wantsTrail = IsDashing || IsVaultKicking || IsBladeDashing || IsCartwheeling || IsFlipping || IsUppercutting || IsSliding;
+        if (wantsTrail)
+        {
+            _afterimageSpawnTimer -= dt;
+            if (_afterimageSpawnTimer <= 0)
+            {
+                _afterimageSpawnTimer = AfterimageSpawnRate;
+                var (aimgRow, aimgFrame) = GetSpriteAnim();
+                _afterimages[_afterimageIndex] = new Afterimage
+                {
+                    Position = Position,
+                    SpriteRow = aimgRow,
+                    SpriteFrame = aimgFrame,
+                    FacingDir = FacingDir,
+                    Alpha = 0.8f,
+                    TimeLeft = AfterimageLifetime
+                };
+                _afterimageIndex = (_afterimageIndex + 1) % MaxAfterimages;
+            }
+        }
+        else
+        {
+            _afterimageSpawnTimer = 0;
+        }
+        for (int i = 0; i < MaxAfterimages; i++)
+        {
+            if (_afterimages[i].TimeLeft > 0)
+            {
+                _afterimages[i].TimeLeft -= dt;
+                _afterimages[i].Alpha = 0.8f * (_afterimages[i].TimeLeft / AfterimageLifetime);
+            }
+        }
+
         _wasGrounded = IsGrounded;
         _wasOnSlope = _onSlope;
         _prevKb = kb;
@@ -1764,6 +1888,21 @@ public class Player
 
         if (spriteSheet != null)
         {
+            // Draw afterimage trail
+            for (int i = 0; i < MaxAfterimages; i++)
+            {
+                if (_afterimages[i].TimeLeft > 0)
+                {
+                    var ai = _afterimages[i];
+                    var aiSrcRect = new Rectangle(ai.SpriteFrame * SpriteW, ai.SpriteRow * SpriteH, SpriteW, SpriteH);
+                    var aiFlip = ai.FacingDir < 0 ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
+                    int aiDrawX = (int)ai.Position.X - (SpriteW - Width) / 2;
+                    int aiDrawY = (int)ai.Position.Y + Height - SpriteH + 1;
+                    var aiColor = Color.White * ai.Alpha;
+                    spriteBatch.Draw(spriteSheet, new Rectangle(aiDrawX, aiDrawY, SpriteW, SpriteH), aiSrcRect, aiColor, 0f, Vector2.Zero, aiFlip, 0f);
+                }
+            }
+
             var (row, frame) = GetSpriteAnim();
             if (row < 0) { DrawFallback(spriteBatch, pixel); goto afterSprite; }
             var srcRect = new Rectangle(frame * SpriteW, row * SpriteH, SpriteW, SpriteH);
@@ -1776,10 +1915,12 @@ public class Player
             else if (IsBladeDashing) tint = Color.White * 0.9f;
             else if (IsDashing) tint = new Color(200, 200, 200);
 
-            // Center the 48x48 sprite frame on the 32x48 collision box
-            int drawX = (int)Position.X - (SpriteW - Width) / 2;
-            int drawY = (int)Position.Y + Height - SpriteH + 1; // bottom-aligned, nudged down 1px
-            var destRect = new Rectangle(drawX, drawY, SpriteW, SpriteH);
+            // Squash & stretch: scale sprite from bottom-center
+            int scaledW = (int)(SpriteW * _visualScale.X);
+            int scaledH = (int)(SpriteH * _visualScale.Y);
+            int drawX = (int)Position.X + Width / 2 - scaledW / 2;
+            int drawY = (int)Position.Y + Height - scaledH + 1;
+            var destRect = new Rectangle(drawX, drawY, scaledW, scaledH);
             spriteBatch.Draw(spriteSheet, destRect, srcRect, tint, 0f, Vector2.Zero, flip, 0f);
         }
         else
@@ -1804,6 +1945,27 @@ public class Player
 
     private void DrawFallback(SpriteBatch spriteBatch, Texture2D pixel)
     {
+        // Afterimage trail (fallback: colored ghost rectangles)
+        for (int i = 0; i < MaxAfterimages; i++)
+        {
+            if (_afterimages[i].TimeLeft > 0)
+            {
+                var ai = _afterimages[i];
+                int aiW = Width;
+                int aiH = Height;
+                var aiColor = new Color(150, 180, 255) * ai.Alpha;
+                spriteBatch.Draw(pixel,
+                    new Rectangle((int)ai.Position.X, (int)ai.Position.Y, aiW, aiH),
+                    aiColor);
+            }
+        }
+
+        // Apply squash & stretch to fallback rectangles
+        int sqW = (int)(Width * _visualScale.X);
+        int sqH = (int)(Height * _visualScale.Y);
+        int sqX = (int)Position.X + Width / 2 - sqW / 2;
+        int sqY = (int)Position.Y + Height - sqH; // bottom-aligned
+
         if (IsVaulting)
         {
             int size = (int)(Width * 0.8f);
@@ -1814,7 +1976,7 @@ public class Player
         else if (IsOnWall)
         {
             spriteBatch.Draw(pixel,
-                new Rectangle((int)Position.X, (int)Position.Y, Width, Height),
+                new Rectangle(sqX, sqY, sqW, sqH),
                 IsCrouching ? Color.DarkGray : new Color(100, 140, 100));
             int gripX = _currentWallClimbSide == 1 ? (int)Position.X : (int)Position.X + Width - 4;
             spriteBatch.Draw(pixel,
@@ -1825,7 +1987,7 @@ public class Player
         else if (IsOnRope)
         {
             spriteBatch.Draw(pixel,
-                new Rectangle((int)Position.X, (int)Position.Y, Width, Height),
+                new Rectangle(sqX, sqY, sqW, sqH),
                 IsCrouching ? Color.DarkGray : new Color(160, 120, 80));
             int gripY = (int)Position.Y + Height / 2 - 2;
             spriteBatch.Draw(pixel,
@@ -1834,18 +1996,24 @@ public class Player
         }
         else if (IsSliding)
         {
-            int drawY = (int)Position.Y + Height - SlideHeight;
+            int slideW = (int)(Width * _visualScale.X);
+            int slideH = (int)(SlideHeight * _visualScale.Y);
+            int slideX = (int)Position.X + Width / 2 - slideW / 2;
+            int slideY = (int)Position.Y + Height - slideH;
             spriteBatch.Draw(pixel,
-                new Rectangle((int)Position.X, drawY, Width, SlideHeight),
+                new Rectangle(slideX, slideY, slideW, slideH),
                 Color.CornflowerBlue);
         }
         else if (IsCrouching)
         {
-            int drawY = (int)Position.Y + Height - CrouchHeight;
+            int crouchW = (int)(Width * _visualScale.X);
+            int crouchH = (int)(CrouchHeight * _visualScale.Y);
+            int crouchX = (int)Position.X + Width / 2 - crouchW / 2;
+            int crouchY = (int)Position.Y + Height - crouchH;
             spriteBatch.Draw(pixel,
-                new Rectangle((int)Position.X, drawY, Width, CrouchHeight),
+                new Rectangle(crouchX, crouchY, crouchW, crouchH),
                 Color.DarkGray);
-            var center = new Vector2((int)Position.X + Width / 2f, drawY + CrouchHeight / 2f);
+            var center = new Vector2(crouchX + crouchW / 2f, crouchY + crouchH / 2f);
             for (int i = 0; i < 15; i++)
             {
                 var p = center + AimDir * (i * 2);
@@ -1856,11 +2024,11 @@ public class Player
         {
             var bodyColor = IsDashing ? new Color(180, 180, 180) : Color.Gray;
             spriteBatch.Draw(pixel,
-                new Rectangle((int)Position.X, (int)Position.Y, Width, Height),
+                new Rectangle(sqX, sqY, sqW, sqH),
                 bodyColor);
-            int notchX = FacingDir == 1 ? (int)Position.X + Width - 4 : (int)Position.X;
+            int notchX = FacingDir == 1 ? sqX + sqW - 4 : sqX;
             spriteBatch.Draw(pixel,
-                new Rectangle(notchX, (int)Position.Y + Height / 2 - 3, 4, 6),
+                new Rectangle(notchX, sqY + sqH / 2 - 3, 4, 6),
                 Color.LightGray);
         }
     }

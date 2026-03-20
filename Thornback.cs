@@ -13,6 +13,10 @@ public class Thornback
     public float DamageCooldown;
     public float HitFlash;
     public float MeleeHitCooldown;
+    public Vector2 KnockbackVel;
+    public Vector2 VisualScale = Vector2.One;
+    public float SquashResistance = 0.7f;
+    private float _squashHoldTimer;
 
     public Thornback(Vector2 pos)
     {
@@ -27,6 +31,15 @@ public class Thornback
         if (DamageCooldown > 0) DamageCooldown -= dt;
         if (HitFlash > 0) HitFlash -= dt;
         if (MeleeHitCooldown > 0) MeleeHitCooldown -= dt;
+
+        if (KnockbackVel.LengthSquared() > 1f)
+        {
+            Position += KnockbackVel * dt;
+            KnockbackVel *= 0.85f;
+        }
+
+        if (_squashHoldTimer > 0) _squashHoldTimer -= dt;
+        else VisualScale = Vector2.Lerp(VisualScale, Vector2.One, 8f * dt);
     }
 
     public int CheckPlayerDamage(Rectangle playerRect)
@@ -40,12 +53,16 @@ public class Thornback
         return 0;
     }
 
-    public bool TakeHit(int damage)
+    public bool TakeHit(int damage, float knockbackX = 0, float knockbackY = 0)
     {
         if (!Alive || MeleeHitCooldown > 0) return false;
         Hp -= damage;
         HitFlash = 0.15f;
         MeleeHitCooldown = 0.2f;
+        KnockbackVel = new Vector2(knockbackX, knockbackY);
+        float squashAmount = 1f - SquashResistance;
+        VisualScale = new Vector2(1f + 0.3f * squashAmount, 1f - 0.25f * squashAmount);
+        _squashHoldTimer = 0.05f;
         if (Hp <= 0) { Alive = false; return true; }
         return false;
     }
@@ -54,7 +71,11 @@ public class Thornback
     {
         if (!Alive) return;
         Color baseColor = HitFlash > 0 ? Color.White : new Color(60, 100, 30);
-        sb.Draw(pixel, Rect, baseColor);
+        int scaledW = (int)(Width * VisualScale.X);
+        int scaledH = (int)(Height * VisualScale.Y);
+        int drawX = (int)Position.X + Width / 2 - scaledW / 2;
+        int drawY = (int)Position.Y + Height - scaledH;
+        sb.Draw(pixel, new Rectangle(drawX, drawY, scaledW, scaledH), baseColor);
         sb.Draw(pixel, new Rectangle((int)Position.X - 3, (int)Position.Y + 6, 4, 4), baseColor * 0.8f);
         sb.Draw(pixel, new Rectangle((int)Position.X + Width - 1, (int)Position.Y + 8, 4, 4), baseColor * 0.8f);
         sb.Draw(pixel, new Rectangle((int)Position.X + 8, (int)Position.Y - 3, 4, 4), baseColor * 0.8f);

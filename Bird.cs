@@ -10,6 +10,10 @@ public class Bird
     public Vector2 Velocity;
     public bool Alive = true;
     public const int Width = 10, Height = 8;
+    public Vector2 KnockbackVel;
+    public Vector2 VisualScale = Vector2.One;
+    public float SquashResistance = 0.2f;
+    private float _squashHoldTimer;
 
     private enum State { Perched, Pecking, Hopping, Fleeing, Flying }
     private State _state = State.Perched;
@@ -48,6 +52,15 @@ public class Bird
         Rectangle[] platforms, Rectangle[] solidFloors, float floorY)
     {
         if (!Alive) return;
+
+        if (KnockbackVel.LengthSquared() > 1f)
+        {
+            Position += KnockbackVel * dt;
+            KnockbackVel *= 0.85f;
+        }
+
+        if (_squashHoldTimer > 0) _squashHoldTimer -= dt;
+        else VisualScale = Vector2.Lerp(VisualScale, Vector2.One, 8f * dt);
 
         float dist = Vector2.Distance(playerPos, Position + new Vector2(Width / 2f, Height / 2f));
         float dx = playerPos.X - (Position.X + Width / 2f);
@@ -177,6 +190,17 @@ public class Bird
         // Keep on ground when not flying (snap to ground Y)
         if (_state != State.Flying && _state != State.Hopping && _state != State.Fleeing)
             Position.Y = GroundY;
+    }
+
+    public bool TakeHit(int damage, float knockbackX = 0, float knockbackY = 0)
+    {
+        if (!Alive) return false;
+        KnockbackVel = new Vector2(knockbackX * 0.5f, knockbackY);
+        float squashAmount = 1f - SquashResistance;
+        VisualScale = new Vector2(1f + 0.3f * squashAmount, 1f - 0.25f * squashAmount);
+        _squashHoldTimer = 0.05f;
+        Alive = false;
+        return true;
     }
 
     /// <summary>

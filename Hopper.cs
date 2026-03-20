@@ -21,6 +21,10 @@ public class Hopper
     public float DamageCooldown;
     public float HitFlash;
     public float MeleeHitCooldown;
+    public Vector2 KnockbackVel;
+    public Vector2 VisualScale = Vector2.One;
+    public float SquashResistance = 0.1f;
+    private float _squashHoldTimer;
 
     // Hop state machine
     private enum State { Grounded, Winding, Airborne, Landing }
@@ -59,6 +63,15 @@ public class Hopper
         if (DamageCooldown > 0) DamageCooldown -= dt;
         if (HitFlash > 0) HitFlash -= dt;
         if (MeleeHitCooldown > 0) MeleeHitCooldown -= dt;
+
+        if (KnockbackVel.LengthSquared() > 1f)
+        {
+            Position += KnockbackVel * dt;
+            KnockbackVel *= 0.85f;
+        }
+
+        if (_squashHoldTimer > 0) _squashHoldTimer -= dt;
+        else VisualScale = Vector2.Lerp(VisualScale, Vector2.One, 8f * dt);
 
         float dist = Vector2.Distance(playerCenter, Position + new Vector2(Width / 2f, Height / 2f));
         Aggroed = dist < AggroRange;
@@ -133,12 +146,16 @@ public class Hopper
         return 0;
     }
 
-    public bool TakeHit(int damage)
+    public bool TakeHit(int damage, float knockbackX = 0, float knockbackY = 0)
     {
         if (!Alive || MeleeHitCooldown > 0) return false;
         Hp -= damage;
         HitFlash = 0.15f;
         MeleeHitCooldown = 0.2f;
+        KnockbackVel = new Vector2(knockbackX, knockbackY);
+        float squashAmount = 1f - SquashResistance;
+        VisualScale = new Vector2(1f + 0.3f * squashAmount, 1f - 0.25f * squashAmount);
+        _squashHoldTimer = 0.05f;
         if (Hp <= 0) { Alive = false; return true; }
         return false;
     }
@@ -183,11 +200,16 @@ public class Hopper
         }
 
         Color bodyColor = HitFlash > 0 ? Color.Red : (Aggroed ? new Color(80, 140, 60) : new Color(60, 120, 50));
-        sb.Draw(pixel, new Rectangle(drawX, drawY, drawW, drawH), bodyColor);
-        sb.Draw(pixel, new Rectangle(drawX + 2, drawY, drawW - 4, 3), Color.LightGreen * 0.4f);
+        // Apply hit squash on top of state animation
+        int finalW = (int)(drawW * VisualScale.X);
+        int finalH = (int)(drawH * VisualScale.Y);
+        int finalX = drawX + drawW / 2 - finalW / 2;
+        int finalY = drawY + drawH - finalH;
+        sb.Draw(pixel, new Rectangle(finalX, finalY, finalW, finalH), bodyColor);
+        sb.Draw(pixel, new Rectangle(finalX + 2, finalY, finalW - 4, 3), Color.LightGreen * 0.4f);
 
-        int eyeOffsetX = _dir > 0 ? drawW - 6 : 2;
-        sb.Draw(pixel, new Rectangle(drawX + eyeOffsetX, drawY + 3, 3, 3), Color.White);
-        sb.Draw(pixel, new Rectangle(drawX + eyeOffsetX + 1, drawY + 4, 1, 1), Color.Black);
+        int eyeOffsetX = _dir > 0 ? finalW - 6 : 2;
+        sb.Draw(pixel, new Rectangle(finalX + eyeOffsetX, finalY + 3, 3, 3), Color.White);
+        sb.Draw(pixel, new Rectangle(finalX + eyeOffsetX + 1, finalY + 4, 1, 1), Color.Black);
     }
 }
