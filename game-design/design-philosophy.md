@@ -318,6 +318,19 @@ Mystery = withholding information intentionally. Four types of concealment:
 - EVE's scanning IS the "tell the player" system — wrapped in worldbuilding
 - Funsies: smashable ship debris, sparking consoles, weird alien plants that react to touch
 
+## 20. ENEMY PERSONALITY THROUGH ENVIRONMENTAL INTERACTION
+
+**From Zelda — Boss Distractions (Bottles, Fishing Poles, Bug Nets):**
+
+Zelda bosses can be distracted by mundane items — bottles, fishing poles, bug nets. This creates emergent humor, rewards experimentation, and makes enemies feel like living creatures with quirks rather than HP bags.
+
+**For Genesis:**
+- **Giant Lizard** — only aggressive when EVE is deployed (glowing light = threat display). Stow EVE = it calms down. Creates tactical choice: scan it with EVE at risk, or fight blind
+- **Poison Moth** — attracted to specific armor type/material. Wear it to lure the moth into traps. Or remove it to make the moth lose interest
+- **Wolf** — throw a stick, it chases. Not every enemy needs to be killed. Some can be befriended, distracted, or redirected
+- **Crawlers** — already have swarm/latch behaviors. Could add: certain plants repel them (craftable repellent?), fire scatters them
+- **General principle:** Every major enemy should have at least one non-combat interaction. Rewards observation and experimentation over brute force. Connects to EVE scanning — scan reveals behavioral quirks, not just weaknesses
+
 ---
 
 *These aren't rules to follow rigidly. They're lenses to evaluate every design decision through. When in doubt: Does this serve a Core pillar? Does it have a unique silhouette? Does it deepen the mystery? Does it reward mastery? Does it preserve soul? Does it serve the story spine?*

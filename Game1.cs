@@ -218,6 +218,19 @@ public class Game1 : Game
         _eveMessageTimer = duration;
     }
 
+    // --- Weather system ---
+    private bool _weatherRain;
+    private bool _weatherStorm;
+    private bool _weatherWind;
+    private float _windDir = 1f; // 1 = right, -1 = left
+    private float _windStrength = 40f;
+    private float _lightningTimer;
+    private float _lightningFlash;
+    private struct RainDrop { public float X, Y, Speed, Length; }
+    private List<RainDrop> _rainDrops = new();
+    private struct Cloud { public float X, Y, W, H, Speed, Opacity; }
+    private List<Cloud> _clouds = new();
+
     // EVE Scan System
     private Dictionary<string, int> _scanProgress = new(); // "crawler" -> scan count (0-3)
     private float _scanTimer;
@@ -371,6 +384,8 @@ public class Game1 : Game
         _itemPickups.Clear();
         _destroyedBreakables.Clear();
         _activatedSwitches.Clear();
+        _weatherRain = false; _weatherStorm = false; _weatherWind = false;
+        _rainDrops.Clear(); _clouds.Clear(); _lightningFlash = 0;
         foreach (var item in _level.Items)
         {
             bool alreadyCollected = _saveData?.CollectedItems?.Contains(item.Id) == true;
@@ -1636,6 +1651,9 @@ public class Game1 : Game
             LogDeath();
         }
 
+        // --- Weather update ---
+        UpdateWeather(dt);
+
         // Update particles (outside hitstop so they animate during freeze)
         for (int i = _particles.Count - 1; i >= 0; i--)
         {
@@ -1802,16 +1820,38 @@ public class Game1 : Game
             var pRect = new Rectangle((int)_player.Position.X - 10, (int)_player.Position.Y, Player.Width + 20, Player.Height);
             foreach (var sw in _level.Switches)
             {
-                if (_activatedSwitches.Contains(sw.Id)) continue;
+                bool isToggle = sw.Action.StartsWith("toggle-");
+                if (!isToggle && _activatedSwitches.Contains(sw.Id)) continue;
                 var swRect = new Rectangle((int)sw.X, (int)sw.Y, sw.W, sw.H);
                 if (pRect.Intersects(swRect))
                 {
-                    _activatedSwitches.Add(sw.Id);
+                    if (!isToggle) _activatedSwitches.Add(sw.Id);
                     // Execute switch action
                     switch (sw.Action)
                     {
                         case "unfreeze-crawlers":
                             foreach (var c in _crawlers) c.Frozen = false;
+                            break;
+                        case "toggle-rain":
+                            _weatherRain = !_weatherRain;
+                            if (!_weatherRain) _weatherStorm = false;
+                            if (_eveOrbActive) EveAlert(_weatherRain ? "Atmospheric moisture detected. Rain incoming." : "Rain subsiding.", 2.5f);
+                            break;
+                        case "toggle-storm":
+                            _weatherStorm = !_weatherStorm;
+                            if (_weatherStorm) _weatherRain = true;
+                            if (_eveOrbActive) EveAlert(_weatherStorm ? "Electrical storm detected! Seek shelter!" : "Storm clearing.", 2.5f);
+                            break;
+                        case "toggle-wind":
+                            _weatherWind = !_weatherWind;
+                            if (_eveOrbActive) EveAlert(_weatherWind ? "High wind advisory. Watch your footing." : "Wind died down.", 2.5f);
+                            break;
+                        case "toggle-all-weather":
+                            bool allOn = _weatherRain && _weatherStorm && _weatherWind;
+                            _weatherRain = !allOn;
+                            _weatherStorm = !allOn;
+                            _weatherWind = !allOn;
+                            if (_eveOrbActive) EveAlert(!allOn ? "Full atmospheric event! Incredible!" : "Systems normalizing.", 3f);
                             break;
                     }
                     // Screen shake + particles for feedback
@@ -5194,130 +5234,311 @@ public class Game1 : Game
     }
 
     /// <summary>Draw a slope tile as a filled shape (scanline).</summary>
-    /// <summary>Draw an animated liquid tile (water, lava, acid). Uses layered sine waves for surface + bubbles.</summary>
+    // ===================== WEATHER SYSTEM =====================
+    private void UpdateWeather(float dt)
+    {
+        // Clouds
+        if (_weatherRain || _weatherStorm)
+        {
+            // Spawn clouds if needed
+            while (_clouds.Count < 8)
+            {
+                float cx = _rng.Next((int)_level.Bounds.Left - 200, (int)_level.Bounds.Right + 200);
+                float cy = _level.Bounds.Top + _rng.Next(20, 80);
+                _clouds.Add(new Cloud
+                {
+                    X = cx, Y = cy,
+                    W = 80 + _rng.Next(120),
+                    H = 20 + _rng.Next(15),
+                    Speed = 10 + (float)_rng.NextDouble() * 20f,
+                    Opacity = 0.3f + (float)_rng.NextDouble() * 0.4f
+                });
+            }
+            // Move clouds
+            for (int i = 0; i < _clouds.Count; i++)
+            {
+                var c = _clouds[i];
+                float windPush = _weatherWind ? _windDir * _windStrength * 0.5f : 0;
+                c.X += (c.Speed + windPush) * dt;
+                if (c.X > _level.Bounds.Right + 300) c.X = _level.Bounds.Left - 300;
+                if (c.X < _level.Bounds.Left - 300) c.X = _level.Bounds.Right + 300;
+                _clouds[i] = c;
+            }
+        }
+        else
+        {
+            _clouds.Clear();
+        }
+
+        // Rain drops
+        if (_weatherRain)
+        {
+            // Spawn rain
+            int spawnCount = _weatherStorm ? 12 : 5;
+            float camLeft = _player.Position.X - ViewW / 2f - 50;
+            float camRight = _player.Position.X + ViewW / 2f + 50;
+            float camTop = _player.Position.Y - ViewH / 2f - 20;
+            for (int i = 0; i < spawnCount; i++)
+            {
+                _rainDrops.Add(new RainDrop
+                {
+                    X = camLeft + (float)_rng.NextDouble() * (camRight - camLeft),
+                    Y = camTop,
+                    Speed = 300 + (float)_rng.NextDouble() * 200f,
+                    Length = 4 + (float)_rng.NextDouble() * 8f
+                });
+            }
+
+            // Update drops
+            float windPush = _weatherWind ? _windDir * _windStrength : 0;
+            for (int i = _rainDrops.Count - 1; i >= 0; i--)
+            {
+                var d = _rainDrops[i];
+                d.Y += d.Speed * dt;
+                d.X += windPush * dt;
+                _rainDrops[i] = d;
+
+                // Remove if below floor or too many
+                if (d.Y > _level.Floor.Y + 20)
+                {
+                    // Splash particle on impact
+                    if (_dustParticlesEnabled && _rng.NextDouble() < 0.3)
+                    {
+                        _particles.Add(new Particle
+                        {
+                            Position = new Vector2(d.X, _level.Floor.Y),
+                            Velocity = new Vector2((float)(_rng.NextDouble() * 30 - 15), -(float)(_rng.NextDouble() * 40)),
+                            Life = 0.2f,
+                            Color = new Color(100, 140, 180) * 0.6f
+                        });
+                    }
+                    _rainDrops.RemoveAt(i);
+                }
+            }
+            // Cap
+            if (_rainDrops.Count > 600) _rainDrops.RemoveRange(0, _rainDrops.Count - 600);
+        }
+        else
+        {
+            _rainDrops.Clear();
+        }
+
+        // Lightning
+        if (_weatherStorm)
+        {
+            _lightningTimer -= dt;
+            if (_lightningTimer <= 0)
+            {
+                _lightningTimer = 2f + (float)_rng.NextDouble() * 5f;
+                _lightningFlash = 0.3f;
+                if (_screenShakeEnabled) { _shakeTimer = 0.2f; _shakeIntensity = 4f; }
+            }
+            if (_lightningFlash > 0) _lightningFlash -= dt * 2f;
+        }
+        else
+        {
+            _lightningFlash = 0;
+        }
+    }
+
+    private void DrawWeather()
+    {
+        // Clouds (behind everything, drawn in world space)
+        foreach (var c in _clouds)
+        {
+            float alpha = c.Opacity * (_weatherStorm ? 0.7f : 0.4f);
+            var cloudColor = _weatherStorm ? new Color(40, 40, 50) : new Color(160, 170, 180);
+            // Cloud body (layered rects for puffy shape)
+            _spriteBatch.Draw(_pixel, new Rectangle((int)c.X, (int)c.Y, (int)c.W, (int)c.H), cloudColor * alpha);
+            _spriteBatch.Draw(_pixel, new Rectangle((int)(c.X + c.W * 0.1f), (int)(c.Y - c.H * 0.3f), (int)(c.W * 0.8f), (int)(c.H * 0.5f)), cloudColor * (alpha * 0.8f));
+            _spriteBatch.Draw(_pixel, new Rectangle((int)(c.X + c.W * 0.25f), (int)(c.Y - c.H * 0.5f), (int)(c.W * 0.5f), (int)(c.H * 0.4f)), cloudColor * (alpha * 0.6f));
+        }
+
+        // Rain drops
+        float windAngle = _weatherWind ? _windDir * 0.15f : 0;
+        var rainColor = _weatherStorm ? new Color(150, 170, 200) * 0.7f : new Color(120, 150, 200) * 0.5f;
+        foreach (var d in _rainDrops)
+        {
+            float endX = d.X + windAngle * d.Length;
+            // Draw as a thin line (1px wide rect angled via two small rects)
+            _spriteBatch.Draw(_pixel, new Rectangle((int)d.X, (int)d.Y, 1, (int)d.Length), rainColor);
+        }
+    }
+
+    private void DrawWeatherOverlay()
+    {
+        // Lightning flash (screen-space overlay)
+        if (_lightningFlash > 0)
+        {
+            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), Color.White * (_lightningFlash * 0.6f));
+        }
+
+        // Ambient darkening during storms
+        if (_weatherStorm)
+        {
+            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), Color.Black * 0.15f);
+        }
+        else if (_weatherRain)
+        {
+            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), Color.Black * 0.05f);
+        }
+    }
+
+    /// <summary>Draw an animated liquid tile (water, lava, acid). Uses Voronoi cellular noise for caustic light patterns.</summary>
     private void DrawLiquidTile(int wx, int wy, int ts, TileType tile, TileGrid tg, int tx, int ty)
     {
         float t = _totalTime;
-        Color baseColor, deepColor, surfaceColor, bubbleColor;
+        Color baseColor, deepColor, ridgeColor, surfaceColor;
         float speed, waveAmp;
 
         switch (tile)
         {
             case TileType.Lava:
                 baseColor = new Color(180, 50, 10);
-                deepColor = new Color(120, 20, 5);
+                deepColor = new Color(80, 15, 5);
+                ridgeColor = new Color(255, 200, 60);
                 surfaceColor = new Color(255, 180, 40);
-                bubbleColor = new Color(255, 220, 80);
                 speed = 1.8f;
                 waveAmp = 4f;
                 break;
             case TileType.Acid:
                 baseColor = new Color(40, 160, 30);
-                deepColor = new Color(20, 100, 15);
+                deepColor = new Color(15, 60, 10);
+                ridgeColor = new Color(140, 255, 100);
                 surfaceColor = new Color(120, 255, 80);
-                bubbleColor = new Color(160, 255, 120);
                 speed = 1.2f;
                 waveAmp = 3f;
                 break;
             default: // Water
-                baseColor = new Color(20, 60, 140);
-                deepColor = new Color(10, 30, 80);
+                baseColor = new Color(25, 55, 80);
+                deepColor = new Color(10, 25, 45);
+                ridgeColor = new Color(160, 170, 100); // golden-green caustic ridges like reference
                 surfaceColor = new Color(80, 160, 255);
-                bubbleColor = new Color(140, 200, 255);
-                speed = 0.8f;
+                speed = 0.6f;
                 waveAmp = 3f;
                 break;
         }
 
         // Check if this is a surface tile (no liquid directly above)
         bool isSurface = ty == 0 || !TileProperties.IsLiquid(tg.GetTileAt(tx, ty - 1));
-        // Check depth (how many liquid tiles above)
         int depth = 0;
         for (int checkY = ty - 1; checkY >= 0; checkY--)
         {
             if (TileProperties.IsLiquid(tg.GetTileAt(tx, checkY))) depth++;
             else break;
         }
+        float depthFactor = MathHelper.Clamp(1f - depth * 0.12f, 0.35f, 1f);
 
-        // Darken with depth
-        float depthFactor = MathHelper.Clamp(1f - depth * 0.15f, 0.4f, 1f);
-        var bodyColor = new Color(
-            (int)(MathHelper.Lerp(deepColor.R, baseColor.R, depthFactor)),
-            (int)(MathHelper.Lerp(deepColor.G, baseColor.G, depthFactor)),
-            (int)(MathHelper.Lerp(deepColor.B, baseColor.B, depthFactor)));
+        // Voronoi caustic noise — compute at 2px resolution for performance
+        int step = 2;
+        int bodyStartY = isSurface ? 8 : 0; // leave room for surface wave
 
         if (isSurface)
         {
-            // Draw animated surface with sine wave
-            // Two overlapping waves for complexity
+            // Draw animated surface wave
             for (int px = 0; px < ts; px++)
             {
                 float worldX = wx + px;
                 float wave1 = MathF.Sin((worldX * 0.08f + t * speed)) * waveAmp;
                 float wave2 = MathF.Sin((worldX * 0.13f + t * speed * 0.7f + 1.5f)) * (waveAmp * 0.5f);
                 int surfaceOffset = (int)(wave1 + wave2);
-
-                // Surface highlight (top 2-3 pixels of wave)
-                int surfY = wy + 6 + surfaceOffset; // 6px down from top to allow wave crest room
+                int surfY = wy + 6 + surfaceOffset;
                 if (surfY < wy) surfY = wy;
 
-                // Sky/empty above surface
-                // Don't draw anything above surfY
-
-                // Surface highlight line
                 if (surfY >= wy && surfY < wy + ts)
                 {
                     _spriteBatch.Draw(_pixel, new Rectangle(wx + px, surfY, 1, 2), surfaceColor * 0.9f);
-                    // Specular glint
                     float glint = MathF.Sin(worldX * 0.2f + t * speed * 2f);
                     if (glint > 0.7f)
                         _spriteBatch.Draw(_pixel, new Rectangle(wx + px, surfY, 1, 1), Color.White * (glint - 0.5f));
                 }
 
-                // Body below surface
-                int bodyStart = Math.Max(surfY + 2, wy);
-                int bodyHeight = (wy + ts) - bodyStart;
-                if (bodyHeight > 0)
-                    _spriteBatch.Draw(_pixel, new Rectangle(wx + px, bodyStart, 1, bodyHeight), bodyColor * 0.85f);
+                // Body fill below surface
+                int bodyTop = Math.Max(surfY + 2, wy);
+                int bodyH = (wy + ts) - bodyTop;
+                if (bodyH > 0)
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx + px, bodyTop, 1, bodyH), deepColor * depthFactor);
             }
+            bodyStartY = 10; // caustics start below surface
         }
         else
         {
-            // Subsurface body — subtle horizontal color variation
-            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, ts), bodyColor * 0.85f);
+            // Full body fill
+            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, ts), deepColor * depthFactor);
+        }
 
-            // Subtle caustic pattern (moving light patches)
-            for (int px = 0; px < ts; px += 4)
+        // Voronoi caustics over body area
+        // Use ~8 seed points per tile neighborhood, animated over time
+        float cellScale = 0.09f; // controls cell size
+        float timeScale = speed * 0.4f;
+
+        for (int py = bodyStartY; py < ts; py += step)
+        {
+            for (int px = 0; px < ts; px += step)
             {
-                float worldX = wx + px;
-                float caustic = MathF.Sin(worldX * 0.15f + t * speed * 0.5f) *
-                                MathF.Sin((wy + 16) * 0.12f + t * speed * 0.3f);
-                if (caustic > 0.3f)
+                float worldX = (wx + px) * cellScale;
+                float worldY = (wy + py) * cellScale;
+
+                // Animated Voronoi: check 3x3 grid of cells
+                float d1 = 999f, d2 = 999f;
+                int cellX = (int)MathF.Floor(worldX);
+                int cellY = (int)MathF.Floor(worldY);
+
+                for (int cy = -1; cy <= 1; cy++)
                 {
-                    int cw = (int)(4 + caustic * 4);
-                    _spriteBatch.Draw(_pixel, new Rectangle(wx + px, wy + (int)(MathF.Sin(worldX * 0.1f) * 8 + 16), cw, 2),
-                        surfaceColor * (caustic * 0.25f));
+                    for (int cx = -1; cx <= 1; cx++)
+                    {
+                        int cxi = cellX + cx;
+                        int cyi = cellY + cy;
+                        // Hash-based seed point per cell (animated)
+                        float hash1 = ((cxi * 127 + cyi * 311) & 0xFFFF) / 65536f;
+                        float hash2 = ((cxi * 269 + cyi * 173) & 0xFFFF) / 65536f;
+                        float seedX = cxi + hash1 + MathF.Sin(t * timeScale + hash1 * 6.28f) * 0.35f;
+                        float seedY = cyi + hash2 + MathF.Cos(t * timeScale * 0.8f + hash2 * 6.28f) * 0.35f;
+
+                        float dx = worldX - seedX;
+                        float dy = worldY - seedY;
+                        float dist = MathF.Sqrt(dx * dx + dy * dy);
+
+                        if (dist < d1) { d2 = d1; d1 = dist; }
+                        else if (dist < d2) { d2 = dist; }
+                    }
+                }
+
+                // Ridge = edge between cells (where d2 - d1 is small)
+                float ridge = d2 - d1;
+                // Sharpen the ridge
+                float ridgeBrightness = MathHelper.Clamp(1f - ridge * 3.5f, 0f, 1f);
+                ridgeBrightness *= ridgeBrightness; // quadratic falloff for sharper ridges
+
+                if (ridgeBrightness > 0.05f)
+                {
+                    var causticColor = new Color(
+                        (int)(ridgeColor.R * ridgeBrightness * depthFactor),
+                        (int)(ridgeColor.G * ridgeBrightness * depthFactor),
+                        (int)(ridgeColor.B * ridgeBrightness * depthFactor));
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx + px, wy + py, step, step), causticColor);
                 }
             }
         }
 
-        // Animated bubbles (both surface and body tiles)
-        // Use tile position as seed for consistent bubble placement
-        int seed = tx * 7919 + ty * 104729;
-        for (int b = 0; b < 3; b++)
+        // Subtle bubbles for lava/acid only
+        if (tile != TileType.Water)
         {
-            int bseed = seed + b * 31337;
-            float bx = (bseed % ts);
-            float byBase = (bseed / ts) % ts;
-            // Bubbles rise over time
-            float byOffset = ((t * speed * 15f + bseed * 0.01f) % (ts + 8)) - 4;
-            float by = wy + ts - byOffset;
-            if (by >= wy && by < wy + ts - 2)
+            int seed = tx * 7919 + ty * 104729;
+            for (int b = 0; b < 3; b++)
             {
-                int bsize = 1 + (bseed % 3);
-                float wobble = MathF.Sin(t * 3f + bseed) * 2f;
-                _spriteBatch.Draw(_pixel, new Rectangle(wx + (int)(bx + wobble), (int)by, bsize, bsize),
-                    bubbleColor * (0.3f + (bseed % 4) * 0.1f));
+                int bseed = seed + b * 31337;
+                float bx = (bseed % ts);
+                float byOffset = ((t * speed * 15f + bseed * 0.01f) % (ts + 8)) - 4;
+                float by = wy + ts - byOffset;
+                if (by >= wy && by < wy + ts - 2)
+                {
+                    int bsize = 1 + (bseed % 3);
+                    float wobble = MathF.Sin(t * 3f + bseed) * 2f;
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx + (int)(bx + wobble), (int)by, bsize, bsize),
+                        ridgeColor * (0.3f + (bseed % 4) * 0.1f));
+                }
             }
         }
 
@@ -5328,7 +5549,6 @@ public class Game1 : Game
             _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 2, ts), deepColor * 0.5f);
         if (!rightLiquid)
             _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 2, wy, 2, ts), deepColor * 0.5f);
-        // Bottom edge if no liquid below
         bool belowLiquid = ty < tg.Height - 1 && TileProperties.IsLiquid(tg.GetTileAt(tx, ty + 1));
         if (!belowLiquid)
             _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 2, ts, 2), deepColor * 0.6f);
@@ -6080,6 +6300,9 @@ public class Game1 : Game
             _spriteBatch.Draw(_pixel, new Rectangle(ledge.X, ledge.Y, ledge.Width, 2), new Color(100, 100, 100));
         }
 
+        // Draw weather (clouds + rain in world space, behind tiles)
+        DrawWeather();
+
         // Draw tile grid (gameplay) — after all legacy geometry so tile colors aren't covered
         if (_level.TileGridInstance != null)
         {
@@ -6231,18 +6454,27 @@ public class Game1 : Game
         // Draw switches
         foreach (var sw in _level.Switches)
         {
+            bool isToggle = sw.Action.StartsWith("toggle-");
             bool activated = _activatedSwitches.Contains(sw.Id);
-            var swColor = activated ? new Color(60, 60, 60) : new Color(200, 180, 50);
+            // For toggle switches, check current weather state
+            bool isOn = isToggle ? (sw.Action switch {
+                "toggle-rain" => _weatherRain,
+                "toggle-storm" => _weatherStorm,
+                "toggle-wind" => _weatherWind,
+                "toggle-all-weather" => _weatherRain && _weatherStorm && _weatherWind,
+                _ => activated
+            }) : activated;
+            var swColor = isOn ? new Color(50, 180, 50) : new Color(200, 180, 50);
+            if (!isToggle && activated) swColor = new Color(60, 60, 60);
             // Draw switch body
             _spriteBatch.Draw(_pixel, new Rectangle((int)sw.X, (int)sw.Y, sw.W, sw.H), swColor);
             // Draw lever/handle
-            int handleY = activated ? (int)sw.Y + sw.H - 6 : (int)sw.Y + 2;
-            _spriteBatch.Draw(_pixel, new Rectangle((int)sw.X + 2, handleY, sw.W - 4, 4), activated ? Color.Gray : Color.White);
+            int handleY = isOn ? (int)sw.Y + sw.H - 6 : (int)sw.Y + 2;
+            _spriteBatch.Draw(_pixel, new Rectangle((int)sw.X + 2, handleY, sw.W - 4, 4), isOn ? Color.Gray : Color.White);
             // Draw label above
             if (!string.IsNullOrEmpty(sw.Label))
-                DrawOutlinedString(_fontSmall, sw.Label, new Vector2(sw.X - 20, sw.Y - 16), activated ? Color.Gray : Color.Yellow);
-            // Draw "W" prompt when player is near and not activated
-            if (!activated)
+                DrawOutlinedString(_fontSmall, sw.Label, new Vector2(sw.X - 20, sw.Y - 16), isOn ? new Color(100, 200, 100) : Color.Yellow);
+            // Draw "W" prompt when player is near
             {
                 float dist = Math.Abs(_player.Position.X + Player.Width / 2f - (sw.X + sw.W / 2f));
                 if (dist < 60)
@@ -6475,6 +6707,9 @@ public class Game1 : Game
 
         // --- UI rendering (no camera transform, screen-space) ---
         _spriteBatch.Begin();
+
+        // Weather overlay (lightning flash, ambient darkening)
+        DrawWeatherOverlay();
 
         // Death overlay
         if (_isDead)
