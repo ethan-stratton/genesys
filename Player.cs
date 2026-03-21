@@ -618,7 +618,7 @@ public class Player
 
         // --- Wall attachment check ---
         _wallHopCooldown -= dt;
-        if (!IsOnWall && !IsOnRope && walls != null && !IsSliding && _wallHopCooldown <= 0f)
+        if (!IsOnWall && !IsOnRope && walls != null && !IsSliding && !IsVaultKicking && _wallHopCooldown <= 0f)
         {
             float playerCenterY = Position.Y + Height / 2f;
             bool nearAnyWall = false;
@@ -1196,6 +1196,7 @@ public class Player
             if (_vaultKickTimer <= 0)
             {
                 IsVaultKicking = false;
+                IsCrouching = false;
                 vel.X = _vaultKickDir * Speed; // return to normal speed
             }
         }
@@ -1729,6 +1730,10 @@ public class Player
                     else
                         pos.X = w.Right - CollisionOffsetX;
                     vel.X = 0;
+                    // Cancel momentum-based moves on wall impact
+                    if (IsVaultKicking) { IsVaultKicking = false; IsCrouching = false; }
+                    if (IsDashing) IsDashing = false;
+                    if (IsBladeDashing) IsBladeDashing = false;
                 }
             }
         }

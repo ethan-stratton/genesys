@@ -5341,6 +5341,55 @@ public class Game1 : Game
         }
     }
 
+    /// <summary>Draw outline that follows the slope diagonal edge instead of a box.</summary>
+    private void DrawSlopeOutline(int wx, int wy, int ts, TileType tile, Color outlineColor)
+    {
+        // Draw the diagonal edge + solid edges (bottom, sides where solid)
+        for (int row = 0; row < ts; row++)
+        {
+            int edgeX;
+            switch (tile)
+            {
+                case TileType.SlopeUpRight: // ╱ bottom-left to top-right
+                    edgeX = wx + (ts - 1 - row);
+                    _spriteBatch.Draw(_pixel, new Rectangle(edgeX, wy + row, 1, 1), outlineColor);
+                    break;
+                case TileType.SlopeUpLeft: // ╲ top-left to bottom-right
+                    edgeX = wx + row;
+                    _spriteBatch.Draw(_pixel, new Rectangle(edgeX, wy + row, 1, 1), outlineColor);
+                    break;
+                case TileType.SlopeCeilRight:
+                    edgeX = wx + row;
+                    _spriteBatch.Draw(_pixel, new Rectangle(edgeX, wy + row, 1, 1), outlineColor);
+                    break;
+                case TileType.SlopeCeilLeft:
+                    edgeX = wx + (ts - 1 - row);
+                    _spriteBatch.Draw(_pixel, new Rectangle(edgeX, wy + row, 1, 1), outlineColor);
+                    break;
+                default:
+                    // For gentle/shaved slopes, just draw bottom + vertical edges
+                    break;
+            }
+        }
+        // Bottom edge (always solid for floor slopes)
+        if (tile == TileType.SlopeUpRight || tile == TileType.SlopeUpLeft ||
+            tile == TileType.GentleUpRight || tile == TileType.GentleUpLeft)
+        {
+            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), outlineColor);
+        }
+        // Top edge for ceiling slopes
+        if (tile == TileType.SlopeCeilRight || tile == TileType.SlopeCeilLeft ||
+            tile == TileType.GentleCeilRight || tile == TileType.GentleCeilLeft)
+        {
+            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), outlineColor);
+        }
+        // Vertical edges where the slope meets solid ground
+        if (tile == TileType.SlopeUpRight || tile == TileType.SlopeCeilLeft)
+            _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts), outlineColor); // right edge
+        if (tile == TileType.SlopeUpLeft || tile == TileType.SlopeCeilRight)
+            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts), outlineColor); // left edge
+    }
+
     /// <summary>Draw a spike tile (triangular spikes pointing in a direction).</summary>
     private void DrawSpikeTile(int wx, int wy, int ts, TileType tile, Color color)
     {
@@ -5671,16 +5720,27 @@ public class Game1 : Game
                         DrawSlopeTile(wx, wy, tg.TileSize, tile, isDebugLevel ? new Color(100, 60, 120) : color);
                         if (isDebugLevel)
                         {
+                            // Draw slope edge outline following the diagonal (not a box)
                             var gridColor = new Color(160, 130, 80);
-                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 1), gridColor);
-                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + tg.TileSize - 1, tg.TileSize, 1), gridColor);
-                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, tg.TileSize), gridColor);
-                            _spriteBatch.Draw(_pixel, new Rectangle(wx + tg.TileSize - 1, wy, 1, tg.TileSize), gridColor);
+                            DrawSlopeOutline(wx, wy, tg.TileSize, tile, gridColor);
                         }
                     }
                     else if (TileProperties.IsLiquid(tile))
                     {
                         DrawLiquidTile(wx, wy, tg.TileSize, tile, tg, tx, ty);
+                    }
+                    else if (TileProperties.IsEffectTile(tile) || tile == TileType.Breakable)
+                    {
+                        // Effect tiles keep their distinct colored appearance in all levels
+                        int tsE = tg.TileSize;
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tsE, tsE), color * 0.4f);
+                        var bright = new Color(
+                            Math.Min(255, color.R + 80), Math.Min(255, color.G + 80), Math.Min(255, color.B + 80));
+                        var border = bright * 0.7f;
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tsE, 1), border);
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + tsE - 1, tsE, 1), border);
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, tsE), border);
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx + tsE - 1, wy, 1, tsE), border);
                     }
                     else
                     {
