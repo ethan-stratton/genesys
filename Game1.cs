@@ -5341,27 +5341,23 @@ public class Game1 : Game
         }
     }
 
-    /// <summary>Draw outline that follows the slope diagonal edge instead of a box.</summary>
-    private void DrawSlopeOutline(int wx, int wy, int ts, TileType tile, Color outlineColor)
+    /// <summary>Draw 3D-bevel outline tracing only the filled area of the slope.</summary>
+    private void DrawSlopeOutline(int wx, int wy, int ts, TileType tile, Color lightColor, Color darkColor)
     {
-        // Draw the diagonal edge pixel by pixel (2px thick)
+        // Draw diagonal edge: use light color for top-facing diagonals, dark for bottom-facing
+        bool diagIsTop = tile == TileType.SlopeUpRight || tile == TileType.SlopeUpLeft ||
+                         tile == TileType.GentleUpRight || tile == TileType.GentleUpLeft;
+        var diagColor = diagIsTop ? lightColor : darkColor;
+
         for (int row = 0; row < ts; row++)
         {
             int edgeX = -1;
             switch (tile)
             {
-                case TileType.SlopeUpRight:
-                    edgeX = wx + (ts - 1 - row);
-                    break;
-                case TileType.SlopeUpLeft:
-                    edgeX = wx + row;
-                    break;
-                case TileType.SlopeCeilRight:
-                    edgeX = wx + row;
-                    break;
-                case TileType.SlopeCeilLeft:
-                    edgeX = wx + (ts - 1 - row);
-                    break;
+                case TileType.SlopeUpRight: edgeX = wx + (ts - 1 - row); break;
+                case TileType.SlopeUpLeft: edgeX = wx + row; break;
+                case TileType.SlopeCeilRight: edgeX = wx + row; break;
+                case TileType.SlopeCeilLeft: edgeX = wx + (ts - 1 - row); break;
                 case TileType.GentleUpRight:
                     if (row >= ts / 2) edgeX = wx + (int)((ts - row) * 2f);
                     break;
@@ -5376,30 +5372,37 @@ public class Game1 : Game
                     break;
             }
             if (edgeX >= wx && edgeX < wx + ts)
-            {
-                _spriteBatch.Draw(_pixel, new Rectangle(edgeX, wy + row, 2, 2), outlineColor);
-            }
+                _spriteBatch.Draw(_pixel, new Rectangle(edgeX, wy + row, 1, 1), diagColor);
         }
 
-        // Solid edges (2px thick to match grid)
-        bool isFloorSlope = tile == TileType.SlopeUpRight || tile == TileType.SlopeUpLeft ||
-                            tile == TileType.GentleUpRight || tile == TileType.GentleUpLeft ||
-                            tile == TileType.ShavedRight || tile == TileType.ShavedLeft;
-        bool isCeilSlope = tile == TileType.SlopeCeilRight || tile == TileType.SlopeCeilLeft ||
-                           tile == TileType.GentleCeilRight || tile == TileType.GentleCeilLeft ||
-                           tile == TileType.ShavedCeilRight || tile == TileType.ShavedCeilLeft;
+        // Bottom edge (dark) — only for floor slopes, traces the full bottom
+        if (tile == TileType.SlopeUpRight || tile == TileType.SlopeUpLeft ||
+            tile == TileType.GentleUpRight || tile == TileType.GentleUpLeft)
+            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), darkColor);
 
-        if (isFloorSlope)
-            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 2, ts, 2), outlineColor);
-        if (isCeilSlope)
-            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 2), outlineColor);
+        // Top edge (light) — only for ceiling slopes
+        if (tile == TileType.SlopeCeilRight || tile == TileType.SlopeCeilLeft ||
+            tile == TileType.GentleCeilRight || tile == TileType.GentleCeilLeft)
+            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), lightColor);
 
-        if (tile == TileType.SlopeUpRight || tile == TileType.SlopeCeilLeft ||
-            tile == TileType.GentleUpRight || tile == TileType.GentleCeilLeft)
-            _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 2, wy, 2, ts), outlineColor);
-        if (tile == TileType.SlopeUpLeft || tile == TileType.SlopeCeilRight ||
-            tile == TileType.GentleUpLeft || tile == TileType.GentleCeilRight)
-            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 2, ts), outlineColor);
+        // Vertical edges — only on the TALL side where the slope meets full height
+        // SlopeUpRight: tall side is RIGHT (dark), SlopeUpLeft: tall side is LEFT (light)
+        // SlopeCeilRight: tall side is RIGHT (dark), SlopeCeilLeft: tall side is LEFT (light)
+        switch (tile)
+        {
+            case TileType.SlopeUpRight:
+            case TileType.SlopeCeilRight:
+            case TileType.GentleUpRight:
+            case TileType.GentleCeilRight:
+                _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts), darkColor);
+                break;
+            case TileType.SlopeUpLeft:
+            case TileType.SlopeCeilLeft:
+            case TileType.GentleUpLeft:
+            case TileType.GentleCeilLeft:
+                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts), lightColor);
+                break;
+        }
     }
 
     /// <summary>Draw a spike tile (triangular spikes pointing in a direction).</summary>
@@ -5605,8 +5608,8 @@ public class Game1 : Game
             }
         }
 
-        _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, floorH), isDebugLevel ? new Color(75, 65, 85) : new Color(40, 40, 40));
-        _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, 2), isDebugLevel ? Color.Black : new Color(80, 80, 80));
+        _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, floorH), isDebugLevel ? new Color(140, 80, 160) : new Color(40, 40, 40));
+        _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, 1), isDebugLevel ? new Color(190, 160, 100) : new Color(80, 80, 80));
 
         // Draw platforms
         foreach (var plat in _level.PlatformRects)
@@ -5729,10 +5732,10 @@ public class Game1 : Game
                     }
                     else if (TileProperties.IsSlope(tile))
                     {
-                        DrawSlopeTile(wx, wy, tg.TileSize, tile, isDebugLevel ? new Color(75, 65, 85) : color);
+                        DrawSlopeTile(wx, wy, tg.TileSize, tile, isDebugLevel ? new Color(140, 80, 160) : color);
                         if (isDebugLevel)
                         {
-                            DrawSlopeOutline(wx, wy, tg.TileSize, tile, Color.Black);
+                            DrawSlopeOutline(wx, wy, tg.TileSize, tile, new Color(190, 160, 100), new Color(80, 60, 30));
                         }
                     }
                     else if (TileProperties.IsLiquid(tile))
@@ -5756,29 +5759,26 @@ public class Game1 : Game
                     {
                         if (isDebugLevel)
                         {
-                            // SotN-style debug tiles: stone-grey purple fill, black grid lines, inner bevel
+                            // SotN-style debug tiles: vibrant purple fill, gold 3D-bevel grid
                             int ts3 = tg.TileSize;
-                            // Shade variation per tile (seeded by position for stone-block feel)
-                            int shade = ((tx * 7 + ty * 13) % 7) - 3; // -3 to +3
+                            // Subtle shade variation per tile
+                            int shade = ((tx * 7 + ty * 13) % 5) - 2; // -2 to +2
                             var tileColor = new Color(
-                                Math.Clamp(75 + shade * 4, 60, 90),
-                                Math.Clamp(65 + shade * 3, 52, 78),
-                                Math.Clamp(85 + shade * 5, 70, 100));
+                                Math.Clamp(140 + shade * 5, 125, 155),
+                                Math.Clamp(80 + shade * 3, 68, 92),
+                                Math.Clamp(160 + shade * 6, 145, 175));
                             _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts3, ts3), tileColor);
-                            // Inner highlight (top + left edges — stone bevel)
-                            var highlight = new Color(110, 100, 125);
-                            _spriteBatch.Draw(_pixel, new Rectangle(wx + 2, wy + 2, ts3 - 4, 1), highlight * 0.6f);
-                            _spriteBatch.Draw(_pixel, new Rectangle(wx + 2, wy + 2, 1, ts3 - 4), highlight * 0.6f);
-                            // Inner shadow (bottom + right edges)
-                            var shadow = new Color(35, 30, 45);
-                            _spriteBatch.Draw(_pixel, new Rectangle(wx + 2, wy + ts3 - 3, ts3 - 4, 1), shadow * 0.8f);
-                            _spriteBatch.Draw(_pixel, new Rectangle(wx + ts3 - 3, wy + 2, 1, ts3 - 4), shadow * 0.8f);
-                            // Black grid border (2px thick like SotN)
-                            var gridColor = Color.Black;
-                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts3, 2), gridColor);
-                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts3 - 2, ts3, 2), gridColor);
-                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 2, ts3), gridColor);
-                            _spriteBatch.Draw(_pixel, new Rectangle(wx + ts3 - 2, wy, 2, ts3), gridColor);
+                            // 3D bevel: light gold top-left, dark bottom-right
+                            var lightGold = new Color(190, 160, 100);
+                            var darkGold = new Color(80, 60, 30);
+                            // Top edge (light)
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts3, 1), lightGold);
+                            // Left edge (light)
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts3), lightGold);
+                            // Bottom edge (dark)
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts3 - 1, ts3, 1), darkGold);
+                            // Right edge (dark)
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx + ts3 - 1, wy, 1, ts3), darkGold);
                         }
                         else
                         {
