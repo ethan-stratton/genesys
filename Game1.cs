@@ -511,16 +511,15 @@ public class Game1 : Game
         _pixel = new Texture2D(GraphicsDevice, 1, 1);
         _pixel.SetData(new[] { Color.White });
 
-        // Load parallax background layers
-        // Load from Content/backgrounds/Nature Landscapes Free Pixel Art/nature_5/ (layers 1-5, back to front)
-        var layers = new List<Texture2D>();
-        string bgDir = "Content/backgrounds/Nature Landscapes Free Pixel Art/nature_5";
-        for (int i = 1; i <= 5; i++)
-        {
-            string path = Path.Combine(bgDir, $"{i}.png");
-            if (File.Exists(path)) { using var fs = File.OpenRead(path); layers.Add(Texture2D.FromStream(GraphicsDevice, fs)); }
-        }
-        _parallaxLayers = layers.ToArray();
+        // Load parallax background layers (DISABLED — backgrounds too small)
+        // var layers = new List<Texture2D>();
+        // string bgDir = "Content/backgrounds/Nature Landscapes Free Pixel Art/nature_5";
+        // for (int i = 1; i <= 5; i++)
+        // {
+        //     string path = Path.Combine(bgDir, $"{i}.png");
+        //     if (File.Exists(path)) { using var fs = File.OpenRead(path); layers.Add(Texture2D.FromStream(GraphicsDevice, fs)); }
+        // }
+        _parallaxLayers = Array.Empty<Texture2D>();
 
         // Load player sprite sheet (prefer richter, fall back to adam)
         string[] sheetPaths = { "Content/sprites/richter_sheet.png", "Content/sprites/adam_sheet.png" };
@@ -2387,8 +2386,10 @@ public class Game1 : Game
             if (place)
             {
                 var selectedType = entityTypes[_entityPaletteCursor];
-                float cx = _editorGridSnap ? MathF.Round(_editorCursor.X / 32) * 32 : _editorCursor.X;
-                float cy = _editorGridSnap ? MathF.Round(_editorCursor.Y / 32) * 32 : _editorCursor.Y;
+                int _eox = _level.TileGridInstance?.OriginX ?? 0;
+                int _eoy = _level.TileGridInstance?.OriginY ?? 0;
+                float cx = _editorGridSnap ? _eox + MathF.Round((_editorCursor.X - _eox) / 32) * 32 : _editorCursor.X;
+                float cy = _editorGridSnap ? _eoy + MathF.Round((_editorCursor.Y - _eoy) / 32) * 32 : _editorCursor.Y;
 
                 switch (selectedType)
                 {
@@ -2519,10 +2520,12 @@ public class Game1 : Game
             new Vector2(mouse.X, mouse.Y),
             Matrix.Invert(_camera.TransformMatrix));
 
+        int _snapOx = _level.TileGridInstance?.OriginX ?? 0;
+        int _snapOy = _level.TileGridInstance?.OriginY ?? 0;
         var snapped = _editorGridSnap
             ? new Vector2(
-                MathF.Round(worldMouse.X / _editorGridSize) * _editorGridSize,
-                MathF.Round(worldMouse.Y / _editorGridSize) * _editorGridSize)
+                _snapOx + MathF.Round((worldMouse.X - _snapOx) / _editorGridSize) * _editorGridSize,
+                _snapOy + MathF.Round((worldMouse.Y - _snapOy) / _editorGridSize) * _editorGridSize)
             : worldMouse;
 
         // Initialize tile grid if needed when entering tile paint mode
@@ -2541,8 +2544,10 @@ public class Game1 : Game
         {
             var tg = _level.TileGridInstance;
             // Snap to 32x32 tile grid
-            int tileSnappedX = (int)MathF.Floor(worldMouse.X / 32f) * 32;
-            int tileSnappedY = (int)MathF.Floor(worldMouse.Y / 32f) * 32;
+            int ox = _level.TileGridInstance?.OriginX ?? 0;
+            int oy = _level.TileGridInstance?.OriginY ?? 0;
+            int tileSnappedX = ox + (int)MathF.Floor((worldMouse.X - ox) / 32f) * 32;
+            int tileSnappedY = oy + (int)MathF.Floor((worldMouse.Y - oy) / 32f) * 32;
 
             // Left click/hold = paint
             if (mouse.LeftButton == ButtonState.Pressed && !kb.IsKeyDown(Keys.T))
@@ -3421,8 +3426,12 @@ public class Game1 : Game
             var topLeft = Vector2.Transform(Vector2.Zero, camInv);
             var botRight = Vector2.Transform(new Vector2(ViewW, ViewH), camInv);
             int gs = _editorGridSize;
-            int startX = ((int)topLeft.X / gs) * gs;
-            int startY = ((int)topLeft.Y / gs) * gs;
+            int ox = _level.TileGridInstance?.OriginX ?? 0;
+            int oy = _level.TileGridInstance?.OriginY ?? 0;
+            int startX = ox + ((int)(topLeft.X - ox) / gs) * gs;
+            int startY = oy + ((int)(topLeft.Y - oy) / gs) * gs;
+            if (topLeft.X - ox < 0) startX -= gs;
+            if (topLeft.Y - oy < 0) startY -= gs;
             for (int gx = startX; gx < (int)botRight.X; gx += gs)
                 _spriteBatch.Draw(_pixel, new Rectangle(gx, (int)topLeft.Y, 1, (int)(botRight.Y - topLeft.Y)), Color.White * 0.30f);
             for (int gy = startY; gy < (int)botRight.Y; gy += gs)
@@ -3813,8 +3822,10 @@ public class Game1 : Game
         if (_editorDragging)
         {
             var worldMouse = Vector2.Transform(new Vector2(mouse.X, mouse.Y), Matrix.Invert(_camera.TransformMatrix));
+            int _dox = _level.TileGridInstance?.OriginX ?? 0;
+            int _doy = _level.TileGridInstance?.OriginY ?? 0;
             var dragEnd = _editorGridSnap
-                ? new Vector2(MathF.Round(worldMouse.X / _editorGridSize) * _editorGridSize, MathF.Round(worldMouse.Y / _editorGridSize) * _editorGridSize)
+                ? new Vector2(_dox + MathF.Round((worldMouse.X - _dox) / _editorGridSize) * _editorGridSize, _doy + MathF.Round((worldMouse.Y - _doy) / _editorGridSize) * _editorGridSize)
                 : worldMouse;
 
             int px = (int)MathF.Min(_editorDragStart.X, dragEnd.X);
