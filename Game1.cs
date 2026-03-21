@@ -1538,6 +1538,18 @@ public class Game1 : Game
                 }
             }
             if (splatted) continue;
+            // Hit slope floor
+            if (!splatted && p.Velocity.Y > 0 && _level.TileGridInstance != null)
+            {
+                float slopeY = _level.TileGridInstance.GetSlopeFloorY(p.Position.X - 1, p.Position.Y - 1, 2, 2);
+                if (slopeY < float.MaxValue && p.Position.Y >= slopeY)
+                {
+                    if (_rng.NextDouble() < 0.6 && _splatters.Count < 200)
+                        _splatters.Add(new Splatter { Position = new Vector2(p.Position.X, slopeY - 1), Life = 3.5f, Color = p.Color });
+                    _particles.RemoveAt(i);
+                    continue;
+                }
+            }
             if (p.Position.Y >= _level.Floor.Y)
             {
                 if (_splatters.Count < 200)
