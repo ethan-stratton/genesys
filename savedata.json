@@ -1,12 +1,12 @@
 {
   "currentLevel": "debug-room",
-  "spawnX": 352,
-  "spawnY": 126.350006,
+  "spawnX": 1488.5839,
+  "spawnY": 180,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 4337.7197,
+  "playTime": 4349.125,
   "meleeInventory": [
     "Stick",
     "Whip",

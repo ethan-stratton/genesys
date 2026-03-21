@@ -240,6 +240,7 @@ public class Game1 : Game
 
     private List<ItemPickup> _itemPickups = new();
     private HashSet<(int col, int row)> _destroyedBreakables = new();
+    private HashSet<string> _activatedSwitches = new();
 
     // --- Editor state ---
     private enum EditorTool { SolidFloor = 0, Platform = 1, Rope = 2, Wall = 3, Spike = 4, Exit = 5, Spawn = 6, WallSpike = 7, OverworldExit = 8, Ceiling = 9, TilePaint = 10 }
@@ -360,6 +361,7 @@ public class Game1 : Game
         // Load item pickups
         _itemPickups.Clear();
         _destroyedBreakables.Clear();
+        _activatedSwitches.Clear();
         foreach (var item in _level.Items)
         {
             bool alreadyCollected = _saveData?.CollectedItems?.Contains(item.Id) == true;
@@ -460,6 +462,7 @@ public class Game1 : Game
                 case "crawler":
                     float snapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Crawler.Width, Crawler.Height, tg, ts, plats, sFloors, walls, mainFloor);
                     var c = new Crawler(new Vector2(e.X, snapY), e.X - 100, e.X + 100, 0, 0);
+                    c.Frozen = e.Frozen;
                     c.UpdateSurfaceEdges(tg, ts, plats, sFloors, bLeft, bRight);
                     _crawlers.Add(c);
                     break;
@@ -1323,6 +1326,80 @@ public class Game1 : Game
             }
         }
 
+        // Crawler Swarm Override: 4+ non-frozen crawlers within 100px converge on nearest non-dummy crawler
+        _swarmDamageTimer -= dt;
+        if (_swarmDamageTimer <= 0)
+        {
+            _swarmDamageTimer = 0.5f; // check every 0.5s
+            var aliveCrawlers = new List<Crawler>();
+            foreach (var c in _crawlers)
+                if (c.Alive && !c.IsDummy && !c.Frozen) aliveCrawlers.Add(c);
+
+            // Find clusters: for each crawler, count neighbors within 100px
+            for (int ci = 0; ci < aliveCrawlers.Count; ci++)
+            {
+                var c = aliveCrawlers[ci];
+                var cCenter = c.Position + new Vector2(c.EffectiveWidth / 2f, c.EffectiveHeight / 2f);
+                var neighbors = new List<Crawler>();
+                foreach (var other in aliveCrawlers)
+                {
+                    if (other == c) continue;
+                    var oCenter = other.Position + new Vector2(other.EffectiveWidth / 2f, other.EffectiveHeight / 2f);
+                    if (Vector2.Distance(cCenter, oCenter) < 100f)
+                        neighbors.Add(other);
+                }
+                if (neighbors.Count + 1 >= 4) // 4+ including self = swarm
+                {
+                    c.SwarmActive = true;
+                    foreach (var n in neighbors) n.SwarmActive = true;
+
+                    // Find nearest enemy target (dummy or player)
+                    Crawler nearestTarget = null;
+                    float nearestDist = 300f;
+                    foreach (var t in _crawlers)
+                    {
+                        if (!t.Alive || !t.IsDummy) continue;
+                        var tCenter = t.Position + new Vector2(t.EffectiveWidth / 2f, t.EffectiveHeight / 2f);
+                        float d = Vector2.Distance(cCenter, tCenter);
+                        if (d < nearestDist) { nearestDist = d; nearestTarget = t; }
+                    }
+                    if (nearestTarget != null)
+                    {
+                        // Converge: set direction toward target
+                        float targetX = nearestTarget.Position.X + nearestTarget.EffectiveWidth / 2f;
+                        c.Dir = targetX > cCenter.X ? 1 : -1;
+                        foreach (var n in neighbors)
+                        {
+                            var nCenter = n.Position + new Vector2(n.EffectiveWidth / 2f, n.EffectiveHeight / 2f);
+                            n.Dir = targetX > nCenter.X ? 1 : -1;
+                        }
+                        // Deal collective damage when close enough
+                        float distToTarget = Math.Abs(targetX - (nearestTarget.Position.X + nearestTarget.EffectiveWidth / 2f));
+                        var swarmersTouching = new List<Crawler>();
+                        var targetRect = new Rectangle((int)nearestTarget.Position.X, (int)nearestTarget.Position.Y,
+                            nearestTarget.EffectiveWidth, nearestTarget.EffectiveHeight);
+                        foreach (var s in aliveCrawlers)
+                        {
+                            if (s == nearestTarget || s.IsDummy) continue;
+                            var sRect = new Rectangle((int)s.Position.X, (int)s.Position.Y, s.EffectiveWidth, s.EffectiveHeight);
+                            if (sRect.Intersects(targetRect)) swarmersTouching.Add(s);
+                        }
+                        if (swarmersTouching.Count >= 4)
+                        {
+                            int swarmDmg = swarmersTouching.Count * 2;
+                            nearestTarget.TakeHit(swarmDmg);
+                            var hitPos = nearestTarget.Position + new Vector2(nearestTarget.EffectiveWidth / 2f, nearestTarget.EffectiveHeight / 2f);
+                            SpawnHitSpray(hitPos, nearestTarget.Position.X > cCenter.X ? 1 : -1, GetEnemyHitColor("crawler"), 1f, false);
+                        }
+                    }
+                }
+                else
+                {
+                    c.SwarmActive = false;
+                }
+            }
+        }
+
         // Bullets vs crawlers and thornbacks
         foreach (var b in _bullets)
         {
@@ -1653,6 +1730,32 @@ public class Game1 : Game
                 {
                     item.Collected = true;
                     _player.Hp = Math.Min(_player.Hp + 25, _player.MaxHp);
+                }
+            }
+        }
+
+        // Switch interaction (W key near switch)
+        if (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W) && !_dialogueOpen)
+        {
+            var pRect = new Rectangle((int)_player.Position.X - 10, (int)_player.Position.Y, Player.Width + 20, Player.Height);
+            foreach (var sw in _level.Switches)
+            {
+                if (_activatedSwitches.Contains(sw.Id)) continue;
+                var swRect = new Rectangle((int)sw.X, (int)sw.Y, sw.W, sw.H);
+                if (pRect.Intersects(swRect))
+                {
+                    _activatedSwitches.Add(sw.Id);
+                    // Execute switch action
+                    switch (sw.Action)
+                    {
+                        case "unfreeze-crawlers":
+                            foreach (var c in _crawlers) c.Frozen = false;
+                            break;
+                    }
+                    // Screen shake + particles for feedback
+                    _screenShakeTimer = 0.15f; _screenShakeMagnitude = 3f;
+                    SpawnDustParticles(new Vector2(sw.X + sw.W / 2f, sw.Y + sw.H / 2f), 10);
+                    break;
                 }
             }
         }
@@ -6061,6 +6164,28 @@ public class Game1 : Game
                 _ => Color.White
             };
             DrawOutlinedString(lblFont, lbl.Text, new Vector2(lbl.X, lbl.Y), lblColor * 0.9f);
+        }
+
+        // Draw switches
+        foreach (var sw in _level.Switches)
+        {
+            bool activated = _activatedSwitches.Contains(sw.Id);
+            var swColor = activated ? new Color(60, 60, 60) : new Color(200, 180, 50);
+            // Draw switch body
+            _spriteBatch.Draw(_pixel, new Rectangle((int)sw.X, (int)sw.Y, sw.W, sw.H), swColor);
+            // Draw lever/handle
+            int handleY = activated ? (int)sw.Y + sw.H - 6 : (int)sw.Y + 2;
+            _spriteBatch.Draw(_pixel, new Rectangle((int)sw.X + 2, handleY, sw.W - 4, 4), activated ? Color.Gray : Color.White);
+            // Draw label above
+            if (!string.IsNullOrEmpty(sw.Label))
+                DrawOutlinedString(_fontSmall, sw.Label, new Vector2(sw.X - 20, sw.Y - 16), activated ? Color.Gray : Color.Yellow);
+            // Draw "W" prompt when player is near and not activated
+            if (!activated)
+            {
+                float dist = Math.Abs(_player.Position.X + Player.Width / 2f - (sw.X + sw.W / 2f));
+                if (dist < 60)
+                    DrawOutlinedString(_fontSmall, "[W]", new Vector2(sw.X - 2, sw.Y - 28), Color.White * 0.8f);
+            }
         }
 
         // Draw item pickups (gameplay)

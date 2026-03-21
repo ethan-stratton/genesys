@@ -30,6 +30,8 @@ public class Crawler
 
     // Dummy mode: high HP, no aggro, respawns at original position
     public bool IsDummy;
+    public bool Frozen; // Frozen crawlers don't move or aggro until unfrozen
+    public bool SwarmActive; // Part of active swarm cluster
     public bool AlwaysCrit;
     public float DummyScale = 1f;
     public int EffectiveWidth => IsDummy ? (int)(Width * DummyScale) : Width;
@@ -92,8 +94,8 @@ public class Crawler
         if (_squashHoldTimer > 0) _squashHoldTimer -= dt;
         else VisualScale = Vector2.Lerp(VisualScale, Vector2.One, 8f * dt);
 
-        // Dummies don't aggro or move
-        if (IsDummy)
+        // Dummies don't aggro or move; Frozen crawlers stay still
+        if (IsDummy || Frozen)
         {
             Velocity.X = 0;
         }
@@ -185,7 +187,7 @@ public class Crawler
         if (!Alive) return;
         int ew = EffectiveWidth;
         int eh = EffectiveHeight;
-        Color bodyColor = HitFlash > 0 ? Color.Red : IsDummy ? new Color(140, 100, 160) : (Aggroed ? new Color(120, 60, 20) : new Color(80, 50, 20));
+        Color bodyColor = HitFlash > 0 ? Color.Red : IsDummy ? new Color(140, 100, 160) : Frozen ? new Color(100, 160, 200) : SwarmActive ? new Color(180, 40, 20) : (Aggroed ? new Color(120, 60, 20) : new Color(80, 50, 20));
         int scaledW = (int)(ew * VisualScale.X);
         int scaledH = (int)(eh * VisualScale.Y);
         int drawX = (int)Position.X + ew / 2 - scaledW / 2;

@@ -25,6 +25,7 @@ public class LevelData
     [JsonPropertyName("items")] public ItemData[] Items { get; set; } = Array.Empty<ItemData>();
     [JsonPropertyName("objects")] public EnvObjectData[] Objects { get; set; } = Array.Empty<EnvObjectData>();
     [JsonPropertyName("enemies")] public EnemySpawnData[] Enemies { get; set; } = Array.Empty<EnemySpawnData>();
+    [JsonPropertyName("switches")] public SwitchData[] Switches { get; set; } = Array.Empty<SwitchData>();
     [JsonPropertyName("labels")] public LabelData[] Labels { get; set; } = Array.Empty<LabelData>();
     [JsonPropertyName("tileGrid")] public TileGridData TileGrid { get; set; }
 
@@ -342,6 +343,7 @@ public class EnemySpawnData
     [JsonPropertyName("y")] public float Y { get; set; }
     [JsonPropertyName("count")] public int Count { get; set; } = 1;
     [JsonPropertyName("scale")] public float Scale { get; set; } = 1f;
+    [JsonPropertyName("frozen")] public bool Frozen { get; set; } = false;
 }
 
 public class LabelData
@@ -351,4 +353,15 @@ public class LabelData
     [JsonPropertyName("y")] public float Y { get; set; }
     [JsonPropertyName("color")] public string Color { get; set; } = "White";
     [JsonPropertyName("size")] public string Size { get; set; } = "small"; // "small", "normal", "large"
+}
+
+public class SwitchData
+{
+    [JsonPropertyName("id")] public string Id { get; set; } = "";
+    [JsonPropertyName("x")] public float X { get; set; }
+    [JsonPropertyName("y")] public float Y { get; set; }
+    [JsonPropertyName("w")] public int W { get; set; } = 16;
+    [JsonPropertyName("h")] public int H { get; set; } = 24;
+    [JsonPropertyName("action")] public string Action { get; set; } = ""; // "unfreeze-crawlers", etc.
+    [JsonPropertyName("label")] public string Label { get; set; } = "";
 }

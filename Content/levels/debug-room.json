@@ -341,6 +341,15 @@
       "targetLevel": "test-arena",
       "id": "exit-right",
       "targetExitId": ""
+    },
+    {
+      "x": 10600,
+      "y": 736,
+      "w": 30,
+      "h": 48,
+      "targetLevel": "debug-room-2",
+      "id": "exit-to-debug2",
+      "targetExitId": "exit-to-debug1"
     }
   ],
   "npcs": [],
@@ -1127,6 +1136,13 @@
       "y": 622,
       "color": "Cyan",
       "size": "small"
+    },
+    {
+      "text": "MORE DEBUG WORLD",
+      "x": 10560,
+      "y": 710,
+      "color": "Cyan",
+      "size": "normal"
     }
   ],
   "tileGrid": {
