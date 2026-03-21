@@ -2388,8 +2388,8 @@ public class Game1 : Game
                 var selectedType = entityTypes[_entityPaletteCursor];
                 int _eox = _level.TileGridInstance?.OriginX ?? 0;
                 int _eoy = _level.TileGridInstance?.OriginY ?? 0;
-                float cx = _editorGridSnap ? _eox + MathF.Round((_editorCursor.X - _eox) / 32) * 32 : _editorCursor.X;
-                float cy = _editorGridSnap ? _eoy + MathF.Round((_editorCursor.Y - _eoy) / 32) * 32 : _editorCursor.Y;
+                float cx = _editorGridSnap ? _eox + MathF.Floor((_editorCursor.X - _eox) / 32) * 32 : _editorCursor.X;
+                float cy = _editorGridSnap ? _eoy + MathF.Floor((_editorCursor.Y - _eoy) / 32) * 32 : _editorCursor.Y;
 
                 switch (selectedType)
                 {
@@ -2524,8 +2524,8 @@ public class Game1 : Game
         int _snapOy = _level.TileGridInstance?.OriginY ?? 0;
         var snapped = _editorGridSnap
             ? new Vector2(
-                _snapOx + MathF.Round((worldMouse.X - _snapOx) / _editorGridSize) * _editorGridSize,
-                _snapOy + MathF.Round((worldMouse.Y - _snapOy) / _editorGridSize) * _editorGridSize)
+                _snapOx + MathF.Floor((worldMouse.X - _snapOx) / _editorGridSize) * _editorGridSize,
+                _snapOy + MathF.Floor((worldMouse.Y - _snapOy) / _editorGridSize) * _editorGridSize)
             : worldMouse;
 
         // Initialize tile grid if needed when entering tile paint mode
@@ -3825,7 +3825,7 @@ public class Game1 : Game
             int _dox = _level.TileGridInstance?.OriginX ?? 0;
             int _doy = _level.TileGridInstance?.OriginY ?? 0;
             var dragEnd = _editorGridSnap
-                ? new Vector2(_dox + MathF.Round((worldMouse.X - _dox) / _editorGridSize) * _editorGridSize, _doy + MathF.Round((worldMouse.Y - _doy) / _editorGridSize) * _editorGridSize)
+                ? new Vector2(_dox + MathF.Floor((worldMouse.X - _dox) / _editorGridSize) * _editorGridSize, _doy + MathF.Floor((worldMouse.Y - _doy) / _editorGridSize) * _editorGridSize)
                 : worldMouse;
 
             int px = (int)MathF.Min(_editorDragStart.X, dragEnd.X);
