@@ -241,6 +241,8 @@ public class Game1 : Game
     private List<ItemPickup> _itemPickups = new();
     private HashSet<(int col, int row)> _destroyedBreakables = new();
     private HashSet<string> _activatedSwitches = new();
+    private float _nextLatchDelay; // stagger delay between consecutive latches
+    private const int MaxLatched = 4; // max crawlers latched at once
 
     // --- Editor state ---
     private enum EditorTool { SolidFloor = 0, Platform = 1, Rope = 2, Wall = 3, Spike = 4, Exit = 5, Spawn = 6, WallSpike = 7, OverworldExit = 8, Ceiling = 9, TilePaint = 10 }
@@ -1095,15 +1097,45 @@ public class Game1 : Game
         }
 
         // Update crawlers
+        if (_nextLatchDelay > 0) _nextLatchDelay -= dt;
+        int latchedCount = 0;
+        foreach (var c in _crawlers) if (c.IsLatched) latchedCount++;
+
         foreach (var c in _crawlers)
         {
+            // Update latched crawlers: stick to player, deal tick damage
+            if (c.IsLatched)
+            {
+                c.Position = _player.Position + c.LatchOffset;
+                int tickDmg = c.UpdateLatch(dt);
+                if (tickDmg > 0 && _spawnInvincibility <= 0 && !_isDead)
+                {
+                    _lastDamageSource = "Crawler (latched)";
+                    _player.TakeDamage(tickDmg, 0);
+                }
+            }
+
             c.Update(dt, playerCenter2,
                 _level.TileGridInstance, _level.TileGrid?.TileSize ?? 32,
                 _level.AllPlatforms, _level.SolidFloorRects, _level.Floor.Y);
-            if (_spawnInvincibility <= 0 && !_isDead)
+
+            // Latch-on: aggroed crawler touches player → latches instead of contact damage
+            if (_spawnInvincibility <= 0 && !_isDead && !c.IsLatched)
             {
-                int dmg = c.CheckPlayerDamage(playerRect2);
-                if (dmg > 0) { _lastDamageSource = "Crawler"; _player.TakeDamage(dmg, _player.Position.X - c.Position.X); }
+                if (c.CanLatch && latchedCount < MaxLatched && _nextLatchDelay <= 0
+                    && c.Rect.Intersects(playerRect2))
+                {
+                    c.Latch(_player.Position, _rng);
+                    latchedCount++;
+                    _nextLatchDelay = 0.4f; // stagger: 0.4s between latches
+                    _shakeTimer = 0.1f; _shakeIntensity = 2f;
+                }
+                else
+                {
+                    // Normal contact damage for non-latchable crawlers (dummies, frozen, etc.)
+                    int dmg = c.CheckPlayerDamage(playerRect2);
+                    if (dmg > 0) { _lastDamageSource = "Crawler"; _player.TakeDamage(dmg, _player.Position.X - c.Position.X); }
+                }
             }
             if (_player.MeleeTimer > 0 && c.Alive)
             {
@@ -1663,6 +1695,15 @@ public class Game1 : Game
         // Dust on dash start
         if (_dustParticlesEnabled && _player.IsDashing && !_playerWasDashing)
             SpawnDustParticles(new Vector2(_player.Position.X + Player.Width / 2f, _player.Position.Y + Player.Height), 6);
+        // Dashing flings off some latched crawlers
+        if (_player.IsDashing && !_playerWasDashing)
+        {
+            foreach (var c in _crawlers)
+            {
+                if (c.IsLatched && _rng.NextDouble() < 0.6) // 60% chance each
+                    c.Detach(_player.FacingDir * 200f, -150f);
+            }
+        }
         _playerWasGrounded = _player.IsGrounded;
         _playerWasDashing = _player.IsDashing;
 
@@ -6435,6 +6476,14 @@ public class Game1 : Game
                 hpPct > 0.5f ? Color.LimeGreen : (hpPct > 0.25f ? Color.Yellow : Color.Red));
             DrawHollowRect(hpBarX, hpBarY, hpBarW, hpBarH, Color.White * 0.3f);
             DrawOutlinedString(_font, $"HP {_player.Hp}/{_player.MaxHp}", new Vector2(hpBarX + hpBarW + 8, hpBarY - 2), Color.White * 0.7f);
+
+            // Latched crawler warning
+            {
+                int lc = 0;
+                foreach (var c in _crawlers) if (c.IsLatched) lc++;
+                if (lc > 0)
+                    DrawOutlinedString(_font, $"LATCHED x{lc} — Melee/Dash to shake off!", new Vector2(hpBarX, hpBarY + hpBarH + 4), Color.OrangeRed);
+            }
 
             // Weapon HUD
             {

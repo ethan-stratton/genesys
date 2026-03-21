@@ -45,6 +45,15 @@ public class Crawler
     public float? SwarmTargetX; // X position to converge on when swarming
     public bool AlwaysCrit;
     public float DummyScale = 1f;
+
+    // Latch-on behavior (clings to player)
+    public bool IsLatched;
+    public Vector2 LatchOffset; // offset from player position
+    private float _latchDamageTick;
+    private const float LatchDamageInterval = 0.3f;
+    public const int LatchDamage = 1;
+    private float _latchCooldown; // delay before can latch again after being shaken off
+    private const float LatchCooldownTime = 1.5f;
     public int EffectiveWidth => IsDummy ? (int)(Width * DummyScale) : Width;
     public int EffectiveHeight => IsDummy ? (int)(Height * DummyScale) : Height;
     private Vector2 _spawnPos;
@@ -95,6 +104,17 @@ public class Crawler
         if (DamageCooldown > 0) DamageCooldown -= dt;
         if (MeleeHitCooldown > 0) MeleeHitCooldown -= dt;
         if (HitFlash > 0) HitFlash -= dt;
+        if (_latchCooldown > 0) _latchCooldown -= dt;
+
+        // Latched: skip all movement, stick to player
+        if (IsLatched)
+        {
+            Velocity = Vector2.Zero;
+            KnockbackVel = Vector2.Zero;
+            if (_squashHoldTimer > 0) _squashHoldTimer -= dt;
+            else VisualScale = Vector2.Lerp(VisualScale, Vector2.One, 8f * dt);
+            return; // position updated externally by Game1
+        }
 
         if (KnockbackVel.LengthSquared() > 1f)
         {
@@ -224,7 +244,8 @@ public class Crawler
         Hp -= damage;
         HitFlash = 0.15f;
         MeleeHitCooldown = 0.2f;
-        KnockbackVel = new Vector2(knockbackX, knockbackY);
+        if (IsLatched) Detach(knockbackX, knockbackY);
+        else KnockbackVel = new Vector2(knockbackX, knockbackY);
         float squashAmount = 1f - SquashResistance;
         VisualScale = new Vector2(1f + 0.3f * squashAmount, 1f - 0.25f * squashAmount);
         _squashHoldTimer = 0.05f;
@@ -232,12 +253,47 @@ public class Crawler
         return false;
     }
 
+    public bool CanLatch => Alive && !IsDummy && !Frozen && !IsLatched && _latchCooldown <= 0 && Aggroed;
+
+    public void Latch(Vector2 playerPos, Random rng)
+    {
+        IsLatched = true;
+        // Random offset on player body
+        LatchOffset = new Vector2(
+            rng.Next(-Player.Width / 2, Player.Width / 2),
+            rng.Next(0, Player.Height - Height));
+        _latchDamageTick = LatchDamageInterval; // small grace before first tick
+        Velocity = Vector2.Zero;
+        VisualScale = new Vector2(1.2f, 0.8f);
+        _squashHoldTimer = 0.06f;
+    }
+
+    public void Detach(float kbX = 0, float kbY = 0)
+    {
+        IsLatched = false;
+        _latchCooldown = LatchCooldownTime;
+        KnockbackVel = new Vector2(kbX != 0 ? kbX : (Dir * -150f), kbY != 0 ? kbY : -200f);
+    }
+
+    /// <summary>Tick latch damage. Returns damage dealt this frame (0 if no tick yet).</summary>
+    public int UpdateLatch(float dt)
+    {
+        if (!IsLatched) return 0;
+        _latchDamageTick -= dt;
+        if (_latchDamageTick <= 0)
+        {
+            _latchDamageTick = LatchDamageInterval;
+            return LatchDamage;
+        }
+        return 0;
+    }
+
     public void Draw(SpriteBatch sb, Texture2D pixel)
     {
         if (!Alive) return;
         int ew = EffectiveWidth;
         int eh = EffectiveHeight;
-        Color bodyColor = HitFlash > 0 ? Color.Red : IsDummy ? new Color(140, 100, 160) : Frozen ? new Color(100, 160, 200) : SwarmActive ? new Color(180, 40, 20) : (Aggroed ? new Color(120, 60, 20) : new Color(80, 50, 20));
+        Color bodyColor = HitFlash > 0 ? Color.Red : IsDummy ? new Color(140, 100, 160) : Frozen ? new Color(100, 160, 200) : IsLatched ? new Color(160, 40, 40) : SwarmActive ? new Color(180, 40, 20) : (Aggroed ? new Color(120, 60, 20) : new Color(80, 50, 20));
         int scaledW = (int)(ew * VisualScale.X);
         int scaledH = (int)(eh * VisualScale.Y);
         int drawX = (int)Position.X + ew / 2 - scaledW / 2;
