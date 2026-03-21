@@ -2121,9 +2121,9 @@ public class Game1 : Game
     {
         for (int i = 0; i < count; i++)
         {
-            float vx = (float)(_rng.NextDouble() * 120 - 60);
-            float vy = -(float)(_rng.NextDouble() * 80 + 30);
-            float life = 0.25f + (float)(_rng.NextDouble() * 0.3f);
+            float vx = (float)(_rng.NextDouble() * 160 - 80);
+            float vy = -(float)(_rng.NextDouble() * 20 + 5); // mostly horizontal, slight upward drift
+            float life = 0.2f + (float)(_rng.NextDouble() * 0.25f);
             _particles.Add(new Particle
             {
                 Position = position,
@@ -5544,8 +5544,8 @@ public class Game1 : Game
             }
         }
 
-        _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, floorH), isDebugLevel ? new Color(40, 20, 55) : new Color(40, 40, 40));
-        _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, 2), isDebugLevel ? Color.White * 0.6f : new Color(80, 80, 80));
+        _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, floorH), isDebugLevel ? new Color(100, 60, 120) : new Color(40, 40, 40));
+        _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, 2), isDebugLevel ? new Color(160, 130, 80) : new Color(80, 80, 80));
 
         // Draw platforms
         foreach (var plat in _level.PlatformRects)
@@ -5668,14 +5668,14 @@ public class Game1 : Game
                     }
                     else if (TileProperties.IsSlope(tile))
                     {
-                        DrawSlopeTile(wx, wy, tg.TileSize, tile, isDebugLevel ? new Color(40, 20, 55) : color);
+                        DrawSlopeTile(wx, wy, tg.TileSize, tile, isDebugLevel ? new Color(100, 60, 120) : color);
                         if (isDebugLevel)
                         {
-                            var outline = Color.White * 0.6f;
-                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 1), outline);
-                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + tg.TileSize - 1, tg.TileSize, 1), outline);
-                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, tg.TileSize), outline);
-                            _spriteBatch.Draw(_pixel, new Rectangle(wx + tg.TileSize - 1, wy, 1, tg.TileSize), outline);
+                            var gridColor = new Color(160, 130, 80);
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 1), gridColor);
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + tg.TileSize - 1, tg.TileSize, 1), gridColor);
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, tg.TileSize), gridColor);
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx + tg.TileSize - 1, wy, 1, tg.TileSize), gridColor);
                         }
                     }
                     else if (TileProperties.IsLiquid(tile))
@@ -5684,29 +5684,47 @@ public class Game1 : Game
                     }
                     else
                     {
-                        var tileColor = isDebugLevel ? new Color(40, 20, 55) : color;
-                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, tg.TileSize), tileColor);
-                        if (!isDebugLevel && tile == TileType.Grass)
-                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 4), TileProperties.GetAccentColor(tile));
-                        if (!isDebugLevel)
-                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 1), Color.White * 0.1f);
                         if (isDebugLevel)
                         {
-                            var outline = Color.White * 0.6f;
-                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 1), outline);
-                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + tg.TileSize - 1, tg.TileSize, 1), outline);
-                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, tg.TileSize), outline);
-                            _spriteBatch.Draw(_pixel, new Rectangle(wx + tg.TileSize - 1, wy, 1, tg.TileSize), outline);
+                            // SotN-style debug tiles: purple fill with warm tan grid lines
+                            int ts3 = tg.TileSize;
+                            // Subtle shade variation per tile (seeded by position)
+                            int shade = ((tx * 7 + ty * 13) % 5) - 2; // -2 to +2
+                            var tileColor = new Color(
+                                Math.Clamp(100 + shade * 4, 85, 115),
+                                Math.Clamp(60 + shade * 3, 48, 72),
+                                Math.Clamp(120 + shade * 5, 105, 135));
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts3, ts3), tileColor);
+                            // Inner highlight (top + left edges, lighter)
+                            var highlight = new Color(140, 100, 160);
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx + 1, wy + 1, ts3 - 2, 1), highlight * 0.5f);
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx + 1, wy + 1, 1, ts3 - 2), highlight * 0.5f);
+                            // Inner shadow (bottom + right edges, darker)
+                            var shadow = new Color(50, 25, 60);
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx + 1, wy + ts3 - 2, ts3 - 2, 1), shadow * 0.6f);
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx + ts3 - 2, wy + 1, 1, ts3 - 2), shadow * 0.6f);
+                            // Warm tan/gold grid border
+                            var gridColor = new Color(160, 130, 80);
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts3, 1), gridColor);
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts3 - 1, ts3, 1), gridColor);
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts3), gridColor);
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx + ts3 - 1, wy, 1, ts3), gridColor);
+                        }
+                        else
+                        {
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, tg.TileSize), color);
+                            if (tile == TileType.Grass)
+                                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 4), TileProperties.GetAccentColor(tile));
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, tg.TileSize, 1), Color.White * 0.1f);
+                            var dark = new Color(
+                                (int)(color.R * 0.5f), (int)(color.G * 0.5f), (int)(color.B * 0.5f));
+                            int ts3 = tg.TileSize;
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts3, 1), dark);
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts3 - 1, ts3, 1), dark);
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts3), dark);
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx + ts3 - 1, wy, 1, ts3), dark);
                         }
                     }
-
-                    var dark = new Color(
-                        (int)(color.R * 0.5f), (int)(color.G * 0.5f), (int)(color.B * 0.5f));
-                    int ts = tg.TileSize;
-                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), dark);
-                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), dark);
-                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts), dark);
-                    _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts), dark);
                 }
             }
         }
