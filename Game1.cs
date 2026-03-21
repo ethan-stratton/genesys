@@ -5389,6 +5389,73 @@ public class Game1 : Game
                 case TileType.ShavedCeilLeft: // bottom-left shaved
                     if (row > ts / 2) { int sr = row - ts / 2; edgeX = wx + sr * 2; }
                     edgeColor = darkColor; break;
+
+                // Gentle4 floor slopes (4-tile, quarter-height rise per tile)
+                case TileType.Gentle4UpRightA:
+                case TileType.Gentle4UpRightB:
+                case TileType.Gentle4UpRightC:
+                case TileType.Gentle4UpRightD:
+                    {
+                        int qi = tile - TileType.Gentle4UpRightA;
+                        int qBase = ts - qi * (ts / 4);
+                        int qTop = qBase - ts / 4;
+                        if (row >= qTop && row < qBase)
+                        {
+                            int surfX = (qBase - row) * 4;
+                            if (surfX >= 0 && surfX < ts) edgeX = wx + surfX;
+                        }
+                        edgeColor = lightColor;
+                    }
+                    break;
+                case TileType.Gentle4UpLeftA:
+                case TileType.Gentle4UpLeftB:
+                case TileType.Gentle4UpLeftC:
+                case TileType.Gentle4UpLeftD:
+                    {
+                        int qi = tile - TileType.Gentle4UpLeftA;
+                        int qBase = ts - qi * (ts / 4);
+                        int qTop = qBase - ts / 4;
+                        if (row >= qTop && row < qBase)
+                        {
+                            int fillW = (row - qTop) * 4;
+                            if (fillW >= 0 && fillW < ts) edgeX = wx + fillW;
+                        }
+                        edgeColor = lightColor;
+                    }
+                    break;
+                case TileType.Gentle4CeilRightA:
+                case TileType.Gentle4CeilRightB:
+                case TileType.Gentle4CeilRightC:
+                case TileType.Gentle4CeilRightD:
+                    {
+                        int qi = tile - TileType.Gentle4CeilRightA;
+                        int surfLeft = qi * (ts / 4);
+                        int surfRight = surfLeft + ts / 4;
+                        if (row > surfLeft && row <= surfRight)
+                        {
+                            int sx = (row - surfLeft) * 4;
+                            if (sx >= 0 && sx < ts) edgeX = wx + sx;
+                        }
+                        edgeColor = darkColor;
+                    }
+                    break;
+                case TileType.Gentle4CeilLeftA:
+                case TileType.Gentle4CeilLeftB:
+                case TileType.Gentle4CeilLeftC:
+                case TileType.Gentle4CeilLeftD:
+                    {
+                        int qi = tile - TileType.Gentle4CeilLeftA;
+                        int surfRight = qi * (ts / 4);
+                        int surfLeft = surfRight + ts / 4;
+                        if (row > surfRight && row <= surfLeft)
+                        {
+                            int sx = (row - surfRight) * 4;
+                            int ex = ts - sx;
+                            if (ex >= 0 && ex < ts) edgeX = wx + ex;
+                        }
+                        edgeColor = darkColor;
+                    }
+                    break;
             }
             if (edgeX >= wx && edgeX < wx + ts)
                 _spriteBatch.Draw(_pixel, new Rectangle(edgeX, wy + row, 1, 1), edgeColor);
@@ -5448,6 +5515,64 @@ public class Game1 : Game
                 _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), lightColor); // top
                 _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts), darkColor); // right
                 _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts / 2), lightColor); // left above shave
+                break;
+
+            // Gentle4 floor slopes — straight edges
+            case TileType.Gentle4UpRightA:
+            case TileType.Gentle4UpRightB:
+            case TileType.Gentle4UpRightC:
+            case TileType.Gentle4UpRightD:
+                {
+                    int qi = tile - TileType.Gentle4UpRightA;
+                    int qBase = ts - qi * (ts / 4);
+                    int qTop = qBase - ts / 4;
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), darkColor); // bottom
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy + qTop, 1, ts - qTop), darkColor); // right from surface top down
+                    if (qBase < ts) // left edge below surface (where fill is full-width)
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + qBase, 1, ts - qBase), lightColor);
+                }
+                break;
+            case TileType.Gentle4UpLeftA:
+            case TileType.Gentle4UpLeftB:
+            case TileType.Gentle4UpLeftC:
+            case TileType.Gentle4UpLeftD:
+                {
+                    int qi = tile - TileType.Gentle4UpLeftA;
+                    int qBase = ts - qi * (ts / 4);
+                    int qTop = qBase - ts / 4;
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), darkColor); // bottom
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + qTop, 1, ts - qTop), lightColor); // left from surface top down
+                    if (qBase < ts) // right edge below surface
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy + qBase, 1, ts - qBase), darkColor);
+                }
+                break;
+            case TileType.Gentle4CeilRightA:
+            case TileType.Gentle4CeilRightB:
+            case TileType.Gentle4CeilRightC:
+            case TileType.Gentle4CeilRightD:
+                {
+                    int qi = tile - TileType.Gentle4CeilRightA;
+                    int surfLeft = qi * (ts / 4);
+                    int surfRight = surfLeft + ts / 4;
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), lightColor); // top
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, surfRight), darkColor); // right from top to surface bottom
+                    if (surfLeft > 0) // left edge above surface (where fill is full-width)
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, surfLeft), lightColor);
+                }
+                break;
+            case TileType.Gentle4CeilLeftA:
+            case TileType.Gentle4CeilLeftB:
+            case TileType.Gentle4CeilLeftC:
+            case TileType.Gentle4CeilLeftD:
+                {
+                    int qi = tile - TileType.Gentle4CeilLeftA;
+                    int surfRight = qi * (ts / 4);
+                    int surfLeft = surfRight + ts / 4;
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), lightColor); // top
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, surfLeft), lightColor); // left from top to surface bottom
+                    if (surfRight > 0) // right edge above surface
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, surfRight), darkColor);
+                }
                 break;
         }
     }
