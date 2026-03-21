@@ -461,7 +461,7 @@ public class Game1 : Game
                     break;
                 case "crawler":
                     float snapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Crawler.Width, Crawler.Height, tg, ts, plats, sFloors, walls, mainFloor);
-                    var c = new Crawler(new Vector2(e.X, snapY), e.X - 100, e.X + 100, 0, 0);
+                    var c = new Crawler(new Vector2(e.X, snapY), bLeft, bRight, 0, 0);
                     c.Frozen = e.Frozen;
                     c.UpdateSurfaceEdges(tg, ts, plats, sFloors, bLeft, bRight);
                     _crawlers.Add(c);
@@ -1355,7 +1355,7 @@ public class Game1 : Game
 
                     // Find nearest enemy target (dummy or player)
                     Crawler nearestTarget = null;
-                    float nearestDist = 300f;
+                    float nearestDist = 600f;
                     foreach (var t in _crawlers)
                     {
                         if (!t.Alive || !t.IsDummy) continue;
@@ -1365,14 +1365,11 @@ public class Game1 : Game
                     }
                     if (nearestTarget != null)
                     {
-                        // Converge: set direction toward target
+                        // Converge: set swarm target for crawler AI to handle movement + jumping
                         float targetX = nearestTarget.Position.X + nearestTarget.EffectiveWidth / 2f;
-                        c.Dir = targetX > cCenter.X ? 1 : -1;
+                        c.SwarmTargetX = targetX;
                         foreach (var n in neighbors)
-                        {
-                            var nCenter = n.Position + new Vector2(n.EffectiveWidth / 2f, n.EffectiveHeight / 2f);
-                            n.Dir = targetX > nCenter.X ? 1 : -1;
-                        }
+                            n.SwarmTargetX = targetX;
                         // Deal collective damage when close enough
                         float distToTarget = Math.Abs(targetX - (nearestTarget.Position.X + nearestTarget.EffectiveWidth / 2f));
                         var swarmersTouching = new List<Crawler>();
@@ -1396,6 +1393,7 @@ public class Game1 : Game
                 else
                 {
                     c.SwarmActive = false;
+                    c.SwarmTargetX = null;
                 }
             }
         }

@@ -18,20 +18,31 @@ public class Crawler
     public float AggroRange = 200f;
     public float Speed = 60f;
     public float ChaseSpeed = 100f;
+    public float SwarmSpeed = 130f;
     public float DamageCooldown;
     public float MeleeHitCooldown;
     public float HitFlash;
     private bool _onGround;
+    private bool _wasOnGround;
 
     public Vector2 KnockbackVel;
     public Vector2 VisualScale = Vector2.One;
     public float SquashResistance = 0f;
     private float _squashHoldTimer;
 
+    // Jump behavior
+    private float _jumpCooldown;
+    private const float JumpCooldownTime = 1.5f;
+    private const float NormalJumpForce = -200f;
+    private const float SwarmJumpForce = -300f;
+    private const float NormalJumpHSpeed = 80f;
+    private const float SwarmJumpHSpeed = 150f;
+
     // Dummy mode: high HP, no aggro, respawns at original position
     public bool IsDummy;
     public bool Frozen; // Frozen crawlers don't move or aggro until unfrozen
     public bool SwarmActive; // Part of active swarm cluster
+    public float? SwarmTargetX; // X position to converge on when swarming
     public bool AlwaysCrit;
     public float DummyScale = 1f;
     public int EffectiveWidth => IsDummy ? (int)(Width * DummyScale) : Width;
@@ -101,20 +112,48 @@ public class Crawler
         }
         else
         {
+        if (_jumpCooldown > 0) _jumpCooldown -= dt;
+
         float dist = Vector2.Distance(playerCenter, Position + new Vector2(Width / 2f, Height / 2f));
         Aggroed = dist < AggroRange;
 
-        if (Aggroed)
+        if (SwarmActive && SwarmTargetX.HasValue)
+        {
+            // Swarm mode: override patrol, move toward target at swarm speed
+            float dx = SwarmTargetX.Value - (Position.X + Width / 2f);
+            Dir = dx > 0 ? 1 : -1;
+            Velocity.X = Dir * SwarmSpeed;
+            // Swarm jump: aggressive forward leap when grounded
+            if (_onGround && _jumpCooldown <= 0 && MathF.Abs(dx) > 30f)
+            {
+                Velocity.Y = SwarmJumpForce;
+                Velocity.X = Dir * SwarmJumpHSpeed;
+                _jumpCooldown = 0.6f;
+                VisualScale = new Vector2(0.7f, 1.3f); // squash on jump
+                _squashHoldTimer = 0.04f;
+            }
+        }
+        else if (Aggroed)
         {
             float dx = playerCenter.X - (Position.X + Width / 2f);
             Dir = dx > 0 ? 1 : -1;
             Velocity.X = Dir * ChaseSpeed;
+            // Chase jump: short hop toward player
+            if (_onGround && _jumpCooldown <= 0 && MathF.Abs(dx) > 50f)
+            {
+                Velocity.Y = NormalJumpForce;
+                Velocity.X = Dir * NormalJumpHSpeed;
+                _jumpCooldown = JumpCooldownTime;
+                VisualScale = new Vector2(0.8f, 1.2f);
+                _squashHoldTimer = 0.04f;
+            }
         }
         else
         {
+            // Patrol full surface range
             Velocity.X = Dir * Speed;
-            if (Position.X <= PatrolLeft) { Position.X = PatrolLeft; Dir = 1; }
-            if (Position.X + Width >= PatrolRight) { Position.X = PatrolRight - Width; Dir = -1; }
+            if (Position.X <= SurfaceLeft) { Position.X = SurfaceLeft; Dir = 1; }
+            if (Position.X + Width >= SurfaceRight) { Position.X = SurfaceRight - Width; Dir = -1; }
         }
         } // end non-dummy movement
 
@@ -125,16 +164,27 @@ public class Crawler
             tileGrid, tileSize,
             platforms, solidFloors, floorY);
 
-        // Clamp to surface edges
-        if (Position.X < SurfaceLeft)
+        // Landing squash
+        if (_onGround && !_wasOnGround)
         {
-            Position.X = SurfaceLeft;
-            if (!Aggroed) Dir = 1;
+            VisualScale = new Vector2(1.3f, 0.7f);
+            _squashHoldTimer = 0.05f;
         }
-        if (Position.X + EffectiveWidth > SurfaceRight)
+        _wasOnGround = _onGround;
+
+        // Clamp to surface edges (skip during swarm — they need to roam freely)
+        if (!SwarmActive)
         {
-            Position.X = SurfaceRight - Width;
-            if (!Aggroed) Dir = -1;
+            if (Position.X < SurfaceLeft)
+            {
+                Position.X = SurfaceLeft;
+                if (!Aggroed) Dir = 1;
+            }
+            if (Position.X + EffectiveWidth > SurfaceRight)
+            {
+                Position.X = SurfaceRight - Width;
+                if (!Aggroed) Dir = -1;
+            }
         }
     }
 
