@@ -5407,10 +5407,47 @@ public class Game1 : Game
     /// <summary>Good hash for Voronoi — produces well-distributed 0..1 values from integer coords.</summary>
     private static float Hash2D(int x, int y, int seed)
     {
-        // PCG-style bit mixing
         uint h = (uint)(x * 73856093 ^ y * 19349663 ^ seed * 83492791);
         h ^= h >> 16; h *= 0x45d9f3b; h ^= h >> 16; h *= 0x45d9f3b; h ^= h >> 16;
         return (h & 0x7FFFFFFF) / (float)0x7FFFFFFF;
+    }
+
+    /// <summary>Compute Voronoi caustic value at a world position. Returns 0..1 brightness.</summary>
+    private float VoronoiCaustic(float worldX, float worldY, float cellSize, float time, float timeScale, float power)
+    {
+        float invCell = 1f / cellSize;
+        float wx = worldX * invCell;
+        float wy = worldY * invCell;
+        int cellX = (int)MathF.Floor(wx);
+        int cellY = (int)MathF.Floor(wy);
+
+        float d1 = 99f, d2 = 99f;
+        for (int cy = -1; cy <= 1; cy++)
+        {
+            for (int cx = -1; cx <= 1; cx++)
+            {
+                int cxi = cellX + cx;
+                int cyi = cellY + cy;
+                float hx = Hash2D(cxi, cyi, 0);
+                float hy = Hash2D(cxi, cyi, 1);
+                // Seed point: offset within cell + animated orbit
+                float seedX = cxi + 0.1f + hx * 0.8f + MathF.Sin(time * timeScale + hx * 6.28f) * 0.3f;
+                float seedY = cyi + 0.1f + hy * 0.8f + MathF.Cos(time * timeScale * 0.85f + hy * 6.28f) * 0.3f;
+                float dx = wx - seedX;
+                float dy = wy - seedY;
+                float dist = MathF.Sqrt(dx * dx + dy * dy);
+                if (dist < d1) { d2 = d1; d1 = dist; }
+                else if (dist < d2) { d2 = dist; }
+            }
+        }
+
+        // The classic caustic formula: the EDGE value (d2 - d1) inverted and raised to high power
+        // Small d2-d1 = near a ridge = bright. Large = inside a cell = dark.
+        float edge = d2 - d1;
+        // Normalize roughly (max edge in Voronoi ~0.8) and invert
+        float v = MathHelper.Clamp(1f - edge * 1.5f, 0f, 1f);
+        // Power function crushes everything except the brightest ridge peaks
+        return MathF.Pow(v, power);
     }
 
     /// <summary>Draw an animated liquid tile (water, lava, acid). Uses Voronoi cellular noise for caustic light patterns.</summary>
@@ -5418,7 +5455,7 @@ public class Game1 : Game
     {
         float t = _totalTime;
         Color deepColor, ridgeColor, surfaceColor;
-        float speed, waveAmp;
+        float speed, waveAmp, caustPower;
 
         switch (tile)
         {
@@ -5428,6 +5465,7 @@ public class Game1 : Game
                 surfaceColor = new Color(255, 180, 40);
                 speed = 1.8f;
                 waveAmp = 4f;
+                caustPower = 4f;
                 break;
             case TileType.Acid:
                 deepColor = new Color(8, 35, 5);
@@ -5435,13 +5473,15 @@ public class Game1 : Game
                 surfaceColor = new Color(120, 255, 80);
                 speed = 1.2f;
                 waveAmp = 3f;
+                caustPower = 4f;
                 break;
             default: // Water
                 deepColor = new Color(8, 18, 30);
-                ridgeColor = new Color(120, 140, 80);
+                ridgeColor = new Color(130, 150, 90);
                 surfaceColor = new Color(60, 130, 200);
                 speed = 0.5f;
                 waveAmp = 3f;
+                caustPower = 5f; // higher power = thinner ridges
                 break;
         }
 
@@ -5454,7 +5494,7 @@ public class Game1 : Game
         }
         float depthFactor = MathHelper.Clamp(1f - depth * 0.1f, 0.3f, 1f);
 
-        // Fill entire tile with deep color first
+        // Fill with deep color
         _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, ts), deepColor * (0.7f + depthFactor * 0.3f));
 
         // Surface wave
@@ -5469,10 +5509,6 @@ public class Game1 : Game
                 if (surfY < wy) surfY = wy;
                 if (surfY >= wy && surfY < wy + ts)
                 {
-                    // Clear above surface (draw background color)
-                    if (surfY > wy)
-                        _spriteBatch.Draw(_pixel, new Rectangle(wx + px, wy, 1, surfY - wy), Color.Transparent);
-                    // Surface highlight
                     _spriteBatch.Draw(_pixel, new Rectangle(wx + px, surfY, 1, 2), surfaceColor * 0.85f);
                     float glint = MathF.Sin(worldX * 0.18f + t * speed * 2.5f);
                     if (glint > 0.6f)
@@ -5481,67 +5517,33 @@ public class Game1 : Game
             }
         }
 
-        // Voronoi caustics — larger cells, better hash, organic shapes
-        // Cell size in world pixels (~24px per cell = nice big organic shapes)
-        float cellSize = 24f;
-        float invCell = 1f / cellSize;
+        // Voronoi caustics — two layers at different scales for complexity
         float timeScale = speed * 0.35f;
-        int step = 2; // render at 2px resolution
-
+        int step = 2;
         int startY = isSurface ? 8 : 0;
+
         for (int py = startY; py < ts; py += step)
         {
             for (int px = 0; px < ts; px += step)
             {
-                float worldX = (wx + px) * invCell;
-                float worldY = (wy + py) * invCell;
+                float wX = wx + px;
+                float wY = wy + py;
 
-                int cellX = (int)MathF.Floor(worldX);
-                int cellY = (int)MathF.Floor(worldY);
+                // Layer 1: large cells (30px)
+                float v1 = VoronoiCaustic(wX, wY, 30f, t, timeScale, caustPower);
+                // Layer 2: smaller cells (18px), offset time for variety
+                float v2 = VoronoiCaustic(wX + 500f, wY + 500f, 18f, t + 10f, timeScale * 1.3f, caustPower);
 
-                float d1 = 99f, d2 = 99f;
+                // Combine: take the brighter of the two (like real overlapping caustics)
+                float combined = MathF.Max(v1, v2) * depthFactor;
 
-                for (int cy = -1; cy <= 1; cy++)
+                if (combined > 0.01f)
                 {
-                    for (int cx = -1; cx <= 1; cx++)
-                    {
-                        int cxi = cellX + cx;
-                        int cyi = cellY + cy;
-
-                        // Hash gives well-distributed point within each cell
-                        float hx = Hash2D(cxi, cyi, 0);
-                        float hy = Hash2D(cxi, cyi, 1);
-
-                        // Animate: seed points orbit slowly
-                        float seedX = cxi + 0.15f + hx * 0.7f + MathF.Sin(t * timeScale + hx * 6.28f) * 0.3f;
-                        float seedY = cyi + 0.15f + hy * 0.7f + MathF.Cos(t * timeScale * 0.9f + hy * 6.28f) * 0.3f;
-
-                        float dx = worldX - seedX;
-                        float dy = worldY - seedY;
-                        float dist = MathF.Sqrt(dx * dx + dy * dy);
-
-                        if (dist < d1) { d2 = d1; d1 = dist; }
-                        else if (dist < d2) { d2 = dist; }
-                    }
-                }
-
-                // Ridge brightness: where d2 ≈ d1 (cell boundaries)
-                float edge = d2 - d1;
-                // Adjust sharpness — lower multiplier = thicker ridges
-                float brightness = MathHelper.Clamp(1f - edge * 2.8f, 0f, 1f);
-                brightness = brightness * brightness; // sharpen
-
-                // Also add subtle inner glow (inverse d1 for cell center brightness)
-                float innerGlow = MathHelper.Clamp(0.15f - d1 * 0.15f, 0f, 0.15f);
-
-                float total = (brightness + innerGlow) * depthFactor;
-                if (total > 0.02f)
-                {
-                    var c = new Color(
-                        (int)(ridgeColor.R * total),
-                        (int)(ridgeColor.G * total),
-                        (int)(ridgeColor.B * total));
-                    _spriteBatch.Draw(_pixel, new Rectangle(wx + px, wy + py, step, step), c);
+                    // Clamp color channels to 255
+                    int r = Math.Min((int)(ridgeColor.R * combined * 1.5f), 255);
+                    int g = Math.Min((int)(ridgeColor.G * combined * 1.5f), 255);
+                    int b = Math.Min((int)(ridgeColor.B * combined * 1.5f), 255);
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx + px, wy + py, step, step), new Color(r, g, b));
                 }
             }
         }
