@@ -1522,7 +1522,10 @@ public class Game1 : Game
             bool splatted = false;
             foreach (var sf in _level.SolidFloorRects)
             {
-                if (p.Position.Y >= sf.Top && p.Position.X >= sf.Left && p.Position.X <= sf.Right)
+                // Particle must be within X bounds, crossing the top surface downward (within 8px tolerance)
+                if (p.Position.X >= sf.Left && p.Position.X <= sf.Right
+                    && p.Position.Y >= sf.Top && p.Position.Y <= sf.Top + 8
+                    && p.Velocity.Y > 0)
                 {
                     if (_rng.NextDouble() < 0.6)
                     {
@@ -1870,6 +1873,46 @@ public class Game1 : Game
                                 Collected = false,
                                 HasGravity = true,
                                 VelY = -150f // pop upward then fall
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        // Breakable tile destruction (uppercut)
+        if (_player.IsUppercutting)
+        {
+            var uppercutRect = _player.UppercutHitbox;
+            var tgi = _level.TileGridInstance;
+            if (tgi != null)
+            {
+                int ts = tgi.TileSize;
+                int ox = tgi.OriginX, oy = tgi.OriginY;
+                int startCol = Math.Max(0, (uppercutRect.Left - ox) / ts);
+                int endCol = Math.Min(tgi.Width - 1, (uppercutRect.Right - ox) / ts);
+                int startRow = Math.Max(0, (uppercutRect.Top - oy) / ts);
+                int endRow = Math.Min(tgi.Height - 1, (uppercutRect.Bottom - oy) / ts);
+                for (int row = startRow; row <= endRow; row++)
+                {
+                    for (int col = startCol; col <= endCol; col++)
+                    {
+                        if (tgi.GetTileAt(col, row) == TileType.Breakable)
+                        {
+                            _destroyedBreakables.Add((col, row));
+                            tgi.SetTileAt(col, row, TileType.Empty);
+                            _level.RebuildTileCollision();
+                            int twx = ox + col * ts, twy = oy + row * ts;
+                            _itemPickups.Add(new ItemPickup
+                            {
+                                Id = $"heart-break-{twx}-{twy}",
+                                X = twx + ts / 2f - 8,
+                                Y = twy,
+                                W = 16, H = 16,
+                                ItemType = "heart",
+                                Collected = false,
+                                HasGravity = true,
+                                VelY = -150f
                             });
                         }
                     }
