@@ -374,10 +374,15 @@ public class Player
         if (tileGrid != null)
         {
             int ts = tileGrid.TileSize;
-            int topRow = newTop / ts;
-            int bottomRow = ((int)Position.Y + Height - 1) / ts;
-            int leftCol = left / ts;
-            int rightCol = right / ts;
+            int ox = tileGrid.OriginX;
+            int oy = tileGrid.OriginY;
+            int topRow = (newTop - oy) / ts;
+            int bottomRow = ((int)Position.Y + Height - 1 - oy) / ts;
+            int leftCol = (left - ox) / ts;
+            int rightCol = (right - ox) / ts;
+            // Clamp negative divisions
+            if (newTop < oy) topRow--;
+            if (left < ox) leftCol--;
             for (int ty = topRow; ty <= bottomRow; ty++)
             {
                 for (int tx = leftCol; tx <= rightCol; tx++)
@@ -386,7 +391,7 @@ public class Player
                     if (TileProperties.IsSolid(tileGrid.GetTileAt(tx, ty)))
                     {
                         // Check if this tile actually overlaps the new head area
-                        int tileTop = ty * ts;
+                        int tileTop = oy + ty * ts;
                         int tileBottom = tileTop + ts;
                         if (tileBottom > newTop && tileTop < newTop + (Height - currentH))
                             return false;
@@ -618,7 +623,7 @@ public class Player
 
         // --- Wall attachment check ---
         _wallHopCooldown -= dt;
-        if (!IsOnWall && !IsOnRope && walls != null && !IsSliding && !IsVaultKicking && _wallHopCooldown <= 0f)
+        if (!IsOnWall && !IsOnRope && walls != null && !IsSliding && _wallHopCooldown <= 0f)
         {
             float playerCenterY = Position.Y + Height / 2f;
             bool nearAnyWall = false;
@@ -652,6 +657,9 @@ public class Player
                     {
                         IsOnWall = true;
                         IsDashing = false; // cancel dash on wall grab
+                        IsVaultKicking = false; // cancel vault kick on wall grab
+                        IsBladeDashing = false; // cancel blade dash on wall grab
+                        IsCrouching = false; // clear crouch from slide/vault kick
                         _visualScale = Vector2.One; // reset squash/stretch
                         _squashHoldTimer = 0;
                         _currentWall = w;

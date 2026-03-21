@@ -5344,50 +5344,61 @@ public class Game1 : Game
     /// <summary>Draw outline that follows the slope diagonal edge instead of a box.</summary>
     private void DrawSlopeOutline(int wx, int wy, int ts, TileType tile, Color outlineColor)
     {
-        // Draw the diagonal edge + solid edges (bottom, sides where solid)
+        // Draw the diagonal edge pixel by pixel
         for (int row = 0; row < ts; row++)
         {
-            int edgeX;
+            int edgeX = -1;
             switch (tile)
             {
                 case TileType.SlopeUpRight: // ╱ bottom-left to top-right
                     edgeX = wx + (ts - 1 - row);
-                    _spriteBatch.Draw(_pixel, new Rectangle(edgeX, wy + row, 1, 1), outlineColor);
                     break;
-                case TileType.SlopeUpLeft: // ╲ top-left to bottom-right
+                case TileType.SlopeUpLeft: // ╲ top-left to bottom-right  
                     edgeX = wx + row;
-                    _spriteBatch.Draw(_pixel, new Rectangle(edgeX, wy + row, 1, 1), outlineColor);
                     break;
-                case TileType.SlopeCeilRight:
+                case TileType.SlopeCeilRight: // ceiling: solid top-right, diagonal goes top-left to bottom-right
                     edgeX = wx + row;
-                    _spriteBatch.Draw(_pixel, new Rectangle(edgeX, wy + row, 1, 1), outlineColor);
                     break;
-                case TileType.SlopeCeilLeft:
+                case TileType.SlopeCeilLeft: // ceiling: solid top-left, diagonal goes top-right to bottom-left
                     edgeX = wx + (ts - 1 - row);
-                    _spriteBatch.Draw(_pixel, new Rectangle(edgeX, wy + row, 1, 1), outlineColor);
                     break;
-                default:
-                    // For gentle/shaved slopes, just draw bottom + vertical edges
+                case TileType.GentleUpRight: // rises right, half-height
+                    if (row >= ts / 2) edgeX = wx + (int)((ts - row) * 2f);
+                    break;
+                case TileType.GentleUpLeft: // rises left, half-height
+                    if (row >= ts / 2) edgeX = wx + (int)((row - ts / 2) * 2f);
+                    break;
+                case TileType.GentleCeilRight:
+                    if (row * 2 < ts) edgeX = wx + row * 2;
+                    break;
+                case TileType.GentleCeilLeft:
+                    if (row * 2 < ts) edgeX = wx + ts - 1 - row * 2;
                     break;
             }
+            if (edgeX >= wx && edgeX < wx + ts)
+                _spriteBatch.Draw(_pixel, new Rectangle(edgeX, wy + row, 1, 1), outlineColor);
         }
-        // Bottom edge (always solid for floor slopes)
-        if (tile == TileType.SlopeUpRight || tile == TileType.SlopeUpLeft ||
-            tile == TileType.GentleUpRight || tile == TileType.GentleUpLeft)
-        {
+
+        // Solid edges (bottom for floor slopes, top for ceiling slopes, vertical where meets solid)
+        bool isFloorSlope = tile == TileType.SlopeUpRight || tile == TileType.SlopeUpLeft ||
+                            tile == TileType.GentleUpRight || tile == TileType.GentleUpLeft ||
+                            tile == TileType.ShavedRight || tile == TileType.ShavedLeft;
+        bool isCeilSlope = tile == TileType.SlopeCeilRight || tile == TileType.SlopeCeilLeft ||
+                           tile == TileType.GentleCeilRight || tile == TileType.GentleCeilLeft ||
+                           tile == TileType.ShavedCeilRight || tile == TileType.ShavedCeilLeft;
+
+        if (isFloorSlope)
             _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), outlineColor);
-        }
-        // Top edge for ceiling slopes
-        if (tile == TileType.SlopeCeilRight || tile == TileType.SlopeCeilLeft ||
-            tile == TileType.GentleCeilRight || tile == TileType.GentleCeilLeft)
-        {
+        if (isCeilSlope)
             _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), outlineColor);
-        }
-        // Vertical edges where the slope meets solid ground
-        if (tile == TileType.SlopeUpRight || tile == TileType.SlopeCeilLeft)
-            _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts), outlineColor); // right edge
-        if (tile == TileType.SlopeUpLeft || tile == TileType.SlopeCeilRight)
-            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts), outlineColor); // left edge
+
+        // Vertical edge on the "tall" side of the slope
+        if (tile == TileType.SlopeUpRight || tile == TileType.SlopeCeilLeft ||
+            tile == TileType.GentleUpRight || tile == TileType.GentleCeilLeft)
+            _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts), outlineColor);
+        if (tile == TileType.SlopeUpLeft || tile == TileType.SlopeCeilRight ||
+            tile == TileType.GentleUpLeft || tile == TileType.GentleCeilRight)
+            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts), outlineColor);
     }
 
     /// <summary>Draw a spike tile (triangular spikes pointing in a direction).</summary>

@@ -36,9 +36,15 @@ public static class EnemyPhysics
         return onGround;
     }
 
-    /// <summary>
-    /// Resolve horizontal collisions against solid tiles. Pushes entity out of walls.
-    /// </summary>
+    // Convert world coordinate to tile index, accounting for grid origin
+    private static int WorldToTileX(int worldX, TileGrid tg)
+        => worldX >= tg.OriginX ? (worldX - tg.OriginX) / tg.TileSize : (worldX - tg.OriginX) / tg.TileSize - 1;
+    private static int WorldToTileY(int worldY, TileGrid tg)
+        => worldY >= tg.OriginY ? (worldY - tg.OriginY) / tg.TileSize : (worldY - tg.OriginY) / tg.TileSize - 1;
+    // Convert tile index back to world coordinate
+    private static int TileToWorldX(int tx, TileGrid tg) => tg.OriginX + tx * tg.TileSize;
+    private static int TileToWorldY(int ty, TileGrid tg) => tg.OriginY + ty * tg.TileSize;
+
     private static void ResolveHorizontalTileCollision(
         ref Vector2 position, ref Vector2 velocity,
         int entityW, int entityH, TileGrid tileGrid, int tileSize)
@@ -47,22 +53,20 @@ public static class EnemyPhysics
 
         int left = (int)position.X;
         int right = (int)position.X + entityW - 1;
-        int top = (int)position.Y + 2; // slight inset to avoid catching on floor edges
+        int top = (int)position.Y + 2;
         int bottom = (int)position.Y + entityH - 2;
 
-        // Check tiles at leading edge
         if (velocity.X > 0)
         {
-            // Moving right — check right edge
-            int tileCol = right / tileSize;
+            int tileCol = WorldToTileX(right, tileGrid);
             for (int py = top; py <= bottom; py += tileSize / 2)
             {
-                int tileRow = py / tileSize;
+                int tileRow = WorldToTileY(py, tileGrid);
                 if (tileCol >= 0 && tileCol < tileGrid.Width && tileRow >= 0 && tileRow < tileGrid.Height)
                 {
                     if (TileProperties.IsSolid(tileGrid.GetTileAt(tileCol, tileRow)))
                     {
-                        position.X = tileCol * tileSize - entityW;
+                        position.X = TileToWorldX(tileCol, tileGrid) - entityW;
                         velocity.X = 0;
                         return;
                     }
@@ -71,16 +75,15 @@ public static class EnemyPhysics
         }
         else if (velocity.X < 0)
         {
-            // Moving left — check left edge
-            int tileCol = left / tileSize;
+            int tileCol = WorldToTileX(left, tileGrid);
             for (int py = top; py <= bottom; py += tileSize / 2)
             {
-                int tileRow = py / tileSize;
+                int tileRow = WorldToTileY(py, tileGrid);
                 if (tileCol >= 0 && tileCol < tileGrid.Width && tileRow >= 0 && tileRow < tileGrid.Height)
                 {
                     if (TileProperties.IsSolid(tileGrid.GetTileAt(tileCol, tileRow)))
                     {
-                        position.X = (tileCol + 1) * tileSize;
+                        position.X = TileToWorldX(tileCol + 1, tileGrid);
                         velocity.X = 0;
                         return;
                     }
@@ -89,10 +92,6 @@ public static class EnemyPhysics
         }
     }
 
-    /// <summary>
-    /// Resolve vertical collisions (floor landing and ceiling bonk) against tiles, platforms, solid floors, and main floor.
-    /// Returns true if entity landed on ground.
-    /// </summary>
     private static bool ResolveVerticalCollision(
         ref Vector2 position, ref Vector2 velocity,
         int entityW, int entityH,
@@ -101,23 +100,22 @@ public static class EnemyPhysics
     {
         bool onGround = false;
 
-        if (velocity.Y >= 0) // Falling or on ground
+        if (velocity.Y >= 0)
         {
             float footY = position.Y + entityH;
 
-            // Check tile grid floors
             if (tileGrid != null)
             {
-                int leftCol = (int)position.X / tileSize;
-                int rightCol = ((int)position.X + entityW - 1) / tileSize;
-                int footRow = (int)footY / tileSize;
+                int leftCol = WorldToTileX((int)position.X, tileGrid);
+                int rightCol = WorldToTileX((int)position.X + entityW - 1, tileGrid);
+                int footRow = WorldToTileY((int)footY, tileGrid);
 
                 for (int tx = leftCol; tx <= rightCol; tx++)
                 {
                     if (tx < 0 || tx >= tileGrid.Width || footRow < 0 || footRow >= tileGrid.Height) continue;
                     if (TileProperties.IsSolid(tileGrid.GetTileAt(tx, footRow)))
                     {
-                        float surfaceY = footRow * tileSize;
+                        float surfaceY = TileToWorldY(footRow, tileGrid);
                         if (footY >= surfaceY && position.Y + entityH - velocity.Y * 0.017f <= surfaceY + 8)
                         {
                             position.Y = surfaceY - entityH;
@@ -128,7 +126,6 @@ public static class EnemyPhysics
                 }
             }
 
-            // Check platforms (land on top, one-way)
             if (!onGround && platforms != null)
             {
                 foreach (var p in platforms)
@@ -144,7 +141,6 @@ public static class EnemyPhysics
                 }
             }
 
-            // Check solid floors
             if (!onGround && solidFloors != null)
             {
                 foreach (var sf in solidFloors)
@@ -160,7 +156,6 @@ public static class EnemyPhysics
                 }
             }
 
-            // Check main floor
             if (!onGround && footY >= mainFloorY)
             {
                 position.Y = mainFloorY - entityH;
@@ -168,20 +163,20 @@ public static class EnemyPhysics
                 onGround = true;
             }
         }
-        else // Moving up — check ceilings
+        else
         {
             if (tileGrid != null)
             {
-                int leftCol = (int)position.X / tileSize;
-                int rightCol = ((int)position.X + entityW - 1) / tileSize;
-                int headRow = (int)position.Y / tileSize;
+                int leftCol = WorldToTileX((int)position.X, tileGrid);
+                int rightCol = WorldToTileX((int)position.X + entityW - 1, tileGrid);
+                int headRow = WorldToTileY((int)position.Y, tileGrid);
 
                 for (int tx = leftCol; tx <= rightCol; tx++)
                 {
                     if (tx < 0 || tx >= tileGrid.Width || headRow < 0 || headRow >= tileGrid.Height) continue;
                     if (TileProperties.IsSolid(tileGrid.GetTileAt(tx, headRow)))
                     {
-                        position.Y = (headRow + 1) * tileSize;
+                        position.Y = TileToWorldY(headRow + 1, tileGrid);
                         velocity.Y = 0;
                     }
                 }
@@ -191,41 +186,33 @@ public static class EnemyPhysics
         return onGround;
     }
 
-    /// <summary>
-    /// Find the left and right edges of walkable surface at the given foot position.
-    /// Checks tile grid, platforms, and solid floors.
-    /// </summary>
     public static (float Left, float Right) FindSurfaceEdges(
         float x, float footY, int entityW,
         TileGrid tileGrid, int tileSize,
         Rectangle[] platforms, Rectangle[] solidFloors,
         float boundsLeft, float boundsRight)
     {
-        // Check tile grid — scan left and right from current position for continuous solid tiles
         if (tileGrid != null)
         {
-            int footRow = (int)footY / tileSize;
-            int startCol = (int)x / tileSize;
+            int footRow = WorldToTileY((int)footY, tileGrid);
+            int startCol = WorldToTileX((int)x, tileGrid);
 
-            // Verify we're actually on a tile surface
             if (footRow >= 0 && footRow < tileGrid.Height && startCol >= 0 && startCol < tileGrid.Width
                 && TileProperties.IsSolid(tileGrid.GetTileAt(startCol, footRow)))
             {
-                // Scan left
-                float left = startCol * tileSize;
+                float left = TileToWorldX(startCol, tileGrid);
                 for (int tx = startCol - 1; tx >= 0; tx--)
                 {
                     if (TileProperties.IsSolid(tileGrid.GetTileAt(tx, footRow)))
-                        left = tx * tileSize;
+                        left = TileToWorldX(tx, tileGrid);
                     else
                         break;
                 }
-                // Scan right
-                float right = (startCol + 1) * tileSize;
+                float right = TileToWorldX(startCol + 1, tileGrid);
                 for (int tx = startCol + 1; tx < tileGrid.Width; tx++)
                 {
                     if (TileProperties.IsSolid(tileGrid.GetTileAt(tx, footRow)))
-                        right = (tx + 1) * tileSize;
+                        right = TileToWorldX(tx + 1, tileGrid);
                     else
                         break;
                 }
@@ -233,7 +220,6 @@ public static class EnemyPhysics
             }
         }
 
-        // Check platforms
         if (platforms != null)
         {
             foreach (var p in platforms)
@@ -243,7 +229,6 @@ public static class EnemyPhysics
             }
         }
 
-        // Check solid floors
         if (solidFloors != null)
         {
             foreach (var sf in solidFloors)
@@ -253,14 +238,9 @@ public static class EnemyPhysics
             }
         }
 
-        // Default: full level bounds
         return (boundsLeft, boundsRight);
     }
 
-    /// <summary>
-    /// Snap an entity to the nearest surface below the given position.
-    /// Checks tile grid, platforms, solid floors, walls, and main floor.
-    /// </summary>
     public static float SnapToSurface(
         float x, float y, int entityW, int entityH,
         TileGrid tileGrid, int tileSize,
@@ -269,7 +249,6 @@ public static class EnemyPhysics
     {
         float bestY = mainFloorY - entityH;
 
-        // Check platforms
         if (platforms != null)
         {
             foreach (var p in platforms)
@@ -280,7 +259,6 @@ public static class EnemyPhysics
             }
         }
 
-        // Check solid floors
         if (solidFloors != null)
         {
             foreach (var sf in solidFloors)
@@ -291,7 +269,6 @@ public static class EnemyPhysics
             }
         }
 
-        // Check walls
         if (walls != null)
         {
             foreach (var w in walls)
@@ -302,21 +279,20 @@ public static class EnemyPhysics
             }
         }
 
-        // Check tile grid
         if (tileGrid != null)
         {
-            int startCol = (int)(x / tileSize);
-            int endCol = (int)((x + entityW - 1) / tileSize);
-            int startRow = (int)(y / tileSize);
-            int endRow = (int)(bestY / tileSize) + 1;
+            int startCol = WorldToTileX((int)x, tileGrid);
+            int endCol = WorldToTileX((int)(x + entityW - 1), tileGrid);
+            int startRow = WorldToTileY((int)y, tileGrid);
+            int endRow = WorldToTileY((int)bestY, tileGrid) + 1;
             for (int ty = startRow; ty <= endRow && ty < tileGrid.Height; ty++)
             {
                 for (int tx = startCol; tx <= endCol; tx++)
                 {
-                    if (tx < 0 || tx >= tileGrid.Width) continue;
+                    if (tx < 0 || tx >= tileGrid.Width || ty < 0) continue;
                     if (TileProperties.IsSolid(tileGrid.GetTileAt(tx, ty)))
                     {
-                        float surfaceY = ty * tileSize - entityH;
+                        float surfaceY = TileToWorldY(ty, tileGrid) - entityH;
                         if (surfaceY >= y - 20 && surfaceY < bestY)
                             bestY = surfaceY;
                     }
