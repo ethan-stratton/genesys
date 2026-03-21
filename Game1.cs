@@ -5344,109 +5344,106 @@ public class Game1 : Game
     /// <summary>Draw 3D-bevel outline tracing only the filled area of the slope.</summary>
     private void DrawSlopeOutline(int wx, int wy, int ts, TileType tile, Color lightColor, Color darkColor)
     {
-        // Diagonal bevel
-        bool diagIsTop = tile == TileType.SlopeUpRight || tile == TileType.SlopeUpLeft ||
-                         tile == TileType.GentleUpRight || tile == TileType.GentleUpLeft ||
-                         tile == TileType.ShavedRight || tile == TileType.ShavedLeft;
-        var diagColor = diagIsTop ? lightColor : darkColor;
-
+        // Diagonal edge matching DrawSlopeTile fill geometry exactly
         for (int row = 0; row < ts; row++)
         {
             int edgeX = -1;
+            Color edgeColor = lightColor;
             switch (tile)
             {
-                case TileType.SlopeUpRight: edgeX = wx + (ts - 1 - row); break;
-                case TileType.SlopeUpLeft: edgeX = wx + row; break;
-                case TileType.SlopeCeilRight: edgeX = wx + row; break;
-                case TileType.SlopeCeilLeft: edgeX = wx + (ts - 1 - row); break;
+                // 45° floor slopes: diagonal is the surface (top-facing = light)
+                case TileType.SlopeUpRight: // fill left edge = wx + (ts-1-row)
+                    edgeX = wx + (ts - 1 - row); edgeColor = lightColor; break;
+                case TileType.SlopeUpLeft: // fill right edge = wx + row
+                    edgeX = wx + row; edgeColor = lightColor; break;
+                // 45° ceiling slopes: diagonal is bottom-facing = dark
+                case TileType.SlopeCeilRight: // fill left edge = wx + row
+                    edgeX = wx + row; edgeColor = darkColor; break;
+                case TileType.SlopeCeilLeft: // fill right edge = wx + (ts-1-row)
+                    edgeX = wx + (ts - 1 - row); edgeColor = darkColor; break;
+                // Gentle floor: surface from halfway down
                 case TileType.GentleUpRight:
-                    if (row >= ts / 2) edgeX = wx + (int)((ts - row) * 2f);
-                    break;
+                    if (row >= ts / 2) { int surfX = (int)((ts - row) * 2f); if (surfX < ts) edgeX = wx + surfX; }
+                    edgeColor = lightColor; break;
                 case TileType.GentleUpLeft:
-                    if (row >= ts / 2) edgeX = wx + (int)((row - ts / 2) * 2f);
-                    break;
+                    if (row >= ts / 2) { int fillW = (int)((row - ts / 2) * 2f); edgeX = wx + fillW; }
+                    edgeColor = lightColor; break;
+                // Gentle ceiling: surface from top to halfway
                 case TileType.GentleCeilRight:
-                    if (row * 2 < ts) edgeX = wx + row * 2;
-                    break;
+                    if (row * 2 < ts) { edgeX = wx + row * 2; }
+                    edgeColor = darkColor; break;
                 case TileType.GentleCeilLeft:
-                    if (row * 2 < ts) edgeX = wx + ts - 1 - row * 2;
-                    break;
-                case TileType.ShavedRight:
-                {
-                    // Full block with top-right shaved: diagonal from row 0 to ts/2 on right side
-                    int sr = row;
-                    int fillW = ts - Math.Max(0, sr) * 2;  // doesn't work cleanly; use actual geometry
-                    // Shaved right: at row r, fill goes from wx to wx + ts - max(0, r)*2 (for r < ts/2)
-                    if (row < ts / 2) edgeX = wx + ts - 1 - row * 2;
-                    break;
-                }
-                case TileType.ShavedLeft:
-                {
-                    if (row < ts / 2) edgeX = wx + row * 2;
-                    break;
-                }
-                case TileType.ShavedCeilRight:
-                {
-                    // Shaved off bottom-right
-                    if (row >= ts / 2) edgeX = wx + ts - 1 - (row - ts / 2) * 2;
-                    break;
-                }
-                case TileType.ShavedCeilLeft:
-                {
-                    if (row >= ts / 2) edgeX = wx + (row - ts / 2) * 2;
-                    break;
-                }
+                    if (row * 2 < ts) { edgeX = wx + ts - 1 - row * 2; }
+                    edgeColor = darkColor; break;
+                // Shaved floor: top corner cut off, mostly full block
+                case TileType.ShavedRight: // top-right shaved: diagonal at right edge of fill for row < ts/2
+                    if (row < ts / 2) { edgeX = wx + (int)(row * 2f); }
+                    edgeColor = lightColor; break;
+                case TileType.ShavedLeft: // top-left shaved: diagonal at left edge of fill for row < ts/2
+                    if (row < ts / 2) { int cut = ts - (int)(row * 2f) - 1; if (cut >= 0) edgeX = wx + cut; }
+                    edgeColor = lightColor; break;
+                // Shaved ceiling: bottom corner cut off
+                case TileType.ShavedCeilRight: // bottom-right shaved
+                    if (row > ts / 2) { int sr = row - ts / 2; int w2 = ts - sr * 2; if (w2 > 0) edgeX = wx + w2 - 1; }
+                    edgeColor = darkColor; break;
+                case TileType.ShavedCeilLeft: // bottom-left shaved
+                    if (row > ts / 2) { int sr = row - ts / 2; edgeX = wx + sr * 2; }
+                    edgeColor = darkColor; break;
             }
             if (edgeX >= wx && edgeX < wx + ts)
-                _spriteBatch.Draw(_pixel, new Rectangle(edgeX, wy + row, 1, 1), diagColor);
+                _spriteBatch.Draw(_pixel, new Rectangle(edgeX, wy + row, 1, 1), edgeColor);
         }
 
-        // Straight edges only where the slope has a fully solid edge
+        // Straight edges only where fill is solid along the full edge
         switch (tile)
         {
-            case TileType.SlopeUpRight: // solid bottom
+            case TileType.SlopeUpRight: // bottom full
                 _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), darkColor);
                 break;
-            case TileType.SlopeUpLeft: // solid bottom
+            case TileType.SlopeUpLeft: // bottom full
                 _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), darkColor);
                 break;
-            case TileType.SlopeCeilRight: // solid top
+            case TileType.SlopeCeilRight: // top full
                 _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), lightColor);
                 break;
-            case TileType.SlopeCeilLeft: // solid top
+            case TileType.SlopeCeilLeft: // top full
                 _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), lightColor);
                 break;
-            case TileType.GentleUpRight: // solid bottom
+            case TileType.GentleUpRight: // bottom full, right edge from ts/2 to bottom
                 _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), darkColor);
+                _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy + ts / 2, 1, ts / 2), darkColor);
                 break;
-            case TileType.GentleUpLeft: // solid bottom
+            case TileType.GentleUpLeft: // bottom full, left edge from ts/2 to bottom
                 _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), darkColor);
+                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts / 2, 1, ts / 2), lightColor);
                 break;
-            case TileType.GentleCeilRight: // solid top
+            case TileType.GentleCeilRight: // top full, right edge from top to ts/2
                 _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), lightColor);
+                _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts / 2), darkColor);
                 break;
-            case TileType.GentleCeilLeft: // solid top
+            case TileType.GentleCeilLeft: // top full, left edge from top to ts/2
                 _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), lightColor);
+                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts / 2), lightColor);
                 break;
-            case TileType.ShavedRight: // solid bottom, left, top (shaved top-right)
-                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), darkColor);
-                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts), lightColor);
-                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), lightColor);
+            case TileType.ShavedRight: // top, left, bottom full (top-right corner shaved)
+                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts), lightColor); // left
+                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), darkColor); // bottom
+                _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy + ts / 2, 1, ts / 2), darkColor); // right below shave
                 break;
-            case TileType.ShavedLeft: // solid bottom, right, top (shaved top-left)
-                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), darkColor);
-                _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts), darkColor);
-                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), lightColor);
+            case TileType.ShavedLeft: // top, right, bottom full (top-left corner shaved)
+                _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts), darkColor); // right
+                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), darkColor); // bottom
+                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts / 2, 1, ts / 2), lightColor); // left below shave
                 break;
-            case TileType.ShavedCeilRight: // solid top, left, bottom (shaved bottom-right)
-                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), lightColor);
-                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts), lightColor);
-                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), darkColor);
+            case TileType.ShavedCeilRight: // top, left full, bottom-right shaved
+                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), lightColor); // top
+                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts), lightColor); // left
+                _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts / 2), darkColor); // right above shave
                 break;
-            case TileType.ShavedCeilLeft: // solid top, right, bottom (shaved bottom-left)
-                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), lightColor);
-                _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts), darkColor);
-                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), darkColor);
+            case TileType.ShavedCeilLeft: // top, right full, bottom-left shaved
+                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), lightColor); // top
+                _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts), darkColor); // right
+                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts / 2), lightColor); // left above shave
                 break;
         }
     }
