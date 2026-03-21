@@ -322,6 +322,7 @@ public class Player
         public int SpriteRow;
         public int SpriteFrame;
         public int FacingDir;
+        public int DrawHeight; // height at time of spawn (for crouch/slide)
         public float Alpha;
         public float TimeLeft;
     }
@@ -1806,6 +1807,7 @@ public class Player
                     SpriteRow = aimgRow,
                     SpriteFrame = aimgFrame,
                     FacingDir = FacingDir,
+                    DrawHeight = CurrentHeight,
                     Alpha = 0.8f,
                     TimeLeft = AfterimageLifetime
                 };
@@ -2010,10 +2012,12 @@ public class Player
             {
                 var ai = _afterimages[i];
                 int aiW = Width;
-                int aiH = Height;
+                int aiH = ai.DrawHeight > 0 ? ai.DrawHeight : Height;
                 var aiColor = new Color(150, 180, 255) * ai.Alpha;
+                // Bottom-aligned: afterimage foot = Position.Y + Height
+                int aiY = (int)ai.Position.Y + Height - aiH;
                 spriteBatch.Draw(pixel,
-                    new Rectangle((int)ai.Position.X, (int)ai.Position.Y, aiW, aiH),
+                    new Rectangle((int)ai.Position.X, aiY, aiW, aiH),
                     aiColor);
             }
         }
