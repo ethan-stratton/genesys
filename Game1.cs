@@ -5343,6 +5343,26 @@ public class Game1 : Game
 
     private void DrawWeather()
     {
+        // Wind visual — horizontal streaks/debris particles
+        if (_weatherWind)
+        {
+            float windX = _windDir * _windStrength;
+            for (int i = 0; i < 12; i++)
+            {
+                // Deterministic but scrolling streaks
+                float seed = i * 7331f;
+                float baseX = _player.Position.X + MathF.Sin(seed) * ViewW * 0.8f;
+                float baseY = _player.Position.Y - ViewH * 0.4f + (seed % ViewH);
+                // Scroll with wind
+                float scroll = (_totalTime * windX * 2f + seed * 13f) % (ViewW * 2f) - ViewW;
+                float sx = baseX + scroll;
+                float sy = baseY + MathF.Sin(_totalTime * 1.5f + seed * 0.1f) * 15f;
+                int streakLen = 6 + (int)(seed % 10);
+                var streakColor = new Color(180, 200, 180) * (0.15f + (seed % 5) * 0.03f);
+                _spriteBatch.Draw(_pixel, new Rectangle((int)sx, (int)sy, streakLen, 1), streakColor);
+            }
+        }
+
         // Clouds (behind everything, drawn in world space)
         foreach (var c in _clouds)
         {
@@ -5384,42 +5404,47 @@ public class Game1 : Game
         }
     }
 
+    /// <summary>Good hash for Voronoi — produces well-distributed 0..1 values from integer coords.</summary>
+    private static float Hash2D(int x, int y, int seed)
+    {
+        // PCG-style bit mixing
+        uint h = (uint)(x * 73856093 ^ y * 19349663 ^ seed * 83492791);
+        h ^= h >> 16; h *= 0x45d9f3b; h ^= h >> 16; h *= 0x45d9f3b; h ^= h >> 16;
+        return (h & 0x7FFFFFFF) / (float)0x7FFFFFFF;
+    }
+
     /// <summary>Draw an animated liquid tile (water, lava, acid). Uses Voronoi cellular noise for caustic light patterns.</summary>
     private void DrawLiquidTile(int wx, int wy, int ts, TileType tile, TileGrid tg, int tx, int ty)
     {
         float t = _totalTime;
-        Color baseColor, deepColor, ridgeColor, surfaceColor;
+        Color deepColor, ridgeColor, surfaceColor;
         float speed, waveAmp;
 
         switch (tile)
         {
             case TileType.Lava:
-                baseColor = new Color(180, 50, 10);
-                deepColor = new Color(80, 15, 5);
-                ridgeColor = new Color(255, 200, 60);
+                deepColor = new Color(60, 10, 2);
+                ridgeColor = new Color(255, 160, 40);
                 surfaceColor = new Color(255, 180, 40);
                 speed = 1.8f;
                 waveAmp = 4f;
                 break;
             case TileType.Acid:
-                baseColor = new Color(40, 160, 30);
-                deepColor = new Color(15, 60, 10);
-                ridgeColor = new Color(140, 255, 100);
+                deepColor = new Color(8, 35, 5);
+                ridgeColor = new Color(100, 220, 60);
                 surfaceColor = new Color(120, 255, 80);
                 speed = 1.2f;
                 waveAmp = 3f;
                 break;
             default: // Water
-                baseColor = new Color(25, 55, 80);
-                deepColor = new Color(10, 25, 45);
-                ridgeColor = new Color(160, 170, 100); // golden-green caustic ridges like reference
-                surfaceColor = new Color(80, 160, 255);
-                speed = 0.6f;
+                deepColor = new Color(8, 18, 30);
+                ridgeColor = new Color(120, 140, 80);
+                surfaceColor = new Color(60, 130, 200);
+                speed = 0.5f;
                 waveAmp = 3f;
                 break;
         }
 
-        // Check if this is a surface tile (no liquid directly above)
         bool isSurface = ty == 0 || !TileProperties.IsLiquid(tg.GetTileAt(tx, ty - 1));
         int depth = 0;
         for (int checkY = ty - 1; checkY >= 0; checkY--)
@@ -5427,62 +5452,54 @@ public class Game1 : Game
             if (TileProperties.IsLiquid(tg.GetTileAt(tx, checkY))) depth++;
             else break;
         }
-        float depthFactor = MathHelper.Clamp(1f - depth * 0.12f, 0.35f, 1f);
+        float depthFactor = MathHelper.Clamp(1f - depth * 0.1f, 0.3f, 1f);
 
-        // Voronoi caustic noise — compute at 2px resolution for performance
-        int step = 2;
-        int bodyStartY = isSurface ? 8 : 0; // leave room for surface wave
+        // Fill entire tile with deep color first
+        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, ts), deepColor * (0.7f + depthFactor * 0.3f));
 
+        // Surface wave
         if (isSurface)
         {
-            // Draw animated surface wave
             for (int px = 0; px < ts; px++)
             {
                 float worldX = wx + px;
-                float wave1 = MathF.Sin((worldX * 0.08f + t * speed)) * waveAmp;
-                float wave2 = MathF.Sin((worldX * 0.13f + t * speed * 0.7f + 1.5f)) * (waveAmp * 0.5f);
-                int surfaceOffset = (int)(wave1 + wave2);
-                int surfY = wy + 6 + surfaceOffset;
+                float wave1 = MathF.Sin(worldX * 0.06f + t * speed) * waveAmp;
+                float wave2 = MathF.Sin(worldX * 0.11f + t * speed * 0.7f + 2f) * (waveAmp * 0.6f);
+                int surfY = wy + 5 + (int)(wave1 + wave2);
                 if (surfY < wy) surfY = wy;
-
                 if (surfY >= wy && surfY < wy + ts)
                 {
-                    _spriteBatch.Draw(_pixel, new Rectangle(wx + px, surfY, 1, 2), surfaceColor * 0.9f);
-                    float glint = MathF.Sin(worldX * 0.2f + t * speed * 2f);
-                    if (glint > 0.7f)
-                        _spriteBatch.Draw(_pixel, new Rectangle(wx + px, surfY, 1, 1), Color.White * (glint - 0.5f));
+                    // Clear above surface (draw background color)
+                    if (surfY > wy)
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx + px, wy, 1, surfY - wy), Color.Transparent);
+                    // Surface highlight
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx + px, surfY, 1, 2), surfaceColor * 0.85f);
+                    float glint = MathF.Sin(worldX * 0.18f + t * speed * 2.5f);
+                    if (glint > 0.6f)
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx + px, surfY, 1, 1), Color.White * ((glint - 0.4f) * 0.6f));
                 }
-
-                // Body fill below surface
-                int bodyTop = Math.Max(surfY + 2, wy);
-                int bodyH = (wy + ts) - bodyTop;
-                if (bodyH > 0)
-                    _spriteBatch.Draw(_pixel, new Rectangle(wx + px, bodyTop, 1, bodyH), deepColor * depthFactor);
             }
-            bodyStartY = 10; // caustics start below surface
-        }
-        else
-        {
-            // Full body fill
-            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, ts), deepColor * depthFactor);
         }
 
-        // Voronoi caustics over body area
-        // Use ~8 seed points per tile neighborhood, animated over time
-        float cellScale = 0.09f; // controls cell size
-        float timeScale = speed * 0.4f;
+        // Voronoi caustics — larger cells, better hash, organic shapes
+        // Cell size in world pixels (~24px per cell = nice big organic shapes)
+        float cellSize = 24f;
+        float invCell = 1f / cellSize;
+        float timeScale = speed * 0.35f;
+        int step = 2; // render at 2px resolution
 
-        for (int py = bodyStartY; py < ts; py += step)
+        int startY = isSurface ? 8 : 0;
+        for (int py = startY; py < ts; py += step)
         {
             for (int px = 0; px < ts; px += step)
             {
-                float worldX = (wx + px) * cellScale;
-                float worldY = (wy + py) * cellScale;
+                float worldX = (wx + px) * invCell;
+                float worldY = (wy + py) * invCell;
 
-                // Animated Voronoi: check 3x3 grid of cells
-                float d1 = 999f, d2 = 999f;
                 int cellX = (int)MathF.Floor(worldX);
                 int cellY = (int)MathF.Floor(worldY);
+
+                float d1 = 99f, d2 = 99f;
 
                 for (int cy = -1; cy <= 1; cy++)
                 {
@@ -5490,11 +5507,14 @@ public class Game1 : Game
                     {
                         int cxi = cellX + cx;
                         int cyi = cellY + cy;
-                        // Hash-based seed point per cell (animated)
-                        float hash1 = ((cxi * 127 + cyi * 311) & 0xFFFF) / 65536f;
-                        float hash2 = ((cxi * 269 + cyi * 173) & 0xFFFF) / 65536f;
-                        float seedX = cxi + hash1 + MathF.Sin(t * timeScale + hash1 * 6.28f) * 0.35f;
-                        float seedY = cyi + hash2 + MathF.Cos(t * timeScale * 0.8f + hash2 * 6.28f) * 0.35f;
+
+                        // Hash gives well-distributed point within each cell
+                        float hx = Hash2D(cxi, cyi, 0);
+                        float hy = Hash2D(cxi, cyi, 1);
+
+                        // Animate: seed points orbit slowly
+                        float seedX = cxi + 0.15f + hx * 0.7f + MathF.Sin(t * timeScale + hx * 6.28f) * 0.3f;
+                        float seedY = cyi + 0.15f + hy * 0.7f + MathF.Cos(t * timeScale * 0.9f + hy * 6.28f) * 0.3f;
 
                         float dx = worldX - seedX;
                         float dy = worldY - seedY;
@@ -5505,24 +5525,28 @@ public class Game1 : Game
                     }
                 }
 
-                // Ridge = edge between cells (where d2 - d1 is small)
-                float ridge = d2 - d1;
-                // Sharpen the ridge
-                float ridgeBrightness = MathHelper.Clamp(1f - ridge * 3.5f, 0f, 1f);
-                ridgeBrightness *= ridgeBrightness; // quadratic falloff for sharper ridges
+                // Ridge brightness: where d2 ≈ d1 (cell boundaries)
+                float edge = d2 - d1;
+                // Adjust sharpness — lower multiplier = thicker ridges
+                float brightness = MathHelper.Clamp(1f - edge * 2.8f, 0f, 1f);
+                brightness = brightness * brightness; // sharpen
 
-                if (ridgeBrightness > 0.05f)
+                // Also add subtle inner glow (inverse d1 for cell center brightness)
+                float innerGlow = MathHelper.Clamp(0.15f - d1 * 0.15f, 0f, 0.15f);
+
+                float total = (brightness + innerGlow) * depthFactor;
+                if (total > 0.02f)
                 {
-                    var causticColor = new Color(
-                        (int)(ridgeColor.R * ridgeBrightness * depthFactor),
-                        (int)(ridgeColor.G * ridgeBrightness * depthFactor),
-                        (int)(ridgeColor.B * ridgeBrightness * depthFactor));
-                    _spriteBatch.Draw(_pixel, new Rectangle(wx + px, wy + py, step, step), causticColor);
+                    var c = new Color(
+                        (int)(ridgeColor.R * total),
+                        (int)(ridgeColor.G * total),
+                        (int)(ridgeColor.B * total));
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx + px, wy + py, step, step), c);
                 }
             }
         }
 
-        // Subtle bubbles for lava/acid only
+        // Bubbles for lava/acid only
         if (tile != TileType.Water)
         {
             int seed = tx * 7919 + ty * 104729;
@@ -5542,16 +5566,16 @@ public class Game1 : Game
             }
         }
 
-        // Edge darkening (left/right if adjacent tile is not liquid)
+        // Edge darkening
         bool leftLiquid = tx > 0 && TileProperties.IsLiquid(tg.GetTileAt(tx - 1, ty));
         bool rightLiquid = tx < tg.Width - 1 && TileProperties.IsLiquid(tg.GetTileAt(tx + 1, ty));
         if (!leftLiquid)
-            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 2, ts), deepColor * 0.5f);
+            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 2, ts), Color.Black * 0.4f);
         if (!rightLiquid)
-            _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 2, wy, 2, ts), deepColor * 0.5f);
+            _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 2, wy, 2, ts), Color.Black * 0.4f);
         bool belowLiquid = ty < tg.Height - 1 && TileProperties.IsLiquid(tg.GetTileAt(tx, ty + 1));
         if (!belowLiquid)
-            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 2, ts, 2), deepColor * 0.6f);
+            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 2, ts, 2), Color.Black * 0.5f);
     }
 
     private void DrawSlopeTile(int wx, int wy, int ts, TileType tile, Color color)
