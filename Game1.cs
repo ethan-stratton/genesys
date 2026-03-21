@@ -5397,17 +5397,21 @@ public class Game1 : Game
         // Straight edges only where fill is solid along the full edge
         switch (tile)
         {
-            case TileType.SlopeUpRight: // bottom full
+            case TileType.SlopeUpRight: // bottom full, right edge full (tall side)
                 _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), darkColor);
+                _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts), darkColor);
                 break;
-            case TileType.SlopeUpLeft: // bottom full
+            case TileType.SlopeUpLeft: // bottom full, left edge full (tall side)
                 _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), darkColor);
+                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts), lightColor);
                 break;
-            case TileType.SlopeCeilRight: // top full
+            case TileType.SlopeCeilRight: // top full, right edge full (tall side)
                 _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), lightColor);
+                _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts), darkColor);
                 break;
-            case TileType.SlopeCeilLeft: // top full
+            case TileType.SlopeCeilLeft: // top full, left edge full (tall side)
                 _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), lightColor);
+                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts), lightColor);
                 break;
             case TileType.GentleUpRight: // bottom full, right edge from ts/2 to bottom
                 _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), darkColor);
