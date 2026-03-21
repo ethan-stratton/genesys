@@ -5344,13 +5344,7 @@ public class Game1 : Game
     /// <summary>Draw 3D-bevel outline tracing only the filled area of the slope.</summary>
     private void DrawSlopeOutline(int wx, int wy, int ts, TileType tile, Color lightColor, Color darkColor)
     {
-        // Full gold grid border around the tile cell (same as regular blocks)
-        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), lightColor);       // top (light)
-        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts), lightColor);       // left (light)
-        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), darkColor); // bottom (dark)
-        _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts), darkColor); // right (dark)
-
-        // Diagonal bevel on top of the grid lines
+        // Diagonal bevel
         bool diagIsTop = tile == TileType.SlopeUpRight || tile == TileType.SlopeUpLeft ||
                          tile == TileType.GentleUpRight || tile == TileType.GentleUpLeft;
         var diagColor = diagIsTop ? lightColor : darkColor;
@@ -5379,6 +5373,49 @@ public class Game1 : Game
             }
             if (edgeX >= wx && edgeX < wx + ts)
                 _spriteBatch.Draw(_pixel, new Rectangle(edgeX, wy + row, 1, 1), diagColor);
+        }
+
+        // Edges only where the slope has solid fill along that edge
+        // Floor slopes: full bottom edge, vertical on tall side only
+        // Ceiling slopes: full top edge, vertical on tall side only
+        switch (tile)
+        {
+            case TileType.SlopeUpRight: // ╱ solid: bottom, right
+                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), darkColor);
+                _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts), darkColor);
+                break;
+            case TileType.SlopeUpLeft: // ╲ solid: bottom, left
+                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), darkColor);
+                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts), lightColor);
+                break;
+            case TileType.SlopeCeilRight: // solid: top, right
+                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), lightColor);
+                _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts), darkColor);
+                break;
+            case TileType.SlopeCeilLeft: // solid: top, left
+                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), lightColor);
+                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts), lightColor);
+                break;
+            case TileType.GentleUpRight: // solid: bottom, right, left below halfway
+                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), darkColor);
+                _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy + ts / 2, 1, ts / 2), darkColor);
+                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts / 2, 1, ts / 2), lightColor);
+                break;
+            case TileType.GentleUpLeft: // solid: bottom, left, right below halfway
+                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), darkColor);
+                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts / 2, 1, ts / 2), lightColor);
+                _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy + ts / 2, 1, ts / 2), darkColor);
+                break;
+            case TileType.GentleCeilRight: // solid: top, right, left above halfway
+                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), lightColor);
+                _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts / 2), darkColor);
+                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts / 2), lightColor);
+                break;
+            case TileType.GentleCeilLeft: // solid: top, left, right above halfway
+                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), lightColor);
+                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts / 2), lightColor);
+                _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts / 2), darkColor);
+                break;
         }
     }
 
