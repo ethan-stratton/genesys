@@ -210,6 +210,13 @@ public class Game1 : Game
     #pragma warning disable CS0414
     private bool _eveDialogueExhausted; // used later for quest tracking
     #pragma warning restore CS0414
+    private string _eveMessage = "";
+    private float _eveMessageTimer;
+    private void EveAlert(string msg, float duration = 3f)
+    {
+        _eveMessage = msg;
+        _eveMessageTimer = duration;
+    }
 
     // EVE Scan System
     private Dictionary<string, int> _scanProgress = new(); // "crawler" -> scan count (0-3)
@@ -782,6 +789,7 @@ public class Game1 : Game
 
         var dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
         _totalTime += dt;
+        if (_eveMessageTimer > 0) _eveMessageTimer -= dt;
 
         // Room transition fade
         if (_transitionActive)
@@ -1129,6 +1137,17 @@ public class Game1 : Game
                     latchedCount++;
                     _nextLatchDelay = 0.4f; // stagger: 0.4s between latches
                     _shakeTimer = 0.1f; _shakeIntensity = 2f;
+                    // EVE warns about latched crawlers
+                    if (_eveOrbActive)
+                    {
+                        string[] warns = {
+                            "Hostile organism attached! Shake it off!",
+                            "Crawler latched on! Use melee or dash!",
+                            "Parasite detected on suit! Remove it!",
+                            "Warning: biological attachment detected!"
+                        };
+                        EveAlert(warns[_rng.Next(warns.Length)], 2.5f);
+                    }
                 }
                 else
                 {
@@ -1695,8 +1714,12 @@ public class Game1 : Game
         // Dust on dash start
         if (_dustParticlesEnabled && _player.IsDashing && !_playerWasDashing)
             SpawnDustParticles(new Vector2(_player.Position.X + Player.Width / 2f, _player.Position.Y + Player.Height), 6);
-        // Dashing flings off some latched crawlers
-        if (_player.IsDashing && !_playerWasDashing)
+        // Movement actions fling off latched crawlers
+        bool actionFling = (_player.IsDashing && !_playerWasDashing)
+            || _player.IsSliding || _player.IsUppercutting
+            || _player.IsVaultKicking || _player.IsBladeDashing
+            || _player.IsCartwheeling || _player.IsFlipping;
+        if (actionFling)
         {
             foreach (var c in _crawlers)
             {
@@ -6432,6 +6455,17 @@ public class Game1 : Game
             _spriteBatch.Draw(_pixel, new Rectangle((int)(orbX - 6), (int)(orbY - 6), 12, 12), Color.CornflowerBlue * 0.4f);
             // Core
             _spriteBatch.Draw(_pixel, new Rectangle((int)(orbX - 4), (int)(orbY - 4), 8, 8), Color.Cyan);
+            // EVE speech bubble
+            if (_eveMessageTimer > 0 && !string.IsNullOrEmpty(_eveMessage))
+            {
+                float alpha = MathHelper.Clamp(_eveMessageTimer, 0, 1);
+                var msgSize = _fontSmall.MeasureString(_eveMessage);
+                float bubbleX = orbX - msgSize.X / 2f;
+                float bubbleY = orbY - 24 - msgSize.Y;
+                // Background
+                _spriteBatch.Draw(_pixel, new Rectangle((int)bubbleX - 4, (int)bubbleY - 2, (int)msgSize.X + 8, (int)msgSize.Y + 4), Color.Black * (0.7f * alpha));
+                DrawOutlinedString(_fontSmall, _eveMessage, new Vector2(bubbleX, bubbleY), Color.Cyan * alpha);
+            }
         }
 
         // Draw bullets
@@ -6476,14 +6510,6 @@ public class Game1 : Game
                 hpPct > 0.5f ? Color.LimeGreen : (hpPct > 0.25f ? Color.Yellow : Color.Red));
             DrawHollowRect(hpBarX, hpBarY, hpBarW, hpBarH, Color.White * 0.3f);
             DrawOutlinedString(_font, $"HP {_player.Hp}/{_player.MaxHp}", new Vector2(hpBarX + hpBarW + 8, hpBarY - 2), Color.White * 0.7f);
-
-            // Latched crawler warning
-            {
-                int lc = 0;
-                foreach (var c in _crawlers) if (c.IsLatched) lc++;
-                if (lc > 0)
-                    DrawOutlinedString(_font, $"LATCHED x{lc} — Melee/Dash to shake off!", new Vector2(hpBarX, hpBarY + hpBarH + 4), Color.OrangeRed);
-            }
 
             // Weapon HUD
             {
