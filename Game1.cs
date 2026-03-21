@@ -1753,7 +1753,7 @@ public class Game1 : Game
                             break;
                     }
                     // Screen shake + particles for feedback
-                    _screenShakeTimer = 0.15f; _screenShakeMagnitude = 3f;
+                    if (_screenShakeEnabled) { _shakeTimer = 0.15f; _shakeIntensity = 3f; }
                     SpawnDustParticles(new Vector2(sw.X + sw.W / 2f, sw.Y + sw.H / 2f), 10);
                     break;
                 }
