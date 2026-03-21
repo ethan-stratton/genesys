@@ -248,6 +248,7 @@ public class Game1 : Game
     private bool _toolPaletteOpen;
     private Vector2 _editorCursor; // world position
     private bool _editorGridSnap = true;
+    private bool _editorShowGrid = true;
     private int _editorGridSize = 32;
     private bool _editorDragging;
     private Vector2 _editorDragStart;
@@ -511,35 +512,13 @@ public class Game1 : Game
         _pixel.SetData(new[] { Color.White });
 
         // Load parallax background layers
-        // Supports: Content/backgrounds/parallax_0..3.png OR Content/backgrounds/bg_1/bg_1_layer_3..1.png + bg_1.png
+        // Load from Content/backgrounds/clouds/Clouds 5/ (layers 1-5, back to front)
         var layers = new List<Texture2D>();
-        string bgDir = "Content/backgrounds";
-        // Try numbered parallax_N.png first
-        bool foundNumbered = false;
-        for (int i = 0; i < 4; i++)
+        string bgDir = "Content/backgrounds/clouds/Clouds 5";
+        for (int i = 1; i <= 5; i++)
         {
-            string path = Path.Combine(bgDir, $"parallax_{i}.png");
-            if (File.Exists(path)) { foundNumbered = true; using var fs = File.OpenRead(path); layers.Add(Texture2D.FromStream(GraphicsDevice, fs)); }
-        }
-        if (!foundNumbered)
-        {
-            // Try bg_1 subfolder: layer_3 (sky/far) → layer_2 (mid) → layer_1 (near ground) → bg_1 (composite fallback)
-            var subDirs = Directory.Exists(bgDir) ? Directory.GetDirectories(bgDir) : Array.Empty<string>();
-            if (subDirs.Length > 0)
-            {
-                string sub = subDirs[0];
-                string baseName = Path.GetFileName(sub);
-                // Load back-to-front: layer_3 = furthest, layer_1 = nearest
-                string[] layerFiles = {
-                    Path.Combine(sub, $"{baseName}_layer_3.png"),
-                    Path.Combine(sub, $"{baseName}_layer_2.png"),
-                    Path.Combine(sub, $"{baseName}_layer_1.png"),
-                };
-                foreach (var lf in layerFiles)
-                {
-                    if (File.Exists(lf)) { using var fs = File.OpenRead(lf); layers.Add(Texture2D.FromStream(GraphicsDevice, fs)); }
-                }
-            }
+            string path = Path.Combine(bgDir, $"{i}.png");
+            if (File.Exists(path)) { using var fs = File.OpenRead(path); layers.Add(Texture2D.FromStream(GraphicsDevice, fs)); }
         }
         _parallaxLayers = layers.ToArray();
 
@@ -2096,7 +2075,9 @@ public class Game1 : Game
             1 => new[] { 0.1f },
             2 => new[] { 0.1f, 0.4f },
             3 => new[] { 0.05f, 0.25f, 0.5f },
-            _ => new[] { 0.05f, 0.15f, 0.35f, 0.6f },
+            4 => new[] { 0.05f, 0.15f, 0.35f, 0.6f },
+            5 => new[] { 0.02f, 0.1f, 0.25f, 0.45f, 0.7f },
+            _ => new[] { 0.02f, 0.1f, 0.25f, 0.45f, 0.7f },
         };
         for (int i = 0; i < _parallaxLayers.Length && i < factors.Length; i++)
         {
@@ -2526,9 +2507,9 @@ public class Game1 : Game
         if (kb.IsKeyDown(Keys.D8) && _prevKb.IsKeyUp(Keys.D8)) _editorTool = EditorTool.OverworldExit;
         if (kb.IsKeyDown(Keys.D9) && _prevKb.IsKeyUp(Keys.D9)) _editorTool = EditorTool.Ceiling;
 
-        // Grid snap toggle
+        // Grid visibility toggle (G key); snap is always on
         if (kb.IsKeyDown(Keys.G) && _prevKb.IsKeyUp(Keys.G))
-            _editorGridSnap = !_editorGridSnap;
+            _editorShowGrid = !_editorShowGrid;
 
         // Camera follows cursor
         _camera.SnapTo(_editorCursor, 0, 0);
@@ -3424,7 +3405,7 @@ public class Game1 : Game
         _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, floorH), new Color(40, 40, 40) * 0.5f);
 
         // Draw grid
-        if (_editorGridSnap)
+        if (_editorShowGrid)
         {
             var camInv = Matrix.Invert(_camera.TransformMatrix);
             var topLeft = Vector2.Transform(Vector2.Zero, camInv);
@@ -3433,9 +3414,9 @@ public class Game1 : Game
             int startX = ((int)topLeft.X / gs) * gs;
             int startY = ((int)topLeft.Y / gs) * gs;
             for (int gx = startX; gx < (int)botRight.X; gx += gs)
-                _spriteBatch.Draw(_pixel, new Rectangle(gx, (int)topLeft.Y, 1, (int)(botRight.Y - topLeft.Y)), Color.White * 0.04f);
+                _spriteBatch.Draw(_pixel, new Rectangle(gx, (int)topLeft.Y, 1, (int)(botRight.Y - topLeft.Y)), Color.White * 0.15f);
             for (int gy = startY; gy < (int)botRight.Y; gy += gs)
-                _spriteBatch.Draw(_pixel, new Rectangle((int)topLeft.X, gy, (int)(botRight.X - topLeft.X), 1), Color.White * 0.04f);
+                _spriteBatch.Draw(_pixel, new Rectangle((int)topLeft.X, gy, (int)(botRight.X - topLeft.X), 1), Color.White * 0.15f);
         }
 
         // (tile grid drawn after walls — see below)
