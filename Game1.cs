@@ -512,9 +512,9 @@ public class Game1 : Game
         _pixel.SetData(new[] { Color.White });
 
         // Load parallax background layers
-        // Load from Content/backgrounds/clouds/Clouds 5/ (layers 1-5, back to front)
+        // Load from Content/backgrounds/Nature Landscapes Free Pixel Art/nature_5/ (layers 1-5, back to front)
         var layers = new List<Texture2D>();
-        string bgDir = "Content/backgrounds/clouds/Clouds 5";
+        string bgDir = "Content/backgrounds/Nature Landscapes Free Pixel Art/nature_5";
         for (int i = 1; i <= 5; i++)
         {
             string path = Path.Combine(bgDir, $"{i}.png");
@@ -2526,7 +2526,7 @@ public class Game1 : Game
             : worldMouse;
 
         // Initialize tile grid if needed when entering tile paint mode
-        if (_editorTool == EditorTool.TilePaint && _level.TileGridInstance == null)
+        if ((_editorTool == EditorTool.TilePaint || kb.IsKeyDown(Keys.LeftShift) || kb.IsKeyDown(Keys.RightShift)) && _level.TileGridInstance == null)
         {
             int gridW = (_level.Bounds.Right - _level.Bounds.Left) / 32 + 2;
             int gridH = (_level.Bounds.Bottom - _level.Bounds.Top) / 32 + 2;
@@ -2534,7 +2534,10 @@ public class Game1 : Game
         }
 
         // Tile paint mode — continuous paint/erase with mouse
-        if (_editorTool == EditorTool.TilePaint && _level.TileGridInstance != null)
+        // Works in TilePaint mode directly, or in any mode with Shift held
+        bool tilePaintActive = _editorTool == EditorTool.TilePaint;
+        bool shiftTilePaint = kb.IsKeyDown(Keys.LeftShift) || kb.IsKeyDown(Keys.RightShift);
+        if ((tilePaintActive || shiftTilePaint) && _level.TileGridInstance != null)
         {
             var tg = _level.TileGridInstance;
             // Snap to 32x32 tile grid
@@ -2577,8 +2580,7 @@ public class Game1 : Game
             // Skip normal drag placement when in tile paint mode
         }
 
-        if (_editorTool == EditorTool.TilePaint)
-            goto editorEnd;
+        // Continue to T-drag and other tools (no early return)
 
         // Left click — place / start drag (not when G is held for grab)
         if (mouse.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released && !kb.IsKeyDown(Keys.T))
@@ -2798,6 +2800,13 @@ public class Game1 : Game
                 foreach (var it in _level.Items)
                     if (new Rectangle((int)it.X, (int)it.Y, it.W, it.H).Contains(mp))
                     { _editorMovingEntity = it; _editorMoveOffset = new Vector2(worldMouse.X - it.X, worldMouse.Y - it.Y); SetEditorStatus($"Grabbed item {it.Type}"); break; }
+            // Check player spawn point
+            if (_editorMovingEntity == null && _level.PlayerSpawn != null)
+            {
+                var sp = _level.PlayerSpawn;
+                if (new Rectangle(sp.X - 16, sp.Y - 24, 32, 48).Contains(mp))
+                { _editorMovingEntity = sp; _editorMoveOffset = new Vector2(worldMouse.X - sp.X, worldMouse.Y - sp.Y); SetEditorStatus("Grabbed spawn point"); }
+            }
         }
         // G held + drag — move entity
         if (kb.IsKeyDown(Keys.T) && mouse.LeftButton == ButtonState.Pressed && _editorMovingEntity != null)
@@ -2813,6 +2822,7 @@ public class Game1 : Game
             else if (_editorMovingEntity is EnvObjectData eod) { eod.X = nx; eod.Y = ny; }
             else if (_editorMovingEntity is NpcData npc) { npc.X = (int)nx; npc.Y = (int)ny; }
             else if (_editorMovingEntity is ItemData itd) { itd.X = nx; itd.Y = ny; }
+            else if (_editorMovingEntity is PointData pd) { pd.X = (int)nx; pd.Y = (int)ny; }
         }
         // Release — drop entity and rebuild
         if ((mouse.LeftButton == ButtonState.Released || !kb.IsKeyDown(Keys.T)) && _editorMovingEntity != null)
@@ -2920,7 +2930,7 @@ public class Game1 : Game
                 }
             }
         }
-        editorEnd:;
+        // editorEnd: (label removed — no longer needed)
     }
 
     private bool TryDeleteAt(Point p)
@@ -3414,9 +3424,9 @@ public class Game1 : Game
             int startX = ((int)topLeft.X / gs) * gs;
             int startY = ((int)topLeft.Y / gs) * gs;
             for (int gx = startX; gx < (int)botRight.X; gx += gs)
-                _spriteBatch.Draw(_pixel, new Rectangle(gx, (int)topLeft.Y, 1, (int)(botRight.Y - topLeft.Y)), Color.White * 0.15f);
+                _spriteBatch.Draw(_pixel, new Rectangle(gx, (int)topLeft.Y, 1, (int)(botRight.Y - topLeft.Y)), Color.White * 0.30f);
             for (int gy = startY; gy < (int)botRight.Y; gy += gs)
-                _spriteBatch.Draw(_pixel, new Rectangle((int)topLeft.X, gy, (int)(botRight.X - topLeft.X), 1), Color.White * 0.15f);
+                _spriteBatch.Draw(_pixel, new Rectangle((int)topLeft.X, gy, (int)(botRight.X - topLeft.X), 1), Color.White * 0.30f);
         }
 
         // (tile grid drawn after walls — see below)
@@ -3857,7 +3867,7 @@ public class Game1 : Game
         }
 
         // Grid snap indicator
-        _spriteBatch.DrawString(_font, $"Grid: {(_editorGridSnap ? "ON" : "OFF")} [G]", new Vector2(10, 30), _editorGridSnap ? Color.LightGreen : Color.Gray * 0.5f);
+        _spriteBatch.DrawString(_font, $"Grid: {(_editorShowGrid ? "ON" : "OFF")} [G]", new Vector2(10, 30), _editorShowGrid ? Color.LightGreen : Color.Gray * 0.5f);
 
         // Level name
         _spriteBatch.DrawString(_font, SafeText($"Level: {_level.Name}"), new Vector2(10, 50), Color.White * 0.6f);
