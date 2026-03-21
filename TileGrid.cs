@@ -75,6 +75,11 @@ public enum TileType : byte
     DamageNoKBTile = 83,  // continuous damage, no knockback (dark red)
     DamageFloorTile = 84, // solid + continuous damage, no knockback (dark red, standable)
 
+    // Liquid tiles
+    Water = 90,
+    Lava = 91,
+    Acid = 92,
+
     // Platforms
     PlatformTop = 22,     // half platform spanning top half of tile
     PlatformBottom = 23,  // half platform spanning bottom half of tile
@@ -111,6 +116,7 @@ public static class TileProperties
         || t == TileType.ShavedCeilRight || t == TileType.ShavedCeilLeft
         || (t >= TileType.Gentle4CeilRightA && t <= TileType.Gentle4CeilLeftD);
     public static bool IsEffectTile(TileType t) => (t >= TileType.DamageTile && t <= TileType.FloatTile) || t == TileType.DamageNoKBTile || t == TileType.DamageFloorTile;
+    public static bool IsLiquid(TileType t) => t == TileType.Water || t == TileType.Lava || t == TileType.Acid;
 
     public static Color GetColor(TileType t) => t switch
     {
@@ -171,6 +177,9 @@ public static class TileProperties
         TileType.GrassBg => new Color(38, 76, 0),
         TileType.WoodBg => new Color(69, 45, 21),
         TileType.SandBg => new Color(97, 89, 64),
+        TileType.Water => new Color(30, 90, 180),
+        TileType.Lava => new Color(200, 60, 20),
+        TileType.Acid => new Color(60, 200, 40),
         _ => Color.Transparent,
     };
 
@@ -232,6 +241,9 @@ public static class TileProperties
         TileType.GrassBg => new Color(25, 60, 10),
         TileType.WoodBg => new Color(55, 35, 16),
         TileType.SandBg => new Color(85, 77, 55),
+        TileType.Water => new Color(60, 140, 220),
+        TileType.Lava => new Color(255, 160, 30),
+        TileType.Acid => new Color(120, 255, 80),
         _ => Color.Transparent,
     };
 
@@ -295,6 +307,9 @@ public static class TileProperties
         TileType.GrassBg,
         TileType.WoodBg,
         TileType.SandBg,
+        TileType.Water,
+        TileType.Lava,
+        TileType.Acid,
     };
 }
 

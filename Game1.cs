@@ -3532,6 +3532,10 @@ public class Game1 : Game
                     {
                         DrawSlopeTile(wx, wy, tg.TileSize, tile, color);
                     }
+                    else if (TileProperties.IsLiquid(tile))
+                    {
+                        DrawLiquidTile(wx, wy, tg.TileSize, tile, tg, tx, ty);
+                    }
                     else if (TileProperties.IsEffectTile(tile) || tile == TileType.Breakable)
                     {
                         int ts = tg.TileSize;
@@ -3639,8 +3643,10 @@ public class Game1 : Game
             if (_editorTool == EditorTool.TilePaint)
             {
                 var wm = Vector2.Transform(new Vector2(mouse.X, mouse.Y), Matrix.Invert(_camera.TransformMatrix));
-                int gx = (int)MathF.Floor(wm.X / 32f) * 32;
-                int gy = (int)MathF.Floor(wm.Y / 32f) * 32;
+                int gox = _level.TileGridInstance?.OriginX ?? 0;
+                int goy = _level.TileGridInstance?.OriginY ?? 0;
+                int gx = gox + (int)MathF.Floor((wm.X - gox) / 32f) * 32;
+                int gy = goy + (int)MathF.Floor((wm.Y - goy) / 32f) * 32;
                 _spriteBatch.Draw(_pixel, new Rectangle(gx, gy, 32, 32), TileProperties.GetColor(_selectedTileType) * 0.4f);
                 DrawHollowRect(gx, gy, 32, 32, Color.White * 0.5f);
             }
@@ -4968,6 +4974,146 @@ public class Game1 : Game
     }
 
     /// <summary>Draw a slope tile as a filled shape (scanline).</summary>
+    /// <summary>Draw an animated liquid tile (water, lava, acid). Uses layered sine waves for surface + bubbles.</summary>
+    private void DrawLiquidTile(int wx, int wy, int ts, TileType tile, TileGrid tg, int tx, int ty)
+    {
+        float t = _totalTime;
+        Color baseColor, deepColor, surfaceColor, bubbleColor;
+        float speed, waveAmp;
+
+        switch (tile)
+        {
+            case TileType.Lava:
+                baseColor = new Color(180, 50, 10);
+                deepColor = new Color(120, 20, 5);
+                surfaceColor = new Color(255, 180, 40);
+                bubbleColor = new Color(255, 220, 80);
+                speed = 1.8f;
+                waveAmp = 4f;
+                break;
+            case TileType.Acid:
+                baseColor = new Color(40, 160, 30);
+                deepColor = new Color(20, 100, 15);
+                surfaceColor = new Color(120, 255, 80);
+                bubbleColor = new Color(160, 255, 120);
+                speed = 1.2f;
+                waveAmp = 3f;
+                break;
+            default: // Water
+                baseColor = new Color(20, 60, 140);
+                deepColor = new Color(10, 30, 80);
+                surfaceColor = new Color(80, 160, 255);
+                bubbleColor = new Color(140, 200, 255);
+                speed = 0.8f;
+                waveAmp = 3f;
+                break;
+        }
+
+        // Check if this is a surface tile (no liquid directly above)
+        bool isSurface = ty == 0 || !TileProperties.IsLiquid(tg.GetTileAt(tx, ty - 1));
+        // Check depth (how many liquid tiles above)
+        int depth = 0;
+        for (int checkY = ty - 1; checkY >= 0; checkY--)
+        {
+            if (TileProperties.IsLiquid(tg.GetTileAt(tx, checkY))) depth++;
+            else break;
+        }
+
+        // Darken with depth
+        float depthFactor = MathHelper.Clamp(1f - depth * 0.15f, 0.4f, 1f);
+        var bodyColor = new Color(
+            (int)(MathHelper.Lerp(deepColor.R, baseColor.R, depthFactor)),
+            (int)(MathHelper.Lerp(deepColor.G, baseColor.G, depthFactor)),
+            (int)(MathHelper.Lerp(deepColor.B, baseColor.B, depthFactor)));
+
+        if (isSurface)
+        {
+            // Draw animated surface with sine wave
+            // Two overlapping waves for complexity
+            for (int px = 0; px < ts; px++)
+            {
+                float worldX = wx + px;
+                float wave1 = MathF.Sin((worldX * 0.08f + t * speed)) * waveAmp;
+                float wave2 = MathF.Sin((worldX * 0.13f + t * speed * 0.7f + 1.5f)) * (waveAmp * 0.5f);
+                int surfaceOffset = (int)(wave1 + wave2);
+
+                // Surface highlight (top 2-3 pixels of wave)
+                int surfY = wy + 6 + surfaceOffset; // 6px down from top to allow wave crest room
+                if (surfY < wy) surfY = wy;
+
+                // Sky/empty above surface
+                // Don't draw anything above surfY
+
+                // Surface highlight line
+                if (surfY >= wy && surfY < wy + ts)
+                {
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx + px, surfY, 1, 2), surfaceColor * 0.9f);
+                    // Specular glint
+                    float glint = MathF.Sin(worldX * 0.2f + t * speed * 2f);
+                    if (glint > 0.7f)
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx + px, surfY, 1, 1), Color.White * (glint - 0.5f));
+                }
+
+                // Body below surface
+                int bodyStart = Math.Max(surfY + 2, wy);
+                int bodyHeight = (wy + ts) - bodyStart;
+                if (bodyHeight > 0)
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx + px, bodyStart, 1, bodyHeight), bodyColor * 0.85f);
+            }
+        }
+        else
+        {
+            // Subsurface body — subtle horizontal color variation
+            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, ts), bodyColor * 0.85f);
+
+            // Subtle caustic pattern (moving light patches)
+            for (int px = 0; px < ts; px += 4)
+            {
+                float worldX = wx + px;
+                float caustic = MathF.Sin(worldX * 0.15f + t * speed * 0.5f) *
+                                MathF.Sin((wy + 16) * 0.12f + t * speed * 0.3f);
+                if (caustic > 0.3f)
+                {
+                    int cw = (int)(4 + caustic * 4);
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx + px, wy + (int)(MathF.Sin(worldX * 0.1f) * 8 + 16), cw, 2),
+                        surfaceColor * (caustic * 0.25f));
+                }
+            }
+        }
+
+        // Animated bubbles (both surface and body tiles)
+        // Use tile position as seed for consistent bubble placement
+        int seed = tx * 7919 + ty * 104729;
+        for (int b = 0; b < 3; b++)
+        {
+            int bseed = seed + b * 31337;
+            float bx = (bseed % ts);
+            float byBase = (bseed / ts) % ts;
+            // Bubbles rise over time
+            float byOffset = ((t * speed * 15f + bseed * 0.01f) % (ts + 8)) - 4;
+            float by = wy + ts - byOffset;
+            if (by >= wy && by < wy + ts - 2)
+            {
+                int bsize = 1 + (bseed % 3);
+                float wobble = MathF.Sin(t * 3f + bseed) * 2f;
+                _spriteBatch.Draw(_pixel, new Rectangle(wx + (int)(bx + wobble), (int)by, bsize, bsize),
+                    bubbleColor * (0.3f + (bseed % 4) * 0.1f));
+            }
+        }
+
+        // Edge darkening (left/right if adjacent tile is not liquid)
+        bool leftLiquid = tx > 0 && TileProperties.IsLiquid(tg.GetTileAt(tx - 1, ty));
+        bool rightLiquid = tx < tg.Width - 1 && TileProperties.IsLiquid(tg.GetTileAt(tx + 1, ty));
+        if (!leftLiquid)
+            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 2, ts), deepColor * 0.5f);
+        if (!rightLiquid)
+            _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 2, wy, 2, ts), deepColor * 0.5f);
+        // Bottom edge if no liquid below
+        bool belowLiquid = ty < tg.Height - 1 && TileProperties.IsLiquid(tg.GetTileAt(tx, ty + 1));
+        if (!belowLiquid)
+            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 2, ts, 2), deepColor * 0.6f);
+    }
+
     private void DrawSlopeTile(int wx, int wy, int ts, TileType tile, Color color)
     {
         for (int row = 0; row < ts; row++)
@@ -5531,6 +5677,10 @@ public class Game1 : Game
                             _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, tg.TileSize), outline);
                             _spriteBatch.Draw(_pixel, new Rectangle(wx + tg.TileSize - 1, wy, 1, tg.TileSize), outline);
                         }
+                    }
+                    else if (TileProperties.IsLiquid(tile))
+                    {
+                        DrawLiquidTile(wx, wy, tg.TileSize, tile, tg, tx, ty);
                     }
                     else
                     {
