@@ -5344,7 +5344,8 @@ public class Game1 : Game
     /// <summary>Draw 3D-bevel outline tracing only the filled area of the slope.</summary>
     private void DrawSlopeOutline(int wx, int wy, int ts, TileType tile, Color lightColor, Color darkColor)
     {
-        // Draw diagonal edge: use light color for top-facing diagonals, dark for bottom-facing
+        // Only draw the diagonal edge — adjacent solid tiles provide their own grid lines
+        // Light color for top-facing diagonals (floor slopes), dark for bottom-facing (ceiling slopes)
         bool diagIsTop = tile == TileType.SlopeUpRight || tile == TileType.SlopeUpLeft ||
                          tile == TileType.GentleUpRight || tile == TileType.GentleUpLeft;
         var diagColor = diagIsTop ? lightColor : darkColor;
@@ -5373,35 +5374,6 @@ public class Game1 : Game
             }
             if (edgeX >= wx && edgeX < wx + ts)
                 _spriteBatch.Draw(_pixel, new Rectangle(edgeX, wy + row, 1, 1), diagColor);
-        }
-
-        // Bottom edge (dark) — only for floor slopes, traces the full bottom
-        if (tile == TileType.SlopeUpRight || tile == TileType.SlopeUpLeft ||
-            tile == TileType.GentleUpRight || tile == TileType.GentleUpLeft)
-            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), darkColor);
-
-        // Top edge (light) — only for ceiling slopes
-        if (tile == TileType.SlopeCeilRight || tile == TileType.SlopeCeilLeft ||
-            tile == TileType.GentleCeilRight || tile == TileType.GentleCeilLeft)
-            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), lightColor);
-
-        // Vertical edges — only on the TALL side where the slope meets full height
-        // SlopeUpRight: tall side is RIGHT (dark), SlopeUpLeft: tall side is LEFT (light)
-        // SlopeCeilRight: tall side is RIGHT (dark), SlopeCeilLeft: tall side is LEFT (light)
-        switch (tile)
-        {
-            case TileType.SlopeUpRight:
-            case TileType.SlopeCeilRight:
-            case TileType.GentleUpRight:
-            case TileType.GentleCeilRight:
-                _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts), darkColor);
-                break;
-            case TileType.SlopeUpLeft:
-            case TileType.SlopeCeilLeft:
-            case TileType.GentleUpLeft:
-            case TileType.GentleCeilLeft:
-                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts), lightColor);
-                break;
         }
     }
 
