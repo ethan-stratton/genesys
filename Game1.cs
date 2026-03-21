@@ -5344,8 +5344,13 @@ public class Game1 : Game
     /// <summary>Draw 3D-bevel outline tracing only the filled area of the slope.</summary>
     private void DrawSlopeOutline(int wx, int wy, int ts, TileType tile, Color lightColor, Color darkColor)
     {
-        // Only draw the diagonal edge — adjacent solid tiles provide their own grid lines
-        // Light color for top-facing diagonals (floor slopes), dark for bottom-facing (ceiling slopes)
+        // Full gold grid border around the tile cell (same as regular blocks)
+        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, 1), lightColor);       // top (light)
+        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts), lightColor);       // left (light)
+        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), darkColor); // bottom (dark)
+        _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts), darkColor); // right (dark)
+
+        // Diagonal bevel on top of the grid lines
         bool diagIsTop = tile == TileType.SlopeUpRight || tile == TileType.SlopeUpLeft ||
                          tile == TileType.GentleUpRight || tile == TileType.GentleUpLeft;
         var diagColor = diagIsTop ? lightColor : darkColor;
