@@ -27,6 +27,7 @@ public class LevelData
     [JsonPropertyName("enemies")] public EnemySpawnData[] Enemies { get; set; } = Array.Empty<EnemySpawnData>();
     [JsonPropertyName("switches")] public SwitchData[] Switches { get; set; } = Array.Empty<SwitchData>();
     [JsonPropertyName("labels")] public LabelData[] Labels { get; set; } = Array.Empty<LabelData>();
+    [JsonPropertyName("retractableSpikes")] public RetractableSpikeData[] RetractableSpikes { get; set; } = Array.Empty<RetractableSpikeData>();
     [JsonPropertyName("tileGrid")] public TileGridData TileGrid { get; set; }
 
     [JsonIgnore] public TileGrid TileGridInstance { get; set; }
@@ -364,4 +365,15 @@ public class SwitchData
     [JsonPropertyName("h")] public int H { get; set; } = 24;
     [JsonPropertyName("action")] public string Action { get; set; } = ""; // "unfreeze-crawlers", etc.
     [JsonPropertyName("label")] public string Label { get; set; } = "";
+}
+
+public class RetractableSpikeData
+{
+    [JsonPropertyName("x")] public float X { get; set; }
+    [JsonPropertyName("y")] public float Y { get; set; }
+    [JsonPropertyName("w")] public int W { get; set; } = 32;
+    [JsonPropertyName("h")] public int H { get; set; } = 32;
+    [JsonPropertyName("upTime")] public float UpTime { get; set; } = 1.5f;   // seconds extended
+    [JsonPropertyName("downTime")] public float DownTime { get; set; } = 1.5f; // seconds retracted
+    [JsonPropertyName("phase")] public float Phase { get; set; } = 0f;         // offset in cycle (0..1)
 }

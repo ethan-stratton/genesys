@@ -1938,6 +1938,24 @@ public class Game1 : Game
                     break;
                 }
             }
+
+            // Retractable spike collision (only when extended)
+            foreach (var rs in _level.RetractableSpikes)
+            {
+                float cycle = rs.UpTime + rs.DownTime;
+                float phase = (_totalTime + rs.Phase * cycle) % cycle;
+                if (phase < rs.UpTime) // extended
+                {
+                    var rsRect = new Rectangle((int)rs.X, (int)rs.Y, rs.W, rs.H);
+                    if (pRect.Intersects(rsRect) && _spawnInvincibility <= 0f)
+                    {
+                        _lastDamageSource = "Retractable Spikes";
+                        _player.TakeDamage(25, _player.Position.X - rsRect.Center.X);
+                        if (_player.Hp <= 0) { _isDead = true; LogDeath(); }
+                        break;
+                    }
+                }
+            }
         }
 
         // Tile-based spike collision
@@ -6359,6 +6377,38 @@ public class Game1 : Game
             }
         }
 
+        // Draw retractable spikes
+        foreach (var rs in _level.RetractableSpikes)
+        {
+            float cycle = rs.UpTime + rs.DownTime;
+            float phase = (_totalTime + rs.Phase * cycle) % cycle;
+            bool extended = phase < rs.UpTime;
+            // Animate: slide up/down over 0.15s at transitions
+            float extendT;
+            if (phase < 0.15f) extendT = phase / 0.15f; // rising
+            else if (phase < rs.UpTime - 0.15f) extendT = 1f;
+            else if (phase < rs.UpTime) extendT = (rs.UpTime - phase) / 0.15f; // retracting
+            else extendT = 0f;
+
+            int fullH = rs.H;
+            int visH = (int)(fullH * extendT);
+            if (visH > 0)
+            {
+                int drawY = (int)rs.Y + fullH - visH;
+                var col = extended ? new Color(200, 50, 50) : new Color(150, 80, 80);
+                _spriteBatch.Draw(_pixel, new Rectangle((int)rs.X, drawY, rs.W, visH), col);
+                // Teeth on top
+                int teethCount = rs.W / 8;
+                for (int t = 0; t < teethCount; t++)
+                {
+                    int tx = (int)rs.X + t * 8 + 2;
+                    _spriteBatch.Draw(_pixel, new Rectangle(tx, drawY - 4, 4, 4), col * 0.8f);
+                }
+            }
+            // Base plate (always visible)
+            _spriteBatch.Draw(_pixel, new Rectangle((int)rs.X, (int)rs.Y + fullH, rs.W, 4), new Color(100, 100, 100));
+        }
+
         // Draw walls
         foreach (var wall in _level.WallRects)
         {
@@ -6483,8 +6533,7 @@ public class Game1 : Game
             }
         }
 
-        // Draw ropes (gameplay)
-        if (_enableRopeClimb)
+        // Draw ropes (always visible — disabling rope climb only prevents grabbing)
         {
             for (int i = 0; i < _level.RopeXPositions.Length; i++)
             {
