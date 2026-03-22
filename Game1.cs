@@ -4604,7 +4604,7 @@ public class Game1 : Game
 
         // Status message
         if (_editorStatusTimer > 0)
-            _spriteBatch.DrawString(_font, SafeText(_editorStatusMsg), new Vector2(10, 570), Color.Yellow);
+            _spriteBatch.DrawString(_font, SafeText(_editorStatusMsg), new Vector2(10, ViewH - 40), Color.Yellow);
 
         // Controls hint
         string controlsHint = _editorTool switch
@@ -4614,7 +4614,7 @@ public class Game1 : Game
             EditorTool.Item => $"[=] Play  [Q] Tools  [LClick] Place  [[ ]] Type: {ItemTypes[_editorItemCursor]}",
             _ => "[=] Play  [Esc] Menu  [Q] Tools  [E] Entities  [Drag] Place  [RClick] Delete  [Tab] Target",
         };
-        _spriteBatch.DrawString(_font, controlsHint, new Vector2(10, 550), Color.Gray * 0.35f);
+        _spriteBatch.DrawString(_font, controlsHint, new Vector2(10, ViewH - 20), Color.Gray * 0.35f);
 
         // Tile type indicator when in tile paint mode
         if (_editorTool == EditorTool.TilePaint)
