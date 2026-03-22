@@ -328,9 +328,14 @@ public class Game1 : Game
     private int _editorEnemyCursor;
     private static readonly string[] ItemTypes = { "stick", "dagger", "sword", "axe", "club", "hammer", "greatsword", "greatclub", "whip", "sling", "bow", "gun", "heart" };
     private int _editorItemCursor;
+
+    // Item placement palette (P key in editor)
+    private static readonly string[] ItemPaletteTypes = { "stick", "dagger", "sword", "axe", "club", "hammer", "greatsword", "greatclub", "whip", "sling", "bow", "gun", "heart" };
+    private bool _itemPaletteOpen;
+    private int _itemPaletteCursor;
     private bool _entityPaletteOpen;
     private int _entityPaletteCursor;
-    private enum EntityType { Swarm, Crawler, Thornback, Hopper, Tree, Bird, Dummy, CritDummy, Wingbeater, ItemStick, ItemDagger, ItemSword, ItemAxe, ItemBow, ItemGun, ItemHeart }
+    private enum EntityType { Swarm, Crawler, Thornback, Hopper, Tree, Bird, Dummy, CritDummy, Wingbeater }
 
     // Tile paint state
     private int _tilePaletteCursor;
@@ -2792,28 +2797,37 @@ public class Game1 : Game
         if ((kb.IsKeyDown(Keys.LeftControl) || kb.IsKeyDown(Keys.RightControl)) && kb.IsKeyDown(Keys.Z) && _prevKb.IsKeyUp(Keys.Z))
             EditorUndo();
 
-        // --- Spawn weapon menu (P key) ---
+        // --- Item placement palette (P key in editor) ---
         if (kb.IsKeyDown(Keys.P) && _prevKb.IsKeyUp(Keys.P))
         {
-            _spawnMenuOpen = !_spawnMenuOpen;
-            if (_spawnMenuOpen) _spawnMenuCursor = 0;
+            _itemPaletteOpen = !_itemPaletteOpen;
+            if (_itemPaletteOpen) { _itemPaletteCursor = 0; _entityPaletteOpen = false; }
             return;
         }
 
-        if (_spawnMenuOpen)
+        if (_itemPaletteOpen)
         {
             if (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W))
-                _spawnMenuCursor = (_spawnMenuCursor - 1 + SpawnMenuItems.Length) % SpawnMenuItems.Length;
+                _itemPaletteCursor = (_itemPaletteCursor - 1 + ItemPaletteTypes.Length) % ItemPaletteTypes.Length;
             if (kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S))
-                _spawnMenuCursor = (_spawnMenuCursor + 1) % SpawnMenuItems.Length;
+                _itemPaletteCursor = (_itemPaletteCursor + 1) % ItemPaletteTypes.Length;
             if (kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter) ||
                 kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space))
             {
-                SpawnItemAtPlayer(SpawnMenuItems[_spawnMenuCursor].ToLower());
-                _spawnMenuOpen = false;
+                int _eox = _level.TileGridInstance?.OriginX ?? 0;
+                int _eoy = _level.TileGridInstance?.OriginY ?? 0;
+                float cx = _editorGridSnap ? _eox + MathF.Floor((_editorCursor.X - _eox) / 32) * 32 : _editorCursor.X;
+                float cy = _editorGridSnap ? _eoy + MathF.Floor((_editorCursor.Y - _eoy) / 32) * 32 : _editorCursor.Y;
+                string itype = ItemPaletteTypes[_itemPaletteCursor];
+                var itemList = new List<ItemData>(_level.Items);
+                itemList.Add(new ItemData { Id = $"{itype}-{itemList.Count}", Type = itype, X = cx, Y = cy });
+                _level.Items = itemList.ToArray();
+                SetEditorStatus($"Placed item: {itype} at ({(int)cx}, {(int)cy})");
+                _itemPaletteOpen = false;
+                SaveLevel();
             }
             if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape))
-                _spawnMenuOpen = false;
+                _itemPaletteOpen = false;
             return;
         }
 
@@ -2830,6 +2844,10 @@ public class Game1 : Game
             else if (_entityPaletteOpen)
             {
                 _entityPaletteOpen = false;
+            }
+            else if (_itemPaletteOpen)
+            {
+                _itemPaletteOpen = false;
             }
             else
             {
@@ -2968,29 +2986,6 @@ public class Game1 : Game
                         wbList.Add(new EnemySpawnData { Id = $"wingbeater-{wbList.Count}", Type = "wingbeater", X = cx, Y = cy });
                         _level.Enemies = wbList.ToArray();
                         SetEditorStatus($"Placed wingbeater at ({(int)cx}, {(int)cy})");
-                        break;
-                    case EntityType.ItemStick:
-                    case EntityType.ItemDagger:
-                    case EntityType.ItemSword:
-                    case EntityType.ItemAxe:
-                    case EntityType.ItemBow:
-                    case EntityType.ItemGun:
-                    case EntityType.ItemHeart:
-                        string itemType = selectedType switch
-                        {
-                            EntityType.ItemStick => "stick",
-                            EntityType.ItemDagger => "dagger",
-                            EntityType.ItemSword => "sword",
-                            EntityType.ItemAxe => "axe",
-                            EntityType.ItemBow => "bow",
-                            EntityType.ItemGun => "gun",
-                            EntityType.ItemHeart => "heart",
-                            _ => "stick"
-                        };
-                        var itemList = new List<ItemData>(_level.Items);
-                        itemList.Add(new ItemData { Id = $"{itemType}-{itemList.Count}", Type = itemType, X = cx, Y = cy });
-                        _level.Items = itemList.ToArray();
-                        SetEditorStatus($"Placed item: {itemType} at ({(int)cx}, {(int)cy})");
                         break;
                 }
             }
@@ -4587,7 +4582,7 @@ public class Game1 : Game
         _spriteBatch.Begin();
 
         // Toolbar
-        string[] toolNames = { "0:Flr", "1:Plt", "2:Rop", "3:Wal", "4:Spk", "5:Ext", "6:Spn", "7:WS", "8:OW", "9:Ceil", "T:Tile", "E:Eny", "I:Itm" };
+        string[] toolNames = { "0:Flr", "1:Plt", "2:Rop", "3:Wal", "4:Spk", "5:Ext", "6:Spn", "7:WS", "8:OW", "9:Ceil", "Q:Tile" };
         float toolX = 10;
         for (int i = 0; i < toolNames.Length; i++)
         {
@@ -4595,6 +4590,10 @@ public class Game1 : Game
             _spriteBatch.DrawString(_fontSmall, toolNames[i], new Vector2(toolX, 10), active ? Color.Yellow : Color.Gray * 0.6f);
             toolX += _fontSmall.MeasureString(toolNames[i]).X + 8;
         }
+        // E/P palette indicators
+        _spriteBatch.DrawString(_fontSmall, "E:Enemy", new Vector2(toolX, 10), _entityPaletteOpen ? Color.Yellow : Color.Gray * 0.6f);
+        toolX += _fontSmall.MeasureString("E:Enemy").X + 8;
+        _spriteBatch.DrawString(_fontSmall, "P:Item", new Vector2(toolX, 10), _spawnMenuOpen ? Color.Yellow : Color.Gray * 0.6f);
 
         // Grid snap indicator
         _spriteBatch.DrawString(_font, $"Grid: {(_editorShowGrid ? "ON" : "OFF")} [G]", new Vector2(10, 30), _editorShowGrid ? Color.LightGreen : Color.Gray * 0.5f);
@@ -4615,7 +4614,7 @@ public class Game1 : Game
             EditorTool.TilePaint => "[=]Play [Q]Tools [Click]Paint [Ctrl+Drag]Fill [RClick]Erase [[ ]]Tile [Ctrl+Z]Undo",
             EditorTool.Enemy => $"[=]Play [Q]Tools [Click]Place [[ ]]Type: {EnemyTypes[_editorEnemyCursor]}",
             EditorTool.Item => $"[=]Play [Q]Tools [Click]Place [[ ]]Type: {ItemTypes[_editorItemCursor]}",
-            _ => "[=]Play [Esc]Menu [Q]Tools [E]Entities [Drag]Place [RClick]Del [Tab]Target",
+            _ => "[=]Play [Esc]Menu [Q]Tile [E]Enemy [P]Item [Drag]Place [RClick]Del [Tab]Target",
         };
         _spriteBatch.DrawString(_fontSmall, controlsHint, new Vector2(10, ViewH - 16), Color.Gray * 0.45f);
 
@@ -4713,6 +4712,25 @@ public class Game1 : Game
                 };
                 _spriteBatch.Draw(_pixel, new Rectangle((int)epalX + 10, (int)itemY + 8, 10, 10), iconColor);
                 _spriteBatch.DrawString(_font, SafeText(label), new Vector2(epalX + 26, itemY + 4), selected ? Color.Yellow : Color.Gray);
+            }
+        }
+
+        // Item placement palette (P key)
+        if (_itemPaletteOpen)
+        {
+            float ipalW = 180, ipalH = ItemPaletteTypes.Length * 28 + 20;
+            float ipalX = ViewW / 2f - ipalW / 2f, ipalY = ViewH / 2f - ipalH / 2f;
+            _spriteBatch.Draw(_pixel, new Rectangle((int)ipalX, (int)ipalY, (int)ipalW, (int)ipalH), Color.Black * 0.85f);
+            _spriteBatch.DrawString(_font, SafeText("ITEMS [P]"), new Vector2(ipalX + 40, ipalY + 4), Color.White);
+
+            for (int i = 0; i < ItemPaletteTypes.Length; i++)
+            {
+                float itemY = ipalY + 24 + i * 28;
+                bool selected = i == _itemPaletteCursor;
+                if (selected)
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)ipalX + 4, (int)itemY, (int)ipalW - 8, 26), Color.Cyan * 0.15f);
+                _spriteBatch.Draw(_pixel, new Rectangle((int)ipalX + 10, (int)itemY + 8, 10, 10), Color.Goldenrod);
+                _spriteBatch.DrawString(_font, SafeText(ItemPaletteTypes[i]), new Vector2(ipalX + 26, itemY + 4), selected ? Color.Cyan : Color.Gray);
             }
         }
 
