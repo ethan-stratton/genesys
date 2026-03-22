@@ -2016,6 +2016,8 @@ public class Game1 : Game
                     break; // pick up one at a time
                 }
             }
+            // Auto-save after pickup
+            if (_saveData != null) { SyncInventoryToSave(); _saveData.Save(); }
         }
 
         // Spike collision
