@@ -1,4 +1,611 @@
 {
+  "name": "Untitled",
+  "author": "",
+  "playerSpawn": {
+    "x": 64,
+    "y": 480
+  },
+  "bounds": {
+    "left": -32,
+    "right": 7872,
+    "top": -64,
+    "bottom": 640
+  },
+  "floor": {
+    "y": 544,
+    "height": 50
+  },
+  "platforms": [
+    {
+      "x": 2944,
+      "y": 128,
+      "w": 192,
+      "h": 8,
+      "type": "thin"
+    },
+    {
+      "x": 2944,
+      "y": 224,
+      "w": 192,
+      "h": 8,
+      "type": "thin"
+    },
+    {
+      "x": 2944,
+      "y": 320,
+      "w": 192,
+      "h": 8,
+      "type": "thin"
+    },
+    {
+      "x": 2944,
+      "y": 416,
+      "w": 192,
+      "h": 8,
+      "type": "thin"
+    },
+    {
+      "x": 7424,
+      "y": 96,
+      "w": 128,
+      "h": 8,
+      "type": "thin"
+    }
+  ],
+  "ropes": [
+    {
+      "x": 7360,
+      "top": 64,
+      "bottom": 448
+    }
+  ],
+  "walls": [],
+  "spikes": [],
+  "ceilings": [],
+  "solidFloors": [],
+  "wallSpikes": [],
+  "exits": [
+    {
+      "x": 5,
+      "y": 480,
+      "w": 30,
+      "h": 48,
+      "targetLevel": "debug-room",
+      "id": "exit-to-debug",
+      "targetExitId": "exit-to-training"
+    }
+  ],
+  "npcs": [],
+  "items": [],
+  "objects": [],
+  "enemies": [
+    {
+      "type": "dummy",
+      "x": 3728,
+      "y": 480,
+      "w": 24,
+      "h": 32,
+      "hp": 9999,
+      "scale": 1,
+      "patrol": "jump-loop",
+      "jumpHeight": 32,
+      "id": "vaultkick-dummy"
+    },
+    {
+      "type": "dummy",
+      "x": 4348,
+      "y": 128,
+      "w": 28,
+      "h": 28,
+      "hp": 9999,
+      "scale": 1.5,
+      "behavior": "float",
+      "floatAmplitude": 40,
+      "floatSpeed": 1.0,
+      "id": "uppercut-target"
+    },
+    {
+      "type": "dummy",
+      "x": 4888,
+      "y": 464,
+      "w": 20,
+      "h": 48,
+      "hp": 9999,
+      "scale": 1,
+      "id": "cartwheel-pillar-0"
+    },
+    {
+      "type": "dummy",
+      "x": 4968,
+      "y": 464,
+      "w": 20,
+      "h": 48,
+      "hp": 9999,
+      "scale": 1,
+      "id": "cartwheel-pillar-1"
+    },
+    {
+      "type": "dummy",
+      "x": 5048,
+      "y": 464,
+      "w": 20,
+      "h": 48,
+      "hp": 9999,
+      "scale": 1,
+      "id": "cartwheel-pillar-2"
+    },
+    {
+      "type": "wingbeater",
+      "x": 5628,
+      "y": 96,
+      "behavior": "dive-bomb",
+      "returnToStart": true,
+      "id": "flip-wingbeater"
+    },
+    {
+      "type": "dummy",
+      "x": 6148,
+      "y": 160,
+      "w": 24,
+      "h": 24,
+      "hp": 9999,
+      "scale": 1,
+      "behavior": "float-vertical",
+      "floatAmplitude": 80,
+      "floatSpeed": 0.8,
+      "phaseOffset": 0.0,
+      "id": "bladedash-target-0"
+    },
+    {
+      "type": "dummy",
+      "x": 6228,
+      "y": 208,
+      "w": 24,
+      "h": 24,
+      "hp": 9999,
+      "scale": 1,
+      "behavior": "float-vertical",
+      "floatAmplitude": 80,
+      "floatSpeed": 0.8,
+      "phaseOffset": 1.2,
+      "id": "bladedash-target-1"
+    },
+    {
+      "type": "dummy",
+      "x": 6308,
+      "y": 256,
+      "w": 24,
+      "h": 24,
+      "hp": 9999,
+      "scale": 1,
+      "behavior": "float-vertical",
+      "floatAmplitude": 80,
+      "floatSpeed": 0.8,
+      "phaseOffset": 2.4,
+      "id": "bladedash-target-2"
+    },
+    {
+      "type": "dummy",
+      "x": 6788,
+      "y": 480,
+      "w": 20,
+      "h": 28,
+      "hp": 9999,
+      "scale": 1,
+      "id": "spinmelee-target-0"
+    },
+    {
+      "type": "dummy",
+      "x": 6848,
+      "y": 480,
+      "w": 20,
+      "h": 28,
+      "hp": 9999,
+      "scale": 1,
+      "id": "spinmelee-target-1"
+    },
+    {
+      "type": "dummy",
+      "x": 6908,
+      "y": 480,
+      "w": 20,
+      "h": 28,
+      "hp": 9999,
+      "scale": 1,
+      "id": "spinmelee-target-2"
+    },
+    {
+      "type": "dummy",
+      "x": 6788,
+      "y": 432,
+      "w": 20,
+      "h": 28,
+      "hp": 9999,
+      "scale": 1,
+      "id": "spinmelee-target-3"
+    },
+    {
+      "type": "dummy",
+      "x": 6848,
+      "y": 432,
+      "w": 20,
+      "h": 28,
+      "hp": 9999,
+      "scale": 1,
+      "id": "spinmelee-target-4"
+    }
+  ],
+  "switches": [
+    {
+      "id": "shrine-slide",
+      "x": 448,
+      "y": 456,
+      "w": 16,
+      "h": 24,
+      "action": "grant-slide",
+      "label": "SLIDE"
+    },
+    {
+      "id": "shrine-dash",
+      "x": 1088,
+      "y": 456,
+      "w": 16,
+      "h": 24,
+      "action": "grant-dash",
+      "label": "DASH (RUN)"
+    },
+    {
+      "id": "shrine-double-jump",
+      "x": 1728,
+      "y": 456,
+      "w": 16,
+      "h": 24,
+      "action": "grant-double-jump",
+      "label": "DOUBLE JUMP"
+    },
+    {
+      "id": "shrine-wall-climb",
+      "x": 2368,
+      "y": 456,
+      "w": 16,
+      "h": 24,
+      "action": "grant-wall-climb",
+      "label": "WALL CLIMB"
+    },
+    {
+      "id": "shrine-drop-through",
+      "x": 3008,
+      "y": 456,
+      "w": 16,
+      "h": 24,
+      "action": "grant-drop-through",
+      "label": "DROP THROUGH"
+    },
+    {
+      "id": "shrine-vault-kick",
+      "x": 3648,
+      "y": 456,
+      "w": 16,
+      "h": 24,
+      "action": "grant-vault-kick",
+      "label": "VAULT KICK"
+    },
+    {
+      "id": "shrine-uppercut",
+      "x": 4288,
+      "y": 456,
+      "w": 16,
+      "h": 24,
+      "action": "grant-uppercut",
+      "label": "UPPERCUT"
+    },
+    {
+      "id": "shrine-cartwheel",
+      "x": 4928,
+      "y": 456,
+      "w": 16,
+      "h": 24,
+      "action": "grant-cartwheel",
+      "label": "CARTWHEEL"
+    },
+    {
+      "id": "shrine-flip",
+      "x": 5568,
+      "y": 456,
+      "w": 16,
+      "h": 24,
+      "action": "grant-flip",
+      "label": "FLIP"
+    },
+    {
+      "id": "shrine-blade-dash",
+      "x": 6208,
+      "y": 456,
+      "w": 16,
+      "h": 24,
+      "action": "grant-blade-dash",
+      "label": "BLADE DASH"
+    },
+    {
+      "id": "shrine-spin-melee",
+      "x": 6848,
+      "y": 456,
+      "w": 16,
+      "h": 24,
+      "action": "grant-spin-melee",
+      "label": "SPIN MELEE"
+    },
+    {
+      "id": "shrine-rope-climb",
+      "x": 7488,
+      "y": 456,
+      "w": 16,
+      "h": 24,
+      "action": "grant-rope-climb",
+      "label": "ROPE CLIMB"
+    }
+  ],
+  "labels": [
+    {
+      "text": "== SLIDE ==",
+      "x": 408,
+      "y": 40,
+      "color": "Cyan",
+      "size": "normal"
+    },
+    {
+      "text": "Crouch while running to slide under gaps",
+      "x": 388,
+      "y": 70,
+      "color": "Gray",
+      "size": "small"
+    },
+    {
+      "text": "== DASH (RUN) ==",
+      "x": 1048,
+      "y": 40,
+      "color": "Cyan",
+      "size": "normal"
+    },
+    {
+      "text": "Hold shift to run fast",
+      "x": 1028,
+      "y": 70,
+      "color": "Gray",
+      "size": "small"
+    },
+    {
+      "text": "== DOUBLE JUMP ==",
+      "x": 1688,
+      "y": 40,
+      "color": "Cyan",
+      "size": "normal"
+    },
+    {
+      "text": "Jump again in mid-air",
+      "x": 1668,
+      "y": 70,
+      "color": "Gray",
+      "size": "small"
+    },
+    {
+      "text": "== WALL CLIMB ==",
+      "x": 2328,
+      "y": 40,
+      "color": "Cyan",
+      "size": "normal"
+    },
+    {
+      "text": "Jump at walls to grab and climb",
+      "x": 2308,
+      "y": 70,
+      "color": "Gray",
+      "size": "small"
+    },
+    {
+      "text": "== DROP THROUGH ==",
+      "x": 2968,
+      "y": 40,
+      "color": "Cyan",
+      "size": "normal"
+    },
+    {
+      "text": "Press down on thin platforms",
+      "x": 2948,
+      "y": 70,
+      "color": "Gray",
+      "size": "small"
+    },
+    {
+      "text": "== VAULT KICK ==",
+      "x": 3608,
+      "y": 40,
+      "color": "Cyan",
+      "size": "normal"
+    },
+    {
+      "text": "Kick off walls for momentum",
+      "x": 3588,
+      "y": 70,
+      "color": "Gray",
+      "size": "small"
+    },
+    {
+      "text": "== UPPERCUT ==",
+      "x": 4248,
+      "y": 40,
+      "color": "Cyan",
+      "size": "normal"
+    },
+    {
+      "text": "Up + attack for rising strike",
+      "x": 4228,
+      "y": 70,
+      "color": "Gray",
+      "size": "small"
+    },
+    {
+      "text": "== CARTWHEEL ==",
+      "x": 4888,
+      "y": 40,
+      "color": "Cyan",
+      "size": "normal"
+    },
+    {
+      "text": "Dodge through attacks",
+      "x": 4868,
+      "y": 70,
+      "color": "Gray",
+      "size": "small"
+    },
+    {
+      "text": "== FLIP ==",
+      "x": 5528,
+      "y": 40,
+      "color": "Cyan",
+      "size": "normal"
+    },
+    {
+      "text": "Aerial acrobatics",
+      "x": 5508,
+      "y": 70,
+      "color": "Gray",
+      "size": "small"
+    },
+    {
+      "text": "== BLADE DASH ==",
+      "x": 6168,
+      "y": 40,
+      "color": "Cyan",
+      "size": "normal"
+    },
+    {
+      "text": "Dash attack with weapon",
+      "x": 6148,
+      "y": 70,
+      "color": "Gray",
+      "size": "small"
+    },
+    {
+      "text": "== SPIN MELEE ==",
+      "x": 6808,
+      "y": 40,
+      "color": "Cyan",
+      "size": "normal"
+    },
+    {
+      "text": "Spinning attack hits all around",
+      "x": 6788,
+      "y": 70,
+      "color": "Gray",
+      "size": "small"
+    },
+    {
+      "text": "== ROPE CLIMB ==",
+      "x": 7448,
+      "y": 40,
+      "color": "Cyan",
+      "size": "normal"
+    },
+    {
+      "text": "Grab and climb ropes",
+      "x": 7428,
+      "y": 70,
+      "color": "Gray",
+      "size": "small"
+    },
+    {
+      "text": "== TRAINING HALL ==",
+      "x": 40,
+      "y": 40,
+      "color": "Gold",
+      "size": "normal"
+    },
+    {
+      "text": "Slide under!",
+      "x": 448,
+      "y": 384,
+      "color": "Yellow",
+      "size": "small"
+    },
+    {
+      "text": "Double-tap A/D to dash across!",
+      "x": 992,
+      "y": 416,
+      "color": "Yellow",
+      "size": "small"
+    },
+    {
+      "text": "Double jump over!",
+      "x": 1664,
+      "y": 288,
+      "color": "Yellow",
+      "size": "small"
+    },
+    {
+      "text": "Climb the shaft!",
+      "x": 2368,
+      "y": 64,
+      "color": "Yellow",
+      "size": "small"
+    },
+    {
+      "text": "Press DOWN to drop through!",
+      "x": 2912,
+      "y": 96,
+      "color": "Yellow",
+      "size": "small"
+    },
+    {
+      "text": "Vault kick the target!",
+      "x": 3628,
+      "y": 384,
+      "color": "Yellow",
+      "size": "small"
+    },
+    {
+      "text": "Uppercut to reach it!",
+      "x": 4268,
+      "y": 96,
+      "color": "Yellow",
+      "size": "small"
+    },
+    {
+      "text": "Cartwheel through them!",
+      "x": 4868,
+      "y": 384,
+      "color": "Yellow",
+      "size": "small"
+    },
+    {
+      "text": "Double-tap jump to backflip!",
+      "x": 5528,
+      "y": 64,
+      "color": "Yellow",
+      "size": "small"
+    },
+    {
+      "text": "QCF+K to blade dash!",
+      "x": 6168,
+      "y": 96,
+      "color": "Yellow",
+      "size": "small"
+    },
+    {
+      "text": "Hold K to spin attack!",
+      "x": 6798,
+      "y": 384,
+      "color": "Yellow",
+      "size": "small"
+    },
+    {
+      "text": "Climb the rope!",
+      "x": 7458,
+      "y": 64,
+      "color": "Yellow",
+      "size": "small"
+    }
+  ],
   "tileGrid": {
     "width": 245,
     "height": 18,
@@ -265,9 +872,9 @@
       0,
       0,
       0,
-      0,
-      0,
-      0,
+      1,
+      1,
+      1,
       0,
       0,
       0,
@@ -501,9 +1108,6 @@
       0,
       0,
       1,
-      0,
-      0,
-      0,
       0,
       0,
       0,
@@ -513,6 +1117,9 @@
       0,
       0,
       0,
+      1,
+      1,
+      1,
       0,
       0,
       0,
@@ -746,8 +1353,6 @@
       0,
       0,
       1,
-      0,
-      0,
       0,
       0,
       0,
@@ -757,7 +1362,9 @@
       0,
       0,
       0,
-      0,
+      1,
+      1,
+      1,
       0,
       0,
       0,
@@ -806,7 +1413,6 @@
       0,
       0,
       1,
-      0,
       0,
       0,
       0,
@@ -816,9 +1422,10 @@
       0,
       0,
       0,
-      0,
-      0,
-      0,
+      1,
+      1,
+      1,
+      1,
       0,
       0,
       0,
@@ -991,8 +1598,6 @@
       0,
       0,
       1,
-      0,
-      0,
       0,
       0,
       0,
@@ -1002,7 +1607,9 @@
       0,
       0,
       0,
-      0,
+      1,
+      1,
+      1,
       0,
       0,
       0,
@@ -1051,7 +1658,6 @@
       0,
       0,
       1,
-      0,
       0,
       0,
       0,
@@ -1061,9 +1667,10 @@
       0,
       0,
       0,
-      0,
+      1,
       0,
       0,
+      1,
       0,
       0,
       0,
@@ -1236,8 +1843,6 @@
       0,
       0,
       1,
-      0,
-      0,
       0,
       0,
       0,
@@ -1247,7 +1852,9 @@
       0,
       0,
       0,
-      0,
+      1,
+      1,
+      1,
       0,
       0,
       0,
@@ -1305,10 +1912,10 @@
       0,
       0,
       0,
-      0,
-      0,
+      1,
       0,
       0,
+      1,
       0,
       0,
       0,
@@ -1481,7 +2088,6 @@
       0,
       0,
       1,
-      0,
       0,
       0,
       0,
@@ -1491,8 +2097,9 @@
       0,
       0,
       0,
-      0,
-      0,
+      1,
+      1,
+      1,
       0,
       0,
       0,
@@ -1550,10 +2157,10 @@
       0,
       0,
       0,
-      0,
-      0,
+      1,
       0,
       0,
+      1,
       0,
       0,
       0,
@@ -1726,7 +2333,6 @@
       0,
       0,
       1,
-      0,
       0,
       0,
       0,
@@ -1736,8 +2342,9 @@
       0,
       0,
       0,
-      0,
-      0,
+      1,
+      1,
+      1,
       0,
       0,
       0,
@@ -1795,10 +2402,10 @@
       0,
       0,
       0,
-      0,
-      0,
+      1,
       0,
       0,
+      1,
       0,
       0,
       0,
@@ -1971,7 +2578,6 @@
       0,
       0,
       1,
-      0,
       0,
       0,
       0,
@@ -1981,8 +2587,9 @@
       0,
       0,
       0,
-      0,
-      0,
+      1,
+      1,
+      1,
       0,
       0,
       0,
@@ -2040,10 +2647,10 @@
       0,
       0,
       0,
-      0,
-      0,
+      1,
       0,
       0,
+      1,
       0,
       0,
       0,
@@ -2216,7 +2823,6 @@
       0,
       0,
       1,
-      0,
       0,
       0,
       0,
@@ -2226,8 +2832,9 @@
       0,
       0,
       0,
-      0,
-      0,
+      1,
+      1,
+      1,
       0,
       0,
       0,
@@ -2276,7 +2883,6 @@
       0,
       0,
       1,
-      0,
       0,
       0,
       0,
@@ -2286,9 +2892,10 @@
       0,
       0,
       0,
-      0,
+      1,
       0,
       0,
+      1,
       0,
       0,
       0,
@@ -2470,9 +3077,9 @@
       0,
       0,
       0,
-      0,
-      0,
-      0,
+      1,
+      1,
+      1,
       0,
       0,
       0,
@@ -2521,7 +3128,6 @@
       0,
       0,
       1,
-      0,
       0,
       0,
       0,
@@ -2531,9 +3137,10 @@
       0,
       0,
       0,
-      0,
+      1,
       0,
       0,
+      1,
       0,
       0,
       0,
@@ -2715,9 +3322,9 @@
       0,
       0,
       0,
-      0,
-      0,
-      0,
+      1,
+      1,
+      1,
       0,
       0,
       0,
@@ -2755,8 +3362,8 @@
       0,
       0,
       0,
-      0,
-      0,
+      1,
+      1,
       0,
       0,
       0,
@@ -2766,7 +3373,6 @@
       0,
       0,
       1,
-      0,
       0,
       0,
       0,
@@ -2776,9 +3382,10 @@
       0,
       0,
       0,
-      0,
+      1,
       0,
       0,
+      1,
       0,
       0,
       0,
@@ -2960,9 +3567,9 @@
       0,
       0,
       0,
-      0,
-      0,
-      0,
+      1,
+      1,
+      1,
       0,
       0,
       0,
@@ -2991,7 +3598,6 @@
       0,
       0,
       1,
-      0,
       0,
       0,
       0,
@@ -3001,7 +3607,8 @@
       0,
       0,
       0,
-      0,
+      1,
+      1,
       0,
       0,
       0,
@@ -3011,7 +3618,6 @@
       0,
       0,
       1,
-      0,
       0,
       0,
       0,
@@ -3021,9 +3627,10 @@
       0,
       0,
       0,
-      0,
+      1,
       0,
       0,
+      1,
       0,
       0,
       0,
@@ -3205,13 +3812,9 @@
       0,
       0,
       0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
+      1,
+      1,
+      1,
       0,
       0,
       0,
@@ -3249,6 +3852,8 @@
       0,
       0,
       0,
+      1,
+      1,
       0,
       0,
       0,
@@ -3267,8 +3872,10 @@
       0,
       0,
       0,
+      1,
       0,
       0,
+      1,
       0,
       0,
       0,
@@ -3437,7 +4044,6 @@
       0,
       1,
       1,
-      0,
       0,
       0,
       0,
@@ -3491,9 +4097,8 @@
       0,
       0,
       0,
-      0,
-      0,
-      0,
+      1,
+      1,
       0,
       0,
       0,
@@ -3512,8 +4117,10 @@
       0,
       0,
       0,
+      1,
       0,
       0,
+      1,
       0,
       0,
       0,
@@ -3682,9 +4289,6 @@
       0,
       1,
       1,
-      0,
-      0,
-      0,
       0,
       0,
       0,
@@ -3738,7 +4342,8 @@
       0,
       0,
       0,
-      0,
+      1,
+      1,
       0,
       0,
       0,
@@ -3757,8 +4362,10 @@
       0,
       0,
       0,
+      1,
       0,
       0,
+      1,
       0,
       0,
       0,
@@ -4417,319 +5024,5 @@
       1,
       1
     ]
-  },
-  "bounds": {
-    "left": -32,
-    "right": 7872,
-    "top": -64,
-    "bottom": 640
-  },
-  "playerSpawn": {
-    "x": 64,
-    "y": 480
-  },
-  "exits": [
-    {
-      "x": 5,
-      "y": 480,
-      "w": 30,
-      "h": 48,
-      "targetLevel": "debug-room",
-      "id": "exit-to-debug",
-      "targetExitId": "exit-to-training"
-    }
-  ],
-  "platforms": [],
-  "enemies": [],
-  "npcs": [],
-  "switches": [
-    {
-      "id": "shrine-slide",
-      "x": 448,
-      "y": 456,
-      "w": 16,
-      "h": 24,
-      "action": "grant-slide",
-      "label": "SLIDE"
-    },
-    {
-      "id": "shrine-dash",
-      "x": 1088,
-      "y": 456,
-      "w": 16,
-      "h": 24,
-      "action": "grant-dash",
-      "label": "DASH (RUN)"
-    },
-    {
-      "id": "shrine-double-jump",
-      "x": 1728,
-      "y": 456,
-      "w": 16,
-      "h": 24,
-      "action": "grant-double-jump",
-      "label": "DOUBLE JUMP"
-    },
-    {
-      "id": "shrine-wall-climb",
-      "x": 2368,
-      "y": 456,
-      "w": 16,
-      "h": 24,
-      "action": "grant-wall-climb",
-      "label": "WALL CLIMB"
-    },
-    {
-      "id": "shrine-drop-through",
-      "x": 3008,
-      "y": 456,
-      "w": 16,
-      "h": 24,
-      "action": "grant-drop-through",
-      "label": "DROP THROUGH"
-    },
-    {
-      "id": "shrine-vault-kick",
-      "x": 3648,
-      "y": 456,
-      "w": 16,
-      "h": 24,
-      "action": "grant-vault-kick",
-      "label": "VAULT KICK"
-    },
-    {
-      "id": "shrine-uppercut",
-      "x": 4288,
-      "y": 456,
-      "w": 16,
-      "h": 24,
-      "action": "grant-uppercut",
-      "label": "UPPERCUT"
-    },
-    {
-      "id": "shrine-cartwheel",
-      "x": 4928,
-      "y": 456,
-      "w": 16,
-      "h": 24,
-      "action": "grant-cartwheel",
-      "label": "CARTWHEEL"
-    },
-    {
-      "id": "shrine-flip",
-      "x": 5568,
-      "y": 456,
-      "w": 16,
-      "h": 24,
-      "action": "grant-flip",
-      "label": "FLIP"
-    },
-    {
-      "id": "shrine-blade-dash",
-      "x": 6208,
-      "y": 456,
-      "w": 16,
-      "h": 24,
-      "action": "grant-blade-dash",
-      "label": "BLADE DASH"
-    },
-    {
-      "id": "shrine-spin-melee",
-      "x": 6848,
-      "y": 456,
-      "w": 16,
-      "h": 24,
-      "action": "grant-spin-melee",
-      "label": "SPIN MELEE"
-    },
-    {
-      "id": "shrine-rope-climb",
-      "x": 7488,
-      "y": 456,
-      "w": 16,
-      "h": 24,
-      "action": "grant-rope-climb",
-      "label": "ROPE CLIMB"
-    }
-  ],
-  "labels": [
-    {
-      "text": "== SLIDE ==",
-      "x": 408,
-      "y": 40,
-      "color": "Cyan",
-      "size": "normal"
-    },
-    {
-      "text": "Crouch while running to slide under gaps",
-      "x": 388,
-      "y": 70,
-      "color": "Gray",
-      "size": "small"
-    },
-    {
-      "text": "== DASH (RUN) ==",
-      "x": 1048,
-      "y": 40,
-      "color": "Cyan",
-      "size": "normal"
-    },
-    {
-      "text": "Hold shift to run fast",
-      "x": 1028,
-      "y": 70,
-      "color": "Gray",
-      "size": "small"
-    },
-    {
-      "text": "== DOUBLE JUMP ==",
-      "x": 1688,
-      "y": 40,
-      "color": "Cyan",
-      "size": "normal"
-    },
-    {
-      "text": "Jump again in mid-air",
-      "x": 1668,
-      "y": 70,
-      "color": "Gray",
-      "size": "small"
-    },
-    {
-      "text": "== WALL CLIMB ==",
-      "x": 2328,
-      "y": 40,
-      "color": "Cyan",
-      "size": "normal"
-    },
-    {
-      "text": "Jump at walls to grab and climb",
-      "x": 2308,
-      "y": 70,
-      "color": "Gray",
-      "size": "small"
-    },
-    {
-      "text": "== DROP THROUGH ==",
-      "x": 2968,
-      "y": 40,
-      "color": "Cyan",
-      "size": "normal"
-    },
-    {
-      "text": "Press down on thin platforms",
-      "x": 2948,
-      "y": 70,
-      "color": "Gray",
-      "size": "small"
-    },
-    {
-      "text": "== VAULT KICK ==",
-      "x": 3608,
-      "y": 40,
-      "color": "Cyan",
-      "size": "normal"
-    },
-    {
-      "text": "Kick off walls for momentum",
-      "x": 3588,
-      "y": 70,
-      "color": "Gray",
-      "size": "small"
-    },
-    {
-      "text": "== UPPERCUT ==",
-      "x": 4248,
-      "y": 40,
-      "color": "Cyan",
-      "size": "normal"
-    },
-    {
-      "text": "Up + attack for rising strike",
-      "x": 4228,
-      "y": 70,
-      "color": "Gray",
-      "size": "small"
-    },
-    {
-      "text": "== CARTWHEEL ==",
-      "x": 4888,
-      "y": 40,
-      "color": "Cyan",
-      "size": "normal"
-    },
-    {
-      "text": "Dodge through attacks",
-      "x": 4868,
-      "y": 70,
-      "color": "Gray",
-      "size": "small"
-    },
-    {
-      "text": "== FLIP ==",
-      "x": 5528,
-      "y": 40,
-      "color": "Cyan",
-      "size": "normal"
-    },
-    {
-      "text": "Aerial acrobatics",
-      "x": 5508,
-      "y": 70,
-      "color": "Gray",
-      "size": "small"
-    },
-    {
-      "text": "== BLADE DASH ==",
-      "x": 6168,
-      "y": 40,
-      "color": "Cyan",
-      "size": "normal"
-    },
-    {
-      "text": "Dash attack with weapon",
-      "x": 6148,
-      "y": 70,
-      "color": "Gray",
-      "size": "small"
-    },
-    {
-      "text": "== SPIN MELEE ==",
-      "x": 6808,
-      "y": 40,
-      "color": "Cyan",
-      "size": "normal"
-    },
-    {
-      "text": "Spinning attack hits all around",
-      "x": 6788,
-      "y": 70,
-      "color": "Gray",
-      "size": "small"
-    },
-    {
-      "text": "== ROPE CLIMB ==",
-      "x": 7448,
-      "y": 40,
-      "color": "Cyan",
-      "size": "normal"
-    },
-    {
-      "text": "Grab and climb ropes",
-      "x": 7428,
-      "y": 70,
-      "color": "Gray",
-      "size": "small"
-    },
-    {
-      "text": "== TRAINING HALL ==",
-      "x": 40,
-      "y": 40,
-      "color": "Gold",
-      "size": "normal"
-    }
-  ],
-  "floor": {
-    "y": 544
   }
 }

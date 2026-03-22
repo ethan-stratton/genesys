@@ -820,7 +820,7 @@ public class Player
         }
 
         // --- Blade dash QCF detection (↓↘→+K, mirrored when facing left) ---
-        if (EnableBladeDash && !IsBladeDashing)
+        if (EnableBladeDash && !IsBladeDashing && _meleeHoldTimer < SpinMeleeActivateTime)
         {
             bool kDown = kb.IsKeyDown(Keys.K);
             int fwd = FacingDir; // +1 right, -1 left

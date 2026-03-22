@@ -352,8 +352,8 @@
       "targetExitId": "exit-to-debug1"
     },
     {
-      "x": 1050,
-      "y": 280,
+      "x": 1043,
+      "y": 159,
       "w": 30,
       "h": 48,
       "targetLevel": "training-hall",
