@@ -4958,6 +4958,10 @@ public class Game1 : Game
             _prologueSkipTimer = Math.Max(0f, _prologueSkipTimer - dt * 2f);
         }
 
+        // Already transitioning out — just wait for fade
+        if (_prologuePhase >= ProloguePhaseDurations.Length)
+            return;
+
         // Fade in at phase start
         if (_prologueFadeAlpha > 0f)
             _prologueFadeAlpha = Math.Max(0f, _prologueFadeAlpha - dt * 2f);
@@ -4975,6 +4979,7 @@ public class Game1 : Game
             {
                 // Prologue done → title card
                 StartFadeTo(GameState.TitleCard, 2f);
+                return;
             }
         }
     }
