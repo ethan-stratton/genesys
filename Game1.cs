@@ -916,6 +916,14 @@ public class Game1 : Game
             }
             if (_isPaused) { _prevKb = kb; return; }
 
+            // Y: Cycle movement tier
+            if (kb.IsKeyDown(Keys.Y) && _prevKb.IsKeyUp(Keys.Y))
+            {
+                _player.CurrentTier = (Player.MoveTier)(((int)_player.CurrentTier + 1) % 3);
+                _player.ApplyTierConstants();
+                _tierSwitchFlash = 1.0f;
+            }
+
             if (kb.IsKeyDown(Keys.D1) && _prevKb.IsKeyUp(Keys.D1) && _rangedInventory.Length > 0)
             {
                 _rangedIndex = (_rangedIndex + 1) % _rangedInventory.Length;
@@ -5199,17 +5207,6 @@ public class Game1 : Game
             Restart();
             _gameState = GameState.Playing;
             return;
-        }
-
-        // Y: Cycle movement tier (debug levels only)
-        if (true)
-        {
-            if (kb.IsKeyDown(Keys.Y) && _prevKb.IsKeyUp(Keys.Y))
-            {
-                _player.CurrentTier = (Player.MoveTier)(((int)_player.CurrentTier + 1) % 3);
-                _player.ApplyTierConstants();
-                _tierSwitchFlash = 1.0f;
-            }
         }
 
         // Enter/Space on biome entrance
