@@ -4110,7 +4110,10 @@ public class Game1 : Game
         int bL = _level.Bounds.Left;
         int bR = _level.Bounds.Right;
         if (floorH > 0)
-            _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, floorH), new Color(40, 40, 40) * 0.5f);
+        {
+            _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, floorH), new Color(70, 50, 30));
+            _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, 2), new Color(110, 80, 50));
+        }
 
         // Draw grid
         if (_editorShowGrid)
@@ -4584,13 +4587,13 @@ public class Game1 : Game
         _spriteBatch.Begin();
 
         // Toolbar
-        string[] toolNames = { "0:Floor", "1:Plat", "2:Rope", "3:Wall", "4:Spike", "5:Exit", "6:Spawn", "7:WSpike", "8:Overworld", "9:Ceiling", "Tile" };
+        string[] toolNames = { "0:Flr", "1:Plt", "2:Rop", "3:Wal", "4:Spk", "5:Ext", "6:Spn", "7:WS", "8:OW", "9:Ceil", "T:Tile", "E:Eny", "I:Itm" };
         float toolX = 10;
         for (int i = 0; i < toolNames.Length; i++)
         {
             bool active = (int)_editorTool == i;
-            _spriteBatch.DrawString(_font, toolNames[i], new Vector2(toolX, 10), active ? Color.Yellow : Color.Gray * 0.6f);
-            toolX += _font.MeasureString(toolNames[i]).X + 15;
+            _spriteBatch.DrawString(_fontSmall, toolNames[i], new Vector2(toolX, 10), active ? Color.Yellow : Color.Gray * 0.6f);
+            toolX += _fontSmall.MeasureString(toolNames[i]).X + 8;
         }
 
         // Grid snap indicator
@@ -4604,17 +4607,17 @@ public class Game1 : Game
 
         // Status message
         if (_editorStatusTimer > 0)
-            _spriteBatch.DrawString(_font, SafeText(_editorStatusMsg), new Vector2(10, ViewH - 40), Color.Yellow);
+            _spriteBatch.DrawString(_fontSmall, SafeText(_editorStatusMsg), new Vector2(10, ViewH - 30), Color.Yellow);
 
         // Controls hint
         string controlsHint = _editorTool switch
         {
-            EditorTool.TilePaint => "[=] Play  [Esc] Menu  [Q] Tools  [LClick] Paint  [Ctrl+Drag] Fill  [RClick] Erase  [[ ]] Tile  [Ctrl+Z] Undo",
-            EditorTool.Enemy => $"[=] Play  [Q] Tools  [LClick] Place  [[ ]] Type: {EnemyTypes[_editorEnemyCursor]}",
-            EditorTool.Item => $"[=] Play  [Q] Tools  [LClick] Place  [[ ]] Type: {ItemTypes[_editorItemCursor]}",
-            _ => "[=] Play  [Esc] Menu  [Q] Tools  [E] Entities  [Drag] Place  [RClick] Delete  [Tab] Target",
+            EditorTool.TilePaint => "[=]Play [Q]Tools [Click]Paint [Ctrl+Drag]Fill [RClick]Erase [[ ]]Tile [Ctrl+Z]Undo",
+            EditorTool.Enemy => $"[=]Play [Q]Tools [Click]Place [[ ]]Type: {EnemyTypes[_editorEnemyCursor]}",
+            EditorTool.Item => $"[=]Play [Q]Tools [Click]Place [[ ]]Type: {ItemTypes[_editorItemCursor]}",
+            _ => "[=]Play [Esc]Menu [Q]Tools [E]Entities [Drag]Place [RClick]Del [Tab]Target",
         };
-        _spriteBatch.DrawString(_font, controlsHint, new Vector2(10, ViewH - 20), Color.Gray * 0.35f);
+        _spriteBatch.DrawString(_fontSmall, controlsHint, new Vector2(10, ViewH - 16), Color.Gray * 0.45f);
 
         // Tile type indicator when in tile paint mode
         if (_editorTool == EditorTool.TilePaint)
