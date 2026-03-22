@@ -33,6 +33,12 @@ public enum TileType : byte
     // Retractable variants (cycle in/out)
     RetractSpikesUp = 48,
     RetractSpikesDown = 49,
+    RetractSpikesLeft = 84,
+    RetractSpikesRight = 85,
+    RetractHalfSpikesUp = 86,
+    RetractHalfSpikesDown = 87,
+    RetractHalfSpikesLeft = 88,
+    RetractHalfSpikesRight = 89,
 
     // Slopes (45°)
     SlopeUpRight = 50,   // floor slopes up left→right (45°)
@@ -104,8 +110,11 @@ public static class TileProperties
     public static bool IsPlatform(TileType t) => t >= TileType.PlatformWood && t <= TileType.PlatformBottom;
     /// <summary>Standard thin platforms only (for merged rects). Half platforms use custom rects.</summary>
     public static bool IsStandardPlatform(TileType t) => t == TileType.PlatformWood || t == TileType.PlatformStone;
-    public static bool IsHazard(TileType t) => t >= TileType.Spikes && t <= TileType.RetractSpikesDown;
-    public static bool IsRetractable(TileType t) => t == TileType.RetractSpikesUp || t == TileType.RetractSpikesDown;
+    public static bool IsHazard(TileType t) => (t >= TileType.Spikes && t <= TileType.RetractSpikesDown) || (t >= TileType.RetractSpikesLeft && t <= TileType.RetractHalfSpikesRight);
+    public static bool IsRetractable(TileType t) => t == TileType.RetractSpikesUp || t == TileType.RetractSpikesDown
+        || t == TileType.RetractSpikesLeft || t == TileType.RetractSpikesRight
+        || t == TileType.RetractHalfSpikesUp || t == TileType.RetractHalfSpikesDown
+        || t == TileType.RetractHalfSpikesLeft || t == TileType.RetractHalfSpikesRight;
     /// <summary>Full-size hazards only (for merged rect collision). Half spikes use per-tile hitboxes.</summary>
     public static bool IsFullHazard(TileType t) => t >= TileType.Spikes && t <= TileType.SpikesRight;
     public static bool IsBackground(TileType t) => (int)t >= 100;
@@ -142,6 +151,12 @@ public static class TileProperties
         TileType.HalfSpikesRight => new Color(180, 25, 25),
         TileType.RetractSpikesUp => new Color(200, 120, 30),
         TileType.RetractSpikesDown => new Color(200, 120, 30),
+        TileType.RetractSpikesLeft => new Color(200, 120, 30),
+        TileType.RetractSpikesRight => new Color(200, 120, 30),
+        TileType.RetractHalfSpikesUp => new Color(180, 110, 25),
+        TileType.RetractHalfSpikesDown => new Color(180, 110, 25),
+        TileType.RetractHalfSpikesLeft => new Color(180, 110, 25),
+        TileType.RetractHalfSpikesRight => new Color(180, 110, 25),
         TileType.PlatformTop => new Color(100, 100, 100),
         TileType.PlatformBottom => new Color(100, 100, 100),
         TileType.SlopeUpRight => new Color(90, 60, 30),
@@ -220,6 +235,12 @@ public static class TileProperties
         TileType.HalfSpikesRight => new Color(140, 18, 18),
         TileType.RetractSpikesUp => new Color(160, 90, 20),
         TileType.RetractSpikesDown => new Color(160, 90, 20),
+        TileType.RetractSpikesLeft => new Color(160, 90, 20),
+        TileType.RetractSpikesRight => new Color(160, 90, 20),
+        TileType.RetractHalfSpikesUp => new Color(140, 80, 18),
+        TileType.RetractHalfSpikesDown => new Color(140, 80, 18),
+        TileType.RetractHalfSpikesLeft => new Color(140, 80, 18),
+        TileType.RetractHalfSpikesRight => new Color(140, 80, 18),
         TileType.PlatformTop => new Color(80, 80, 80),
         TileType.PlatformBottom => new Color(80, 80, 80),
         TileType.Gentle4UpRightA => new Color(75, 50, 25),
@@ -304,6 +325,12 @@ public static class TileProperties
         TileType.HalfSpikesRight,
         TileType.RetractSpikesUp,
         TileType.RetractSpikesDown,
+        TileType.RetractSpikesLeft,
+        TileType.RetractSpikesRight,
+        TileType.RetractHalfSpikesUp,
+        TileType.RetractHalfSpikesDown,
+        TileType.RetractHalfSpikesLeft,
+        TileType.RetractHalfSpikesRight,
         TileType.PlatformTop,
         TileType.PlatformBottom,
         TileType.Breakable,

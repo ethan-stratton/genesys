@@ -2036,13 +2036,24 @@ public class Game1 : Game
                         case TileType.HalfSpikesLeft:  spikeRect = new Rectangle(twx + ts / 2, twy, ts / 2, ts); break;
                         case TileType.HalfSpikesRight: spikeRect = new Rectangle(twx, twy, ts / 2, ts); break;
                         case TileType.RetractSpikesUp:
-                            if (!tgi.RetractExtended) continue;
-                            spikeRect = new Rectangle(twx, twy, ts, ts);
-                            break;
                         case TileType.RetractSpikesDown:
+                        case TileType.RetractSpikesLeft:
+                        case TileType.RetractSpikesRight:
                             if (!tgi.RetractExtended) continue;
                             spikeRect = new Rectangle(twx, twy, ts, ts);
                             break;
+                        case TileType.RetractHalfSpikesUp:
+                            if (!tgi.RetractExtended) continue;
+                            spikeRect = new Rectangle(twx, twy + ts / 2, ts, ts / 2); break;
+                        case TileType.RetractHalfSpikesDown:
+                            if (!tgi.RetractExtended) continue;
+                            spikeRect = new Rectangle(twx, twy, ts, ts / 2); break;
+                        case TileType.RetractHalfSpikesLeft:
+                            if (!tgi.RetractExtended) continue;
+                            spikeRect = new Rectangle(twx + ts / 2, twy, ts / 2, ts); break;
+                        case TileType.RetractHalfSpikesRight:
+                            if (!tgi.RetractExtended) continue;
+                            spikeRect = new Rectangle(twx, twy, ts / 2, ts); break;
                         default: continue;
                     }
                     
@@ -2269,6 +2280,12 @@ public class Game1 : Game
                 if (!b.Alive || !uppercutRect.Intersects(b.Rect)) continue;
                 b.TakeHit(uppercutDmg, _player.FacingDir * 200f, -300f);
                 SpawnHitSpray(new Vector2(b.Position.X + Bird.Width / 2f, b.Position.Y + Bird.Height / 2f), _player.FacingDir, GetEnemyHitColor("bird"), 1, false);
+            }
+            foreach (var wb in _wingbeaters)
+            {
+                if (!wb.Alive || !uppercutRect.Intersects(wb.Rect)) continue;
+                wb.TakeHit(uppercutDmg, _player.FacingDir * 200f, -300f);
+                SpawnHitSpray(new Vector2(wb.Position.X + Wingbeater.Width / 2f, wb.Position.Y + Wingbeater.Height / 2f), _player.FacingDir, GetEnemyHitColor("wingbeater"), 1, false);
             }
         }
 
@@ -2982,6 +2999,30 @@ public class Game1 : Game
                 _tilePaletteCursor = (_tilePaletteCursor + 1) % TileProperties.PaletteTiles.Length;
                 _selectedTileType = TileProperties.PaletteTiles[_tilePaletteCursor];
                 SetEditorStatus($"Tile: {_selectedTileType}");
+            }
+
+            // Click on tile palette to select (palette drawn at top-right)
+            {
+                int colsPerRow = 16, tileW = 20, tileH = 20;
+                int startX = ViewW - colsPerRow * tileW - 10;
+                int startY = 50;
+                var mouse = Mouse.GetState();
+                if (mouse.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released)
+                {
+                    int mx = mouse.X, my = mouse.Y;
+                    if (mx >= startX && my >= startY)
+                    {
+                        int col = (mx - startX) / tileW;
+                        int row = (my - startY) / tileH;
+                        int idx = row * colsPerRow + col;
+                        if (idx >= 0 && idx < TileProperties.PaletteTiles.Length && col < colsPerRow)
+                        {
+                            _tilePaletteCursor = idx;
+                            _selectedTileType = TileProperties.PaletteTiles[idx];
+                            SetEditorStatus($"Tile: {_selectedTileType}");
+                        }
+                    }
+                }
             }
 
             // Skip normal drag placement when in tile paint mode
@@ -6215,6 +6256,12 @@ public class Game1 : Game
             // Map retract types to their base spike direction
             if (tile == TileType.RetractSpikesUp) tile = TileType.Spikes;
             else if (tile == TileType.RetractSpikesDown) tile = TileType.SpikesDown;
+            else if (tile == TileType.RetractSpikesLeft) tile = TileType.SpikesLeft;
+            else if (tile == TileType.RetractSpikesRight) tile = TileType.SpikesRight;
+            else if (tile == TileType.RetractHalfSpikesUp) tile = TileType.HalfSpikesUp;
+            else if (tile == TileType.RetractHalfSpikesDown) tile = TileType.HalfSpikesDown;
+            else if (tile == TileType.RetractHalfSpikesLeft) tile = TileType.HalfSpikesLeft;
+            else if (tile == TileType.RetractHalfSpikesRight) tile = TileType.HalfSpikesRight;
             color = Color.Lerp(color * 0.3f, color, ext); // fade when retracting
         }
         
