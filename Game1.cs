@@ -330,7 +330,7 @@ public class Game1 : Game
     private int _editorItemCursor;
     private bool _entityPaletteOpen;
     private int _entityPaletteCursor;
-    private enum EntityType { Swarm, Crawler, Thornback, Hopper, Tree, Bird, Dummy, CritDummy, Wingbeater }
+    private enum EntityType { Swarm, Crawler, Thornback, Hopper, Tree, Bird, Dummy, CritDummy, Wingbeater, ItemStick, ItemDagger, ItemSword, ItemAxe, ItemBow, ItemGun, ItemHeart }
 
     // Tile paint state
     private int _tilePaletteCursor;
@@ -340,7 +340,7 @@ public class Game1 : Game
     {
         _graphics = new GraphicsDeviceManager(this);
         Content.RootDirectory = "Content";
-        IsMouseVisible = false;
+        IsMouseVisible = false; // hidden in gameplay, shown in editor
     }
 
     protected override void Initialize()
@@ -806,6 +806,7 @@ public class Game1 : Game
             _gameState = GameState.Editing;
             _editorCursor = _player.Position;
             _editorMenuOpen = false;
+            IsMouseVisible = true;
             _prevKb = kb;
             _prevMouse = Mouse.GetState();
             return;
@@ -2968,6 +2969,29 @@ public class Game1 : Game
                         _level.Enemies = wbList.ToArray();
                         SetEditorStatus($"Placed wingbeater at ({(int)cx}, {(int)cy})");
                         break;
+                    case EntityType.ItemStick:
+                    case EntityType.ItemDagger:
+                    case EntityType.ItemSword:
+                    case EntityType.ItemAxe:
+                    case EntityType.ItemBow:
+                    case EntityType.ItemGun:
+                    case EntityType.ItemHeart:
+                        string itemType = selectedType switch
+                        {
+                            EntityType.ItemStick => "stick",
+                            EntityType.ItemDagger => "dagger",
+                            EntityType.ItemSword => "sword",
+                            EntityType.ItemAxe => "axe",
+                            EntityType.ItemBow => "bow",
+                            EntityType.ItemGun => "gun",
+                            EntityType.ItemHeart => "heart",
+                            _ => "stick"
+                        };
+                        var itemList = new List<ItemData>(_level.Items);
+                        itemList.Add(new ItemData { Id = $"{itemType}-{itemList.Count}", Type = itemType, X = cx, Y = cy });
+                        _level.Items = itemList.ToArray();
+                        SetEditorStatus($"Placed item: {itemType} at ({(int)cx}, {(int)cy})");
+                        break;
                 }
             }
 
@@ -2982,6 +3006,7 @@ public class Game1 : Game
         {
             SaveLevel(); // auto-save on exit editor
             _gameState = GameState.Playing;
+            IsMouseVisible = false;
             // Rebuild level arrays (sync tile grid data)
             if (_level.TileGridInstance != null)
                 _level.TileGrid = _level.TileGridInstance.ToData();

@@ -1,17 +1,21 @@
 {
   "currentLevel": "test-arena",
-  "spawnX": 416,
-  "spawnY": 192,
+  "spawnX": 192.45638,
+  "spawnY": 284,
   "unlockedAbilities": [],
   "flags": {},
-  "playTime": 0,
-  "meleeInventory": [],
+  "playTime": 40.499557,
+  "meleeInventory": [
+    "Stick"
+  ],
   "rangedInventory": [],
-  "meleeIndex": -1,
+  "meleeIndex": 0,
   "rangedIndex": -1,
-  "collectedItems": [],
+  "collectedItems": [
+    "stick-1"
+  ],
   "windowSizeIndex": 0,
   "crtEnabled": false,
-  "moveTier": 1,
+  "moveTier": 0,
   "upgrades": []
 }
