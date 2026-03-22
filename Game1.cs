@@ -838,7 +838,6 @@ public class Game1 : Game
             return;
         }
 
-        var dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
         _totalTime += dt;
         if (_eveMessageTimer > 0) _eveMessageTimer -= dt;
 
