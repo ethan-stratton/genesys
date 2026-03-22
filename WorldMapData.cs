@@ -6,7 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Xna.Framework;
 
-namespace ArenaShooter;
+namespace Genesis;
 
 public class BiomeData
 {

@@ -4,7 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Xna.Framework;
 
-namespace ArenaShooter;
+namespace Genesis;
 
 public class LevelData
 {
@@ -162,7 +162,7 @@ public class LevelData
         // Tile grid collision integration
         if (TileGrid != null)
         {
-            TileGridInstance = ArenaShooter.TileGrid.FromData(TileGrid);
+            TileGridInstance = Genesis.TileGrid.FromData(TileGrid);
         }
         if (TileGridInstance != null)
         {

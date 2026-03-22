@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using Microsoft.Xna.Framework;
 
-namespace ArenaShooter;
+namespace Genesis;
 
 public enum TileType : byte
 {

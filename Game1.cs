@@ -8,7 +8,7 @@ using Microsoft.Xna.Framework.Media;
 using System.IO;
 using FontStashSharp;
 
-namespace ArenaShooter;
+namespace Genesis;
 
 public enum WeaponType { None, Stick, Whip, Dagger, Sword, GreatSword, Axe, Club, GreatClub, Hammer, Sling, Bow, Gun }
 

@@ -2,7 +2,7 @@ using System;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
-namespace ArenaShooter;
+namespace Genesis;
 
 /// <summary>
 /// Flying enemy that patrols the air and dive-bombs the player.

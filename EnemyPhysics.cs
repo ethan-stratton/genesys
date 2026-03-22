@@ -1,7 +1,7 @@
 using System;
 using Microsoft.Xna.Framework;
 
-namespace ArenaShooter;
+namespace Genesis;
 
 /// <summary>
 /// Shared physics helper for all enemies. Handles gravity, tile collision,

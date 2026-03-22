@@ -1,4 +1,4 @@
-namespace ArenaShooter;
+namespace Genesis;
 
 public static class WeaponStats
 {

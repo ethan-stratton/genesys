@@ -1,7 +1,7 @@
 using System;
 using Microsoft.Xna.Framework;
 
-namespace ArenaShooter;
+namespace Genesis;
 
 public class Camera
 {
