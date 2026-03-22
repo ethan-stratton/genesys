@@ -291,6 +291,18 @@ If Adam stays, the planet changes:
 
 ---
 
+## UNIQUE ENEMIES
+
+### The Poltergeist
+- Invisible. Cannot be seen without cipher technology
+- Powerful — a real threat, not a nuisance
+- Without cipher: EVE must encounter it enough times to figure out its pattern. Then she can advise how to beat it or how to escape without it chasing you
+- With cipher: visible, fightable, still dangerous
+- **Requires no visual sprite** — presence communicated through sound, particle effects (displaced dust, bent foliage, disturbed water), EVE's panicked readings
+- Design philosophy: the scariest enemy in the game is one you can't see. The player's imagination does all the work
+
+---
+
 ## MCGONIGAL ALIGNMENT CHECK
 
 - **Unnecessary obstacles:** The planet itself. Adam chose to come here. Every challenge is a consequence of that choice
@@ -299,6 +311,40 @@ If Adam stays, the planet changes:
 - **Hope of success:** Each scan/discovery proves the world is knowable. Progress is visible
 - **Social connectivity:** Layered lore creates community interpretation (Vaati/Firelink model)
 - **Epic meaning:** The Fall, creation, knowledge, sacrifice — experienced, not lectured
+
+---
+
+---
+
+## FIRST 30 MINUTES — BEAT BY BEAT
+
+See `first-30-minutes.md` for the complete minute-by-minute opening sequence.
+
+Summary of key beats:
+- 0:00 — Audio-only prologue. Adam overrides EVE. Ship crashes. Adam's CHOICE established
+- 1:00 — Wake up. Tight camera. Injured movement. No HUD yet
+- 1:30 — EVE reboots glitchy. HUD appears. She's damaged too
+- 2:00 — Crash site exploration. Basic movement. First passive scan (alien plant)
+- 3:30 — First creature (scavenger). Non-hostile. Teaches: the planet is already consuming your stuff
+- 4:30 — Suit sparking. Integrity dropping in real-time. Tech suppression is REAL
+- 5:00 — First environmental hazard (toxic spores). Multiple solutions
+- 6:00 — Ship cockpit. Sidearm (12 rounds). Optional mission briefing log. Federation beacon planted
+- 8:00 — First hostile (alien predator). Real combat. Gun-vs-knife choice
+- 9:30 — Edge of Wreckage. Forest visible. EVE: "I recommended we not come here." Beautiful and terrifying
+- 10:00 — Enter forest. Camera opens up. Atmosphere transforms
+- 11:00 — Observation lesson (herbivore self-medicating). First bio-tier hint
+- 12:00 — Path split. Battery cell find. "Lock before key" ledge for later
+- 13:30 — Weather shift. Rain. World reacts. EVE shakes off water droplets
+- 15:00 — First Adapted sign (stone cairn). "We're not the first ones here"
+- 16:30 — Predator pack. Multiple approach options (fight/sneak/watch/shoot)
+- 18:00 — Grapple found in debris. First major tool. Battery-powered
+- 20:00 — Canopy vista. Can see all major areas on horizon. Transformed Lands visible. EVE: "What IS that?"
+- 22:00 — THE SCREAM. Dragon's call. All creatures flee. EVE's sensors overflow. Terror without seeing anything
+- 24:00 — First Adapted encounter. Humanoid but changed. Leaves a carved chitin piece. EVE: "Partially human"
+- 26:00 — Native Ruins visible but gated (cliff too sheer). Wall-climb lock
+- 27:00 — First shelter/save point. Brief rest. Ecosystem shifts
+- 28:00 — EVE revelation: the distress signal is centuries old and was broadcasting TO the planet, not from it. "Like an invitation"
+- 30:00 — Forest opens to choice: explore more, approach Ruins cliff, head to Bone Reef marshland
 
 ---
 
