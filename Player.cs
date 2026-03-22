@@ -25,7 +25,7 @@ public class Player
     private static readonly float[] TierGravity =        { 900f,  750f,  950f  };
     private static readonly float[] TierJumpForce =      { -370f, -430f, -400f };
     private static readonly float[] TierRunAccel =       { 2000f, 1000f, 1600f };  // Tech: snap (high accel, low speed)
-    private static readonly float[] TierRunDecel =       { 2000f, 1000f, 800f  };  // Cipher: low decel = slides
+    private static readonly float[] TierRunDecel =       { 2000f, 1000f, 2500f };  // Cipher: stops on a dime
     private static readonly float[] TierAirAccel =       { 250f,  800f,  500f  };  // Tech: very low air control
     private static readonly float[] TierAirDecel =       { 200f,  350f,  300f  };  // Tech: can barely redirect in air
     private static readonly float[] TierAirMult =        { 0.35f, 0.9f,  0.7f  };  // Tech: committed to your jump arc
@@ -72,7 +72,7 @@ public class Player
                 EnableUppercut = false;
                 EnableWallClimb = false;
                 EnableSlide = true;
-                EnableVaultKick = true;
+                EnableVaultKick = false;
                 EnableCartwheel = false;
                 EnableFlip = false;
                 EnableDoubleJump = false;
@@ -82,7 +82,7 @@ public class Player
                 EnableUppercut = false;
                 EnableWallClimb = true;
                 EnableSlide = true;
-                EnableVaultKick = true;
+                EnableVaultKick = false;
                 EnableCartwheel = true;
                 EnableFlip = true;
                 EnableDoubleJump = true;
@@ -376,6 +376,13 @@ public class Player
     public bool EnableBladeDash { get; set; } = true;
     public bool EnableWallClimb { get; set; } = true;
 
+    // Tech charged jump: hold Space on ground to charge, release to jump higher
+    private float _chargeJumpTimer;
+    private const float ChargeJumpMaxTime = 0.5f;     // max charge time
+    private const float ChargeJumpMinForce = -300f;    // tap jump (weak)
+    private const float ChargeJumpMaxForce = -550f;    // full charge (near double jump height)
+    private bool _chargingJump;
+
     // Weapon gating (set by Game1)
     public bool HasMeleeWeapon { get; set; }
     public bool HasRangedWeapon { get; set; }
@@ -430,6 +437,8 @@ public class Player
     public float GetTierAccel() => _runAccel;
     public float GetTierAirMult() => _airMult;
     public float GetTierJump() => _jumpForce;
+    public bool IsChargingJump => _chargingJump;
+    public float ChargeJumpProgress => _chargeJumpTimer / ChargeJumpMaxTime;
 
     public int CurrentHeight => IsSliding ? SlideHeight : (IsCrouching ? CrouchHeight : Height);
 
@@ -641,7 +650,7 @@ public class Player
         }
     }
 
-    public void Update(float dt, KeyboardState kb, float floorY, Rectangle[] platforms, float[] ropeXPositions = null, float[] ropeTops = null, float[] ropeBottoms = null, Rectangle[] walls = null, int[] wallClimbSides = null, Rectangle[] solidWalls = null, Rectangle[] ceilings = null, Rectangle[] solidFloors = null, TileGrid tileGrid = null)
+    public void Update(float dt, KeyboardState kb, float floorY, Rectangle[] platforms, float[] ropeXPositions = null, float[] ropeTops = null, float[] ropeBottoms = null, Rectangle[] walls = null, int[] wallClimbSides = null, Rectangle[] solidWalls = null, Rectangle[] ceilings = null, Rectangle[] solidFloors = null, TileGrid tileGrid = null, Vector2? mouseWorldPos = null)
     {
         WantsToShoot = false;
         WantsToMelee = false;
@@ -954,19 +963,20 @@ public class Player
         // --- Facing direction ---
         if (inputX != 0 && !IsSliding) FacingDir = inputX;
 
-        // --- Aim direction ---
-        if (IsCrouching)
+        // --- Aim direction (mouse-based) ---
+        if (mouseWorldPos.HasValue)
         {
-            var aim = Vector2.Zero;
-            if (inputX != 0) aim.X = inputX;
-            if (inputY != 0) aim.Y = inputY;
-            if (aim == Vector2.Zero) aim.X = FacingDir;
-            aim.Normalize();
-            AimDir = aim;
+            var center = Position + new Vector2(Width / 2f, Height / 2f);
+            var toMouse = mouseWorldPos.Value - center;
+            if (toMouse.LengthSquared() > 4f) // deadzone
+            {
+                toMouse.Normalize();
+                AimDir = toMouse;
+            }
         }
         else
         {
-            // 8-way aim based on input, default to facing
+            // Fallback: keyboard aim
             var aim = Vector2.Zero;
             aim.X = inputX != 0 ? inputX : FacingDir;
             if (inputY != 0) aim.Y = inputY;
@@ -1448,9 +1458,39 @@ public class Player
             }
 
             // Jump (Space) — only if NOT holding S (S+Space = slide)
-            int minJumpsLeft = EnableDoubleJump ? 0 : 1; // 1 = block second jump
-            if (spacePressed && !_jumpHeld && _jumpsLeft > minJumpsLeft && inputY <= 0)
+            bool canJump = _jumpsLeft > (EnableDoubleJump ? 0 : 1);
+
+            // Tech charged jump: hold to charge on ground, release to launch
+            if (CurrentTier == MoveTier.Tech && (IsGrounded || _coyoteTimer > 0))
             {
+                if (spacePressed && inputY <= 0)
+                {
+                    if (!_chargingJump)
+                    {
+                        _chargingJump = true;
+                        _chargeJumpTimer = 0f;
+                    }
+                    _chargeJumpTimer = Math.Min(_chargeJumpTimer + dt, ChargeJumpMaxTime);
+                    // Slow down while charging
+                    vel.X *= 0.9f;
+                }
+                else if (_chargingJump && !spacePressed)
+                {
+                    // Release — jump with charged force
+                    float t = _chargeJumpTimer / ChargeJumpMaxTime;
+                    vel.Y = MathHelper.Lerp(ChargeJumpMinForce, ChargeJumpMaxForce, t);
+                    _jumpsLeft--;
+                    _chargingJump = false;
+                    _chargeJumpTimer = 0f;
+                    SetSquash(0.6f + 0.1f * (1f - t), 1.2f + 0.2f * t);
+                    IsGrounded = false;
+                    _wasGrounded = false;
+                    _coyoteTimer = 0;
+                }
+            }
+            else if (spacePressed && !_jumpHeld && canJump && inputY <= 0)
+            {
+                _chargingJump = false;
                 float now_flip = (float)System.DateTime.UtcNow.TimeOfDay.TotalSeconds;
                 bool isSecondJump = _jumpsLeft < MaxJumps; // already used first jump
 

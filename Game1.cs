@@ -868,17 +868,10 @@ public class Game1 : Game
         // Exit re-entry cooldown
         // (exit enter-trigger tracking happens in exit collision section below)
 
-        // Pass enabled features to player
-        _player.EnableSlide = _enableSlide;
-        _player.EnableCartwheel = _enableCartwheel;
+        // Ability gating now handled by Player.ApplyTierConstants()
         _player.EnableDash = _enableDash;
-        _player.EnableDoubleJump = _enableDoubleJump;
         _player.EnableDropThrough = _enableDropThrough;
-        _player.EnableVaultKick = _enableVaultKick;
-        _player.EnableUppercut = _enableUppercut;
         _player.EnableSpinMelee = _enableSpinMelee;
-        _player.EnableFlip = _enableFlip;
-        _player.EnableBladeDash = _enableBladeDash;
 
         // Weapon system: set weapon availability and melee range
         _player.HasMeleeWeapon = true; // always have fists at minimum
@@ -1034,7 +1027,11 @@ public class Game1 : Game
         if (!hitStopped)
         {
         _playerPrevVelY = _player.Velocity.Y;
-        _player.Update(dt, kb, _level.Floor.Y, _level.AllPlatforms, ropesToPass, ropeTopsToPass, ropeBottomsToPass, wallsToPass, wallSidesToPass, _level.WallRects, _level.CeilingRects, _level.SolidFloorRects, _level.TileGridInstance);
+        // Mouse world position for aiming
+        var mouseState = Mouse.GetState();
+        var mouseScreen = new Vector2(mouseState.X, mouseState.Y);
+        var mouseWorld = Vector2.Transform(mouseScreen, Matrix.Invert(_camera.TransformMatrix));
+        _player.Update(dt, kb, _level.Floor.Y, _level.AllPlatforms, ropesToPass, ropeTopsToPass, ropeBottomsToPass, wallsToPass, wallSidesToPass, _level.WallRects, _level.CeilingRects, _level.SolidFloorRects, _level.TileGridInstance, mouseWorld);
         _player.UpdateRegen(dt);
         }
 
@@ -7282,6 +7279,20 @@ public class Game1 : Game
 
         // Draw bullets
         _bullets.ForEach(b => b.Draw(_spriteBatch, _pixel));
+
+        // Draw crosshair reticle at mouse position (world space)
+        {
+            var ms = Mouse.GetState();
+            var mScreen = new Vector2(ms.X, ms.Y);
+            var mWorld = Vector2.Transform(mScreen, Matrix.Invert(_camera.TransformMatrix));
+            int mx = (int)mWorld.X, my = (int)mWorld.Y;
+            var rc = Color.White * 0.7f;
+            // 4 pixels: N, S, E, W with 2px gap from center
+            _spriteBatch.Draw(_pixel, new Rectangle(mx, my - 4, 1, 2), rc); // N
+            _spriteBatch.Draw(_pixel, new Rectangle(mx, my + 3, 1, 2), rc); // S
+            _spriteBatch.Draw(_pixel, new Rectangle(mx + 3, my, 2, 1), rc); // E
+            _spriteBatch.Draw(_pixel, new Rectangle(mx - 4, my, 2, 1), rc); // W
+        }
 
         _spriteBatch.End();
 
