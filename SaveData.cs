@@ -23,6 +23,8 @@ public class SaveData
     [JsonPropertyName("collectedItems")] public HashSet<string> CollectedItems { get; set; } = new(); // item IDs picked up
     [JsonPropertyName("windowSizeIndex")] public int WindowSizeIndex { get; set; } = 0;
     [JsonPropertyName("crtEnabled")] public bool CrtEnabled { get; set; } = false;
+    [JsonPropertyName("moveTier")] public int MoveTier { get; set; } = 0; // 0=Tech, 1=Bio, 2=Cipher
+    [JsonPropertyName("upgrades")] public List<string> Upgrades { get; set; } = new(); // future: equipped upgrade IDs
 
     public void Save()
     {

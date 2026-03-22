@@ -727,6 +727,10 @@ public class Game1 : Game
                             _rangedIndex = _saveData.RangedIndex;
                             if (_meleeIndex >= _meleeInventory.Length) _meleeIndex = _meleeInventory.Length > 0 ? 0 : -1;
                             if (_rangedIndex >= _rangedInventory.Length) _rangedIndex = _rangedInventory.Length > 0 ? 0 : -1;
+
+                            // Load movement tier
+                            _player.CurrentTier = (Player.MoveTier)Math.Clamp(_saveData.MoveTier, 0, 2);
+                            _player.ApplyTierConstants();
                         }
                         break;
                     case "New Game":
@@ -915,6 +919,7 @@ public class Game1 : Game
                 _player.CurrentTier = (Player.MoveTier)(((int)_player.CurrentTier + 1) % 3);
                 _player.ApplyTierConstants();
                 _tierSwitchFlash = 1.0f;
+                if (_saveData != null) { SyncInventoryToSave(); _saveData.Save(); }
             }
 
             if (kb.IsKeyDown(Keys.D1) && _prevKb.IsKeyUp(Keys.D1) && _rangedInventory.Length > 0)
@@ -3886,6 +3891,7 @@ public class Game1 : Game
         _saveData.RangedInventory = new List<string>(Array.ConvertAll(_rangedInventory, w => w.ToString()));
         _saveData.MeleeIndex = _meleeIndex;
         _saveData.RangedIndex = _rangedIndex;
+        _saveData.MoveTier = (int)_player.CurrentTier;
     }
 
     private void SaveLevel()

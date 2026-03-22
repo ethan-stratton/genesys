@@ -594,22 +594,54 @@ public class Player
                     (int)(hbCenterX - hw / 2f), (int)(hbCenterY - hh / 2f), hw, hh);
             }
 
-            // Overhead swing arc: hitbox follows MeleeSwingAngle
-            float t = MeleeTimer > 0 ? 1f - (MeleeTimer / CurrentMeleeActiveTime) : 1f; // 0→1 over swing
-            // Ease-in-out for more readable swing (fast middle, slow start/end)
-            float eased = t < 0.5f ? 2f * t * t : 1f - MathF.Pow(-2f * t + 2f, 2f) / 2f;
+            // Tier-aware melee styles
+            float t = MeleeTimer > 0 ? 1f - (MeleeTimer / CurrentMeleeActiveTime) : 1f;
             float baseAngle = MathF.Atan2(MeleeDirection.Y, MeleeDirection.X);
-            float startAngle = baseAngle - MathF.PI * 0.6f; // start 108° before aim
-            float endAngle = baseAngle + MathF.PI * 0.6f;   // end 108° after aim (216° total)
-            float angle = startAngle + (endAngle - startAngle) * eased;
-            MeleeSwingAngle = angle;
 
-            // Larger rectangular hitbox covering the swing arc
-            int sw = 28, sh = 28;
-            float hbX = center.X + MathF.Cos(angle) * range * 0.55f;
-            float hbY = center.Y + MathF.Sin(angle) * range * 0.55f;
-            return new Rectangle(
-                (int)(hbX - sw / 2f), (int)(hbY - sh / 2f), sw, sh);
+            if (CurrentTier == MoveTier.Tech)
+            {
+                // TECH: Forward thrust/stab (SOTN style) — small arc, forward-biased
+                float eased = t; // linear, snappy
+                float startAngle = baseAngle - MathF.PI * 0.15f; // slight upward start
+                float endAngle = baseAngle + MathF.PI * 0.2f;    // ends slightly downward (72° total)
+                float angle = startAngle + (endAngle - startAngle) * eased;
+                MeleeSwingAngle = angle;
+                // Long narrow hitbox (thrust)
+                int sw = 14, sh = 32;
+                float hbX = center.X + MathF.Cos(angle) * range * 0.65f;
+                float hbY = center.Y + MathF.Sin(angle) * range * 0.65f;
+                return new Rectangle(
+                    (int)(hbX - sw / 2f), (int)(hbY - sh / 2f), sw, sh);
+            }
+            else if (CurrentTier == MoveTier.Bio)
+            {
+                // BIO: Overhead arc swing (Terraria style) — wide sweeping arc
+                float eased = t < 0.5f ? 2f * t * t : 1f - MathF.Pow(-2f * t + 2f, 2f) / 2f;
+                float startAngle = baseAngle - MathF.PI * 0.6f;
+                float endAngle = baseAngle + MathF.PI * 0.6f; // 216° total
+                float angle = startAngle + (endAngle - startAngle) * eased;
+                MeleeSwingAngle = angle;
+                int sw = 28, sh = 28;
+                float hbX = center.X + MathF.Cos(angle) * range * 0.55f;
+                float hbY = center.Y + MathF.Sin(angle) * range * 0.55f;
+                return new Rectangle(
+                    (int)(hbX - sw / 2f), (int)(hbY - sh / 2f), sw, sh);
+            }
+            else
+            {
+                // CIPHER: Fast multi-hit slash — two quick arcs (there and back)
+                float pingPong = t < 0.5f ? t * 2f : 2f - t * 2f; // 0→1→0
+                float eased = pingPong;
+                float startAngle = baseAngle - MathF.PI * 0.5f;
+                float endAngle = baseAngle + MathF.PI * 0.5f; // 180° sweep, twice
+                float angle = startAngle + (endAngle - startAngle) * eased;
+                MeleeSwingAngle = angle;
+                int sw = 24, sh = 24;
+                float hbX = center.X + MathF.Cos(angle) * range * 0.6f;
+                float hbY = center.Y + MathF.Sin(angle) * range * 0.6f;
+                return new Rectangle(
+                    (int)(hbX - sw / 2f), (int)(hbY - sh / 2f), sw, sh);
+            }
         }
     }
 
