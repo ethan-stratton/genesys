@@ -317,7 +317,7 @@ public class Game1 : Game
     {
         _graphics = new GraphicsDeviceManager(this);
         Content.RootDirectory = "Content";
-        IsMouseVisible = true;
+        IsMouseVisible = false;
     }
 
     protected override void Initialize()
@@ -1031,7 +1031,7 @@ public class Game1 : Game
         var mouseState = Mouse.GetState();
         var mouseScreen = new Vector2(mouseState.X, mouseState.Y);
         var mouseWorld = Vector2.Transform(mouseScreen, Matrix.Invert(_camera.TransformMatrix));
-        _player.Update(dt, kb, _level.Floor.Y, _level.AllPlatforms, ropesToPass, ropeTopsToPass, ropeBottomsToPass, wallsToPass, wallSidesToPass, _level.WallRects, _level.CeilingRects, _level.SolidFloorRects, _level.TileGridInstance, mouseWorld);
+        _player.Update(dt, kb, _level.Floor.Y, _level.AllPlatforms, ropesToPass, ropeTopsToPass, ropeBottomsToPass, wallsToPass, wallSidesToPass, _level.WallRects, _level.CeilingRects, _level.SolidFloorRects, _level.TileGridInstance, mouseWorld, mouseState);
         _player.UpdateRegen(dt);
         }
 
@@ -7250,6 +7250,35 @@ public class Game1 : Game
                     _spriteBatch.Draw(_pixel, new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height), Color.Lime * 0.2f);
                 if (_player.FloatTimer > 0)
                     _spriteBatch.Draw(_pixel, new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height), Color.MediumPurple * 0.25f);
+
+                // Draw melee swing arm
+                if (_player.MeleeTimer > 0 && _player.CurrentWeapon != Player.WeaponType.None)
+                {
+                    var pCenter = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
+                    float swAngle = _player.MeleeSwingAngle;
+                    float range = _player.MeleeRangeOverride;
+                    // Draw arm line (3 segments for thickness)
+                    for (int seg = 0; seg < (int)(range * 0.8f); seg += 2)
+                    {
+                        float sx = pCenter.X + MathF.Cos(swAngle) * seg;
+                        float sy = pCenter.Y + MathF.Sin(swAngle) * seg;
+                        _spriteBatch.Draw(_pixel, new Rectangle((int)sx, (int)sy, 2, 2), Color.White * 0.8f);
+                    }
+                    // Draw tip flash
+                    float tipX = pCenter.X + MathF.Cos(swAngle) * range * 0.7f;
+                    float tipY = pCenter.Y + MathF.Sin(swAngle) * range * 0.7f;
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)tipX - 2, (int)tipY - 2, 4, 4), Color.Yellow * 0.9f);
+                }
+
+                // Draw charge jump indicator
+                if (_player.IsChargingJump)
+                {
+                    float charge = _player.ChargeJumpProgress;
+                    int barW = (int)(Player.Width * charge);
+                    int barX = (int)_player.Position.X + (Player.Width - barW) / 2;
+                    int barY = (int)_player.Position.Y + Player.Height + 3;
+                    _spriteBatch.Draw(_pixel, new Rectangle(barX, barY, barW, 2), Color.Lerp(Color.Gray, Color.Cyan, charge));
+                }
         }
 
         // Draw EVE orbiting companion

@@ -23,7 +23,7 @@ public class Player
     // Per-tier constants: [Tech, Bio, Cipher]
     private static readonly float[] TierSpeed =          { 200f,  250f,  320f  };
     private static readonly float[] TierGravity =        { 900f,  750f,  950f  };
-    private static readonly float[] TierJumpForce =      { -370f, -430f, -400f };
+    private static readonly float[] TierJumpForce =      { -370f, -500f, -400f };  // Bio: big single jump
     private static readonly float[] TierRunAccel =       { 2000f, 1000f, 1600f };  // Tech: snap (high accel, low speed)
     private static readonly float[] TierRunDecel =       { 2000f, 1000f, 2500f };  // Cipher: stops on a dime
     private static readonly float[] TierAirAccel =       { 250f,  800f,  500f  };  // Tech: very low air control
@@ -84,8 +84,8 @@ public class Player
                 EnableSlide = true;
                 EnableVaultKick = false;
                 EnableCartwheel = true;
-                EnableFlip = true;
-                EnableDoubleJump = true;
+                EnableFlip = false;
+                EnableDoubleJump = false;
                 break;
             case MoveTier.Cipher:
                 EnableBladeDash = true;
@@ -150,6 +150,7 @@ public class Player
     public bool WantsToMelee { get; private set; }
     public Vector2 MeleeDirection { get; private set; }
     public float MeleeTimer { get; private set; }
+    public float MeleeSwingAngle { get; private set; } // current angle of overhead swing (radians)
     public const int MeleeRange = 40;
 
     // Weapon stats driven by Game1 each frame
@@ -379,8 +380,8 @@ public class Player
     // Tech charged jump: hold Space on ground to charge, release to jump higher
     private float _chargeJumpTimer;
     private const float ChargeJumpMaxTime = 0.5f;     // max charge time
-    private const float ChargeJumpMinForce = -300f;    // tap jump (weak)
-    private const float ChargeJumpMaxForce = -550f;    // full charge (near double jump height)
+    private const float ChargeJumpMinForce = -320f;    // tap jump (weak)
+    private const float ChargeJumpMaxForce = -620f;    // full charge (higher than before)
     private bool _chargingJump;
 
     // Weapon gating (set by Game1)
@@ -578,15 +579,13 @@ public class Player
         get
         {
             var center = Position + new Vector2(Width / 2f, Height / 2f);
-            int aimX = MathF.Abs(AimDir.X) > 0.1f ? Math.Sign(AimDir.X) : FacingDir;
-            float aimY = AimDir.Y;
             float range = MeleeRangeOverride;
-            bool isGreat = CurrentWeapon == WeaponType.GreatSword || CurrentWeapon == WeaponType.GreatClub;
-            int baseH = isGreat ? 36 : 28;
 
             if (CurrentWeapon == WeaponType.None)
             {
-                // Fist combo: SOTN-style rapid jabs
+                // Fist combo: SOTN-style rapid jabs (unchanged)
+                int aimX = MathF.Abs(AimDir.X) > 0.1f ? Math.Sign(AimDir.X) : FacingDir;
+                float aimY = AimDir.Y;
                 int hw = 18, hh = 20;
                 float extend = _comboStep == 0 ? 18f : 24f;
                 float hbCenterX = center.X + aimX * extend;
@@ -595,62 +594,24 @@ public class Player
                     (int)(hbCenterX - hw / 2f), (int)(hbCenterY - hh / 2f), hw, hh);
             }
 
-            // All other melee weapons use combo-aware hitboxes
-            float vertShift = aimY * 14f;
-            float w, h;
-            if (_comboStep == 0)
-            {
-                // Hit 1: narrow forward
-                w = range * 0.8f;
-                h = baseH;
-                float offsetX = aimX * (range * 0.3f);
-                return new Rectangle(
-                    (int)(center.X + offsetX - (aimX > 0 ? w * 0.15f : w * 0.85f)),
-                    (int)(center.Y - h / 2f + vertShift), (int)w, (int)h);
-            }
-            else if (_comboStep == 1)
-            {
-                // Hit 2: wider sweep
-                w = range * 1.0f;
-                h = baseH + 4;
-                float offsetX = aimX * (range * 0.45f);
-                return new Rectangle(
-                    (int)(center.X + offsetX - (aimX > 0 ? w * 0.15f : w * 0.85f)),
-                    (int)(center.Y - h / 2f + vertShift), (int)w, (int)h);
-            }
-            else
-            {
-                // Hit 3: big finisher — cascading 3-phase sweep
-                w = range * 1.2f;
-                h = baseH + 8;
-                float offsetX = aimX * (range * 0.4f);
-                float phase = MeleeTimer;
-                float totalTime = MeleeTimer; // already counting down
-                // 3-phase sweep based on remaining time
-                float thirdTime = CurrentMeleeActiveTime / 3f;
-                if (phase > thirdTime * 2f)
-                {
-                    // Phase 1: overhead
-                    return new Rectangle(
-                        (int)(center.X + offsetX - w / 2f), (int)(Position.Y - 20f), (int)w, (int)h - 4);
-                }
-                else if (phase > thirdTime)
-                {
-                    // Phase 2: mid-level
-                    return new Rectangle(
-                        (int)(center.X + offsetX - w / 2f), (int)(center.Y - h / 2f), (int)w, (int)h);
-                }
-                else
-                {
-                    // Phase 3: low finisher
-                    return new Rectangle(
-                        (int)(center.X + offsetX - w / 2f), (int)(center.Y + 4f), (int)(w * 1.1f), (int)h + 4);
-                }
-            }
+            // Overhead swing arc: hitbox follows MeleeSwingAngle
+            float t = MeleeTimer > 0 ? 1f - (MeleeTimer / CurrentMeleeActiveTime) : 1f; // 0→1 over swing
+            float baseAngle = MathF.Atan2(MeleeDirection.Y, MeleeDirection.X);
+            float startAngle = baseAngle - MathF.PI * 0.75f; // start 135° before aim
+            float endAngle = baseAngle + MathF.PI * 0.75f;   // end 135° after aim (270° total sweep)
+            float angle = startAngle + (endAngle - startAngle) * t;
+            MeleeSwingAngle = angle;
+
+            // Rectangular hitbox at end of swing arm
+            int sw = 16, sh = (int)(range * 0.8f);
+            float hbX = center.X + MathF.Cos(angle) * range * 0.6f;
+            float hbY = center.Y + MathF.Sin(angle) * range * 0.6f;
+            return new Rectangle(
+                (int)(hbX - sw / 2f), (int)(hbY - sh / 2f), sw, sh);
         }
     }
-
-    public void Update(float dt, KeyboardState kb, float floorY, Rectangle[] platforms, float[] ropeXPositions = null, float[] ropeTops = null, float[] ropeBottoms = null, Rectangle[] walls = null, int[] wallClimbSides = null, Rectangle[] solidWalls = null, Rectangle[] ceilings = null, Rectangle[] solidFloors = null, TileGrid tileGrid = null, Vector2? mouseWorldPos = null)
+                float offsetX = aimX * (range * 0.3f);
+    public void Update(float dt, KeyboardState kb, float floorY, Rectangle[] platforms, float[] ropeXPositions = null, float[] ropeTops = null, float[] ropeBottoms = null, Rectangle[] walls = null, int[] wallClimbSides = null, Rectangle[] solidWalls = null, Rectangle[] ceilings = null, Rectangle[] solidFloors = null, TileGrid tileGrid = null, Vector2? mouseWorldPos = null, MouseState? mouseState = null)
     {
         WantsToShoot = false;
         WantsToMelee = false;
@@ -1547,8 +1508,12 @@ public class Player
             if (vel.Y > _maxFall) vel.Y = _maxFall;
         }
 
-        // --- Right hand / Ranged (J) ---
-        bool jPressed = kb.IsKeyDown(Keys.J);
+        // --- Mouse button state ---
+        bool leftClick = mouseState.HasValue && mouseState.Value.LeftButton == ButtonState.Pressed;
+        bool rightClick = mouseState.HasValue && mouseState.Value.RightButton == ButtonState.Pressed;
+
+        // --- Right hand / Ranged (J or Left Click) ---
+        bool jPressed = kb.IsKeyDown(Keys.J) || leftClick;
         if (HasRangedWeapon && jPressed && !_shootHeld && _shootCooldown <= 0f)
         {
             _shootCooldown = ShootRate;
@@ -1557,8 +1522,8 @@ public class Player
         }
         _shootHeld = jPressed;
 
-        // --- Left hand / Melee (K) ---
-        bool kPressed = kb.IsKeyDown(Keys.K);
+        // --- Left hand / Melee (K or Right Click) ---
+        bool kPressed = kb.IsKeyDown(Keys.K) || rightClick;
 
         // Spinning melee: hold K while grounded
         if (HasMeleeWeapon && EnableSpinMelee && kPressed && _wasGrounded)
