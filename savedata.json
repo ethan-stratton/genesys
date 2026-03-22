@@ -1,0 +1,15 @@
+{
+  "currentLevel": "test-arena",
+  "spawnX": 416,
+  "spawnY": 192,
+  "unlockedAbilities": [],
+  "flags": {},
+  "playTime": 0,
+  "meleeInventory": [],
+  "rangedInventory": [],
+  "meleeIndex": -1,
+  "rangedIndex": -1,
+  "collectedItems": [],
+  "windowSizeIndex": 0,
+  "crtEnabled": false
+}

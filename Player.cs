@@ -20,6 +20,16 @@ public class Player
     private const float Gravity = 900f;
     private const float JumpCutMultiplier = 0.4f; // velocity multiplied by this on early jump release
     private const float JumpForce = -420f;
+
+    // === MOVEMENT PHYSICS (Celeste-inspired) ===
+    private const float RunAccel = 1000f;         // ground acceleration (px/s²)
+    private const float RunDecel = 1200f;          // ground deceleration (stopping)
+    private const float AirAccel = 700f;           // air acceleration (reduced control)
+    private const float AirDecel = 500f;            // air deceleration
+    private const float AirMult = 0.75f;           // air speed cap multiplier
+    private const float MaxFall = 400f;            // terminal velocity
+    private const float HalfGravThreshold = 60f;   // near apex: if |vel.Y| < this, halve gravity
+    private const float CornerCorrectionPx = 4;    // nudge pixels for ceiling bonks
     public bool IsGrounded { get; set; }
     private bool _wasGrounded;
     private bool _wasOnSlope;
@@ -304,7 +314,7 @@ public class Player
 
     // Coyote time
     private float _coyoteTimer;
-    private const float CoyoteTime = 0.08f;
+    private const float CoyoteTime = 0.1f;
 
     // Jump buffering
     private float _jumpBufferTimer;
@@ -1335,7 +1345,30 @@ public class Player
         {
             float moveSpeed = (IsDashing && inputX == _dashDir) ? DashSpeed : Speed;
             if (SpeedBoostTimer > 0) moveSpeed *= SpeedBoostMultiplier;
-            vel.X = inputX * moveSpeed;
+
+            // Acceleration-based movement (Celeste-style)
+            float targetX = inputX * moveSpeed;
+            if (IsGrounded || _coyoteTimer > 0)
+            {
+                // Ground: fast accel/decel
+                if (inputX != 0)
+                    vel.X = ApproachF(vel.X, targetX, RunAccel * dt);
+                else
+                    vel.X = ApproachF(vel.X, 0f, RunDecel * dt);
+            }
+            else
+            {
+                // Air: reduced control, capped speed
+                float airMax = moveSpeed * AirMult;
+                if (inputX != 0)
+                {
+                    // Don't reduce speed if already going faster (momentum preservation)
+                    if (Math.Abs(vel.X) <= airMax || Math.Sign(vel.X) != inputX)
+                        vel.X = ApproachF(vel.X, inputX * airMax, AirAccel * dt);
+                }
+                else
+                    vel.X = ApproachF(vel.X, 0f, AirDecel * dt);
+            }
 
             // Jump (Space) — only if NOT holding S (S+Space = slide)
             int minJumpsLeft = EnableDoubleJump ? 0 : 1; // 1 = block second jump
@@ -1387,7 +1420,14 @@ public class Player
                 vel.Y *= JumpCutMultiplier;
             }
 
-            vel.Y += Gravity * (vel.Y > 0 ? FallGravityMultiplier : 1f) * dt;
+            // Gravity with half-gravity at apex (Celeste-style) + terminal velocity
+            float gravMult = 1f;
+            if (vel.Y > 0)
+                gravMult = FallGravityMultiplier; // falling: heavier
+            else if (Math.Abs(vel.Y) < HalfGravThreshold)
+                gravMult = 0.5f; // near apex: floaty hang time
+            vel.Y += Gravity * gravMult * dt;
+            if (vel.Y > MaxFall) vel.Y = MaxFall;
         }
 
         // --- Right hand / Ranged (J) ---
@@ -1637,8 +1677,34 @@ public class Player
                     }
                     if (!nearCeilSlope)
                     {
-                        pos.Y = ceil.Bottom;
-                        vel.Y = 0;
+                        // Corner correction: try nudging left/right to clear near-miss bonks
+                        bool corrected = false;
+                        for (int nudge = 1; nudge <= (int)CornerCorrectionPx; nudge++)
+                        {
+                            // Try nudging right
+                            int tryLeft = collLeft + nudge;
+                            int tryRight = collRight + nudge;
+                            if (!(tryRight > ceil.X && tryLeft < ceil.X + ceil.Width))
+                            {
+                                pos.X += nudge;
+                                corrected = true;
+                                break;
+                            }
+                            // Try nudging left
+                            tryLeft = collLeft - nudge;
+                            tryRight = collRight - nudge;
+                            if (!(tryRight > ceil.X && tryLeft < ceil.X + ceil.Width))
+                            {
+                                pos.X -= nudge;
+                                corrected = true;
+                                break;
+                            }
+                        }
+                        if (!corrected)
+                        {
+                            pos.Y = ceil.Bottom;
+                            vel.Y = 0;
+                        }
                     }
                 }
             }
@@ -2093,5 +2159,14 @@ public class Player
                 new Rectangle(notchX, sqY + sqH / 2 - 3, 4, 6),
                 Color.LightGray);
         }
+    }
+
+    /// <summary>Move value toward target by maxDelta per call (Celeste's Calc.Approach).</summary>
+    private static float ApproachF(float val, float target, float maxDelta)
+    {
+        if (val < target)
+            return Math.Min(val + maxDelta, target);
+        else
+            return Math.Max(val - maxDelta, target);
     }
 }
