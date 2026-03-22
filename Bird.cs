@@ -50,7 +50,7 @@ public class Bird
         {
             for (float scanY = startY; scanY < _floorY; scanY += _tileSize)
             {
-                var (tx, ty) = _tileGrid.WorldToTile(x + Width / 2f, scanY);
+                var (tx, ty) = _tileGrid.WorldToTile((int)(x + Width / 2f), (int)scanY);
                 if (tx >= 0 && ty >= 0 && TileProperties.IsSolid(_tileGrid.GetTileAt(tx, ty)))
                     return ty * _tileSize + _tileGrid.OriginY - Height;
             }
