@@ -266,7 +266,7 @@ public class Game1 : Game
     private const int MaxLatched = 4; // max crawlers latched at once
 
     // --- Editor state ---
-    private enum EditorTool { SolidFloor = 0, Platform = 1, Rope = 2, Wall = 3, Spike = 4, Exit = 5, Spawn = 6, WallSpike = 7, OverworldExit = 8, Ceiling = 9, TilePaint = 10, RetractableSpike = 11 }
+    private enum EditorTool { SolidFloor = 0, Platform = 1, Rope = 2, Wall = 3, Spike = 4, Exit = 5, Spawn = 6, WallSpike = 7, OverworldExit = 8, Ceiling = 9, TilePaint = 10 }
     // Wall climbSide values: 0=both, 1=right face, -1=left face, 99=no climb (solid only)
     private EditorTool _editorTool = EditorTool.Platform;
     private bool _toolPaletteOpen;
@@ -813,6 +813,10 @@ public class Game1 : Game
         var dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
         _totalTime += dt;
         if (_eveMessageTimer > 0) _eveMessageTimer -= dt;
+
+        // Update retractable spike timer
+        if (_level.TileGridInstance != null)
+            _level.TileGridInstance.RetractTimer += dt;
 
         // Room transition fade
         if (_transitionActive)
@@ -1997,24 +2001,6 @@ public class Game1 : Game
                     break;
                 }
             }
-
-            // Retractable spike collision (only when extended)
-            foreach (var rs in _level.RetractableSpikes)
-            {
-                float cycle = rs.UpTime + rs.DownTime;
-                float phase = (_totalTime + rs.Phase * cycle) % cycle;
-                if (phase < rs.UpTime) // extended
-                {
-                    var rsRect = new Rectangle((int)rs.X, (int)rs.Y, rs.W, rs.H);
-                    if (pRect.Intersects(rsRect) && _spawnInvincibility <= 0f)
-                    {
-                        _lastDamageSource = "Retractable Spikes";
-                        _player.TakeDamage(25, _player.Position.X - rsRect.Center.X);
-                        if (_player.Hp <= 0) { _isDead = true; LogDeath(); }
-                        break;
-                    }
-                }
-            }
         }
 
         // Tile-based spike collision
@@ -2049,6 +2035,14 @@ public class Game1 : Game
                         case TileType.HalfSpikesDown:  spikeRect = new Rectangle(twx, twy, ts, ts / 2); break;
                         case TileType.HalfSpikesLeft:  spikeRect = new Rectangle(twx + ts / 2, twy, ts / 2, ts); break;
                         case TileType.HalfSpikesRight: spikeRect = new Rectangle(twx, twy, ts / 2, ts); break;
+                        case TileType.RetractSpikesUp:
+                            if (!tgi.RetractExtended) continue;
+                            spikeRect = new Rectangle(twx, twy, ts, ts);
+                            break;
+                        case TileType.RetractSpikesDown:
+                            if (!tgi.RetractExtended) continue;
+                            spikeRect = new Rectangle(twx, twy, ts, ts);
+                            break;
                         default: continue;
                     }
                     
@@ -3133,12 +3127,6 @@ public class Game1 : Game
                     _level.Build();
                     SetEditorStatus("Ceiling added");
                     break;
-                case EditorTool.RetractableSpike:
-                    var rsList = new List<RetractableSpikeData>(_level.RetractableSpikes);
-                    rsList.Add(new RetractableSpikeData { X = x, Y = y - 24, W = 16, H = 24, UpTime = 1.5f, DownTime = 1.5f, Phase = 0f });
-                    _level.RetractableSpikes = rsList.ToArray();
-                    SetEditorStatus("Retractable spike added");
-                    break;
             }
         }
 
@@ -3195,11 +3183,6 @@ public class Game1 : Game
                 foreach (var ws in _level.WallSpikes)
                     if (new Rectangle(ws.X, ws.Y, ws.W, ws.H).Contains(mp))
                     { _editorMovingEntity = ws; _editorMoveOffset = new Vector2(worldMouse.X - ws.X, worldMouse.Y - ws.Y); SetEditorStatus("Grabbed wall spike"); break; }
-            // Check retractable spikes
-            if (_editorMovingEntity == null)
-                foreach (var rs in _level.RetractableSpikes)
-                    if (new Rectangle((int)rs.X, (int)rs.Y, rs.W, rs.H).Contains(mp))
-                    { _editorMovingEntity = rs; _editorMoveOffset = new Vector2(worldMouse.X - rs.X, worldMouse.Y - rs.Y); SetEditorStatus("Grabbed retractable spike"); break; }
             // Check enemies
             if (_editorMovingEntity == null)
                 foreach (var e in _level.Enemies)
@@ -3247,7 +3230,6 @@ public class Game1 : Game
             else if (_editorMovingEntity is NpcData npc) { npc.X = (int)nx; npc.Y = (int)ny; }
             else if (_editorMovingEntity is ItemData itd) { itd.X = nx; itd.Y = ny; }
             else if (_editorMovingEntity is PointData pd) { pd.X = (int)nx; pd.Y = (int)ny; }
-            else if (_editorMovingEntity is RetractableSpikeData rsd) { rsd.X = nx; rsd.Y = ny; }
         }
         // Release — drop entity and rebuild
         if ((mouse.LeftButton == ButtonState.Released || !kb.IsKeyDown(Keys.T)) && _editorMovingEntity != null)
@@ -3487,18 +3469,6 @@ public class Game1 : Game
                 var list = new List<EnvObjectData>(_level.Objects);
                 list.RemoveAt(i);
                 _level.Objects = list.ToArray();
-                return true;
-            }
-        }
-        // Check retractable spikes
-        for (int i = _level.RetractableSpikes.Length - 1; i >= 0; i--)
-        {
-            var rs = _level.RetractableSpikes[i];
-            if (new Rectangle((int)rs.X, (int)rs.Y, rs.W, rs.H).Contains(p))
-            {
-                var list = new List<RetractableSpikeData>(_level.RetractableSpikes);
-                list.RemoveAt(i);
-                _level.RetractableSpikes = list.ToArray();
                 return true;
             }
         }
@@ -6236,6 +6206,18 @@ public class Game1 : Game
     /// <summary>Draw a spike tile (triangular spikes pointing in a direction).</summary>
     private void DrawSpikeTile(int wx, int wy, int ts, TileType tile, Color color)
     {
+        bool isRetract = TileProperties.IsRetractable(tile);
+        float ext = 1f;
+        if (isRetract && _level.TileGridInstance != null)
+        {
+            ext = _level.TileGridInstance.RetractExtension;
+            if (ext <= 0.01f) return; // fully retracted, don't draw
+            // Map retract types to their base spike direction
+            if (tile == TileType.RetractSpikesUp) tile = TileType.Spikes;
+            else if (tile == TileType.RetractSpikesDown) tile = TileType.SpikesDown;
+            color = Color.Lerp(color * 0.3f, color, ext); // fade when retracting
+        }
+        
         bool isHalf = tile >= TileType.HalfSpikesUp && tile <= TileType.HalfSpikesRight;
         bool up = tile == TileType.Spikes || tile == TileType.HalfSpikesUp;
         bool down = tile == TileType.SpikesDown || tile == TileType.HalfSpikesDown;
@@ -6246,12 +6228,13 @@ public class Game1 : Game
         
         if (up || down)
         {
-            int h = isHalf ? ts / 2 : ts; // half spikes = half height
+            int h = isHalf ? ts / 2 : ts;
+            if (isRetract) h = (int)(h * ext); // shrink height by extension
+            if (h < 1) return;
             int sw = ts / n;
-            // Base is flush with the wall: UP base at bottom, DOWN base at top
             int oy = 0;
-            if (up) oy = ts - h; // UP: base at bottom of tile, tips point up
-            // DOWN: oy=0, base at top of tile, tips point down
+            if (up) oy = ts - h; // base at bottom, tips retract downward
+            // DOWN: oy=0, tips retract upward
             
             for (int s = 0; s < n; s++)
             {
@@ -6504,38 +6487,6 @@ public class Game1 : Game
                 int tipX2 = ws.Side == 1 ? tipX + 4 : tipX - 4;
                 _spriteBatch.Draw(_pixel, new Rectangle(tipX2, ty + 2, 4, 4), Color.Red * 0.4f);
             }
-        }
-
-        // Draw retractable spikes
-        foreach (var rs in _level.RetractableSpikes)
-        {
-            float cycle = rs.UpTime + rs.DownTime;
-            float phase = (_totalTime + rs.Phase * cycle) % cycle;
-            bool extended = phase < rs.UpTime;
-            // Animate: slide up/down over 0.15s at transitions
-            float extendT;
-            if (phase < 0.15f) extendT = phase / 0.15f; // rising
-            else if (phase < rs.UpTime - 0.15f) extendT = 1f;
-            else if (phase < rs.UpTime) extendT = (rs.UpTime - phase) / 0.15f; // retracting
-            else extendT = 0f;
-
-            int fullH = rs.H;
-            int visH = (int)(fullH * extendT);
-            if (visH > 0)
-            {
-                int drawY = (int)rs.Y + fullH - visH;
-                var col = extended ? new Color(200, 50, 50) : new Color(150, 80, 80);
-                _spriteBatch.Draw(_pixel, new Rectangle((int)rs.X, drawY, rs.W, visH), col);
-                // Teeth on top
-                int teethCount = rs.W / 8;
-                for (int t = 0; t < teethCount; t++)
-                {
-                    int tx = (int)rs.X + t * 8 + 2;
-                    _spriteBatch.Draw(_pixel, new Rectangle(tx, drawY - 4, 4, 4), col * 0.8f);
-                }
-            }
-            // Base plate (always visible)
-            _spriteBatch.Draw(_pixel, new Rectangle((int)rs.X, (int)rs.Y + fullH, rs.W, 4), new Color(100, 100, 100));
         }
 
         // Draw walls

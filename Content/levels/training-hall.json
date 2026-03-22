@@ -76,12 +76,12 @@
   "enemies": [
     {
       "id": "vaultkick-dummy",
-      "type": "dummy",
+      "type": "wingbeater",
       "x": 3728,
-      "y": 384,
+      "y": 416,
       "count": 1,
-      "scale": 3,
-      "frozen": false
+      "frozen": false,
+      "passive": true
     },
     {
       "id": "uppercut-target",
@@ -90,6 +90,8 @@
       "y": 192,
       "count": 1,
       "scale": 3,
+      "scaleX": 0,
+      "scaleY": 0,
       "frozen": false,
       "passive": true
     },
@@ -101,8 +103,7 @@
       "count": 1,
       "scale": 1,
       "frozen": false,
-      "scaleX": 2,
-      "scaleY": 10
+      "passive": false
     },
     {
       "id": "cartwheel-pillar-1",
@@ -112,8 +113,7 @@
       "count": 1,
       "scale": 1,
       "frozen": false,
-      "scaleX": 2,
-      "scaleY": 10
+      "passive": false
     },
     {
       "id": "cartwheel-pillar-2",
@@ -123,8 +123,7 @@
       "count": 1,
       "scale": 1,
       "frozen": false,
-      "scaleX": 2,
-      "scaleY": 10
+      "passive": false
     },
     {
       "id": "bladedash-target-0",
@@ -133,7 +132,10 @@
       "y": 160,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "bladedash-target-1",
@@ -142,7 +144,10 @@
       "y": 208,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "bladedash-target-2",
@@ -151,7 +156,10 @@
       "y": 256,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "spinmelee-target-0",
@@ -160,7 +168,10 @@
       "y": 480,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "spinmelee-target-1",
@@ -169,7 +180,10 @@
       "y": 480,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "spinmelee-target-2",
@@ -178,7 +192,10 @@
       "y": 480,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "spinmelee-target-3",
@@ -187,7 +204,10 @@
       "y": 432,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "spinmelee-target-4",
@@ -196,7 +216,10 @@
       "y": 432,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "flip-wingbeater-1",
@@ -205,7 +228,10 @@
       "y": 288,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     }
   ],
   "switches": [
@@ -579,44 +605,7 @@
       "size": "small"
     }
   ],
-  "retractableSpikes": [
-    {
-      "x": 968,
-      "y": 480,
-      "w": 24,
-      "h": 32,
-      "upTime": 1,
-      "downTime": 0.8,
-      "phase": 0
-    },
-    {
-      "x": 1064,
-      "y": 480,
-      "w": 24,
-      "h": 32,
-      "upTime": 1,
-      "downTime": 0.8,
-      "phase": 0.25
-    },
-    {
-      "x": 1160,
-      "y": 480,
-      "w": 24,
-      "h": 32,
-      "upTime": 1,
-      "downTime": 0.8,
-      "phase": 0.5
-    },
-    {
-      "x": 1256,
-      "y": 480,
-      "w": 24,
-      "h": 32,
-      "upTime": 1,
-      "downTime": 0.8,
-      "phase": 0.75
-    }
-  ],
+  "retractableSpikes": [],
   "tileGrid": {
     "width": 245,
     "height": 18,
@@ -4331,10 +4320,10 @@
       0,
       0,
       0,
-      0,
-      0,
-      0,
-      0,
+      48,
+      48,
+      48,
+      48,
       0,
       0,
       0,
