@@ -3400,10 +3400,6 @@ public class Game1 : Game
             } // end else (non-micro-drag)
         }
 
-        // Right click — delete nearest object
-        // (moved below to before left-click handler)
-        }
-
         // G + Left click — grab and drag entities/objects
         if (kb.IsKeyDown(Keys.T) && mouse.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released)
         {
