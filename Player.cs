@@ -26,13 +26,13 @@ public class Player
     private static readonly float[] TierJumpForce =      { -370f, -430f, -400f };
     private static readonly float[] TierRunAccel =       { 2000f, 1000f, 1600f };  // Tech: snap (high accel, low speed)
     private static readonly float[] TierRunDecel =       { 2000f, 1000f, 800f  };  // Cipher: low decel = slides
-    private static readonly float[] TierAirAccel =       { 400f,  800f,  500f  };  // Bio: best air control
-    private static readonly float[] TierAirDecel =       { 400f,  350f,  300f  };
-    private static readonly float[] TierAirMult =        { 0.5f,  0.9f,  0.7f  };  // Bio: near-full air speed
-    private static readonly float[] TierMaxFall =        { 380f,  300f,  450f  };  // Bio: slow fall
+    private static readonly float[] TierAirAccel =       { 250f,  800f,  500f  };  // Tech: very low air control
+    private static readonly float[] TierAirDecel =       { 200f,  350f,  300f  };  // Tech: can barely redirect in air
+    private static readonly float[] TierAirMult =        { 0.35f, 0.9f,  0.7f  };  // Tech: committed to your jump arc
+    private static readonly float[] TierMaxFall =        { 380f,  350f,  450f  };  // Bio: slower terminal velocity
     private static readonly float[] TierHalfGravThresh = { 20f,   80f,   40f   };  // Bio: huge apex hang
     private static readonly float[] TierJumpCutMult =    { 0.5f,  0.35f, 0.45f };  // Bio: most variable height
-    private static readonly float[] TierFallGravMult =   { 1.3f,  1.1f,  1.6f  };  // Cipher: fast fall
+    private static readonly float[] TierFallGravMult =   { 1.3f,  1.5f,  1.6f  };  // Bio: floaty but pulls you down
 
     // Active physics (resolved from tier)
     private float _speed;
@@ -63,6 +63,41 @@ public class Player
         _halfGravThreshold = TierHalfGravThresh[i];
         _jumpCutMultiplier = TierJumpCutMult[i];
         _fallGravMultiplier = TierFallGravMult[i];
+
+        // Ability gating per tier
+        switch (CurrentTier)
+        {
+            case MoveTier.Tech:
+                EnableBladeDash = false;
+                EnableUppercut = false;
+                EnableWallClimb = false;
+                EnableSlide = true;
+                EnableVaultKick = true;
+                EnableCartwheel = false;
+                EnableFlip = false;
+                EnableDoubleJump = false;
+                break;
+            case MoveTier.Bio:
+                EnableBladeDash = false;
+                EnableUppercut = false;
+                EnableWallClimb = true;
+                EnableSlide = true;
+                EnableVaultKick = true;
+                EnableCartwheel = true;
+                EnableFlip = true;
+                EnableDoubleJump = true;
+                break;
+            case MoveTier.Cipher:
+                EnableBladeDash = true;
+                EnableUppercut = true;
+                EnableWallClimb = true;
+                EnableSlide = true;
+                EnableVaultKick = true;
+                EnableCartwheel = true;
+                EnableFlip = true;
+                EnableDoubleJump = true;
+                break;
+        }
     }
 
     private const float CornerCorrectionPx = 4;    // nudge pixels for ceiling bonks
@@ -339,6 +374,7 @@ public class Player
     public bool EnableSpinMelee { get; set; } = true;
     public bool EnableFlip { get; set; } = true;
     public bool EnableBladeDash { get; set; } = true;
+    public bool EnableWallClimb { get; set; } = true;
 
     // Weapon gating (set by Game1)
     public bool HasMeleeWeapon { get; set; }
@@ -675,7 +711,7 @@ public class Player
 
         // --- Wall attachment check ---
         _wallHopCooldown -= dt;
-        if (!IsOnWall && !IsOnRope && walls != null && !IsSliding && _wallHopCooldown <= 0f)
+        if (!IsOnWall && !IsOnRope && walls != null && EnableWallClimb && !IsSliding && _wallHopCooldown <= 0f)
         {
             float playerCenterY = Position.Y + Height / 2f;
             bool nearAnyWall = false;
