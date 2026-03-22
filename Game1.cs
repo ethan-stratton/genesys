@@ -507,6 +507,7 @@ public class Game1 : Game
                     break;
                 case "wingbeater":
                     var wb = new Wingbeater(new Vector2(e.X, e.Y));
+                    wb.Passive = e.Passive;
                     _wingbeaters.Add(wb);
                     break;
                 case "dummy":
@@ -515,6 +516,8 @@ public class Game1 : Game
                     dummy.IsDummy = true;
                     dummy.Hp = 9999;
                     dummy.DummyScale = e.Scale;
+                    dummy.DummyScaleX = e.ScaleX;
+                    dummy.DummyScaleY = e.ScaleY;
                     dummy.Position.Y -= (dummy.EffectiveHeight - Crawler.Height);
                     dummy.SetSpawnPos(dummy.Position);
                     dummy.UpdateSurfaceEdges(tg, ts, plats, sFloors, bLeft, bRight);

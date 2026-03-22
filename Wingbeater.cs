@@ -18,6 +18,7 @@ public class Wingbeater
     public int Hp = 3;
     public int MaxHp = 3;
     public int ContactDamage = 10;
+    public bool Passive = false; // If true, just hovers — no dive-bombing
     public const int Width = 20, Height = 14;
 
     public Vector2 KnockbackVel;
@@ -103,7 +104,7 @@ public class Wingbeater
                 Position.X = SpawnPos.X + MathF.Sin(_hoverPhase * 0.4f) * 15f;
                 _dir = dx > 0 ? 1 : -1;
 
-                if (dist < DetectRange)
+                if (dist < DetectRange && !Passive)
                 {
                     _state = State.Tracking;
                     _stateTimer = TrackTime;

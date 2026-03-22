@@ -54,15 +54,7 @@
       "bottom": 448
     }
   ],
-  "walls": [
-    {
-      "x": 2368,
-      "y": 96,
-      "w": 32,
-      "h": 416,
-      "climbSide": 1
-    }
-  ],
+  "walls": [],
   "spikes": [],
   "ceilings": [],
   "solidFloors": [],
@@ -86,46 +78,53 @@
       "id": "vaultkick-dummy",
       "type": "dummy",
       "x": 3728,
-      "y": 456,
-      "count": 1,
-      "scale": 5,
-      "frozen": false
-    },
-    {
-      "id": "uppercut-target",
-      "type": "dummy",
-      "x": 4348,
-      "y": 224,
+      "y": 384,
       "count": 1,
       "scale": 3,
       "frozen": false
     },
     {
+      "id": "uppercut-target",
+      "type": "wingbeater",
+      "x": 4348,
+      "y": 192,
+      "count": 1,
+      "scale": 3,
+      "frozen": false,
+      "passive": true
+    },
+    {
       "id": "cartwheel-pillar-0",
       "type": "dummy",
       "x": 4888,
-      "y": 432,
+      "y": 412,
       "count": 1,
-      "scale": 8,
-      "frozen": false
+      "scale": 1,
+      "frozen": false,
+      "scaleX": 2,
+      "scaleY": 10
     },
     {
       "id": "cartwheel-pillar-1",
       "type": "dummy",
       "x": 4968,
-      "y": 432,
+      "y": 412,
       "count": 1,
-      "scale": 8,
-      "frozen": false
+      "scale": 1,
+      "frozen": false,
+      "scaleX": 2,
+      "scaleY": 10
     },
     {
       "id": "cartwheel-pillar-2",
       "type": "dummy",
       "x": 5048,
-      "y": 432,
+      "y": 412,
       "count": 1,
-      "scale": 8,
-      "frozen": false
+      "scale": 1,
+      "frozen": false,
+      "scaleX": 2,
+      "scaleY": 10
     },
     {
       "id": "bladedash-target-0",
@@ -200,10 +199,13 @@
       "frozen": false
     },
     {
+      "id": "flip-wingbeater-1",
       "type": "wingbeater",
       "x": 5628,
-      "y": 128,
-      "id": "flip-wingbeater-1"
+      "y": 288,
+      "count": 1,
+      "scale": 1,
+      "frozen": false
     }
   ],
   "switches": [
@@ -581,8 +583,8 @@
     {
       "x": 968,
       "y": 480,
-      "w": 16,
-      "h": 24,
+      "w": 24,
+      "h": 32,
       "upTime": 1,
       "downTime": 0.8,
       "phase": 0
@@ -590,8 +592,8 @@
     {
       "x": 1064,
       "y": 480,
-      "w": 16,
-      "h": 24,
+      "w": 24,
+      "h": 32,
       "upTime": 1,
       "downTime": 0.8,
       "phase": 0.25
@@ -599,8 +601,8 @@
     {
       "x": 1160,
       "y": 480,
-      "w": 16,
-      "h": 24,
+      "w": 24,
+      "h": 32,
       "upTime": 1,
       "downTime": 0.8,
       "phase": 0.5
@@ -608,8 +610,8 @@
     {
       "x": 1256,
       "y": 480,
-      "w": 16,
-      "h": 24,
+      "w": 24,
+      "h": 32,
       "upTime": 1,
       "downTime": 0.8,
       "phase": 0.75
@@ -4371,7 +4373,7 @@
       0,
       0,
       0,
-      2,
+      0,
       0,
       0,
       0,

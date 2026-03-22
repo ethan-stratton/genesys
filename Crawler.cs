@@ -45,6 +45,8 @@ public class Crawler
     public float? SwarmTargetX; // X position to converge on when swarming
     public bool AlwaysCrit;
     public float DummyScale = 1f;
+    public float DummyScaleX = 0f; // 0 = use DummyScale
+    public float DummyScaleY = 0f; // 0 = use DummyScale
 
     // Latch-on behavior (clings to player)
     public bool IsLatched;
@@ -54,8 +56,8 @@ public class Crawler
     public const int LatchDamage = 1;
     private float _latchCooldown; // delay before can latch again after being shaken off
     private const float LatchCooldownTime = 1.5f;
-    public int EffectiveWidth => IsDummy ? (int)(Width * DummyScale) : Width;
-    public int EffectiveHeight => IsDummy ? (int)(Height * DummyScale) : Height;
+    public int EffectiveWidth => IsDummy ? (int)(Width * (DummyScaleX > 0 ? DummyScaleX : DummyScale)) : Width;
+    public int EffectiveHeight => IsDummy ? (int)(Height * (DummyScaleY > 0 ? DummyScaleY : DummyScale)) : Height;
     private Vector2 _spawnPos;
     public void SetSpawnPos(Vector2 pos) => _spawnPos = pos;
     private float _respawnTimer;
