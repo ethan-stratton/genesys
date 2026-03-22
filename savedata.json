@@ -7,11 +7,9 @@
     "eveOrbActive": true
   },
   "playTime": 761.0583,
-  "meleeInventory": [
-    "Stick"
-  ],
+  "meleeInventory": [],
   "rangedInventory": [],
-  "meleeIndex": 0,
+  "meleeIndex": -1,
   "rangedIndex": -1,
   "collectedItems": [
     "stick-1"

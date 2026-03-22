@@ -155,7 +155,7 @@ public class Player
 
     // Weapon stats driven by Game1 each frame
     public float CurrentMeleeRate { get; set; } = 0.3f;
-    public float CurrentMeleeActiveTime { get; set; } = 0.12f;
+    public float CurrentMeleeActiveTime { get; set; } = 0.25f;
     public float CurrentComboWindow { get; set; } = 0.4f;
     public float CurrentComboCooldown { get; set; } = 0.35f;
 
@@ -380,8 +380,8 @@ public class Player
     // Tech charged jump: hold Space on ground to charge, release to jump higher
     private float _chargeJumpTimer;
     private const float ChargeJumpMaxTime = 0.5f;     // max charge time
-    private const float ChargeJumpMinForce = -320f;    // tap jump (weak)
-    private const float ChargeJumpMaxForce = -620f;    // full charge (higher than before)
+    private const float ChargeJumpMinForce = -350f;    // tap jump
+    private const float ChargeJumpMaxForce = -720f;    // full charge (very high)
     private bool _chargingJump;
 
     // Weapon gating (set by Game1)
@@ -596,16 +596,18 @@ public class Player
 
             // Overhead swing arc: hitbox follows MeleeSwingAngle
             float t = MeleeTimer > 0 ? 1f - (MeleeTimer / CurrentMeleeActiveTime) : 1f; // 0→1 over swing
+            // Ease-in-out for more readable swing (fast middle, slow start/end)
+            float eased = t < 0.5f ? 2f * t * t : 1f - MathF.Pow(-2f * t + 2f, 2f) / 2f;
             float baseAngle = MathF.Atan2(MeleeDirection.Y, MeleeDirection.X);
-            float startAngle = baseAngle - MathF.PI * 0.75f; // start 135° before aim
-            float endAngle = baseAngle + MathF.PI * 0.75f;   // end 135° after aim (270° total sweep)
-            float angle = startAngle + (endAngle - startAngle) * t;
+            float startAngle = baseAngle - MathF.PI * 0.6f; // start 108° before aim
+            float endAngle = baseAngle + MathF.PI * 0.6f;   // end 108° after aim (216° total)
+            float angle = startAngle + (endAngle - startAngle) * eased;
             MeleeSwingAngle = angle;
 
-            // Rectangular hitbox at end of swing arm
-            int sw = 16, sh = (int)(range * 0.8f);
-            float hbX = center.X + MathF.Cos(angle) * range * 0.6f;
-            float hbY = center.Y + MathF.Sin(angle) * range * 0.6f;
+            // Larger rectangular hitbox covering the swing arc
+            int sw = 28, sh = 28;
+            float hbX = center.X + MathF.Cos(angle) * range * 0.55f;
+            float hbY = center.Y + MathF.Sin(angle) * range * 0.55f;
             return new Rectangle(
                 (int)(hbX - sw / 2f), (int)(hbY - sh / 2f), sw, sh);
         }
@@ -1505,7 +1507,15 @@ public class Player
             else if (Math.Abs(vel.Y) < _halfGravThreshold)
                 gravMult = 0.5f; // near apex: floaty hang time
             vel.Y += _gravity * gravMult * dt;
-            if (vel.Y > _maxFall) vel.Y = _maxFall;
+
+            // Bio fast-fall: press S in air to plummet
+            float termVel = _maxFall;
+            if (CurrentTier == MoveTier.Bio && !IsGrounded && inputY > 0)
+            {
+                vel.Y += _gravity * 1.5f * dt; // extra gravity burst
+                termVel = _maxFall * 1.4f;     // higher terminal velocity
+            }
+            if (vel.Y > termVel) vel.Y = termVel;
         }
 
         // --- Mouse button state ---
