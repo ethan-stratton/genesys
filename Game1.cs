@@ -3218,7 +3218,7 @@ public class Game1 : Game
                 string itype = ItemTypes[_editorItemCursor];
                 int nextId = _level.Items.Length;
                 var iList = new List<ItemData>(_level.Items);
-                iList.Add(new ItemData { Id = $"{itype}-{nextId}", ItemType = itype, X = snapped.X, Y = snapped.Y });
+                iList.Add(new ItemData { Id = $"{itype}-{nextId}", Type = itype, X = snapped.X, Y = snapped.Y });
                 _level.Items = iList.ToArray();
                 SetEditorStatus($"Item: {itype} placed ([/] to cycle type)");
                 SaveLevel();
