@@ -3260,8 +3260,13 @@ public class Game1 : Game
             int y = (int)MathF.Min(_editorDragStart.Y, dragEnd.Y);
             int w = (int)MathF.Abs(dragEnd.X - _editorDragStart.X);
             int h = (int)MathF.Abs(dragEnd.Y - _editorDragStart.Y);
-            if (w < 8) w = 32; // minimum sizes
-            if (h < 8) h = 12;
+            
+            // Ignore micro-drags (accidental clicks) — require at least 16px in one dimension
+            if (w < 16 && h < 16) { /* cancelled */ }
+            else
+            {
+            if (w < 16) w = 32; // minimum sizes
+            if (h < 12) h = 12;
 
             switch (_editorTool)
             {
@@ -3374,14 +3379,21 @@ public class Game1 : Game
                     SetEditorStatus("Ceiling added");
                     break;
             }
+            } // end else (non-micro-drag)
         }
 
         // Right click — delete nearest object
-        if (mouse.RightButton == ButtonState.Pressed && _prevMouse.RightButton == ButtonState.Released)
+        // Right click or X+Left click — delete nearest object
+        bool deleteClick = (mouse.RightButton == ButtonState.Pressed && _prevMouse.RightButton == ButtonState.Released) ||
+                           (kb.IsKeyDown(Keys.X) && mouse.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released);
+        if (deleteClick)
         {
             var wp = new Point((int)worldMouse.X, (int)worldMouse.Y);
             if (TryDeleteAt(wp))
+            {
                 SetEditorStatus("Deleted");
+                SaveLevel();
+            }
         }
 
         // G + Left click — grab and drag entities/objects
@@ -3588,11 +3600,15 @@ public class Game1 : Game
 
     private bool TryDeleteAt(Point p)
     {
+        // Expand hit area for small objects
+        int tolerance = 8;
+        
         // Check platforms
         for (int i = _level.Platforms.Length - 1; i >= 0; i--)
         {
             var r = _level.Platforms[i];
-            if (new Rectangle(r.X, r.Y, r.W, r.H).Contains(p))
+            var expanded = new Rectangle(r.X - tolerance, r.Y - tolerance, r.W + tolerance * 2, r.H + tolerance * 2);
+            if (expanded.Contains(p))
             {
                 var list = new List<RectData>(_level.Platforms);
                 list.RemoveAt(i);
