@@ -1378,7 +1378,7 @@ public class Game1 : Game
                     }
                     else
                     {
-                        if (_hitStopEnabled) _hitStopTimer = ws.HitStopHit;
+                        if (_hitStopEnabled) _hitStopTimer = ws.HitStopNormal;
                     }
                 }
             }
@@ -1387,7 +1387,7 @@ public class Game1 : Game
         // Wingbeater contact damage
         if (!_isDead)
         {
-            var playerRect3 = _player.Rect;
+            var playerRect3 = _player.CollisionRect;
             foreach (var wb in _wingbeaters)
             {
                 if (!wb.Alive) continue;
