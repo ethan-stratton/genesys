@@ -24,7 +24,7 @@ public class ItemPickup
     public Rectangle Rect => new((int)X, (int)Y, W, H);
 }
 
-public enum GameState { Title, Playing, Editing, Overworld, SimMode }
+public enum GameState { Prologue, TitleCard, Title, Playing, Editing, Overworld, SimMode }
 
 public class Game1 : Game
 {
@@ -34,6 +34,25 @@ public class Game1 : Game
     private string[] _titleOptions => SaveData.Exists()
         ? new[] { "Continue", "New Game", "Settings", "Quit" }
         : new[] { "New Game", "Settings", "Quit" };
+
+    // === PROLOGUE / TITLE CARD STATE ===
+    private int _prologuePhase;        // 0-3: Ship, Override, Descent, Eye
+    private float _prologueTimer;      // time within current phase
+    private float _prologueFadeAlpha;  // for fades between phases
+    private bool _prologueSkipHeld;    // ESC hold-to-skip
+    private float _prologueSkipTimer;  // 1.0s hold required
+    private float _titleCardTimer;     // 3-second "GENESIS" display
+    private float _titleCardFade;      // fade in/out alpha
+
+    // === SCREEN FADE TRANSITION SYSTEM ===
+    private float _fadeAlpha;          // 0=clear, 1=black
+    private float _fadeSpeed;          // per-second rate
+    private bool _fadingOut;           // true=going to black, false=going to clear
+    private GameState? _fadeTargetState; // state to switch to at peak black
+    private Action _fadeCallback;      // optional action at peak black
+
+    // Prologue phase durations (seconds)
+    private static readonly float[] ProloguePhaseDurations = { 6f, 5f, 5f, 4f };
 
     private OverworldData _overworld;
 
@@ -593,6 +612,46 @@ public class Game1 : Game
     protected override void Update(GameTime gameTime)
     {
         var kb = Keyboard.GetState();
+        float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
+
+        // === FADE TRANSITION UPDATE ===
+        if (_fadingOut)
+        {
+            _fadeAlpha = Math.Min(1f, _fadeAlpha + _fadeSpeed * dt);
+            if (_fadeAlpha >= 1f)
+            {
+                _fadingOut = false;
+                if (_fadeTargetState.HasValue)
+                {
+                    _gameState = _fadeTargetState.Value;
+                    _fadeTargetState = null;
+                }
+                _fadeCallback?.Invoke();
+                _fadeCallback = null;
+            }
+        }
+        else if (_fadeAlpha > 0f)
+        {
+            _fadeAlpha = Math.Max(0f, _fadeAlpha - _fadeSpeed * dt);
+        }
+
+        // === PROLOGUE UPDATE ===
+        if (_gameState == GameState.Prologue)
+        {
+            UpdatePrologue(kb, dt);
+            _prevKb = kb;
+            base.Update(gameTime);
+            return;
+        }
+
+        // === TITLE CARD UPDATE ===
+        if (_gameState == GameState.TitleCard)
+        {
+            UpdateTitleCard(dt);
+            _prevKb = kb;
+            base.Update(gameTime);
+            return;
+        }
 
         if (_gameState == GameState.Overworld)
         {
@@ -680,38 +739,7 @@ public class Game1 : Game
                         _rangedIndex = -1;
                         _debugSword = false;
                         _debugGun = false;
-                        LoadLevel(DefaultLevel);
-                        _camera = MakeCamera();
-                        _gameState = GameState.Playing;
-                        Restart();
-                        _prevInExit = new bool[_level.ExitRects.Length];
-                        for (int k = 0; k < _prevInExit.Length; k++)
-                            _prevInExit[k] = true;
-                        _saveData.CurrentLevel = System.IO.Path.GetFileNameWithoutExtension(DefaultLevel);
-                        _saveData.SpawnX = _player.Position.X;
-                        _saveData.SpawnY = _player.Position.Y;
-                        SyncInventoryToSave(); _saveData.Save();
-                        // Reset overworld to fresh state
-                        if (System.IO.File.Exists(OverworldPath))
-                            _overworld = OverworldData.Load(OverworldPath);
-                        else
-                            _overworld = new OverworldData();
-                        // Reset all nodes: only start node discovered, nothing cleared
-                        foreach (var n in _overworld.Nodes)
-                        {
-                            n.Discovered = n.Id == _overworld.StartNode;
-                            n.Cleared = false;
-                        }
-                        _overworld.Save(OverworldPath);
-                        _currentNodeId = _overworld.StartNode;
-                        // Reset world map
-                        if (System.IO.File.Exists("Content/worldmap.json"))
-                            System.IO.File.Delete("Content/worldmap.json");
-                        _worldMap = null;
-                        // Clean sim data
-                        if (System.IO.Directory.Exists("Content/sim"))
-                            foreach (var f in System.IO.Directory.GetFiles("Content/sim", "*.json"))
-                                System.IO.File.Delete(f);
+                        StartPrologue();
                         break;
                     case "Settings":
                         _menuOpen = true;
@@ -4904,6 +4932,216 @@ public class Game1 : Game
         }
     }
 
+    // === PROLOGUE ===
+    private void StartPrologue()
+    {
+        _gameState = GameState.Prologue;
+        _prologuePhase = 0;
+        _prologueTimer = 0f;
+        _prologueFadeAlpha = 1f; // start from black
+        _prologueSkipTimer = 0f;
+    }
+
+    private void UpdatePrologue(KeyboardState kb, float dt)
+    {
+        // Hold ESC to skip (1 second hold)
+        if (kb.IsKeyDown(Keys.Escape))
+        {
+            _prologueSkipTimer += dt;
+            if (_prologueSkipTimer >= 1.0f)
+            {
+                StartFadeTo(GameState.TitleCard, 2f);
+                return;
+            }
+        }
+        else
+        {
+            _prologueSkipTimer = Math.Max(0f, _prologueSkipTimer - dt * 2f);
+        }
+
+        // Fade in at phase start
+        if (_prologueFadeAlpha > 0f)
+            _prologueFadeAlpha = Math.Max(0f, _prologueFadeAlpha - dt * 2f);
+
+        _prologueTimer += dt;
+
+        float phaseDuration = ProloguePhaseDurations[_prologuePhase];
+        if (_prologueTimer >= phaseDuration)
+        {
+            _prologuePhase++;
+            _prologueTimer = 0f;
+            _prologueFadeAlpha = 1f; // black between phases
+
+            if (_prologuePhase >= ProloguePhaseDurations.Length)
+            {
+                // Prologue done → title card
+                StartFadeTo(GameState.TitleCard, 2f);
+            }
+        }
+    }
+
+    private void DrawPrologue()
+    {
+        _spriteBatch.Begin();
+        float cx = ViewW / 2f;
+        float cy = ViewH / 2f;
+
+        // Phase-specific content
+        switch (_prologuePhase)
+        {
+            case 0: // The Ship
+                _spriteBatch.DrawString(_fontSmall, "Ship alarms echo through the corridor.", new Vector2(cx - 180, cy - 20), Color.Gray * (1f - _prologueFadeAlpha));
+                if (_prologueTimer > 2f)
+                    _spriteBatch.DrawString(_fontSmall, "EVE: \"Proximity alert. Unknown energy signature.\"", new Vector2(cx - 210, cy + 20), new Color(100, 180, 255) * Math.Min(1f, _prologueTimer - 2f));
+                if (_prologueTimer > 4f)
+                    _spriteBatch.DrawString(_fontSmall, "\"Recommend course correction.\"", new Vector2(cx - 140, cy + 50), new Color(100, 180, 255) * Math.Min(1f, _prologueTimer - 4f));
+                break;
+
+            case 1: // The Override
+                if (_prologueTimer > 0.5f)
+                    _spriteBatch.DrawString(_fontSmall, "\"There's a signal underneath it. Someone's alive down there.\"", new Vector2(cx - 270, cy - 20), new Color(200, 200, 180) * Math.Min(1f, _prologueTimer - 0.5f));
+                if (_prologueTimer > 2.5f)
+                    _spriteBatch.DrawString(_fontSmall, "EVE: \"The energy field is incompatible with our systems. I strongly advise—\"", new Vector2(cx - 330, cy + 20), new Color(100, 180, 255) * Math.Min(1f, _prologueTimer - 2.5f));
+                if (_prologueTimer > 4f)
+                    _spriteBatch.DrawString(_fontSmall, "\"Override navigation lock. Take us in.\"", new Vector2(cx - 180, cy + 60), new Color(200, 200, 180) * Math.Min(1f, _prologueTimer - 4f));
+                break;
+
+            case 2: // The Descent
+                _spriteBatch.DrawString(_fontSmall, "Systems fail one by one.", new Vector2(cx - 100, cy - 40), Color.Gray * (1f - _prologueFadeAlpha));
+                if (_prologueTimer > 1.5f)
+                    _spriteBatch.DrawString(_fontSmall, "EVE: \"—Loss of navigation. Loss of comms. Loss of—\"", new Vector2(cx - 230, cy), new Color(100, 180, 255) * Math.Min(1f, (_prologueTimer - 1.5f) * 0.8f));
+                if (_prologueTimer > 3f)
+                    _spriteBatch.DrawString(_fontSmall, "[IMPACT]", new Vector2(cx - 35, cy + 40), Color.White * Math.Min(1f, _prologueTimer - 3f));
+                break;
+
+            case 3: // The Eye
+                // White flash at start
+                float flashAlpha = Math.Max(0f, 1f - _prologueTimer * 3f);
+                _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), Color.White * flashAlpha);
+
+                // Red eye — simple but iconic
+                if (_prologueTimer > 0.5f)
+                {
+                    float eyeAlpha = Math.Min(1f, (_prologueTimer - 0.5f) * 1.5f);
+                    int eyeR = 24;
+                    var eyeColor = new Color(200, 30, 20) * eyeAlpha;
+
+                    // Outer glow
+                    for (int r = eyeR + 20; r > eyeR; r -= 2)
+                    {
+                        float glowA = eyeAlpha * 0.15f * (1f - (r - eyeR) / 20f);
+                        _spriteBatch.Draw(_pixel, new Rectangle((int)(cx - r), (int)(cy - r / 3), r * 2, r * 2 / 3), new Color(200, 30, 20) * glowA);
+                    }
+
+                    // Core eye (ellipse via stacked rectangles)
+                    for (int y = -eyeR / 3; y <= eyeR / 3; y++)
+                    {
+                        float t = 1f - (y * y) / (float)(eyeR * eyeR / 9);
+                        int hw = (int)(eyeR * Math.Sqrt(t));
+                        _spriteBatch.Draw(_pixel, new Rectangle((int)(cx - hw), (int)(cy + y), hw * 2, 1), eyeColor);
+                    }
+
+                    // Pupil (bright center slit)
+                    int slitH = eyeR / 2;
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)cx - 1, (int)cy - slitH / 2, 3, slitH), Color.White * eyeAlpha * 0.9f);
+                }
+                break;
+        }
+
+        // Phase fade overlay
+        if (_prologueFadeAlpha > 0f)
+            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), Color.Black * _prologueFadeAlpha);
+
+        // Skip indicator
+        if (_prologueSkipTimer > 0f)
+        {
+            float skipPct = _prologueSkipTimer / 1.0f;
+            string skipText = "Hold [ESC] to skip";
+            _spriteBatch.DrawString(_fontSmall, skipText, new Vector2(ViewW - 200, ViewH - 40), Color.Gray * 0.5f);
+            _spriteBatch.Draw(_pixel, new Rectangle(ViewW - 200, ViewH - 22, (int)(160 * skipPct), 3), Color.Gray * 0.5f);
+        }
+
+        _spriteBatch.End();
+    }
+
+    // === TITLE CARD ===
+    private void UpdateTitleCard(float dt)
+    {
+        _titleCardTimer += dt;
+
+        if (_titleCardTimer < 1f)
+            _titleCardFade = Math.Min(1f, _titleCardTimer * 2f); // fade in over 0.5s
+        else if (_titleCardTimer > 2.5f)
+            _titleCardFade = Math.Max(0f, 1f - (_titleCardTimer - 2.5f) * 2f); // fade out over 0.5s
+
+        if (_titleCardTimer >= 3.5f)
+        {
+            // After title card, load level and start playing
+            LoadLevel(DefaultLevel);
+            _camera = MakeCamera();
+            _gameState = GameState.Playing;
+            Restart();
+            _prevInExit = new bool[_level.ExitRects.Length];
+            for (int k = 0; k < _prevInExit.Length; k++)
+                _prevInExit[k] = true;
+            _saveData.CurrentLevel = System.IO.Path.GetFileNameWithoutExtension(DefaultLevel);
+            _saveData.SpawnX = _player.Position.X;
+            _saveData.SpawnY = _player.Position.Y;
+            SyncInventoryToSave();
+            _saveData.Save();
+            // Reset overworld
+            if (System.IO.File.Exists(OverworldPath))
+                _overworld = OverworldData.Load(OverworldPath);
+            else
+                _overworld = new OverworldData();
+            foreach (var n in _overworld.Nodes)
+            {
+                n.Discovered = n.Id == _overworld.StartNode;
+                n.Cleared = false;
+            }
+            _overworld.Save(OverworldPath);
+            _currentNodeId = _overworld.StartNode;
+            if (System.IO.File.Exists("Content/worldmap.json"))
+                System.IO.File.Delete("Content/worldmap.json");
+            _worldMap = null;
+            if (System.IO.Directory.Exists("Content/sim"))
+                foreach (var f in System.IO.Directory.GetFiles("Content/sim", "*.json"))
+                    System.IO.File.Delete(f);
+            _titleCardTimer = 0f;
+            _fadeAlpha = 1f; // start gameplay from black, fade in
+        }
+    }
+
+    private void DrawTitleCard()
+    {
+        _spriteBatch.Begin();
+        string title = "GENESIS";
+        var titleSize = _fontLarge.MeasureString(title);
+        float cx = ViewW / 2f;
+        float cy = ViewH / 2f;
+        _spriteBatch.DrawString(_fontLarge, title, new Vector2(cx - titleSize.X / 2, cy - titleSize.Y / 2), Color.White * _titleCardFade);
+        _spriteBatch.End();
+    }
+
+    // === FADE TRANSITION ===
+    private void StartFadeTo(GameState target, float speed = 1.5f, Action callback = null)
+    {
+        _fadingOut = true;
+        _fadeSpeed = speed;
+        _fadeTargetState = target;
+        _fadeCallback = callback;
+    }
+
+    private void DrawFadeOverlay()
+    {
+        if (_fadeAlpha > 0f)
+        {
+            _spriteBatch.Begin();
+            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), Color.Black * _fadeAlpha);
+            _spriteBatch.End();
+        }
+    }
+
     private void UpdateOverworld(KeyboardState kb)
     {
         if (_worldMap == null) _worldMap = WorldMapData.LoadOrCreate();
@@ -6398,6 +6636,28 @@ public class Game1 : Game
             return;
         }
 
+        // Prologue draw
+        if (_gameState == GameState.Prologue)
+        {
+            GraphicsDevice.Clear(Color.Black);
+            DrawPrologue();
+            DrawFadeOverlay();
+            DrawCRT();
+            base.Draw(gameTime);
+            return;
+        }
+
+        // Title card draw
+        if (_gameState == GameState.TitleCard)
+        {
+            GraphicsDevice.Clear(Color.Black);
+            DrawTitleCard();
+            DrawFadeOverlay();
+            DrawCRT();
+            base.Draw(gameTime);
+            return;
+        }
+
         if (_gameState == GameState.Overworld)
         {
             DrawOverworld();
@@ -6419,7 +6679,7 @@ public class Game1 : Game
             _spriteBatch.Begin();
 
             // Title
-            string title = "Genesys";
+            string title = "GENESIS";
             var titleSize = _fontLarge.MeasureString(title);
             float cx = ViewW / 2f;
             float cy = ViewH / 2f;
