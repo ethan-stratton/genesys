@@ -1257,7 +1257,7 @@ public class Player
             {
                 IsVaultKicking = false;
                 IsCrouching = false;
-                vel.X = _vaultKickDir * Speed; // return to normal speed
+                vel.X = _vaultKickDir * _speed; // return to normal speed
             }
         }
         else if (IsUppercutting)
