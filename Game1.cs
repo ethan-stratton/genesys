@@ -7252,7 +7252,7 @@ public class Game1 : Game
                     _spriteBatch.Draw(_pixel, new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height), Color.MediumPurple * 0.25f);
 
                 // Draw melee swing arm
-                if (_player.MeleeTimer > 0 && _player.CurrentWeapon != Player.WeaponType.None)
+                if (_player.MeleeTimer > 0 && _player.CurrentWeapon != WeaponType.None)
                 {
                     var pCenter = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
                     float swAngle = _player.MeleeSwingAngle;

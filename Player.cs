@@ -610,7 +610,7 @@ public class Player
                 (int)(hbX - sw / 2f), (int)(hbY - sh / 2f), sw, sh);
         }
     }
-                float offsetX = aimX * (range * 0.3f);
+
     public void Update(float dt, KeyboardState kb, float floorY, Rectangle[] platforms, float[] ropeXPositions = null, float[] ropeTops = null, float[] ropeBottoms = null, Rectangle[] walls = null, int[] wallClimbSides = null, Rectangle[] solidWalls = null, Rectangle[] ceilings = null, Rectangle[] solidFloors = null, TileGrid tileGrid = null, Vector2? mouseWorldPos = null, MouseState? mouseState = null)
     {
         WantsToShoot = false;
