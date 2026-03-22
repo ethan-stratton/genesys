@@ -323,6 +323,9 @@ public class Game1 : Game
     private List<(int col, int row, TileType oldTile, TileType newTile)> _currentUndoBatch;
     private const int MaxUndoSteps = 50;
 
+    // Entity delete undo stack (stores JSON snapshots of level arrays before deletion)
+    private readonly List<(string type, int index, object data)> _entityUndoStack = new();
+
     // Enemy/item editor placement
     private static readonly string[] EnemyTypes = { "crawler", "wingbeater", "dummy" };
     private int _editorEnemyCursor;
@@ -3215,8 +3218,23 @@ public class Game1 : Game
 
         // Continue to T-drag and other tools (no early return)
 
-        // Left click — place / start drag (not when G is held for grab)
-        if (mouse.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released && !kb.IsKeyDown(Keys.T))
+        // Right click or X+Left click — delete nearest object
+        {
+            bool deleteClick = (mouse.RightButton == ButtonState.Pressed && _prevMouse.RightButton == ButtonState.Released) ||
+                               (kb.IsKeyDown(Keys.X) && mouse.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released);
+            if (deleteClick)
+            {
+                var wp = new Point((int)worldMouse.X, (int)worldMouse.Y);
+                if (TryDeleteAt(wp))
+                {
+                    SetEditorStatus("Deleted");
+                    SaveLevel();
+                }
+            }
+        }
+
+        // Left click — place / start drag (not when G is held for grab, not when X is held for delete)
+        if (mouse.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released && !kb.IsKeyDown(Keys.T) && !kb.IsKeyDown(Keys.X))
         {
             if (_editorTool == EditorTool.Spawn)
             {
@@ -3383,17 +3401,7 @@ public class Game1 : Game
         }
 
         // Right click — delete nearest object
-        // Right click or X+Left click — delete nearest object
-        bool deleteClick = (mouse.RightButton == ButtonState.Pressed && _prevMouse.RightButton == ButtonState.Released) ||
-                           (kb.IsKeyDown(Keys.X) && mouse.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released);
-        if (deleteClick)
-        {
-            var wp = new Point((int)worldMouse.X, (int)worldMouse.Y);
-            if (TryDeleteAt(wp))
-            {
-                SetEditorStatus("Deleted");
-                SaveLevel();
-            }
+        // (moved below to before left-click handler)
         }
 
         // G + Left click — grab and drag entities/objects
@@ -3610,6 +3618,7 @@ public class Game1 : Game
             var expanded = new Rectangle(r.X - tolerance, r.Y - tolerance, r.W + tolerance * 2, r.H + tolerance * 2);
             if (expanded.Contains(p))
             {
+                _entityUndoStack.Add(("platform", i, _level.Platforms[i]));
                 var list = new List<RectData>(_level.Platforms);
                 list.RemoveAt(i);
                 _level.Platforms = list.ToArray();
@@ -3623,6 +3632,7 @@ public class Game1 : Game
             var r = _level.Spikes[i];
             if (new Rectangle(r.X, r.Y, r.W, r.H).Contains(p))
             {
+                _entityUndoStack.Add(("spike", i, _level.Spikes[i]));
                 var list = new List<RectData>(_level.Spikes);
                 list.RemoveAt(i);
                 _level.Spikes = list.ToArray();
@@ -3636,6 +3646,7 @@ public class Game1 : Game
             var w = _level.Walls[i];
             if (new Rectangle(w.X, w.Y, w.W, w.H).Contains(p))
             {
+                _entityUndoStack.Add(("wall", i, _level.Walls[i]));
                 var list = new List<WallData>(_level.Walls);
                 list.RemoveAt(i);
                 _level.Walls = list.ToArray();
@@ -3716,6 +3727,7 @@ public class Game1 : Game
             int h = e.Type == "thornback" ? 28 : (e.Type == "hopper" ? 16 : (e.Type == "swarm" ? 20 : 10));
             if (new Rectangle((int)e.X, (int)e.Y, size, h).Contains(p))
             {
+                _entityUndoStack.Add(("enemy", i, _level.Enemies[i]));
                 var list = new List<EnemySpawnData>(_level.Enemies);
                 list.RemoveAt(i);
                 _level.Enemies = list.ToArray();
@@ -4050,6 +4062,45 @@ public class Game1 : Game
     }
     private void EditorUndo()
     {
+        // Try entity undo first (most recent action)
+        if (_entityUndoStack.Count > 0)
+        {
+            var (type, index, data) = _entityUndoStack[^1];
+            _entityUndoStack.RemoveAt(_entityUndoStack.Count - 1);
+            switch (type)
+            {
+                case "platform":
+                    var pList = new List<RectData>(_level.Platforms);
+                    pList.Insert(Math.Min(index, pList.Count), (RectData)data);
+                    _level.Platforms = pList.ToArray();
+                    break;
+                case "spike":
+                    var sList = new List<RectData>(_level.Spikes);
+                    sList.Insert(Math.Min(index, sList.Count), (RectData)data);
+                    _level.Spikes = sList.ToArray();
+                    break;
+                case "wall":
+                    var wList = new List<WallData>(_level.Walls);
+                    wList.Insert(Math.Min(index, wList.Count), (WallData)data);
+                    _level.Walls = wList.ToArray();
+                    break;
+                case "enemy":
+                    var eList = new List<EnemySpawnData>(_level.Enemies);
+                    eList.Insert(Math.Min(index, eList.Count), (EnemySpawnData)data);
+                    _level.Enemies = eList.ToArray();
+                    break;
+                case "item":
+                    var iList = new List<ItemData>(_level.Items);
+                    iList.Insert(Math.Min(index, iList.Count), (ItemData)data);
+                    _level.Items = iList.ToArray();
+                    break;
+            }
+            _level.Build();
+            SaveLevel();
+            SetEditorStatus($"Undo: restored {type}");
+            return;
+        }
+        
         if (_undoStack.Count == 0 || _level.TileGridInstance == null) return;
         var batch = _undoStack[^1];
         _undoStack.RemoveAt(_undoStack.Count - 1);

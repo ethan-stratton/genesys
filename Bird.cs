@@ -36,6 +36,39 @@ public class Bird
 
     private const float FlyGravity = 100f;
 
+    // Cached for ground detection during flight
+    private TileGrid _tileGrid;
+    private int _tileSize;
+    private Rectangle[] _platforms;
+    private Rectangle[] _solidFloors;
+    private float _floorY;
+
+    private float FindGroundBelow(float x, float startY)
+    {
+        // Check tiles below
+        if (_tileGrid != null)
+        {
+            for (float scanY = startY; scanY < _floorY; scanY += _tileSize)
+            {
+                var (tx, ty) = _tileGrid.WorldToTile(x + Width / 2f, scanY);
+                if (tx >= 0 && ty >= 0 && TileProperties.IsSolid(_tileGrid.GetTileAt(tx, ty)))
+                    return ty * _tileSize + _tileGrid.OriginY - Height;
+            }
+        }
+        // Check platforms
+        if (_platforms != null)
+        {
+            float bestY = _floorY - Height;
+            foreach (var p in _platforms)
+            {
+                if (x + Width > p.X && x < p.X + p.Width && p.Y >= startY && p.Y < bestY + Height)
+                    bestY = p.Y - Height;
+            }
+            return bestY;
+        }
+        return _floorY - Height;
+    }
+
     public Bird(Vector2 pos, float surfaceLeft, float surfaceRight, Random rng)
     {
         Position = pos;
@@ -53,6 +86,12 @@ public class Bird
         Rectangle[] platforms, Rectangle[] solidFloors, float floorY)
     {
         if (!Alive) return;
+
+        _tileGrid = tileGrid;
+        _tileSize = tileSize;
+        _platforms = platforms;
+        _solidFloors = solidFloors;
+        _floorY = floorY;
 
         if (KnockbackVel.LengthSquared() > 1f)
         {
@@ -178,12 +217,21 @@ public class Bird
                 if (_flightTime > 4f)
                     Alive = false;
 
-                if (_flightTime > 1.5f && Position.Y >= GroundY && Velocity.Y > 0)
+                if (_flightTime > 1.5f && Velocity.Y > 0)
                 {
-                    Position.Y = GroundY;
-                    Velocity = Vector2.Zero;
-                    _state = State.Perched;
-                    _stateTimer = 2f + (float)_rng.NextDouble() * 3f;
+                    // Find actual ground below current position
+                    float groundBelow = FindGroundBelow(Position.X, Position.Y);
+                    if (Position.Y >= groundBelow)
+                    {
+                        Position.Y = groundBelow;
+                        GroundY = groundBelow;
+                        Velocity = Vector2.Zero;
+                        _state = State.Perched;
+                        _stateTimer = 2f + (float)_rng.NextDouble() * 3f;
+                        // Update surface edges for new position
+                        UpdateSurfaceEdges(_tileGrid, _tileSize, _platforms, _solidFloors,
+                            Position.X - 200, Position.X + 200);
+                    }
                 }
                 break;
         }
