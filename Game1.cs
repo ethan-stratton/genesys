@@ -5476,7 +5476,7 @@ public class Game1 : Game
             default: // Water
                 deepColor = new Color(10, 22, 40);
                 brightColor = new Color(50, 90, 120);
-                surfaceColor = new Color(70, 140, 210);
+                surfaceColor = new Color(100, 180, 240);
                 speed = 0.5f;
                 waveAmp = 3f;
                 break;
@@ -5507,11 +5507,11 @@ public class Game1 : Game
                 // Surface highlight
                 if (surfY >= wy && surfY < wy + ts)
                 {
-                    _spriteBatch.Draw(_pixel, new Rectangle(wx + px, surfY, 1, 1), surfaceColor * 0.9f);
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx + px, surfY, 1, 2), surfaceColor * 0.9f);
                     // Specular glint
                     float g = MathF.Sin(worldX * 0.2f + t * speed * 2.5f);
                     if (g > 0.65f)
-                        _spriteBatch.Draw(_pixel, new Rectangle(wx + px, surfY, 1, 1), Color.White * ((g - 0.5f) * 0.7f));
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx + px, surfY, 1, 1), Color.White * ((g - 0.5f) * 0.8f));
                 }
 
                 // Body column below surface
@@ -5565,10 +5565,11 @@ public class Game1 : Game
             }
         }
 
-        // Bubbles for lava/acid
-        if (tile != TileType.Water)
+        // Bubbles for all liquids
         {
             int seed = tx * 7919 + ty * 104729;
+            var bubbleColor = tile == TileType.Water ? new Color(80, 140, 180) :
+                              tile == TileType.Acid ? new Color(120, 220, 80) : brightColor;
             for (int b = 0; b < 3; b++)
             {
                 int bseed = seed + b * 31337;
@@ -5580,7 +5581,7 @@ public class Game1 : Game
                     int bsize = 1 + (bseed % 3);
                     float wobble = MathF.Sin(t * 3f + bseed) * 2f;
                     _spriteBatch.Draw(_pixel, new Rectangle(wx + (int)(bx + wobble), (int)by, bsize, bsize),
-                        brightColor * (0.3f + (bseed % 4) * 0.1f));
+                        bubbleColor * (0.3f + (bseed % 4) * 0.1f));
                 }
             }
         }
