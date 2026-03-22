@@ -5202,7 +5202,7 @@ public class Game1 : Game
         }
 
         // Y: Cycle movement tier (debug levels only)
-        if (_editorSaveFile.Contains("debug", StringComparison.OrdinalIgnoreCase))
+        if (true)
         {
             if (kb.IsKeyDown(Keys.Y) && _prevKb.IsKeyUp(Keys.Y))
             {
@@ -7350,7 +7350,7 @@ public class Game1 : Game
         }
 
         // --- MOVEMENT TIER DEBUG SELECTOR (debug levels only) ---
-        if (isDebugLevel)
+        if (true) // tier HUD
         {
             if (_tierSwitchFlash > 0) _tierSwitchFlash -= (float)gameTime.ElapsedGameTime.TotalSeconds * 2f;
             string[] tierNames = { "TECH", "BIO", "CIPHER" };
