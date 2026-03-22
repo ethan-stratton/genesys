@@ -2968,8 +2968,8 @@ public class Game1 : Game
             int tileSnappedX = ox + (int)MathF.Floor((worldMouse.X - ox) / 32f) * 32;
             int tileSnappedY = oy + (int)MathF.Floor((worldMouse.Y - oy) / 32f) * 32;
 
-            // Left click/hold = paint
-            if (mouse.LeftButton == ButtonState.Pressed && !kb.IsKeyDown(Keys.T))
+            // Left click/hold = paint (skip if clicking palette)
+            if (mouse.LeftButton == ButtonState.Pressed && !kb.IsKeyDown(Keys.T) && !paletteClicked)
             {
                 var (tx, ty) = tg.WorldToTile(tileSnappedX, tileSnappedY);
                 if (tx >= 0 && ty >= 0)
@@ -3002,16 +3002,20 @@ public class Game1 : Game
             }
 
             // Click on tile palette to select (palette drawn at top-right)
+            bool paletteClicked = false;
             {
                 int colsPerRow = 16, tileW = 20, tileH = 20;
                 int startX = ViewW - colsPerRow * tileW - 10;
                 int startY = 50;
-                var mouse = Mouse.GetState();
-                if (mouse.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released)
+                int paletteRows = (TileProperties.PaletteTiles.Length + colsPerRow - 1) / colsPerRow;
+                int endY = startY + paletteRows * tileH;
+                var ms = Mouse.GetState();
+                if (ms.X >= startX && ms.Y >= startY && ms.Y < endY)
                 {
-                    int mx = mouse.X, my = mouse.Y;
-                    if (mx >= startX && my >= startY)
+                    paletteClicked = true; // block tile painting behind palette
+                    if (ms.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released)
                     {
+                        int mx = ms.X, my = ms.Y;
                         int col = (mx - startX) / tileW;
                         int row = (my - startY) / tileH;
                         int idx = row * colsPerRow + col;
@@ -3860,7 +3864,8 @@ public class Game1 : Game
         int floorH = _level.Floor.Height;
         int bL = _level.Bounds.Left;
         int bR = _level.Bounds.Right;
-        _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, floorH), new Color(40, 40, 40) * 0.5f);
+        if (floorH > 0)
+            _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, floorH), new Color(40, 40, 40) * 0.5f);
 
         // Draw grid
         if (_editorShowGrid)
@@ -6466,8 +6471,11 @@ public class Game1 : Game
             }
         }
 
-        _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, floorH), isDebugLevel ? new Color(140, 80, 160) : new Color(40, 40, 40));
-        _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, 1), isDebugLevel ? new Color(190, 160, 100) : new Color(80, 80, 80));
+        if (floorH > 0)
+        {
+            _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, floorH), isDebugLevel ? new Color(140, 80, 160) : new Color(40, 40, 40));
+            _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, 1), isDebugLevel ? new Color(190, 160, 100) : new Color(80, 80, 80));
+        }
 
         // Draw platforms
         foreach (var plat in _level.PlatformRects)

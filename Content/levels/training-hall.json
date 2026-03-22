@@ -12,7 +12,7 @@
     "bottom": 640
   },
   "floor": {
-    "y": 99999,
+    "y": 512,
     "height": 0
   },
   "platforms": [
