@@ -16,19 +16,55 @@ public class Player
     public const int CollisionWidth = 21; // Hitbox width (narrower, centered)
     public const int CollisionOffsetX = (Width - CollisionWidth) / 2; // 5px from left edge
     public const int Height = 48;
-    private const float Speed = 250f;
-    private const float Gravity = 900f;
-    private const float JumpCutMultiplier = 0.4f; // velocity multiplied by this on early jump release
-    private const float JumpForce = -420f;
+    // === MOVEMENT TIER SYSTEM ===
+    public enum MoveTier { Tech, Bio, Cipher }
+    public MoveTier CurrentTier { get; set; } = MoveTier.Bio;
 
-    // === MOVEMENT PHYSICS (Celeste-inspired) ===
-    private const float RunAccel = 1000f;         // ground acceleration (px/s²)
-    private const float RunDecel = 1200f;          // ground deceleration (stopping)
-    private const float AirAccel = 700f;           // air acceleration (reduced control)
-    private const float AirDecel = 500f;            // air deceleration
-    private const float AirMult = 0.75f;           // air speed cap multiplier
-    private const float MaxFall = 400f;            // terminal velocity
-    private const float HalfGravThreshold = 60f;   // near apex: if |vel.Y| < this, halve gravity
+    // Per-tier constants: [Tech, Bio, Cipher]
+    private static readonly float[] TierSpeed =          { 200f,  250f,  320f  };
+    private static readonly float[] TierGravity =        { 900f,  750f,  950f  };
+    private static readonly float[] TierJumpForce =      { -370f, -430f, -400f };
+    private static readonly float[] TierRunAccel =       { 2000f, 1000f, 1600f };  // Tech: snap (high accel, low speed)
+    private static readonly float[] TierRunDecel =       { 2000f, 1000f, 800f  };  // Cipher: low decel = slides
+    private static readonly float[] TierAirAccel =       { 400f,  800f,  500f  };  // Bio: best air control
+    private static readonly float[] TierAirDecel =       { 400f,  350f,  300f  };
+    private static readonly float[] TierAirMult =        { 0.5f,  0.9f,  0.7f  };  // Bio: near-full air speed
+    private static readonly float[] TierMaxFall =        { 380f,  300f,  450f  };  // Bio: slow fall
+    private static readonly float[] TierHalfGravThresh = { 20f,   80f,   40f   };  // Bio: huge apex hang
+    private static readonly float[] TierJumpCutMult =    { 0.5f,  0.35f, 0.45f };  // Bio: most variable height
+    private static readonly float[] TierFallGravMult =   { 1.3f,  1.1f,  1.6f  };  // Cipher: fast fall
+
+    // Active physics (resolved from tier)
+    private float _speed;
+    private float _gravity;
+    private float _jumpForce;
+    private float _runAccel;
+    private float _runDecel;
+    private float _airAccel;
+    private float _airDecel;
+    private float _airMult;
+    private float _maxFall;
+    private float _halfGravThreshold;
+    private float _jumpCutMultiplier;
+    private float _fallGravMultiplier;
+
+    public void ApplyTierConstants()
+    {
+        int i = (int)CurrentTier;
+        _speed = TierSpeed[i];
+        _gravity = TierGravity[i];
+        _jumpForce = TierJumpForce[i];
+        _runAccel = TierRunAccel[i];
+        _runDecel = TierRunDecel[i];
+        _airAccel = TierAirAccel[i];
+        _airDecel = TierAirDecel[i];
+        _airMult = TierAirMult[i];
+        _maxFall = TierMaxFall[i];
+        _halfGravThreshold = TierHalfGravThresh[i];
+        _jumpCutMultiplier = TierJumpCutMult[i];
+        _fallGravMultiplier = TierFallGravMult[i];
+    }
+
     private const float CornerCorrectionPx = 4;    // nudge pixels for ceiling bonks
     public bool IsGrounded { get; set; }
     private bool _wasGrounded;
@@ -309,8 +345,6 @@ public class Player
     public bool HasRangedWeapon { get; set; }
     public int MeleeRangeOverride { get; set; } = MeleeRange;
 
-    // Asymmetric fall gravity
-    private const float FallGravityMultiplier = 1.4f;
 
     // Coyote time
     private float _coyoteTimer;
@@ -352,7 +386,14 @@ public class Player
         IsGrounded = false;
         _wasGrounded = false;
         AimDir = new Vector2(1, 0);
+        ApplyTierConstants();
     }
+
+    // Debug getters for tier display
+    public float GetTierSpeed() => _speed;
+    public float GetTierAccel() => _runAccel;
+    public float GetTierAirMult() => _airMult;
+    public float GetTierJump() => _jumpForce;
 
     public int CurrentHeight => IsSliding ? SlideHeight : (IsCrouching ? CrouchHeight : Height);
 
@@ -936,8 +977,8 @@ public class Player
             {
                 IsOnRope = false;
                 _ropeDisengaged = true;
-                vel.Y = JumpForce;
-                if (inputX != 0) vel.X = inputX * Speed;
+                vel.Y = _jumpForce;
+                if (inputX != 0) vel.X = inputX * _speed;
                 _jumpsLeft = MaxJumps - 1;
                 SetSquash(0.7f, 1.3f);
                 IsGrounded = false;
@@ -1112,8 +1153,8 @@ public class Player
                     // Jumping away from wall — detach
                     IsOnWall = false;
                     _wallDisengaged = true;
-                    vel.Y = JumpForce;
-                    vel.X = _currentWallClimbSide * Speed;
+                    vel.Y = _jumpForce;
+                    vel.X = _currentWallClimbSide * _speed;
                     _jumpsLeft = MaxJumps - 1;
                     SetSquash(0.7f, 1.3f);
                     IsGrounded = false;
@@ -1124,7 +1165,7 @@ public class Player
                     // Wall hop — launch up, reattach by pressing toward wall
                     IsOnWall = false;
                     _wallHopCooldown = WallHopCooldownTime;
-                    vel.Y = JumpForce * 0.7f;
+                    vel.Y = _jumpForce * 0.7f;
                     vel.X = 0;
                     _jumpsLeft = 0;
                     IsGrounded = false;
@@ -1199,18 +1240,18 @@ public class Player
             float t = 1f - (_cartwheelTimer / CartwheelDuration);
             vel.X = _cartwheelDir * CartwheelSpeed;
             if (t < 0.15f) vel.Y = CartwheelJumpForce; // initial pop
-            else vel.Y += Gravity * (vel.Y > 0 ? FallGravityMultiplier : 1f) * dt;
+            else vel.Y += _gravity * (vel.Y > 0 ? _fallGravMultiplier : 1f) * dt;
             if (_cartwheelTimer <= 0)
             {
                 IsCartwheeling = false;
-                vel.X = _cartwheelDir * Speed;
+                vel.X = _cartwheelDir * _speed;
             }
         }
         else if (IsVaultKicking)
         {
             _vaultKickTimer -= dt;
             vel.X = _vaultKickDir * VaultKickSpeed;
-            vel.Y += Gravity * (vel.Y > 0 ? FallGravityMultiplier : 1f) * dt;
+            vel.Y += _gravity * (vel.Y > 0 ? _fallGravMultiplier : 1f) * dt;
             _jumpHeld = kb.IsKeyDown(Keys.Space); // track space so uppercut can trigger
             if (_vaultKickTimer <= 0)
             {
@@ -1230,7 +1271,7 @@ public class Player
             }
             else
             {
-                vel.Y += Gravity * (vel.Y > 0 ? FallGravityMultiplier : 1f) * dt;
+                vel.Y += _gravity * (vel.Y > 0 ? _fallGravMultiplier : 1f) * dt;
                 vel.X = inputX * UppercutHSpeed;
             }
             IsGrounded = false;
@@ -1245,11 +1286,11 @@ public class Player
         {
             _flipTimer -= dt;
             vel.X = _flipDir * FlipSpeed;
-            vel.Y += Gravity * (vel.Y > 0 ? FallGravityMultiplier : 1f) * dt;
+            vel.Y += _gravity * (vel.Y > 0 ? _fallGravMultiplier : 1f) * dt;
             if (_flipTimer <= 0)
             {
                 IsFlipping = false;
-                vel.X = inputX * Speed; // return to normal
+                vel.X = inputX * _speed; // return to normal
             }
         }
         else if (IsBladeDashing)
@@ -1331,19 +1372,19 @@ public class Player
             // Gradually blend deflection momentum with input (drag toward input speed)
             float drag = 1f - dt * 3f; // ~3x per second decay
             _ceilDeflectVelX *= drag;
-            vel.X = _ceilDeflectVelX + inputX * Speed * 0.3f;
-            vel.Y += Gravity * (vel.Y > 0 ? FallGravityMultiplier : 1f) * dt;
+            vel.X = _ceilDeflectVelX + inputX * _speed * 0.3f;
+            vel.Y += _gravity * (vel.Y > 0 ? _fallGravMultiplier : 1f) * dt;
             if (IsGrounded) _ceilDeflectTimer = 0; // landing cancels deflect state
         }
         else if (_knockbackTimer > 0)
         {
             _knockbackTimer -= dt;
             // Don't override vel.X — let knockback velocity play out
-            vel.Y += Gravity * (vel.Y > 0 ? FallGravityMultiplier : 1f) * dt;
+            vel.Y += _gravity * (vel.Y > 0 ? _fallGravMultiplier : 1f) * dt;
         }
         else
         {
-            float moveSpeed = (IsDashing && inputX == _dashDir) ? DashSpeed : Speed;
+            float moveSpeed = (IsDashing && inputX == _dashDir) ? DashSpeed : _speed;
             if (SpeedBoostTimer > 0) moveSpeed *= SpeedBoostMultiplier;
 
             // Acceleration-based movement (Celeste-style)
@@ -1352,22 +1393,22 @@ public class Player
             {
                 // Ground: fast accel/decel
                 if (inputX != 0)
-                    vel.X = ApproachF(vel.X, targetX, RunAccel * dt);
+                    vel.X = ApproachF(vel.X, targetX, _runAccel * dt);
                 else
-                    vel.X = ApproachF(vel.X, 0f, RunDecel * dt);
+                    vel.X = ApproachF(vel.X, 0f, _runDecel * dt);
             }
             else
             {
                 // Air: reduced control, capped speed
-                float airMax = moveSpeed * AirMult;
+                float airMax = moveSpeed * _airMult;
                 if (inputX != 0)
                 {
                     // Don't reduce speed if already going faster (momentum preservation)
                     if (Math.Abs(vel.X) <= airMax || Math.Sign(vel.X) != inputX)
-                        vel.X = ApproachF(vel.X, inputX * airMax, AirAccel * dt);
+                        vel.X = ApproachF(vel.X, inputX * airMax, _airAccel * dt);
                 }
                 else
-                    vel.X = ApproachF(vel.X, 0f, AirDecel * dt);
+                    vel.X = ApproachF(vel.X, 0f, _airDecel * dt);
             }
 
             // Jump (Space) — only if NOT holding S (S+Space = slide)
@@ -1397,7 +1438,7 @@ public class Player
                 else
                 {
                     // Normal jump
-                    vel.Y = JumpForce;
+                    vel.Y = _jumpForce;
                     _jumpsLeft--;
                     SetSquash(0.7f, 1.3f);
                     if (!isSecondJump) _firstJumpTime = now_flip;
@@ -1417,17 +1458,17 @@ public class Player
             // Variable jump height: cut upward velocity on the frame Space is released mid-air
             if (wasHoldingJump && !spacePressed && vel.Y < 0 && !IsGrounded && !IsFlipping && !IsUppercutting && !IsVaultKicking)
             {
-                vel.Y *= JumpCutMultiplier;
+                vel.Y *= _jumpCutMultiplier;
             }
 
-            // Gravity with half-gravity at apex (Celeste-style) + terminal velocity
+            // _gravity with half-gravity at apex (Celeste-style) + terminal velocity
             float gravMult = 1f;
             if (vel.Y > 0)
-                gravMult = FallGravityMultiplier; // falling: heavier
-            else if (Math.Abs(vel.Y) < HalfGravThreshold)
+                gravMult = _fallGravMultiplier; // falling: heavier
+            else if (Math.Abs(vel.Y) < _halfGravThreshold)
                 gravMult = 0.5f; // near apex: floaty hang time
-            vel.Y += Gravity * gravMult * dt;
-            if (vel.Y > MaxFall) vel.Y = MaxFall;
+            vel.Y += _gravity * gravMult * dt;
+            if (vel.Y > _maxFall) vel.Y = _maxFall;
         }
 
         // --- Right hand / Ranged (J) ---
@@ -1640,7 +1681,7 @@ public class Player
                 
                 // Snap to surface and zero upward velocity
                 // Player keeps moving horizontally from their existing vel.X
-                // Gravity still pulls down — once it overcomes the jump, player falls off
+                // _gravity still pulls down — once it overcomes the jump, player falls off
                 if (vel.Y < 0) vel.Y = 0;
             }
         }
@@ -1842,7 +1883,7 @@ public class Player
             _jumpBufferTimer -= dt;
         if (!_wasGrounded && IsGrounded && _jumpBufferTimer > 0)
         {
-            vel.Y = JumpForce;
+            vel.Y = _jumpForce;
             _jumpsLeft = MaxJumps - 1;
             IsGrounded = false;
             _jumpBufferTimer = 0;

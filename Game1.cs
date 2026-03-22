@@ -5200,6 +5200,17 @@ public class Game1 : Game
             return;
         }
 
+        // F1-F3: Movement tier switch (debug levels only)
+        if (_editorSaveFile.Contains("debug", StringComparison.OrdinalIgnoreCase))
+        {
+            if (kb.IsKeyDown(Keys.F1) && _prevKb.IsKeyUp(Keys.F1))
+            { _player.CurrentTier = Player.MoveTier.Tech; _player.ApplyTierConstants(); }
+            if (kb.IsKeyDown(Keys.F2) && _prevKb.IsKeyUp(Keys.F2))
+            { _player.CurrentTier = Player.MoveTier.Bio; _player.ApplyTierConstants(); }
+            if (kb.IsKeyDown(Keys.F3) && _prevKb.IsKeyUp(Keys.F3))
+            { _player.CurrentTier = Player.MoveTier.Cipher; _player.ApplyTierConstants(); }
+        }
+
         // Enter/Space on biome entrance
         bool enter = kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter);
         bool space = kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space);
@@ -7335,6 +7346,29 @@ public class Game1 : Game
                     DrawOutlinedString(_font, _deathLog[i], new Vector2(10, y), Color.White * 0.6f * alpha);
                 }
             }
+        }
+
+        // --- MOVEMENT TIER DEBUG SELECTOR (debug levels only) ---
+        if (isDebugLevel)
+        {
+            string[] tierNames = { "TECH", "BIO", "CIPHER" };
+            string[] tierSymbols = { "■", "●", "▲" };
+            Color[] tierColors = { new Color(100, 180, 255), new Color(80, 200, 100), new Color(220, 120, 255) };
+            int tierY = 80;
+            DrawOutlinedString(_fontSmall, "MOVE TIER [F1-F3]", new Vector2(10, tierY), Color.Gray * 0.7f);
+            tierY += 18;
+            for (int i = 0; i < 3; i++)
+            {
+                bool active = (int)_player.CurrentTier == i;
+                string label = $"{tierSymbols[i]} {tierNames[i]}";
+                Color c = active ? tierColors[i] : Color.Gray * 0.4f;
+                if (active) label = "> " + label;
+                DrawOutlinedString(_fontSmall, label, new Vector2(10, tierY + i * 16), c);
+            }
+            // Show active constants
+            tierY += 56;
+            DrawOutlinedString(_fontSmall, $"Spd:{_player.GetTierSpeed():F0} Acc:{_player.GetTierAccel():F0}", new Vector2(10, tierY), Color.Gray * 0.4f);
+            DrawOutlinedString(_fontSmall, $"Air:{_player.GetTierAirMult():F2} Jmp:{_player.GetTierJump():F0}", new Vector2(10, tierY + 14), Color.Gray * 0.4f);
         }
 
         // --- EVE Scan HUD ---

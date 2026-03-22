@@ -489,7 +489,11 @@
       "x": 996.6668,
       "y": 483,
       "count": 10,
-      "scale": 1
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "crawler-1",
@@ -497,7 +501,11 @@
       "x": 1019,
       "y": 283,
       "count": 1,
-      "scale": 1
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "bird-2",
@@ -505,10 +513,16 @@
       "x": -12,
       "y": 241,
       "count": 1,
-      "scale": 1
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     }
   ],
+  "switches": [],
   "labels": [],
+  "retractableSpikes": [],
   "tileGrid": {
     "width": 65,
     "height": 27,
@@ -1778,10 +1792,10 @@
       0,
       0,
       0,
-      0,
-      0,
-      0,
-      0,
+      1,
+      1,
+      1,
+      1,
       0,
       0,
       0,
