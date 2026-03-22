@@ -116,6 +116,7 @@ public class Game1 : Game
     private List<Hopper> _hoppers = new();
     private List<Thornback> _thornbacks = new();
     private List<Bird> _birds = new();
+    private List<Wingbeater> _wingbeaters = new();
 
     private Random _rng;
 
@@ -265,7 +266,7 @@ public class Game1 : Game
     private const int MaxLatched = 4; // max crawlers latched at once
 
     // --- Editor state ---
-    private enum EditorTool { SolidFloor = 0, Platform = 1, Rope = 2, Wall = 3, Spike = 4, Exit = 5, Spawn = 6, WallSpike = 7, OverworldExit = 8, Ceiling = 9, TilePaint = 10 }
+    private enum EditorTool { SolidFloor = 0, Platform = 1, Rope = 2, Wall = 3, Spike = 4, Exit = 5, Spawn = 6, WallSpike = 7, OverworldExit = 8, Ceiling = 9, TilePaint = 10, RetractableSpike = 11 }
     // Wall climbSide values: 0=both, 1=right face, -1=left face, 99=no climb (solid only)
     private EditorTool _editorTool = EditorTool.Platform;
     private bool _toolPaletteOpen;
@@ -286,7 +287,7 @@ public class Game1 : Game
     private Vector2 _editorMoveOffset; // offset from entity origin to grab point
     private bool _entityPaletteOpen;
     private int _entityPaletteCursor;
-    private enum EntityType { Swarm, Crawler, Thornback, Hopper, Tree, Bird, Dummy, CritDummy }
+    private enum EntityType { Swarm, Crawler, Thornback, Hopper, Tree, Bird, Dummy, CritDummy, Wingbeater }
 
     // Tile paint state
     private int _tilePaletteCursor;
@@ -378,7 +379,7 @@ public class Game1 : Game
         _crawlers.Clear();
         _hoppers.Clear();
         _thornbacks.Clear();
-        _birds.Clear();
+        _birds.Clear(); _wingbeaters.Clear();
 
         // Load item pickups
         _itemPickups.Clear();
@@ -464,7 +465,7 @@ public class Game1 : Game
         _crawlers.Clear();
         _hoppers.Clear();
         _thornbacks.Clear();
-        _birds.Clear();
+        _birds.Clear(); _wingbeaters.Clear();
         if (_rng == null) _rng = new Random();
 
         var tg = _level.TileGridInstance;
@@ -503,6 +504,10 @@ public class Game1 : Game
                     var bird = new Bird(new Vector2(e.X, bSnapY), 0, 0, _rng);
                     bird.UpdateSurfaceEdges(tg, ts, plats, sFloors, bLeft, bRight);
                     _birds.Add(bird);
+                    break;
+                case "wingbeater":
+                    var wb = new Wingbeater(new Vector2(e.X, e.Y));
+                    _wingbeaters.Add(wb);
                     break;
                 case "dummy":
                     float dSnapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Crawler.Width, Crawler.Height, tg, ts, plats, sFloors, walls, mainFloor);
@@ -1347,6 +1352,57 @@ public class Game1 : Game
 
         _birds.RemoveAll(b => !b.Alive);
 
+        // --- Wingbeater update ---
+        foreach (var wb in _wingbeaters)
+            wb.Update(dt, playerCenter2, _level.Floor.Y);
+
+        // Melee hit detection for wingbeaters
+        if (_player.MeleeTimer > 0)
+        {
+            foreach (var wb in _wingbeaters)
+            {
+                if (!wb.Alive) continue;
+                if (_player.MeleeHitbox.Intersects(wb.Rect))
+                {
+                    var ws = WeaponStats.Get(_player.CurrentWeapon);
+                    float kbDir = _player.FacingDir;
+                    bool killed = wb.TakeHit(ws.Damage, kbDir * ws.KnockbackForce, ws.KnockbackUp);
+                    var hitPt = new Vector2(wb.Position.X + Wingbeater.Width / 2f, wb.Position.Y + Wingbeater.Height / 2f);
+                    SpawnHitSpray(hitPt, _player.FacingDir, GetEnemyHitColor("wingbeater"), ws.Weight, killed);
+                    if (killed)
+                    {
+                        _player.RegisterComboHit();
+                        if (_hitStopEnabled) _hitStopTimer = ws.HitStopKill;
+                        if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration * 1.5f; _shakeIntensity = ws.ShakeIntensity * 1.2f; }
+                        if (_deathParticlesEnabled) SpawnDeathParticles(hitPt, new Color(160, 60, 40));
+                    }
+                    else
+                    {
+                        if (_hitStopEnabled) _hitStopTimer = ws.HitStopHit;
+                    }
+                }
+            }
+        }
+
+        // Wingbeater contact damage
+        if (!_isDead)
+        {
+            var playerRect3 = _player.Rect;
+            foreach (var wb in _wingbeaters)
+            {
+                if (!wb.Alive) continue;
+                int wbDmg = wb.CheckPlayerDamage(playerRect3);
+                if (wbDmg > 0 && _spawnInvincibility <= 0f)
+                {
+                    _lastDamageSource = "Wingbeater";
+                    _player.TakeDamage(wbDmg, _player.Position.X - wb.Position.X);
+                    if (_player.Hp <= 0) { _isDead = true; LogDeath(); }
+                }
+            }
+        }
+
+        _wingbeaters.RemoveAll(w => !w.Alive);
+
         // --- Ecosystem: Trophic Interactions ---
         _birdHuntTimer -= dt;
         if (_birdHuntTimer <= 0)
@@ -2178,6 +2234,45 @@ public class Game1 : Game
                     }
                 }
             }
+
+            // Uppercut hits enemies
+            int uppercutDmg = 15;
+            foreach (var c in _crawlers)
+            {
+                if (!c.Alive) continue;
+                if (uppercutRect.Intersects(c.Rect))
+                {
+                    int prevHp = c.Hp;
+                    float kbDir = _player.FacingDir;
+                    bool killed = _knockbackEnabled
+                        ? c.TakeHit(uppercutDmg, kbDir * 200f, -300f)
+                        : c.TakeHit(uppercutDmg);
+                    if (c.Hp < prevHp || killed)
+                    {
+                        var hitPt = new Vector2(c.Position.X + c.EffectiveWidth / 2f, c.Position.Y + c.EffectiveHeight / 2f);
+                        SpawnHitSpray(hitPt, _player.FacingDir, GetEnemyHitColor(c.IsDummy ? "dummy" : "crawler"), 1, false);
+                        if (_hitStopEnabled) _hitStopTimer = 0.04f;
+                    }
+                }
+            }
+            foreach (var t in _thornbacks)
+            {
+                if (!t.Alive || !uppercutRect.Intersects(t.Rect)) continue;
+                t.TakeHit(uppercutDmg, _player.FacingDir * 200f, -300f);
+                SpawnHitSpray(new Vector2(t.Position.X + Thornback.Width / 2f, t.Position.Y + Thornback.Height / 2f), _player.FacingDir, GetEnemyHitColor("thornback"), 1, false);
+            }
+            foreach (var h in _hoppers)
+            {
+                if (!h.Alive || !uppercutRect.Intersects(h.Rect)) continue;
+                h.TakeHit(uppercutDmg, _player.FacingDir * 200f, -300f);
+                SpawnHitSpray(new Vector2(h.Position.X + Hopper.Width / 2f, h.Position.Y + Hopper.Height / 2f), _player.FacingDir, GetEnemyHitColor("hopper"), 1, false);
+            }
+            foreach (var b in _birds)
+            {
+                if (!b.Alive || !uppercutRect.Intersects(b.Rect)) continue;
+                b.TakeHit(uppercutDmg, _player.FacingDir * 200f, -300f);
+                SpawnHitSpray(new Vector2(b.Position.X + Bird.Width / 2f, b.Position.Y + Bird.Height / 2f), _player.FacingDir, GetEnemyHitColor("bird"), 1, false);
+            }
         }
 
         // Exit collision — enter-trigger (only fires on transition from outside → inside)
@@ -2446,6 +2541,7 @@ public class Game1 : Game
         "hopper" => new Color(100, 80, 60),
         "thornback" => new Color(60, 100, 30),
         "bird" => new Color(80, 120, 160),
+        "wingbeater" => new Color(160, 60, 40),
         "swarm" => Color.OrangeRed,
         _ => new Color(200, 50, 50)
     };
@@ -2746,6 +2842,12 @@ public class Game1 : Game
                         _level.Enemies = cdList.ToArray();
                         SetEditorStatus($"Placed crit-dummy at ({(int)cx}, {(int)cy})");
                         break;
+                    case EntityType.Wingbeater:
+                        var wbList = new List<EnemySpawnData>(_level.Enemies);
+                        wbList.Add(new EnemySpawnData { Id = $"wingbeater-{wbList.Count}", Type = "wingbeater", X = cx, Y = cy });
+                        _level.Enemies = wbList.ToArray();
+                        SetEditorStatus($"Placed wingbeater at ({(int)cx}, {(int)cy})");
+                        break;
                 }
             }
 
@@ -3028,6 +3130,12 @@ public class Game1 : Game
                     _level.Build();
                     SetEditorStatus("Ceiling added");
                     break;
+                case EditorTool.RetractableSpike:
+                    var rsList = new List<RetractableSpikeData>(_level.RetractableSpikes);
+                    rsList.Add(new RetractableSpikeData { X = x, Y = y - 24, W = 16, H = 24, UpTime = 1.5f, DownTime = 1.5f, Phase = 0f });
+                    _level.RetractableSpikes = rsList.ToArray();
+                    SetEditorStatus("Retractable spike added");
+                    break;
             }
         }
 
@@ -3084,6 +3192,11 @@ public class Game1 : Game
                 foreach (var ws in _level.WallSpikes)
                     if (new Rectangle(ws.X, ws.Y, ws.W, ws.H).Contains(mp))
                     { _editorMovingEntity = ws; _editorMoveOffset = new Vector2(worldMouse.X - ws.X, worldMouse.Y - ws.Y); SetEditorStatus("Grabbed wall spike"); break; }
+            // Check retractable spikes
+            if (_editorMovingEntity == null)
+                foreach (var rs in _level.RetractableSpikes)
+                    if (new Rectangle((int)rs.X, (int)rs.Y, rs.W, rs.H).Contains(mp))
+                    { _editorMovingEntity = rs; _editorMoveOffset = new Vector2(worldMouse.X - rs.X, worldMouse.Y - rs.Y); SetEditorStatus("Grabbed retractable spike"); break; }
             // Check enemies
             if (_editorMovingEntity == null)
                 foreach (var e in _level.Enemies)
@@ -3131,6 +3244,7 @@ public class Game1 : Game
             else if (_editorMovingEntity is NpcData npc) { npc.X = (int)nx; npc.Y = (int)ny; }
             else if (_editorMovingEntity is ItemData itd) { itd.X = nx; itd.Y = ny; }
             else if (_editorMovingEntity is PointData pd) { pd.X = (int)nx; pd.Y = (int)ny; }
+            else if (_editorMovingEntity is RetractableSpikeData rsd) { rsd.X = nx; rsd.Y = ny; }
         }
         // Release — drop entity and rebuild
         if ((mouse.LeftButton == ButtonState.Released || !kb.IsKeyDown(Keys.T)) && _editorMovingEntity != null)
@@ -3370,6 +3484,18 @@ public class Game1 : Game
                 var list = new List<EnvObjectData>(_level.Objects);
                 list.RemoveAt(i);
                 _level.Objects = list.ToArray();
+                return true;
+            }
+        }
+        // Check retractable spikes
+        for (int i = _level.RetractableSpikes.Length - 1; i >= 0; i--)
+        {
+            var rs = _level.RetractableSpikes[i];
+            if (new Rectangle((int)rs.X, (int)rs.Y, rs.W, rs.H).Contains(p))
+            {
+                var list = new List<RetractableSpikeData>(_level.RetractableSpikes);
+                list.RemoveAt(i);
+                _level.RetractableSpikes = list.ToArray();
                 return true;
             }
         }
@@ -6720,6 +6846,7 @@ public class Game1 : Game
             foreach (var h in _hoppers) { if (!_enemySquashEnabled) h.VisualScale = Vector2.One; h.Draw(_spriteBatch, _pixel); }
             foreach (var t in _thornbacks) { if (!_enemySquashEnabled) t.VisualScale = Vector2.One; t.Draw(_spriteBatch, _pixel); }
             foreach (var bird in _birds) { if (!_enemySquashEnabled) bird.VisualScale = Vector2.One; bird.Draw(_spriteBatch, _pixel); }
+            foreach (var wb in _wingbeaters) { if (!_enemySquashEnabled) wb.VisualScale = Vector2.One; wb.Draw(_spriteBatch, _pixel); }
         }
 
         // --- EVE Scan overlays (world-space) ---
