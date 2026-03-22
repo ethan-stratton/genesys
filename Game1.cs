@@ -227,6 +227,13 @@ public class Game1 : Game
 
     // --- EVE orb ---
     private float _totalTime;
+
+    // Suit integrity (0-100, placeholder — decreases from tech suppression field)
+    private float _suitIntegrity = 85f; // starts damaged from crash
+
+    // EVE status
+    private enum EveStatus { Ok, Scanning, Overheat, Offline }
+    private EveStatus _eveStatus = EveStatus.Ok;
     private bool _eveOrbActive;
     #pragma warning disable CS0414
     private bool _eveDialogueExhausted; // used later for quest tracking
@@ -286,7 +293,7 @@ public class Game1 : Game
     private const int MaxLatched = 4; // max crawlers latched at once
 
     // --- Editor state ---
-    private enum EditorTool { SolidFloor = 0, Platform = 1, Rope = 2, Wall = 3, Spike = 4, Exit = 5, Spawn = 6, WallSpike = 7, OverworldExit = 8, Ceiling = 9, TilePaint = 10 }
+    private enum EditorTool { SolidFloor = 0, Platform = 1, Rope = 2, Wall = 3, Spike = 4, Exit = 5, Spawn = 6, WallSpike = 7, OverworldExit = 8, Ceiling = 9, TilePaint = 10, Enemy = 11, Item = 12 }
     // Wall climbSide values: 0=both, 1=right face, -1=left face, 99=no climb (solid only)
     private EditorTool _editorTool = EditorTool.Platform;
     private bool _toolPaletteOpen;
@@ -305,6 +312,22 @@ public class Game1 : Game
     // Entity drag-move state
     private object _editorMovingEntity; // reference to the entity being moved (EnemySpawnData, EnvObjectData, NpcData, ItemData)
     private Vector2 _editorMoveOffset; // offset from entity origin to grab point
+
+    // Drag-fill state
+    private bool _dragFilling;
+    private int _dragFillStartCol, _dragFillStartRow;
+    private int _dragFillEndCol, _dragFillEndRow;
+
+    // Undo system (tile changes)
+    private readonly List<List<(int col, int row, TileType oldTile, TileType newTile)>> _undoStack = new();
+    private List<(int col, int row, TileType oldTile, TileType newTile)> _currentUndoBatch;
+    private const int MaxUndoSteps = 50;
+
+    // Enemy/item editor placement
+    private static readonly string[] EnemyTypes = { "crawler", "wingbeater", "dummy" };
+    private int _editorEnemyCursor;
+    private static readonly string[] ItemTypes = { "stick", "dagger", "sword", "axe", "club", "hammer", "greatsword", "greatclub", "whip", "sling", "bow", "gun", "heart" };
+    private int _editorItemCursor;
     private bool _entityPaletteOpen;
     private int _entityPaletteCursor;
     private enum EntityType { Swarm, Crawler, Thornback, Hopper, Tree, Bird, Dummy, CritDummy, Wingbeater }
@@ -2764,6 +2787,10 @@ public class Game1 : Game
         var dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
         var mouse = Mouse.GetState();
 
+        // Ctrl+Z = undo
+        if ((kb.IsKeyDown(Keys.LeftControl) || kb.IsKeyDown(Keys.RightControl)) && kb.IsKeyDown(Keys.Z) && _prevKb.IsKeyUp(Keys.Z))
+            EditorUndo();
+
         // --- Spawn weapon menu (P key) ---
         if (kb.IsKeyDown(Keys.P) && _prevKb.IsKeyUp(Keys.P))
         {
@@ -3075,24 +3102,63 @@ public class Game1 : Game
                 }
             }
 
-            // Left click/hold = paint (skip if clicking palette)
+            // Left click = paint single OR start drag-fill (Ctrl+click = drag-fill rectangle)
+            bool ctrlHeld = kb.IsKeyDown(Keys.LeftControl) || kb.IsKeyDown(Keys.RightControl);
             if (mouse.LeftButton == ButtonState.Pressed && !kb.IsKeyDown(Keys.T) && !paletteClicked)
             {
                 var (tx, ty) = tg.WorldToTile(tileSnappedX, tileSnappedY);
                 if (tx >= 0 && ty >= 0)
                 {
-                    tg.SetTileAt(tx, ty, _selectedTileType);
+                    if (ctrlHeld)
+                    {
+                        // Ctrl+drag: rectangle fill preview
+                        if (!_dragFilling)
+                        {
+                            _dragFilling = true;
+                            _dragFillStartCol = tx;
+                            _dragFillStartRow = ty;
+                        }
+                        _dragFillEndCol = tx;
+                        _dragFillEndRow = ty;
+                    }
+                    else
+                    {
+                        // Normal paint: single tile with undo
+                        if (_prevMouse.LeftButton == ButtonState.Released) BeginUndoBatch();
+                        EditorSetTile(tg, tx, ty, _selectedTileType);
+                    }
                 }
             }
-            // Right click/hold = erase
+            // Release after Ctrl drag = commit rectangle fill
+            if (_dragFilling && (mouse.LeftButton == ButtonState.Released || !ctrlHeld))
+            {
+                BeginUndoBatch();
+                int minC = Math.Min(_dragFillStartCol, _dragFillEndCol);
+                int maxC = Math.Max(_dragFillStartCol, _dragFillEndCol);
+                int minR = Math.Min(_dragFillStartRow, _dragFillEndRow);
+                int maxR = Math.Max(_dragFillStartRow, _dragFillEndRow);
+                for (int r = minR; r <= maxR; r++)
+                    for (int c = minC; c <= maxC; c++)
+                        EditorSetTile(tg, c, r, _selectedTileType);
+                CommitUndoBatch();
+                int count = (maxC - minC + 1) * (maxR - minR + 1);
+                SetEditorStatus($"Filled {count} tiles");
+                _dragFilling = false;
+            }
+            // Commit single paint undo on release
+            if (!ctrlHeld && mouse.LeftButton == ButtonState.Released && _prevMouse.LeftButton == ButtonState.Pressed && !_dragFilling)
+                CommitUndoBatch();
+
+            // Right click/hold = erase with undo
             if (mouse.RightButton == ButtonState.Pressed)
             {
+                if (_prevMouse.RightButton == ButtonState.Released) BeginUndoBatch();
                 var (tx, ty) = tg.WorldToTile(tileSnappedX, tileSnappedY);
                 if (tx >= 0 && ty >= 0)
-                {
-                    tg.SetTileAt(tx, ty, TileType.Empty);
-                }
+                    EditorSetTile(tg, tx, ty, TileType.Empty);
             }
+            if (mouse.RightButton == ButtonState.Released && _prevMouse.RightButton == ButtonState.Pressed)
+                CommitUndoBatch();
 
             // Cycle tile type with [ and ]
             if (kb.IsKeyDown(Keys.OemOpenBrackets) && _prevKb.IsKeyUp(Keys.OemOpenBrackets))
@@ -3111,6 +3177,22 @@ public class Game1 : Game
             // Skip normal drag placement when in tile paint mode
         }
 
+        // Enemy/Item type cycling with [ and ]
+        if (_editorTool == EditorTool.Enemy)
+        {
+            if (kb.IsKeyDown(Keys.OemOpenBrackets) && _prevKb.IsKeyUp(Keys.OemOpenBrackets))
+            { _editorEnemyCursor = (_editorEnemyCursor - 1 + EnemyTypes.Length) % EnemyTypes.Length; SetEditorStatus($"Enemy: {EnemyTypes[_editorEnemyCursor]}"); }
+            if (kb.IsKeyDown(Keys.OemCloseBrackets) && _prevKb.IsKeyUp(Keys.OemCloseBrackets))
+            { _editorEnemyCursor = (_editorEnemyCursor + 1) % EnemyTypes.Length; SetEditorStatus($"Enemy: {EnemyTypes[_editorEnemyCursor]}"); }
+        }
+        if (_editorTool == EditorTool.Item)
+        {
+            if (kb.IsKeyDown(Keys.OemOpenBrackets) && _prevKb.IsKeyUp(Keys.OemOpenBrackets))
+            { _editorItemCursor = (_editorItemCursor - 1 + ItemTypes.Length) % ItemTypes.Length; SetEditorStatus($"Item: {ItemTypes[_editorItemCursor]}"); }
+            if (kb.IsKeyDown(Keys.OemCloseBrackets) && _prevKb.IsKeyUp(Keys.OemCloseBrackets))
+            { _editorItemCursor = (_editorItemCursor + 1) % ItemTypes.Length; SetEditorStatus($"Item: {ItemTypes[_editorItemCursor]}"); }
+        }
+
         // Continue to T-drag and other tools (no early return)
 
         // Left click — place / start drag (not when G is held for grab)
@@ -3120,6 +3202,26 @@ public class Game1 : Game
             {
                 _level.PlayerSpawn = new PointData { X = (int)snapped.X, Y = (int)snapped.Y };
                 SetEditorStatus("Spawn point set");
+            }
+            else if (_editorTool == EditorTool.Enemy)
+            {
+                string etype = EnemyTypes[_editorEnemyCursor];
+                int nextId = _level.Enemies.Length;
+                var eList = new List<EnemySpawnData>(_level.Enemies);
+                eList.Add(new EnemySpawnData { Id = $"{etype}-{nextId}", Type = etype, X = snapped.X, Y = snapped.Y });
+                _level.Enemies = eList.ToArray();
+                SetEditorStatus($"Enemy: {etype} placed ([/] to cycle type)");
+                SaveLevel();
+            }
+            else if (_editorTool == EditorTool.Item)
+            {
+                string itype = ItemTypes[_editorItemCursor];
+                int nextId = _level.Items.Length;
+                var iList = new List<ItemData>(_level.Items);
+                iList.Add(new ItemData { Id = $"{itype}-{nextId}", ItemType = itype, X = snapped.X, Y = snapped.Y });
+                _level.Items = iList.ToArray();
+                SetEditorStatus($"Item: {itype} placed ([/] to cycle type)");
+                SaveLevel();
             }
             else
             {
@@ -3894,6 +3996,44 @@ public class Game1 : Game
         _saveData.MoveTier = (int)_player.CurrentTier;
     }
 
+    // --- Editor undo helpers ---
+    private void BeginUndoBatch() { _currentUndoBatch = new(); }
+    private void RecordTileChange(int col, int row, TileType oldTile, TileType newTile)
+    {
+        if (_currentUndoBatch != null && oldTile != newTile)
+            _currentUndoBatch.Add((col, row, oldTile, newTile));
+    }
+    private void CommitUndoBatch()
+    {
+        if (_currentUndoBatch != null && _currentUndoBatch.Count > 0)
+        {
+            _undoStack.Add(_currentUndoBatch);
+            if (_undoStack.Count > MaxUndoSteps) _undoStack.RemoveAt(0);
+        }
+        _currentUndoBatch = null;
+    }
+    private void EditorUndo()
+    {
+        if (_undoStack.Count == 0 || _level.TileGridInstance == null) return;
+        var batch = _undoStack[^1];
+        _undoStack.RemoveAt(_undoStack.Count - 1);
+        var tg = _level.TileGridInstance;
+        foreach (var (col, row, oldTile, _) in batch)
+            tg.SetTileAt(col, row, oldTile);
+        SetEditorStatus($"Undo ({batch.Count} tiles)");
+    }
+
+    // --- Editor: set tile with undo tracking ---
+    private void EditorSetTile(TileGrid tg, int col, int row, TileType tile)
+    {
+        var old = tg.GetTileAt(col, row);
+        if (old != tile)
+        {
+            RecordTileChange(col, row, old, tile);
+            tg.SetTileAt(col, row, tile);
+        }
+    }
+
     private void SaveLevel()
     {
         var dir = System.IO.Path.GetDirectoryName(_editorSaveFile);
@@ -4177,6 +4317,23 @@ public class Game1 : Game
                 int gy = goy + (int)MathF.Floor((wm.Y - goy) / 32f) * 32;
                 _spriteBatch.Draw(_pixel, new Rectangle(gx, gy, 32, 32), TileProperties.GetColor(_selectedTileType) * 0.4f);
                 DrawHollowRect(gx, gy, 32, 32, Color.White * 0.5f);
+
+                // Drag-fill preview rectangle
+                if (_dragFilling && _level.TileGridInstance != null)
+                {
+                    int ox = _level.TileGridInstance.OriginX;
+                    int oy = _level.TileGridInstance.OriginY;
+                    int minC = Math.Min(_dragFillStartCol, _dragFillEndCol);
+                    int maxC = Math.Max(_dragFillStartCol, _dragFillEndCol);
+                    int minR = Math.Min(_dragFillStartRow, _dragFillEndRow);
+                    int maxR = Math.Max(_dragFillStartRow, _dragFillEndRow);
+                    int rx = ox + minC * 32, ry = oy + minR * 32;
+                    int rw = (maxC - minC + 1) * 32, rh = (maxR - minR + 1) * 32;
+                    _spriteBatch.Draw(_pixel, new Rectangle(rx, ry, rw, rh), TileProperties.GetColor(_selectedTileType) * 0.25f);
+                    DrawHollowRect(rx, ry, rw, rh, Color.Yellow * 0.7f);
+                    int count = (maxC - minC + 1) * (maxR - minR + 1);
+                    _spriteBatch.DrawString(_fontSmall, $"{count} tiles", new Vector2(rx, ry - 16), Color.Yellow * 0.8f);
+                }
             }
         }
 
@@ -4425,9 +4582,13 @@ public class Game1 : Game
             _spriteBatch.DrawString(_font, SafeText(_editorStatusMsg), new Vector2(10, 570), Color.Yellow);
 
         // Controls hint
-        string controlsHint = _editorTool == EditorTool.TilePaint
-            ? "[=] Play  [Esc] Menu  [Q] Tools  [LClick] Paint  [RClick] Erase  [[ ]] Tile Type"
-            : "[=] Play  [Esc] Menu  [Q] Tools  [E] Entities  [Drag] Place  [RClick] Delete  [Tab] Target";
+        string controlsHint = _editorTool switch
+        {
+            EditorTool.TilePaint => "[=] Play  [Esc] Menu  [Q] Tools  [LClick] Paint  [Ctrl+Drag] Fill  [RClick] Erase  [[ ]] Tile  [Ctrl+Z] Undo",
+            EditorTool.Enemy => $"[=] Play  [Q] Tools  [LClick] Place  [[ ]] Type: {EnemyTypes[_editorEnemyCursor]}",
+            EditorTool.Item => $"[=] Play  [Q] Tools  [LClick] Place  [[ ]] Type: {ItemTypes[_editorItemCursor]}",
+            _ => "[=] Play  [Esc] Menu  [Q] Tools  [E] Entities  [Drag] Place  [RClick] Delete  [Tab] Target",
+        };
         _spriteBatch.DrawString(_font, controlsHint, new Vector2(10, 550), Color.Gray * 0.35f);
 
         // Tile type indicator when in tile paint mode
@@ -7373,6 +7534,42 @@ public class Game1 : Game
                 hpPct > 0.5f ? Color.LimeGreen : (hpPct > 0.25f ? Color.Yellow : Color.Red));
             DrawHollowRect(hpBarX, hpBarY, hpBarW, hpBarH, Color.White * 0.3f);
             DrawOutlinedString(_font, $"HP {_player.Hp}/{_player.MaxHp}", new Vector2(hpBarX + hpBarW + 8, hpBarY - 2), Color.White * 0.7f);
+
+            // Suit Integrity bar (below HP)
+            int siBarY = hpBarY + hpBarH + 6;
+            float siPct = _suitIntegrity / 100f;
+            var siColor = siPct > 0.6f ? new Color(100, 180, 255) : (siPct > 0.3f ? Color.Orange : Color.Red);
+            _spriteBatch.Draw(_pixel, new Rectangle(hpBarX, siBarY, hpBarW, hpBarH), new Color(20, 30, 50) * 0.6f);
+            _spriteBatch.Draw(_pixel, new Rectangle(hpBarX, siBarY, (int)(hpBarW * siPct), hpBarH), siColor);
+            DrawHollowRect(hpBarX, siBarY, hpBarW, hpBarH, Color.White * 0.3f);
+            DrawOutlinedString(_font, $"SUIT {(int)_suitIntegrity}%", new Vector2(hpBarX + hpBarW + 8, siBarY - 2), siColor * 0.9f);
+
+            // EVE Status indicator (below suit)
+            int eveY = siBarY + hpBarH + 8;
+            Color eveStatusColor;
+            string eveStatusText;
+            switch (_eveStatus)
+            {
+                case EveStatus.Scanning:
+                    eveStatusColor = Color.Yellow;
+                    eveStatusText = "SCANNING";
+                    break;
+                case EveStatus.Overheat:
+                    eveStatusColor = Color.Red;
+                    eveStatusText = "OVERHEAT";
+                    break;
+                case EveStatus.Offline:
+                    eveStatusColor = Color.DarkGray;
+                    eveStatusText = "OFFLINE";
+                    break;
+                default:
+                    eveStatusColor = Color.LimeGreen;
+                    eveStatusText = "OK";
+                    break;
+            }
+            // EVE dot + label
+            _spriteBatch.Draw(_pixel, new Rectangle(hpBarX, eveY + 2, 8, 8), eveStatusColor);
+            DrawOutlinedString(_font, $"EVE: {eveStatusText}", new Vector2(hpBarX + 14, eveY), eveStatusColor * 0.9f);
 
             // Weapon HUD
             {

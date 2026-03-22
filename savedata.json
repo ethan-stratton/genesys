@@ -1,19 +1,17 @@
 {
-  "currentLevel": "the-descent",
-  "spawnX": 80,
-  "spawnY": 496,
+  "currentLevel": "test-arena",
+  "spawnX": 416,
+  "spawnY": 192,
   "unlockedAbilities": [],
-  "flags": {
-    "eveOrbActive": true
-  },
-  "playTime": 761.0583,
+  "flags": {},
+  "playTime": 0,
   "meleeInventory": [],
   "rangedInventory": [],
   "meleeIndex": -1,
   "rangedIndex": -1,
-  "collectedItems": [
-    "stick-1"
-  ],
+  "collectedItems": [],
   "windowSizeIndex": 0,
-  "crtEnabled": false
+  "crtEnabled": false,
+  "moveTier": 1,
+  "upgrades": []
 }
