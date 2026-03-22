@@ -92,7 +92,7 @@ Not a health-bar slog. A vetting process:
 
 ### Proxies (How the world talks about the Dragon)
 - **Digital ghosts:** AI companions from previous ships, centuries old, fragmented/corrupted
-- **The Adapted:** Descendants of previous visitors who survived long enough to change. Not quite human. Conflicting beliefs about the Dragon
+- **The Adapted:** Descendants of previous visitors who survived long enough to change. Not quite human. Conflicting beliefs about the Dragon. Visual design inspired by Kodama (Princess Mononoke) — simple iconic silhouette (round/organic head, thin body) but larger and with regional variants: forest Adapted with leaf/vine elements, ruin Adapted with stone/carved elements, deep Adapted with bioluminescent features. Core shape stays consistent across variants for instant recognition. Eerie-cute, not threatening from silhouette alone
 - **Native wildlife:** Responds to the Dragon's movements. Ecosystem IS a proxy
 - **Environmental evidence:** The Dragon has been preparing Adam's path. Clearing dangers, leaving teachings
 
