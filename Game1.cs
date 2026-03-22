@@ -5200,15 +5200,14 @@ public class Game1 : Game
             return;
         }
 
-        // F1-F3: Movement tier switch (debug levels only)
+        // Y: Cycle movement tier (debug levels only)
         if (_editorSaveFile.Contains("debug", StringComparison.OrdinalIgnoreCase))
         {
-            if (kb.IsKeyDown(Keys.F1) && _prevKb.IsKeyUp(Keys.F1))
-            { _player.CurrentTier = Player.MoveTier.Tech; _player.ApplyTierConstants(); }
-            if (kb.IsKeyDown(Keys.F2) && _prevKb.IsKeyUp(Keys.F2))
-            { _player.CurrentTier = Player.MoveTier.Bio; _player.ApplyTierConstants(); }
-            if (kb.IsKeyDown(Keys.F3) && _prevKb.IsKeyUp(Keys.F3))
-            { _player.CurrentTier = Player.MoveTier.Cipher; _player.ApplyTierConstants(); }
+            if (kb.IsKeyDown(Keys.Y) && _prevKb.IsKeyUp(Keys.Y))
+            {
+                _player.CurrentTier = (Player.MoveTier)(((int)_player.CurrentTier + 1) % 3);
+                _player.ApplyTierConstants();
+            }
         }
 
         // Enter/Space on biome entrance
@@ -7355,7 +7354,7 @@ public class Game1 : Game
             string[] tierSymbols = { "■", "●", "▲" };
             Color[] tierColors = { new Color(100, 180, 255), new Color(80, 200, 100), new Color(220, 120, 255) };
             int tierY = 80;
-            DrawOutlinedString(_fontSmall, "MOVE TIER [F1-F3]", new Vector2(10, tierY), Color.Gray * 0.7f);
+            DrawOutlinedString(_fontSmall, "MOVE TIER [Y]", new Vector2(10, tierY), Color.Gray * 0.7f);
             tierY += 18;
             for (int i = 0; i < 3; i++)
             {
