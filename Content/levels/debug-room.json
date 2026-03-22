@@ -350,6 +350,15 @@
       "targetLevel": "debug-room-2",
       "id": "exit-to-debug2",
       "targetExitId": "exit-to-debug1"
+    },
+    {
+      "x": 1050,
+      "y": 280,
+      "w": 30,
+      "h": 48,
+      "targetLevel": "training-hall",
+      "id": "exit-to-training",
+      "targetExitId": "exit-to-debug"
     }
   ],
   "npcs": [],
@@ -1187,6 +1196,13 @@
       "x": 10560,
       "y": 710,
       "color": "Cyan",
+      "size": "normal"
+    },
+    {
+      "text": "TRAINING HALL",
+      "x": 1020,
+      "y": 248,
+      "color": "Gold",
       "size": "normal"
     }
   ],

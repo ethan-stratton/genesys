@@ -1820,7 +1820,7 @@ public class Game1 : Game
             var pRect = new Rectangle((int)_player.Position.X - 10, (int)_player.Position.Y, Player.Width + 20, Player.Height);
             foreach (var sw in _level.Switches)
             {
-                bool isToggle = sw.Action.StartsWith("toggle-");
+                bool isToggle = sw.Action.StartsWith("toggle-") || sw.Action.StartsWith("grant-");
                 if (!isToggle && _activatedSwitches.Contains(sw.Id)) continue;
                 var swRect = new Rectangle((int)sw.X, (int)sw.Y, sw.W, sw.H);
                 if (pRect.Intersects(swRect))
@@ -1853,6 +1853,31 @@ public class Game1 : Game
                             _weatherWind = !allOn;
                             if (_eveOrbActive) EveAlert(!allOn ? "Full atmospheric event! Incredible!" : "Systems normalizing.", 3f);
                             break;
+                        // --- Ability shrine toggles ---
+                        case "grant-slide": _enableSlide = !_enableSlide;
+                            if (_eveOrbActive) EveAlert(_enableSlide ? "Slide technique acquired!" : "Slide technique disabled.", 2f); break;
+                        case "grant-dash": _enableDash = !_enableDash;
+                            if (_eveOrbActive) EveAlert(_enableDash ? "Sprint module online!" : "Sprint module offline.", 2f); break;
+                        case "grant-double-jump": _enableDoubleJump = !_enableDoubleJump;
+                            if (_eveOrbActive) EveAlert(_enableDoubleJump ? "Aerial boost initialized!" : "Aerial boost offline.", 2f); break;
+                        case "grant-wall-climb": _enableWallClimb = !_enableWallClimb;
+                            if (_eveOrbActive) EveAlert(_enableWallClimb ? "Wall grip engaged!" : "Wall grip disengaged.", 2f); break;
+                        case "grant-drop-through": _enableDropThrough = !_enableDropThrough;
+                            if (_eveOrbActive) EveAlert(_enableDropThrough ? "Platform phase enabled!" : "Platform phase disabled.", 2f); break;
+                        case "grant-vault-kick": _enableVaultKick = !_enableVaultKick;
+                            if (_eveOrbActive) EveAlert(_enableVaultKick ? "Vault kick unlocked!" : "Vault kick locked.", 2f); break;
+                        case "grant-uppercut": _enableUppercut = !_enableUppercut;
+                            if (_eveOrbActive) EveAlert(_enableUppercut ? "Rising strike acquired!" : "Rising strike disabled.", 2f); break;
+                        case "grant-cartwheel": _enableCartwheel = !_enableCartwheel;
+                            if (_eveOrbActive) EveAlert(_enableCartwheel ? "Evasive roll online!" : "Evasive roll offline.", 2f); break;
+                        case "grant-flip": _enableFlip = !_enableFlip;
+                            if (_eveOrbActive) EveAlert(_enableFlip ? "Aerial flip mastered!" : "Aerial flip disabled.", 2f); break;
+                        case "grant-blade-dash": _enableBladeDash = !_enableBladeDash;
+                            if (_eveOrbActive) EveAlert(_enableBladeDash ? "Blade dash technique learned!" : "Blade dash technique locked.", 2f); break;
+                        case "grant-spin-melee": _enableSpinMelee = !_enableSpinMelee;
+                            if (_eveOrbActive) EveAlert(_enableSpinMelee ? "Spin attack activated!" : "Spin attack deactivated.", 2f); break;
+                        case "grant-rope-climb": _enableRopeClimb = !_enableRopeClimb;
+                            if (_eveOrbActive) EveAlert(_enableRopeClimb ? "Rope ascension enabled!" : "Rope ascension disabled.", 2f); break;
                     }
                     // Screen shake + particles for feedback
                     if (_screenShakeEnabled) { _shakeTimer = 0.15f; _shakeIntensity = 3f; }
@@ -6498,14 +6523,26 @@ public class Game1 : Game
         // Draw switches
         foreach (var sw in _level.Switches)
         {
-            bool isToggle = sw.Action.StartsWith("toggle-");
+            bool isToggle = sw.Action.StartsWith("toggle-") || sw.Action.StartsWith("grant-");
             bool activated = _activatedSwitches.Contains(sw.Id);
-            // For toggle switches, check current weather state
+            // For toggle/grant switches, check current state
             bool isOn = isToggle ? (sw.Action switch {
                 "toggle-rain" => _weatherRain,
                 "toggle-storm" => _weatherStorm,
                 "toggle-wind" => _weatherWind,
                 "toggle-all-weather" => _weatherRain && _weatherStorm && _weatherWind,
+                "grant-slide" => _enableSlide,
+                "grant-dash" => _enableDash,
+                "grant-double-jump" => _enableDoubleJump,
+                "grant-wall-climb" => _enableWallClimb,
+                "grant-drop-through" => _enableDropThrough,
+                "grant-vault-kick" => _enableVaultKick,
+                "grant-uppercut" => _enableUppercut,
+                "grant-cartwheel" => _enableCartwheel,
+                "grant-flip" => _enableFlip,
+                "grant-blade-dash" => _enableBladeDash,
+                "grant-spin-melee" => _enableSpinMelee,
+                "grant-rope-climb" => _enableRopeClimb,
                 _ => activated
             }) : activated;
             var swColor = isOn ? new Color(50, 180, 50) : new Color(200, 180, 50);
