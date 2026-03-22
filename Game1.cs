@@ -2289,6 +2289,45 @@ public class Game1 : Game
             }
         }
 
+        // Vault kick enemy damage
+        if (_player.IsVaultKicking)
+        {
+            var vkRect = _player.VaultKickHitbox;
+            int vkDmg = 12;
+            float vkKbX = _player.FacingDir * 250f;
+            float vkKbY = -200f;
+            foreach (var c in _crawlers)
+            {
+                if (!c.Alive || c.IsLatched || !vkRect.Intersects(c.Rect)) continue;
+                c.TakeHit(vkDmg, vkKbX, vkKbY);
+                SpawnHitSpray(new Vector2(c.Position.X + c.EffectiveWidth / 2f, c.Position.Y + c.EffectiveHeight / 2f), _player.FacingDir, GetEnemyHitColor("crawler"), 1, false);
+            }
+            foreach (var t in _thornbacks)
+            {
+                if (!t.Alive || !vkRect.Intersects(t.Rect)) continue;
+                t.TakeHit(vkDmg, vkKbX, vkKbY);
+                SpawnHitSpray(new Vector2(t.Position.X + Thornback.Width / 2f, t.Position.Y + Thornback.Height / 2f), _player.FacingDir, GetEnemyHitColor("thornback"), 1, false);
+            }
+            foreach (var h in _hoppers)
+            {
+                if (!h.Alive || !vkRect.Intersects(h.Rect)) continue;
+                h.TakeHit(vkDmg, vkKbX, vkKbY);
+                SpawnHitSpray(new Vector2(h.Position.X + Hopper.Width / 2f, h.Position.Y + Hopper.Height / 2f), _player.FacingDir, GetEnemyHitColor("hopper"), 1, false);
+            }
+            foreach (var b in _birds)
+            {
+                if (!b.Alive || !vkRect.Intersects(b.Rect)) continue;
+                b.TakeHit(vkDmg, vkKbX, vkKbY);
+                SpawnHitSpray(new Vector2(b.Position.X + Bird.Width / 2f, b.Position.Y + Bird.Height / 2f), _player.FacingDir, GetEnemyHitColor("bird"), 1, false);
+            }
+            foreach (var wb in _wingbeaters)
+            {
+                if (!wb.Alive || !vkRect.Intersects(wb.Rect)) continue;
+                wb.TakeHit(vkDmg, vkKbX, vkKbY);
+                SpawnHitSpray(new Vector2(wb.Position.X + Wingbeater.Width / 2f, wb.Position.Y + Wingbeater.Height / 2f), _player.FacingDir, GetEnemyHitColor("wingbeater"), 1, false);
+            }
+        }
+
         // Exit collision — enter-trigger (only fires on transition from outside → inside)
         if (!_isDead)
         {
