@@ -43,6 +43,7 @@ public class Game1 : Game
     private float _prologueSkipTimer;  // 1.0s hold required
     private float _titleCardTimer;     // 3-second "GENESIS" display
     private float _titleCardFade;      // fade in/out alpha
+    private float _tierSwitchFlash;    // flash timer on tier change
 
     // === SCREEN FADE TRANSITION SYSTEM ===
     private float _fadeAlpha;          // 0=clear, 1=black
@@ -5207,6 +5208,7 @@ public class Game1 : Game
             {
                 _player.CurrentTier = (Player.MoveTier)(((int)_player.CurrentTier + 1) % 3);
                 _player.ApplyTierConstants();
+                _tierSwitchFlash = 1.0f;
             }
         }
 
@@ -7350,24 +7352,26 @@ public class Game1 : Game
         // --- MOVEMENT TIER DEBUG SELECTOR (debug levels only) ---
         if (isDebugLevel)
         {
+            if (_tierSwitchFlash > 0) _tierSwitchFlash -= (float)gameTime.ElapsedGameTime.TotalSeconds * 2f;
             string[] tierNames = { "TECH", "BIO", "CIPHER" };
-            string[] tierSymbols = { "■", "●", "▲" };
+            string[] tierSymbols = { "[T]", "[B]", "[C]" };
             Color[] tierColors = { new Color(100, 180, 255), new Color(80, 200, 100), new Color(220, 120, 255) };
             int tierY = 80;
-            DrawOutlinedString(_fontSmall, "MOVE TIER [Y]", new Vector2(10, tierY), Color.Gray * 0.7f);
-            tierY += 18;
+            DrawOutlinedString(_font, "MOVE TIER [Y]", new Vector2(10, tierY), Color.White * 0.8f);
+            tierY += 22;
             for (int i = 0; i < 3; i++)
             {
                 bool active = (int)_player.CurrentTier == i;
                 string label = $"{tierSymbols[i]} {tierNames[i]}";
-                Color c = active ? tierColors[i] : Color.Gray * 0.4f;
+                float flash = active && _tierSwitchFlash > 0 ? _tierSwitchFlash : 0f;
+                Color c = active ? Color.Lerp(tierColors[i], Color.White, flash) : Color.Gray * 0.5f;
                 if (active) label = "> " + label;
-                DrawOutlinedString(_fontSmall, label, new Vector2(10, tierY + i * 16), c);
+                DrawOutlinedString(_font, label, new Vector2(10, tierY + i * 20), c);
             }
             // Show active constants
-            tierY += 56;
-            DrawOutlinedString(_fontSmall, $"Spd:{_player.GetTierSpeed():F0} Acc:{_player.GetTierAccel():F0}", new Vector2(10, tierY), Color.Gray * 0.4f);
-            DrawOutlinedString(_fontSmall, $"Air:{_player.GetTierAirMult():F2} Jmp:{_player.GetTierJump():F0}", new Vector2(10, tierY + 14), Color.Gray * 0.4f);
+            tierY += 68;
+            DrawOutlinedString(_fontSmall, $"Spd:{_player.GetTierSpeed():F0} Acc:{_player.GetTierAccel():F0}", new Vector2(10, tierY), Color.White * 0.5f);
+            DrawOutlinedString(_fontSmall, $"Air:{_player.GetTierAirMult():F2} Jmp:{_player.GetTierJump():F0}", new Vector2(10, tierY + 16), Color.White * 0.5f);
         }
 
         // --- EVE Scan HUD ---
