@@ -33,12 +33,12 @@ public enum TileType : byte
     // Retractable variants (cycle in/out)
     RetractSpikesUp = 48,
     RetractSpikesDown = 49,
-    RetractSpikesLeft = 84,
-    RetractSpikesRight = 85,
-    RetractHalfSpikesUp = 86,
-    RetractHalfSpikesDown = 87,
-    RetractHalfSpikesLeft = 88,
-    RetractHalfSpikesRight = 89,
+    RetractSpikesLeft = 110,
+    RetractSpikesRight = 111,
+    RetractHalfSpikesUp = 112,
+    RetractHalfSpikesDown = 113,
+    RetractHalfSpikesLeft = 114,
+    RetractHalfSpikesRight = 115,
 
     // Slopes (45°)
     SlopeUpRight = 50,   // floor slopes up left→right (45°)
@@ -110,11 +110,10 @@ public static class TileProperties
     public static bool IsPlatform(TileType t) => t >= TileType.PlatformWood && t <= TileType.PlatformBottom;
     /// <summary>Standard thin platforms only (for merged rects). Half platforms use custom rects.</summary>
     public static bool IsStandardPlatform(TileType t) => t == TileType.PlatformWood || t == TileType.PlatformStone;
-    public static bool IsHazard(TileType t) => (t >= TileType.Spikes && t <= TileType.RetractSpikesDown) || (t >= TileType.RetractSpikesLeft && t <= TileType.RetractHalfSpikesRight);
+    public static bool IsHazard(TileType t) => (t >= TileType.Spikes && t <= TileType.RetractSpikesDown)
+        || (t >= TileType.RetractSpikesLeft && t <= TileType.RetractHalfSpikesRight);
     public static bool IsRetractable(TileType t) => t == TileType.RetractSpikesUp || t == TileType.RetractSpikesDown
-        || t == TileType.RetractSpikesLeft || t == TileType.RetractSpikesRight
-        || t == TileType.RetractHalfSpikesUp || t == TileType.RetractHalfSpikesDown
-        || t == TileType.RetractHalfSpikesLeft || t == TileType.RetractHalfSpikesRight;
+        || (t >= TileType.RetractSpikesLeft && t <= TileType.RetractHalfSpikesRight);
     /// <summary>Full-size hazards only (for merged rect collision). Half spikes use per-tile hitboxes.</summary>
     public static bool IsFullHazard(TileType t) => t >= TileType.Spikes && t <= TileType.SpikesRight;
     public static bool IsBackground(TileType t) => (int)t >= 100;

@@ -2968,6 +2968,34 @@ public class Game1 : Game
             int tileSnappedX = ox + (int)MathF.Floor((worldMouse.X - ox) / 32f) * 32;
             int tileSnappedY = oy + (int)MathF.Floor((worldMouse.Y - oy) / 32f) * 32;
 
+            // Click on tile palette to select (palette drawn at top-right)
+            bool paletteClicked = false;
+            {
+                int colsPerRow = 16, tileW = 20, tileH = 20;
+                int startX = ViewW - colsPerRow * tileW - 10;
+                int startY = 50;
+                int paletteRows = (TileProperties.PaletteTiles.Length + colsPerRow - 1) / colsPerRow;
+                int endY = startY + paletteRows * tileH;
+                var ms = Mouse.GetState();
+                if (ms.X >= startX && ms.Y >= startY && ms.Y < endY)
+                {
+                    paletteClicked = true;
+                    if (ms.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released)
+                    {
+                        int mx = ms.X, my = ms.Y;
+                        int col = (mx - startX) / tileW;
+                        int row = (my - startY) / tileH;
+                        int idx = row * colsPerRow + col;
+                        if (idx >= 0 && idx < TileProperties.PaletteTiles.Length && col < colsPerRow)
+                        {
+                            _tilePaletteCursor = idx;
+                            _selectedTileType = TileProperties.PaletteTiles[idx];
+                            SetEditorStatus($"Tile: {_selectedTileType}");
+                        }
+                    }
+                }
+            }
+
             // Left click/hold = paint (skip if clicking palette)
             if (mouse.LeftButton == ButtonState.Pressed && !kb.IsKeyDown(Keys.T) && !paletteClicked)
             {
@@ -2999,34 +3027,6 @@ public class Game1 : Game
                 _tilePaletteCursor = (_tilePaletteCursor + 1) % TileProperties.PaletteTiles.Length;
                 _selectedTileType = TileProperties.PaletteTiles[_tilePaletteCursor];
                 SetEditorStatus($"Tile: {_selectedTileType}");
-            }
-
-            // Click on tile palette to select (palette drawn at top-right)
-            bool paletteClicked = false;
-            {
-                int colsPerRow = 16, tileW = 20, tileH = 20;
-                int startX = ViewW - colsPerRow * tileW - 10;
-                int startY = 50;
-                int paletteRows = (TileProperties.PaletteTiles.Length + colsPerRow - 1) / colsPerRow;
-                int endY = startY + paletteRows * tileH;
-                var ms = Mouse.GetState();
-                if (ms.X >= startX && ms.Y >= startY && ms.Y < endY)
-                {
-                    paletteClicked = true; // block tile painting behind palette
-                    if (ms.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released)
-                    {
-                        int mx = ms.X, my = ms.Y;
-                        int col = (mx - startX) / tileW;
-                        int row = (my - startY) / tileH;
-                        int idx = row * colsPerRow + col;
-                        if (idx >= 0 && idx < TileProperties.PaletteTiles.Length && col < colsPerRow)
-                        {
-                            _tilePaletteCursor = idx;
-                            _selectedTileType = TileProperties.PaletteTiles[idx];
-                            SetEditorStatus($"Tile: {_selectedTileType}");
-                        }
-                    }
-                }
             }
 
             // Skip normal drag placement when in tile paint mode
