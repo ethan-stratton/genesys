@@ -54,15 +54,23 @@
       "bottom": 448
     }
   ],
-  "walls": [],
+  "walls": [
+    {
+      "x": 2368,
+      "y": 96,
+      "w": 32,
+      "h": 352,
+      "climbSide": 0
+    }
+  ],
   "spikes": [],
   "ceilings": [],
   "solidFloors": [],
   "wallSpikes": [],
   "exits": [
     {
-      "x": 5,
-      "y": 480,
+      "x": 47,
+      "y": 397,
       "w": 30,
       "h": 48,
       "targetLevel": "debug-room",
@@ -446,7 +454,7 @@
       "size": "normal"
     },
     {
-      "text": "Up + attack for rising strike",
+      "text": "Up \u002B attack for rising strike",
       "x": 4228,
       "y": 70,
       "color": "Gray",
@@ -593,7 +601,7 @@
       "size": "small"
     },
     {
-      "text": "SD+K or SA+K to blade dash!",
+      "text": "SD\u002BK or SA\u002BK to blade dash!",
       "x": 6168,
       "y": 96,
       "color": "Yellow",
@@ -1882,14 +1890,14 @@
       0,
       0,
       0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
+      48,
+      49,
+      110,
+      111,
+      112,
+      113,
+      114,
+      115,
       0,
       1,
       0,

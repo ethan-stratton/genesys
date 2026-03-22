@@ -6350,6 +6350,8 @@ public class Game1 : Game
         else // left or right
         {
             int w = isHalf ? ts / 2 : ts; // half spikes = half width
+            if (isRetract) w = (int)(w * ext); // shrink width by extension
+            if (w < 1) return;
             int sh = ts / n;
             // Base is flush with the wall: RIGHT base at left, LEFT base at right
             int ox = 0;
