@@ -6,7 +6,7 @@
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 140.57646,
+  "playTime": 149.5576,
   "meleeInventory": [
     "Knife"
   ],
@@ -19,7 +19,7 @@
   ],
   "windowSizeIndex": 0,
   "crtEnabled": false,
-  "moveTier": 1,
+  "moveTier": 2,
   "upgrades": [],
   "shelterLevel": "",
   "shelterX": 0,
