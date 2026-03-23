@@ -3643,6 +3643,11 @@ public class Game1 : Game
                 if (new Rectangle(sp.X - 16, sp.Y - 24, 32, 48).Contains(mp))
                 { _editorMovingEntity = sp; _editorMoveOffset = new Vector2(worldMouse.X - sp.X, worldMouse.Y - sp.Y); SetEditorStatus("Grabbed spawn point"); }
             }
+            // Check shelters
+            if (_editorMovingEntity == null && _level.Shelters != null)
+                foreach (var sh in _level.Shelters)
+                    if (new Rectangle((int)sh.X - 16, (int)sh.Y - 24, 32, 32).Contains(mp))
+                    { _editorMovingEntity = sh; _editorMoveOffset = new Vector2(worldMouse.X - sh.X, worldMouse.Y - sh.Y); SetEditorStatus($"Grabbed shelter {sh.Name}"); break; }
         }
         // G held + drag — move entity
         if (kb.IsKeyDown(Keys.T) && mouse.LeftButton == ButtonState.Pressed && _editorMovingEntity != null)
@@ -3659,6 +3664,7 @@ public class Game1 : Game
             else if (_editorMovingEntity is NpcData npc) { npc.X = (int)nx; npc.Y = (int)ny; }
             else if (_editorMovingEntity is ItemData itd) { itd.X = nx; itd.Y = ny; }
             else if (_editorMovingEntity is PointData pd) { pd.X = (int)nx; pd.Y = (int)ny; }
+            else if (_editorMovingEntity is ShelterData shd) { shd.X = nx; shd.Y = ny; }
         }
         // Release — drop entity and rebuild
         if ((mouse.LeftButton == ButtonState.Released || !kb.IsKeyDown(Keys.T)) && _editorMovingEntity != null)

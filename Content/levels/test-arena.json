@@ -166,24 +166,6 @@
       "y": 704,
       "w": 32,
       "h": 12
-    },
-    {
-      "x": 0,
-      "y": 672,
-      "w": 64,
-      "h": 12
-    },
-    {
-      "x": 256,
-      "y": 704,
-      "w": 32,
-      "h": 12
-    },
-    {
-      "x": 640,
-      "y": 704,
-      "w": 32,
-      "h": 12
     }
   ],
   "solidFloors": [],
@@ -341,6 +323,14 @@
   "switches": [],
   "labels": [],
   "retractableSpikes": [],
+  "shelters": [
+    {
+      "id": "shelter-0",
+      "x": 320,
+      "y": 352,
+      "name": "Leaf Shelter"
+    }
+  ],
   "tileGrid": {
     "width": 65,
     "height": 27,

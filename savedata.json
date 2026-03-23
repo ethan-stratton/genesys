@@ -1,12 +1,12 @@
 {
-  "currentLevel": "training-hall",
-  "spawnX": 46,
-  "spawnY": 397,
+  "currentLevel": "test-arena",
+  "spawnX": 213.3335,
+  "spawnY": 251.33292,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 905.7563,
+  "playTime": 939.748,
   "meleeInventory": [
     "Stick",
     "Hammer"
@@ -24,5 +24,10 @@
   "windowSizeIndex": 1,
   "crtEnabled": false,
   "moveTier": 1,
-  "upgrades": []
+  "upgrades": [],
+  "shelterLevel": "",
+  "shelterX": 0,
+  "shelterY": 0,
+  "deathCount": 0,
+  "hp": 100
 }
