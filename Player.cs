@@ -549,6 +549,13 @@ public class Player
         IsGrappleFiring = false;
     }
     
+    /// <summary>Nudge grapple velocity (for terrain bounce during swing).</summary>
+    public void GrappleNudgeVel(Vector2 nudge)
+    {
+        _grappleVel += nudge;
+        Velocity = _grappleVel;
+    }
+    
     /// <summary>Cancel grapple firing — start retract animation.</summary>
     public void CancelGrappleFire()
     {

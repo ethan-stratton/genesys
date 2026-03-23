@@ -1455,38 +1455,66 @@ public class Game1 : Game
                 _player.AdvanceHook(dt);
         }
         
-        // Terrain collision while swinging — prevent clipping into tiles
+        // Terrain collision while swinging — push player out of tiles, don't auto-release
         if (_player.IsGrappling && _level.TileGridInstance != null)
         {
             var grid = _level.TileGridInstance;
-            var pRect = _player.GetRect();
-            // Check all 4 corners + center bottom
-            var checkPoints = new[] {
-                new Point(pRect.Left + 2, pRect.Top + 2),
-                new Point(pRect.Right - 2, pRect.Top + 2),
-                new Point(pRect.Left + 2, pRect.Bottom - 2),
-                new Point(pRect.Right - 2, pRect.Bottom - 2),
-                new Point(pRect.Center.X, pRect.Bottom - 1),
-            };
-            foreach (var cp in checkPoints)
+            var pRect = _player.CollisionRect;
+            int tileSize = 32;
+            
+            // Check tiles the player overlaps
+            int minCol = (pRect.Left - grid.OriginX) / tileSize;
+            int maxCol = (pRect.Right - 1 - grid.OriginX) / tileSize;
+            int minRow = (pRect.Top - grid.OriginY) / tileSize;
+            int maxRow = (pRect.Bottom - 1 - grid.OriginY) / tileSize;
+            
+            for (int row = minRow; row <= maxRow; row++)
+            for (int col = minCol; col <= maxCol; col++)
             {
-                if (TileProperties.IsSolid(grid.GetTile(cp.X, cp.Y)))
+                if (col < 0 || col >= grid.Width || row < 0 || row >= grid.Height) continue;
+                if (!TileProperties.IsSolid(grid.Tiles[col, row])) continue;
+                
+                var tileRect = new Rectangle(
+                    grid.OriginX + col * tileSize,
+                    grid.OriginY + row * tileSize,
+                    tileSize, tileSize);
+                var overlap = Rectangle.Intersect(pRect, tileRect);
+                if (overlap.Width <= 0 || overlap.Height <= 0) continue;
+                
+                // Push out along smallest overlap axis
+                if (overlap.Width < overlap.Height)
                 {
-                    // Player clipped into solid tile — release grapple
-                    _player.ReleaseGrapple();
-                    break;
+                    float pushX = (pRect.Center.X < tileRect.Center.X) ? -overlap.Width : overlap.Width;
+                    _player.Position = new Vector2(_player.Position.X + pushX, _player.Position.Y);
+                    _player.GrappleNudgeVel(new Vector2(-_player.Velocity.X * 0.5f, 0)); // bounce off
                 }
+                else
+                {
+                    float pushY = (pRect.Center.Y < tileRect.Center.Y) ? -overlap.Height : overlap.Height;
+                    _player.Position = new Vector2(_player.Position.X, _player.Position.Y + pushY);
+                    _player.GrappleNudgeVel(new Vector2(0, -_player.Velocity.Y * 0.5f)); // bounce off
+                }
+                pRect = _player.CollisionRect; // re-read after push
             }
-            // Also check entity walls/floors/ceilings
-            if (_player.IsGrappling)
+            
+            // Also push out of entity walls
+            foreach (var r in _level.WallRects)
             {
-                foreach (var r in _level.WallRects)
-                    if (r.Intersects(pRect)) { _player.ReleaseGrapple(); break; }
+                var overlap = Rectangle.Intersect(pRect, r);
+                if (overlap.Width <= 0 || overlap.Height <= 0) continue;
+                float pushX = (pRect.Center.X < r.Center.X) ? -overlap.Width : overlap.Width;
+                _player.Position = new Vector2(_player.Position.X + pushX, _player.Position.Y);
+                _player.GrappleNudgeVel(new Vector2(-_player.Velocity.X * 0.5f, 0));
+                pRect = _player.CollisionRect;
             }
-            if (_player.IsGrappling)
+            foreach (var r in _level.CeilingRects)
             {
-                foreach (var r in _level.CeilingRects)
-                    if (r.Intersects(pRect)) { _player.ReleaseGrapple(); break; }
+                var overlap = Rectangle.Intersect(pRect, r);
+                if (overlap.Width <= 0 || overlap.Height <= 0) continue;
+                float pushY = (pRect.Center.Y < r.Center.Y) ? -overlap.Height : overlap.Height;
+                _player.Position = new Vector2(_player.Position.X, _player.Position.Y + pushY);
+                _player.GrappleNudgeVel(new Vector2(0, -_player.Velocity.Y * 0.5f));
+                pRect = _player.CollisionRect;
             }
         }
         }
