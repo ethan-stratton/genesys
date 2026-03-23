@@ -9,20 +9,14 @@ namespace Genesis;
 /// After a dive-bomb, returns to its starting position.
 /// Good for teaching the flip/backflip dodge.
 /// </summary>
-public class Wingbeater
+public class Wingbeater : Creature
 {
-    public Vector2 Position;
-    public Vector2 Velocity;
     public Vector2 SpawnPos;
-    public bool Alive = true;
-    public int Hp = 3;
-    public int MaxHp = 3;
     public int ContactDamage = 10;
-    public bool Passive = false; // If true, just hovers — no dive-bombing
+    public bool Passive = false;
     public const int Width = 20, Height = 14;
 
     public Vector2 KnockbackVel;
-    public Vector2 VisualScale = Vector2.One;
     private float _squashHoldTimer;
 
     public float MeleeHitCooldown;
@@ -61,11 +55,18 @@ public class Wingbeater
     {
         Position = pos;
         SpawnPos = pos;
+        Hp = 3;
+        MaxHp = 3;
+        SpeciesName = "Wingbeater";
+        Role = EcologicalRole.Predator;
+        Needs = CreatureNeeds.Default;
         _stateTimer = 1f;
-        _hoverPhase = pos.X * 0.1f; // offset so multiple wingbeaters aren't synced
+        _hoverPhase = pos.X * 0.1f;
     }
 
-    public Rectangle Rect => new((int)Position.X, (int)Position.Y, Width, Height);
+    public override int CreatureWidth => Width;
+    public override int CreatureHeight => Height;
+    public override Rectangle Rect => new((int)Position.X, (int)Position.Y, Width, Height);
 
     public void Update(float dt, Vector2 playerPos, float floorY)
     {
@@ -211,7 +212,7 @@ public class Wingbeater
         _squashHoldTimer = 0.05f;
     }
 
-    public void Draw(SpriteBatch sb, Texture2D pixel)
+    public override void Draw(SpriteBatch sb, Texture2D pixel)
     {
         if (!Alive) return;
 

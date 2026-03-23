@@ -55,16 +55,11 @@ public struct IKLeg
     }
 }
 
-public class Crawler
+public class Crawler : Creature
 {
-    public Vector2 Position;
-    public Vector2 Velocity;
-    public bool Alive = true;
-    public int Hp = 3;
     public const int Width = 16, Height = 10;
     public float PatrolLeft, PatrolRight;
     public float SurfaceLeft, SurfaceRight;
-    public int Dir = 1;
     public bool Aggroed;
     public float AggroRange = 200f;
     public float Speed = 60f;
@@ -72,17 +67,29 @@ public class Crawler
     public float SwarmSpeed = 130f;
     public float DamageCooldown;
     public float MeleeHitCooldown;
-    public float HitFlash;
     private bool _onGround;
     private bool _wasOnGround;
 
     public Vector2 KnockbackVel;
-    public Vector2 VisualScale = Vector2.One;
     public float SquashResistance = 0f;
     private float _squashHoldTimer;
 
     // Variant
     public CrawlerVariant Variant = CrawlerVariant.Forager;
+    
+    /// <summary>Call after setting Variant to sync ecological role.</summary>
+    public void ApplyVariantRole()
+    {
+        Role = Variant switch
+        {
+            CrawlerVariant.Forager => EcologicalRole.Herbivore,
+            CrawlerVariant.Skitter => EcologicalRole.Flighty,
+            CrawlerVariant.Leaper => EcologicalRole.Predator,
+            CrawlerVariant.Bombardier => EcologicalRole.Defensive,
+            _ => EcologicalRole.Herbivore,
+        };
+        SpeciesName = $"Crawler ({Variant})";
+    }
     public string ScanName => Variant switch
     {
         CrawlerVariant.Forager => "Forest Crawler — Forager",
@@ -161,6 +168,8 @@ public class Crawler
     private const float LatchCooldownTime = 1.5f;
     public int EffectiveWidth => IsDummy ? (int)(Width * (DummyScaleX > 0 ? DummyScaleX : DummyScale)) : Width;
     public int EffectiveHeight => IsDummy ? (int)(Height * (DummyScaleY > 0 ? DummyScaleY : DummyScale)) : Height;
+    public override int CreatureWidth => EffectiveWidth;
+    public override int CreatureHeight => EffectiveHeight;
     private Vector2 _spawnPos;
     public void SetSpawnPos(Vector2 pos) => _spawnPos = pos;
     private float _respawnTimer;
@@ -176,6 +185,10 @@ public class Crawler
         PatrolRight = patrolRight;
         SurfaceLeft = surfaceLeft;
         SurfaceRight = surfaceRight;
+        Hp = 3;
+        MaxHp = 3;
+        SpeciesName = "Crawler";
+        Needs = CreatureNeeds.Default;
         _rng = rng ?? new Random();
         // Start in a random state so groups don't move in sync
         _bugStateTimer = (float)_rng.NextDouble() * 2f;
@@ -184,7 +197,7 @@ public class Crawler
         InitLegs();
     }
 
-    public Rectangle Rect => new((int)Position.X, (int)Position.Y, EffectiveWidth, EffectiveHeight);
+    public override Rectangle Rect => new((int)Position.X, (int)Position.Y, EffectiveWidth, EffectiveHeight);
 
     public void Update(float dt, Vector2 playerCenter,
         TileGrid tileGrid, int tileSize,
@@ -803,7 +816,7 @@ public class Crawler
             _gaitGroup = 1 - _gaitGroup;
     }
 
-    public void Draw(SpriteBatch sb, Texture2D pixel)
+    public override void Draw(SpriteBatch sb, Texture2D pixel)
     {
         if (!Alive) return;
         int ew = EffectiveWidth;

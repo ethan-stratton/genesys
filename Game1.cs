@@ -716,6 +716,7 @@ public class Game1 : Game
                     else if (e.Type == "skitter") c.Variant = CrawlerVariant.Skitter;
                     else if (e.Type == "bombardier") c.Variant = CrawlerVariant.Bombardier;
                     else c.Variant = CrawlerVariant.Forager;
+                    c.ApplyVariantRole();
                     c.UpdateSurfaceEdges(tg, ts, plats, sFloors, bLeft, bRight);
                     _crawlers.Add(c);
                     break;

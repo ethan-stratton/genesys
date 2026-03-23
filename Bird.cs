@@ -4,15 +4,10 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace Genesis;
 
-public class Bird
+public class Bird : Creature
 {
-    public Vector2 Position;
-    public Vector2 Velocity;
-    public bool Alive = true;
-    public int Hp = 1;
     public const int Width = 10, Height = 8;
     public Vector2 KnockbackVel;
-    public Vector2 VisualScale = Vector2.One;
     public float SquashResistance = 0.2f;
     private float _squashHoldTimer;
 
@@ -75,11 +70,18 @@ public class Bird
         GroundY = pos.Y;
         SurfaceLeft = surfaceLeft;
         SurfaceRight = surfaceRight;
+        Hp = 1;
+        MaxHp = 1;
+        SpeciesName = "Bird";
+        Role = EcologicalRole.Prey;
+        Needs = CreatureNeeds.Default;
         _rng = rng;
         _stateTimer = 1f + (float)rng.NextDouble() * 3f;
     }
 
-    public Rectangle Rect => new((int)Position.X, (int)Position.Y, Width, Height);
+    public override int CreatureWidth => Width;
+    public override int CreatureHeight => Height;
+    public override Rectangle Rect => new((int)Position.X, (int)Position.Y, Width, Height);
 
     public void Update(float dt, Vector2 playerPos,
         TileGrid tileGrid, int tileSize,
@@ -269,7 +271,7 @@ public class Bird
         SurfaceRight = edges.Right;
     }
 
-    public void Draw(SpriteBatch sb, Texture2D pixel)
+    public override void Draw(SpriteBatch sb, Texture2D pixel)
     {
         if (!Alive) return;
 
