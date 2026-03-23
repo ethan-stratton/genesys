@@ -15,9 +15,11 @@ public class Camera
     public float TargetZoom { get; set; } = 1f;
     public float ZoomLerpSpeed { get; set; } = 0.5f; // slow cinematic default
     
-    // Smoothing
-    private const float LerpSpeedX = 4f;
-    private const float LerpSpeedY = 6f;
+    // Smoothing — SecondOrderDynamics replaces raw lerp
+    // f=3 (responsive), z=0.7 (slight underdamping for organic feel), r=0 (no anticipation)
+    private SecondOrderDynamics _smoothX;
+    private SecondOrderDynamics _smoothY;
+    private bool _springInitialized;
     
     // Dead zone: player can move this far from center before camera follows
     private const float DeadZoneX = 60f;
@@ -116,9 +118,15 @@ public class Camera
             targetY = Position.Y;
         }
         
-        // Lerp toward target
-        float newX = Position.X + (targetX - Position.X) * LerpSpeedX * dt;
-        float newY = Position.Y + (targetY - Position.Y) * LerpSpeedY * dt;
+        // Second-order dynamics toward target (replaces raw lerp)
+        if (!_springInitialized)
+        {
+            _smoothX = new SecondOrderDynamics(3f, 0.7f, 0f, targetX);
+            _smoothY = new SecondOrderDynamics(3.5f, 0.8f, 0f, targetY);
+            _springInitialized = true;
+        }
+        float newX = _smoothX.Update(dt, targetX);
+        float newY = _smoothY.Update(dt, targetY);
         
         // Clamp to world bounds (accounting for zoom)
         newX = MathHelper.Clamp(newX, _worldLeft, MathF.Max(_worldLeft, _worldRight - evw));
@@ -140,6 +148,7 @@ public class Camera
         }
         Position = new Vector2(cx, cy);
         _lastGroundY = playerPos.Y + playerHeight / 2f;
+        if (_springInitialized) { _smoothX.Reset(cx); _smoothY.Reset(cy); }
     }
     
     public Matrix TransformMatrix =>

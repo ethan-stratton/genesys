@@ -128,6 +128,9 @@ public class Crawler : Creature
     private float _startleTimer;
     private float _fleeTimer; // skitters keep running after player leaves range
     private readonly Random _rng;
+    
+    // Second-order dynamics for organic body motion
+    private SecondOrderDynamics _bodyBobSpring; // vertical bob responds to speed changes
 
     // Dummy mode: high HP, no aggro, respawns at original position
     public bool IsDummy;
@@ -190,6 +193,7 @@ public class Crawler : Creature
         SpeciesName = "Crawler";
         Needs = CreatureNeeds.Default;
         _rng = rng ?? new Random();
+        _bodyBobSpring = new SecondOrderDynamics(4f, 0.4f, -1f, 0f); // underdamped + anticipation
         // Start in a random state so groups don't move in sync
         _bugStateTimer = (float)_rng.NextDouble() * 2f;
         _walkSpeedMult = 0.6f + (float)_rng.NextDouble() * 0.8f; // 0.6–1.4x
@@ -549,6 +553,11 @@ public class Crawler : Creature
         
         // Update procedural legs
         UpdateLegs(dt);
+        
+        // Update body bob spring — driven by speed, responds physically
+        float speedNorm = MathF.Min(MathF.Abs(Velocity.X) / 100f, 1f);
+        float bobTarget = speedNorm * MathF.Sin(_antennaeTimer * 12f) * 1.5f;
+        _bodyBobSpring.Update(dt, bobTarget);
 
         // === BOMBARDIER SPRAY LOGIC ===
         BombardierSprayed = false;
@@ -899,8 +908,8 @@ public class Crawler : Creature
                 thoraxX = headX + headW - 2;
                 abdomenX = thoraxX + thoraxW - 2;
             }
-            // Body bob based on movement
-            float bob = MathF.Abs(Velocity.X) > 10f ? MathF.Sin(_antennaeTimer * 12f) * 0.8f : 0f;
+            // Body bob from second-order dynamics (physical response to speed changes)
+            float bob = _bodyBobSpring.Value;
             int headY = drawY + (int)(bob);
             int thoraxY = drawY;
             int abdomenY = drawY + (int)(-bob * 0.5f);
