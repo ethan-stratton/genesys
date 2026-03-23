@@ -1684,7 +1684,6 @@ public class Game1 : Game
                 _shakeTimer = 0.15f; _shakeIntensity = 2f;
             }
         }
-        }
 
         // Bullets vs crawlers and thornbacks
         foreach (var b in _bullets)
