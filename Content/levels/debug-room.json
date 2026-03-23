@@ -362,7 +362,16 @@
     }
   ],
   "npcs": [],
-  "items": [],
+  "items": [
+    {
+      "id": "grapple-0",
+      "type": "grapple",
+      "x": 1728,
+      "y": 592,
+      "w": 20,
+      "h": 20
+    }
+  ],
   "objects": [],
   "enemies": [
     {

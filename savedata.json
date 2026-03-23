@@ -1,12 +1,12 @@
 {
   "currentLevel": "debug-room",
-  "spawnX": 1651.1677,
+  "spawnX": 1738.3082,
   "spawnY": 584,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 149.5576,
+  "playTime": 487.72504,
   "meleeInventory": [
     "Knife"
   ],
@@ -15,7 +15,8 @@
   "rangedIndex": -1,
   "collectedItems": [
     "grapple-2",
-    "knife-4"
+    "knife-4",
+    "grapple-0"
   ],
   "windowSizeIndex": 0,
   "crtEnabled": false,

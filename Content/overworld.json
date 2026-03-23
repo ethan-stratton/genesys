@@ -67,7 +67,7 @@
       "y": 350,
       "level": "debug-room",
       "discovered": true,
-      "cleared": false,
+      "cleared": true,
       "connections": [
         "test-arena"
       ],

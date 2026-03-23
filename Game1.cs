@@ -3146,6 +3146,29 @@ public class Game1 : Game
                         _camera = MakeCamera();
                         Restart();
 
+                        // Restore player state from save data (Restart() creates new Player)
+                        if (_saveData != null)
+                        {
+                            _player.HasGrapple = _saveData.CollectedItems?.Any(id => id.StartsWith("grapple")) == true;
+                            _player.CurrentTier = (Player.MoveTier)Math.Clamp(_saveData.MoveTier, 0, 2);
+                            _player.ApplyTierConstants();
+                            _wakeUpComplete = true;
+                            _player.IsLyingDown = false;
+                            // Restore inventory
+                            if (_saveData.MeleeInventory?.Count > 0)
+                            {
+                                _meleeInventory = _saveData.MeleeInventory.ConvertAll(s => Enum.Parse<WeaponType>(s)).ToArray();
+                                _meleeIndex = Math.Clamp(_saveData.MeleeIndex, 0, Math.Max(0, _meleeInventory.Length - 1));
+                            }
+                            if (_saveData.RangedInventory?.Count > 0)
+                            {
+                                _rangedInventory = _saveData.RangedInventory.ConvertAll(s => Enum.Parse<WeaponType>(s)).ToArray();
+                                _rangedIndex = Math.Clamp(_saveData.RangedIndex, 0, Math.Max(0, _rangedInventory.Length - 1));
+                            }
+                            if (_saveData.Flags.ContainsKey("eveOrbActive"))
+                                _eveOrbActive = _saveData.Flags["eveOrbActive"];
+                        }
+
                         // Tunnel: reposition at target exit
                         if (!string.IsNullOrEmpty(targetExitId))
                         {
