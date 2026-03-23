@@ -487,6 +487,7 @@ public class Player
     public float PlayerWeight = 1.0f;        // placeholder stat, modified by equipment later
     
     private Vector2 _grappleVel;             // player velocity while grappling (Cartesian, not angular)
+    private bool _grappleJustReleased;       // flag: grapple released this frame, use its velocity
     private const float GrappleHookSpeed = 800f;
     private const float GrappleMaxLength = 200f;    // ~6 tiles
     private const float GrappleReelSpeed = 150f;
@@ -539,6 +540,7 @@ public class Player
         {
             Velocity = _grappleVel * GrappleReleaseBoost;
             if (Velocity.Y < -600f) Velocity = new Vector2(Velocity.X, -600f);
+            _grappleJustReleased = true;
         }
         
         IsGrappling = false;
@@ -1955,8 +1957,14 @@ public class Player
             return;
         }
 
-        // Apply velocity (use Velocity which may have been set by ReleaseGrapple)
-        vel = Velocity;
+        // If grapple just released this frame, use the release velocity
+        if (_grappleJustReleased)
+        {
+            vel = Velocity;
+            _grappleJustReleased = false;
+        }
+        
+        // Apply velocity
         var pos = Position + vel * dt;
 
         // --- Collision (always full Height) ---
