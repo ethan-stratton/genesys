@@ -3,16 +3,30 @@
   "spawnX": 416,
   "spawnY": 224,
   "unlockedAbilities": [],
-  "flags": {},
-  "playTime": 0,
-  "meleeInventory": [],
+  "flags": {
+    "eveOrbActive": true
+  },
+  "playTime": 73.43455,
+  "meleeInventory": [
+    "Knife"
+  ],
   "rangedInventory": [],
-  "meleeIndex": -1,
+  "meleeIndex": 0,
   "rangedIndex": -1,
-  "collectedItems": [],
+  "collectedItems": [
+    "knife-7",
+    "grapple-9",
+    "grapple-1",
+    "grapple-2",
+    "knife-3",
+    "knife-4",
+    "knife-5",
+    "knife-6",
+    "grapple-8"
+  ],
   "windowSizeIndex": 0,
   "crtEnabled": false,
-  "moveTier": 1,
+  "moveTier": 2,
   "upgrades": [],
   "shelterLevel": "",
   "shelterX": 0,

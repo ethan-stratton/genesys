@@ -499,6 +499,7 @@ public class Player
     private const float GrappleInputForce = 400f;   // left/right pump strength
     
     private Vector2 _grappleHookDir;
+    private Vector2 _grappleHookVel;         // hook velocity (includes gravity for downward shots)
     private bool _prevEPressed;
     
     /// <summary>Fire grapple toward target.</summary>
@@ -513,6 +514,7 @@ public class Player
         dir /= len;
         GrappleHookPos = center;
         _grappleHookDir = dir;
+        _grappleHookVel = dir * GrappleHookSpeed;
         return true;
     }
     
@@ -574,13 +576,18 @@ public class Player
     public Vector2[] GetHookRaySteps(float dt)
     {
         if (!IsGrappleFiring) return Array.Empty<Vector2>();
-        float dist = GrappleHookSpeed * dt;
+        // Predict where hook will be after gravity is applied
+        var velAfter = _grappleHookVel;
+        velAfter.Y += GrappleGravityBase * 0.5f * dt; // half-step gravity for prediction
+        float dist = velAfter.Length() * dt;
         int steps = Math.Max(1, (int)MathF.Ceiling(dist / 8f));
+        var dir = velAfter;
+        if (dir.Length() > 0.001f) dir = Vector2.Normalize(dir);
         var result = new Vector2[steps];
         for (int i = 0; i < steps; i++)
         {
             float t = (i + 1f) / steps;
-            result[i] = GrappleHookPos + _grappleHookDir * dist * t;
+            result[i] = GrappleHookPos + velAfter * dt * t;
         }
         return result;
     }
@@ -589,11 +596,15 @@ public class Player
     public void AdvanceHook(float dt)
     {
         if (!IsGrappleFiring) return;
-        GrappleHookPos += _grappleHookDir * GrappleHookSpeed * dt;
+        // Apply gravity to hook velocity (makes downward shots accelerate)
+        _grappleHookVel.Y += GrappleGravityBase * 0.5f * dt;
+        GrappleHookPos += _grappleHookVel * dt;
+        // Also update direction for rendering consistency
+        if (_grappleHookVel.Length() > 0.001f)
+            _grappleHookDir = Vector2.Normalize(_grappleHookVel);
         var center = Position + new Vector2(Width / 2f, Height / 2f);
         if (Vector2.Distance(GrappleHookPos, center) > GrappleMaxLength)
         {
-            // Didn't hit anything — retract (fail)
             CancelGrappleFire();
         }
     }
@@ -610,7 +621,21 @@ public class Player
         bool reelIn = kb.IsKeyDown(Keys.W) || kb.IsKeyDown(Keys.Up);
         bool reelOut = kb.IsKeyDown(Keys.S) || kb.IsKeyDown(Keys.Down);
         if (reelIn)
-            GrappleRopeLength = MathF.Max(GrappleMinLength, GrappleRopeLength - GrappleReelSpeed * dt);
+        {
+            float newLen = MathF.Max(GrappleMinLength, GrappleRopeLength - GrappleReelSpeed * dt);
+            // Don't reel so close that player overlaps the anchor tile
+            // Check: would the new position be inside the anchor's tile?
+            var diff0 = (Position + new Vector2(Width / 2f, Height / 2f)) - GrappleAnchor;
+            float curDist = diff0.Length();
+            if (curDist > 0.001f)
+            {
+                var radial = diff0 / curDist;
+                var newCenter = GrappleAnchor + radial * newLen;
+                // Stop reeling if new center is within 20px of anchor (inside terrain)
+                if (newLen > 20f)
+                    GrappleRopeLength = newLen;
+            }
+        }
         if (reelOut)
             GrappleRopeLength = MathF.Min(GrappleMaxLength, GrappleRopeLength + GrappleReelSpeed * dt);
         
