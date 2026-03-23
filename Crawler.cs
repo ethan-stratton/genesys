@@ -4,7 +4,7 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace Genesis;
 
-public enum CrawlerVariant { Basic, Leaper }
+public enum CrawlerVariant { Forager, Skitter, Leaper }
 
 public class Crawler
 {
@@ -33,7 +33,7 @@ public class Crawler
     private float _squashHoldTimer;
 
     // Variant
-    public CrawlerVariant Variant = CrawlerVariant.Basic;
+    public CrawlerVariant Variant = CrawlerVariant.Forager;
 
     // Jump behavior
     private float _jumpCooldown;
@@ -46,7 +46,7 @@ public class Crawler
     private const float LeaperJumpHSpeed = 120f;
 
     // Insect behavior state machine
-    private enum BugState { Idle, Walking, Paused, EdgeSniffing, Startled, Chasing, Swarming }
+    private enum BugState { Idle, Walking, Paused, EdgeSniffing, Startled, Chasing, Swarming, Fleeing }
     private BugState _bugState = BugState.Walking;
     private float _bugStateTimer;
     private float _pauseDuration;
@@ -159,15 +159,25 @@ public class Crawler
             float dx = playerCenter.X - (Position.X + Width / 2f);
             float dy = playerCenter.Y - (Position.Y + Height / 2f);
             bool wasAggroed = Aggroed;
-            Aggroed = dist < AggroRange;
 
-            // Startle: transition from calm to aggroed
-            if (Aggroed && !wasAggroed && _bugState != BugState.Startled)
+            // Only Leapers aggro; Foragers ignore player; Skitters flee
+            if (Variant == CrawlerVariant.Leaper)
+                Aggroed = dist < AggroRange;
+            else if (Variant == CrawlerVariant.Skitter)
+                Aggroed = false; // skitters don't aggro, they flee (handled below)
+            else
+                Aggroed = false; // foragers never aggro
+
+            // Skitter flee behavior
+            bool fleeing = Variant == CrawlerVariant.Skitter && dist < AggroRange;
+
+            // Startle: transition from calm to aggroed/fleeing
+            if ((Aggroed || fleeing) && !wasAggroed && _bugState != BugState.Startled && _bugState != BugState.Fleeing)
             {
                 _bugState = BugState.Startled;
-                _startleTimer = 0.15f + (float)_rng.NextDouble() * 0.1f; // freeze briefly
+                _startleTimer = 0.1f + (float)_rng.NextDouble() * 0.1f;
                 Velocity.X = 0;
-                VisualScale = new Vector2(0.85f, 1.15f); // slight alert squash
+                VisualScale = new Vector2(0.85f, 1.15f);
                 _squashHoldTimer = 0.08f;
             }
 
@@ -191,7 +201,26 @@ public class Crawler
                 _startleTimer -= dt;
                 Velocity.X = 0;
                 if (_startleTimer <= 0)
-                    _bugState = Aggroed ? BugState.Chasing : BugState.Walking;
+                {
+                    if (Aggroed) _bugState = BugState.Chasing;
+                    else if (fleeing) _bugState = BugState.Fleeing;
+                    else _bugState = BugState.Walking;
+                }
+            }
+            else if (_bugState == BugState.Fleeing || fleeing)
+            {
+                // Skitter: run away from player at high speed
+                _bugState = BugState.Fleeing;
+                Dir = dx > 0 ? -1 : 1; // away from player
+                float fleeSpeed = ChaseSpeed * 1.3f;
+                Velocity.X = Dir * fleeSpeed;
+                // If player leaves range, calm down
+                if (!fleeing)
+                {
+                    _bugState = BugState.Paused;
+                    _bugStateTimer = 0.5f + (float)_rng.NextDouble() * 1f;
+                    Velocity.X = 0;
+                }
             }
             else if (Aggroed)
             {
@@ -391,12 +420,20 @@ public class Crawler
     public int CheckPlayerDamage(Rectangle playerRect)
     {
         if (!Alive || DamageCooldown > 0) return 0;
-        if (Rect.Intersects(playerRect))
+        if (!Rect.Intersects(playerRect)) return 0;
+        
+        // Foragers die when stepped on, deal no damage
+        if (Variant == CrawlerVariant.Forager)
         {
-            DamageCooldown = 1.0f;
-            return 5;
+            Alive = false;
+            return 0;
         }
-        return 0;
+        // Skitters don't deal contact damage either
+        if (Variant == CrawlerVariant.Skitter) return 0;
+        
+        // Leapers deal damage
+        DamageCooldown = 1.0f;
+        return 5;
     }
 
     public bool TakeHit(int damage, float knockbackX = 0, float knockbackY = 0)
@@ -414,7 +451,7 @@ public class Crawler
         return false;
     }
 
-    public bool CanLatch => Alive && !IsDummy && !Frozen && !IsLatched && _latchCooldown <= 0 && Aggroed;
+    public bool CanLatch => Alive && !IsDummy && !Frozen && !IsLatched && _latchCooldown <= 0 && Aggroed && Variant == CrawlerVariant.Leaper;
 
     public void Latch(Vector2 playerPos, Random rng)
     {
@@ -460,7 +497,8 @@ public class Crawler
             : IsLatched ? new Color(160, 40, 40)
             : SwarmActive ? new Color(180, 40, 20)
             : Variant == CrawlerVariant.Leaper ? (Aggroed ? new Color(140, 80, 20) : new Color(100, 70, 30))
-            : (Aggroed ? new Color(120, 60, 20) : new Color(80, 50, 20));
+            : Variant == CrawlerVariant.Skitter ? new Color(60, 80, 50) // greenish
+            : new Color(80, 50, 20); // forager: plain brown
         int scaledW = (int)(ew * VisualScale.X);
         int scaledH = (int)(eh * VisualScale.Y);
         int drawX = (int)Position.X + ew / 2 - scaledW / 2;

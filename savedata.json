@@ -1,12 +1,12 @@
 {
-  "currentLevel": "test-arena",
-  "spawnX": 428.58408,
-  "spawnY": 284,
+  "currentLevel": "training-hall",
+  "spawnX": 46,
+  "spawnY": 397,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 294.90546,
+  "playTime": 406.3949,
   "meleeInventory": [
     "Stick"
   ],
@@ -21,6 +21,6 @@
   ],
   "windowSizeIndex": 0,
   "crtEnabled": false,
-  "moveTier": 2,
+  "moveTier": 1,
   "upgrades": []
 }

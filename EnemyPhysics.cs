@@ -23,15 +23,19 @@ public static class EnemyPhysics
     {
         // Apply gravity
         velocity.Y += gravity * dt;
+        if (velocity.Y > 600f) velocity.Y = 600f; // terminal velocity
 
-        // Move X
+        // Move X first
         position.X += velocity.X * dt;
         ResolveHorizontalTileCollision(ref position, ref velocity, entityW, entityH, tileGrid, tileSize);
+
+        // Store pre-move Y for "was above" checks
+        float prevFootY = position.Y + entityH;
 
         // Move Y
         position.Y += velocity.Y * dt;
         bool onGround = ResolveVerticalCollision(ref position, ref velocity, entityW, entityH,
-            tileGrid, tileSize, platforms, solidFloors, mainFloorY);
+            tileGrid, tileSize, platforms, solidFloors, mainFloorY, prevFootY);
 
         return onGround;
     }
@@ -96,7 +100,8 @@ public static class EnemyPhysics
         ref Vector2 position, ref Vector2 velocity,
         int entityW, int entityH,
         TileGrid tileGrid, int tileSize,
-        Rectangle[] platforms, Rectangle[] solidFloors, float mainFloorY)
+        Rectangle[] platforms, Rectangle[] solidFloors, float mainFloorY,
+        float prevFootY)
     {
         bool onGround = false;
 
@@ -104,10 +109,11 @@ public static class EnemyPhysics
         {
             float footY = position.Y + entityH;
 
+            // Tile collision (solid tiles block from all directions)
             if (tileGrid != null)
             {
-                int leftCol = WorldToTileX((int)position.X, tileGrid);
-                int rightCol = WorldToTileX((int)position.X + entityW - 1, tileGrid);
+                int leftCol = WorldToTileX((int)position.X + 2, tileGrid);
+                int rightCol = WorldToTileX((int)position.X + entityW - 3, tileGrid);
                 int footRow = WorldToTileY((int)footY, tileGrid);
 
                 for (int tx = leftCol; tx <= rightCol; tx++)
@@ -116,7 +122,8 @@ public static class EnemyPhysics
                     if (TileProperties.IsSolid(tileGrid.GetTileAt(tx, footRow)))
                     {
                         float surfaceY = TileToWorldY(footRow, tileGrid);
-                        if (footY >= surfaceY && position.Y + entityH - velocity.Y * 0.017f <= surfaceY + 8)
+                        // Only land if feet crossed into the tile this frame
+                        if (footY >= surfaceY && prevFootY <= surfaceY + 4)
                         {
                             position.Y = surfaceY - entityH;
                             velocity.Y = 0;
@@ -126,12 +133,14 @@ public static class EnemyPhysics
                 }
             }
 
+            // Platform collision (one-way: must have been above before)
             if (!onGround && platforms != null)
             {
+                footY = position.Y + entityH;
                 foreach (var p in platforms)
                 {
-                    if (position.X + entityW > p.X && position.X < p.Right &&
-                        footY >= p.Y && footY <= p.Y + velocity.Y * 0.017f + 10)
+                    if (position.X + entityW > p.X + 2 && position.X < p.Right - 2 &&
+                        footY >= p.Y && prevFootY <= p.Y + 4)
                     {
                         position.Y = p.Y - entityH;
                         velocity.Y = 0;
@@ -141,12 +150,14 @@ public static class EnemyPhysics
                 }
             }
 
+            // Solid floors (same as platforms but thicker)
             if (!onGround && solidFloors != null)
             {
+                footY = position.Y + entityH;
                 foreach (var sf in solidFloors)
                 {
-                    if (position.X + entityW > sf.X && position.X < sf.Right &&
-                        footY >= sf.Y && footY <= sf.Y + velocity.Y * 0.017f + 10)
+                    if (position.X + entityW > sf.X + 2 && position.X < sf.Right - 2 &&
+                        footY >= sf.Y && prevFootY <= sf.Y + 4)
                     {
                         position.Y = sf.Y - entityH;
                         velocity.Y = 0;
@@ -156,6 +167,8 @@ public static class EnemyPhysics
                 }
             }
 
+            // Main floor
+            footY = position.Y + entityH;
             if (!onGround && footY >= mainFloorY)
             {
                 position.Y = mainFloorY - entityH;
@@ -165,10 +178,11 @@ public static class EnemyPhysics
         }
         else
         {
+            // Moving up — ceiling collision
             if (tileGrid != null)
             {
-                int leftCol = WorldToTileX((int)position.X, tileGrid);
-                int rightCol = WorldToTileX((int)position.X + entityW - 1, tileGrid);
+                int leftCol = WorldToTileX((int)position.X + 2, tileGrid);
+                int rightCol = WorldToTileX((int)position.X + entityW - 3, tileGrid);
                 int headRow = WorldToTileY((int)position.Y, tileGrid);
 
                 for (int tx = leftCol; tx <= rightCol; tx++)
