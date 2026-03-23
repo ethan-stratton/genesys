@@ -1460,7 +1460,7 @@ public class Game1 : Game
                     if (w.Hp <= 0) continue;
                     if (w.Rect.Contains(pt))
                     {
-                        _player.GrappleEnemy(ei, "wingbeater", w.Position + new Vector2(w.Width / 2f, w.Height / 2f));
+                        _player.GrappleEnemy(ei, "wingbeater", w.Position + new Vector2(Wingbeater.Width / 2f, Wingbeater.Height / 2f));
                         hit = true; break;
                     }
                 }
@@ -1496,7 +1496,7 @@ public class Game1 : Game
         // Grapple enemy pull — update each frame while pulling
         if (_player.IsGrapplePulling)
         {
-            var playerCenter = _player.Position + new Vector2(_player.Width / 2f, _player.Height / 2f);
+            var playerCenter = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
             float pullSpeed = 400f;
             bool done = false;
             
