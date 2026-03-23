@@ -50,7 +50,7 @@ public class Game1 : Game
     // EVE spark particles (during boot-up)
     private struct EveSpark { public float X, Y, VX, VY, Life, MaxLife; public bool IsBlue; }
     private List<EveSpark> _eveSparkParticles = new();
-    private float _titleCardTimer;     // 3-second "GENESIS" display
+    private float _titleCardTimer;     // 3-second "GENESYS" display
     private float _titleCardFade;      // fade in/out alpha
     private float _tierSwitchFlash;    // flash timer on tier change
 
@@ -1096,11 +1096,8 @@ public class Game1 : Game
                     _eveSparkParticles[si] = sp;
                 }
                 _totalTime += dt; // keep _totalTime advancing for orbit
-                // Block player input during wake-up
-                _prevKb = kb;
-                _prevMouse = Mouse.GetState();
-                base.Update(gameTime);
-                return;
+                // Override keyboard to block player input during wake-up
+                kb = new KeyboardState();
             }
 
             // Pause toggle
@@ -5757,7 +5754,7 @@ public class Game1 : Game
     private void DrawTitleCard()
     {
         _spriteBatch.Begin();
-        string title = "GENESIS";
+        string title = "GENESYS";
         var titleSize = _fontLarge.MeasureString(title);
         float cx = ViewW / 2f;
         float cy = ViewH / 2f;
@@ -7321,7 +7318,7 @@ public class Game1 : Game
             _spriteBatch.Begin();
 
             // Title
-            string title = "GENESIS";
+            string title = "GENESYS";
             var titleSize = _fontLarge.MeasureString(title);
             float cx = ViewW / 2f;
             float cy = ViewH / 2f;
@@ -7964,7 +7961,7 @@ public class Game1 : Game
                 float bootProgress = MathHelper.Clamp((_wakeUpPhase - 2 + _wakeUpTimer / 4f), 0, 1);
                 orbitSpeed = 0.3f + bootProgress * 1.7f; // 0.3 → 2.0
                 // Add jitter/stutter
-                orbitSpeed += MathF.Sin(_totalTime * 12f) * 0.15f * (1f - bootProgress);
+                orbitSpeed += MathF.Sin(_totalTime * 3f) * 0.15f * (1f - bootProgress);
             }
             else
                 orbitSpeed = 2f;
@@ -7992,12 +7989,12 @@ public class Game1 : Game
             // Outer glow (flickers during boot)
             float glowAlpha = 0.4f;
             if (!_wakeUpComplete)
-                glowAlpha *= 0.3f + 0.7f * (0.5f + 0.5f * MathF.Sin(_totalTime * 8f));
+                glowAlpha *= 0.3f + 0.7f * (0.5f + 0.5f * MathF.Sin(_totalTime * 2.5f));
             _spriteBatch.Draw(_pixel, new Rectangle((int)(orbX - 6), (int)(orbY - 6), 12, 12), Color.CornflowerBlue * glowAlpha);
             // Core (flickers during boot)
             float coreAlpha = 1f;
             if (!_wakeUpComplete)
-                coreAlpha = 0.4f + 0.6f * (0.5f + 0.5f * MathF.Sin(_totalTime * 15f));
+                coreAlpha = 0.4f + 0.6f * (0.5f + 0.5f * MathF.Sin(_totalTime * 3.5f));
             _spriteBatch.Draw(_pixel, new Rectangle((int)(orbX - 4), (int)(orbY - 4), 8, 8), Color.Cyan * coreAlpha);
             // EVE speech bubble
             if (_eveMessageTimer > 0 && !string.IsNullOrEmpty(_eveMessage))
