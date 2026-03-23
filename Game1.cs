@@ -292,12 +292,18 @@ public class Game1 : Game
     }
     
     /// <summary>Get EVE's lissajous scan position.</summary>
+    /// <summary>Lissajous health scan — EVE traces a full figure-8 beside Adam.</summary>
     private Vector2 EveScanPos(Vector2 playerCenter, float time)
     {
-        float t = time * 1.2f;
+        // Lissajous: x = A*sin(at + δ), y = B*sin(bt)
+        // a:b = 2:1 gives figure-8, phase shift δ = π/4 tilts it
+        float t = time * 0.8f; // slow, deliberate scan pace
+        float xAmp = 18f;     // horizontal spread
+        float yAmp = 36f;     // vertical range (head to feet)
+        float xOffset = 24f;  // hover to Adam's right
         return new Vector2(
-            playerCenter.X + 20f + MathF.Sin(t * 2f) * 12f,
-            playerCenter.Y + MathF.Sin(t) * 28f);
+            playerCenter.X + xOffset + MathF.Sin(t * 2f + MathF.PI * 0.25f) * xAmp,
+            playerCenter.Y + MathF.Sin(t) * yAmp);
     }
     
     /// <summary>Update EVE position each frame.</summary>
@@ -1164,6 +1170,7 @@ public class Game1 : Game
                         }
                         if (_wakeUpTimer >= 4f) { _wakeUpPhase = 3; _wakeUpTimer = 0; }
                         break;
+                    }
                     case 3: // Control given (0-2s) — zoom 1.2 → 1.0
                     {
                         float t3 = Math.Min(1f, _wakeUpTimer / 2f);
