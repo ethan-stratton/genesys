@@ -217,12 +217,44 @@ public class Crawler
                 _bugState = BugState.Swarming;
                 float sdx = SwarmTargetX.Value - (Position.X + Width / 2f);
                 Dir = sdx > 0 ? 1 : -1;
-                Velocity.X = Dir * SwarmSpeed;
+
+                // Variant-specific swarm behavior
+                float swarmSpd, swarmJF, swarmJH;
+                float jCooldown;
+                switch (Variant)
+                {
+                    case CrawlerVariant.Forager:
+                        // Slow, clumsy, hesitant — mob mentality overriding instinct
+                        swarmSpd = Speed * 1.2f; // barely faster than normal walk
+                        swarmJF = -180f;
+                        swarmJH = 80f;
+                        jCooldown = 1.5f;
+                        // Random hesitation — foragers sometimes pause mid-swarm
+                        if (_rng.NextDouble() < 0.01) { Velocity.X = 0; break; }
+                        break;
+                    case CrawlerVariant.Skitter:
+                        // Fast and erratic — panicked, not brave
+                        swarmSpd = ChaseSpeed * 1.5f;
+                        swarmJF = -250f;
+                        swarmJH = 130f;
+                        jCooldown = 0.5f;
+                        // Skitters jitter direction occasionally (nervous even in swarm)
+                        if (_rng.NextDouble() < 0.03) Dir = -Dir;
+                        break;
+                    default: // Leaper
+                        swarmSpd = SwarmSpeed;
+                        swarmJF = SwarmJumpForce;
+                        swarmJH = SwarmJumpHSpeed;
+                        jCooldown = 0.4f;
+                        break;
+                }
+
+                Velocity.X = Dir * swarmSpd * _walkSpeedMult; // use per-crawler speed variation
                 if (_onGround && _jumpCooldown <= 0 && MathF.Abs(sdx) > 30f)
                 {
-                    Velocity.Y = SwarmJumpForce;
-                    Velocity.X = Dir * SwarmJumpHSpeed;
-                    _jumpCooldown = 0.6f;
+                    Velocity.Y = swarmJF;
+                    Velocity.X = Dir * swarmJH;
+                    _jumpCooldown = jCooldown;
                     VisualScale = new Vector2(0.7f, 1.3f);
                     _squashHoldTimer = 0.04f;
                 }
@@ -531,7 +563,7 @@ public class Crawler
             : IsDummy ? new Color(140, 100, 160)
             : Frozen ? new Color(100, 160, 200)
             : IsLatched ? new Color(160, 40, 40)
-            : SwarmActive ? new Color(180, 40, 20)
+            : SwarmActive ? (Variant == CrawlerVariant.Leaper ? new Color(200, 40, 20) : Variant == CrawlerVariant.Skitter ? new Color(140, 60, 40) : new Color(160, 50, 30))
             : Variant == CrawlerVariant.Leaper ? (Aggroed ? new Color(140, 80, 20) : new Color(100, 70, 30))
             : Variant == CrawlerVariant.Skitter ? new Color(60, 80, 50) // greenish
             : new Color(80, 50, 20); // forager: plain brown

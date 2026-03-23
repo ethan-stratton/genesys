@@ -1560,67 +1560,64 @@ public class Game1 : Game
             }
         }
 
-        // Crawler Swarm Override: 4+ non-frozen crawlers within 100px converge on nearest non-dummy crawler
+        // Crawler Swarm: Leaper as pack leader — nearby crawlers mob the player
         _swarmDamageTimer -= dt;
         if (_swarmDamageTimer <= 0)
         {
-            _swarmDamageTimer = 0.5f; // check every 0.5s
+            _swarmDamageTimer = 0.5f;
             var aliveCrawlers = new List<Crawler>();
             foreach (var c in _crawlers)
-                if (c.Alive && !c.IsDummy && !c.Frozen) aliveCrawlers.Add(c);
+                if (c.Alive && !c.IsDummy && !c.Frozen && !c.IsLatched) aliveCrawlers.Add(c);
 
-            // Find clusters: for each crawler, count neighbors within 100px
-            for (int ci = 0; ci < aliveCrawlers.Count; ci++)
+            // Find leapers that are aggroed (pack leaders)
+            var aggroedLeapers = new List<Crawler>();
+            foreach (var c in aliveCrawlers)
+                if (c.Variant == CrawlerVariant.Leaper && c.Aggroed) aggroedLeapers.Add(c);
+
+            // For each aggroed leaper, recruit nearby crawlers into swarm
+            var swarmMembers = new HashSet<Crawler>();
+            foreach (var leader in aggroedLeapers)
             {
-                var c = aliveCrawlers[ci];
-                var cCenter = c.Position + new Vector2(c.EffectiveWidth / 2f, c.EffectiveHeight / 2f);
-                var neighbors = new List<Crawler>();
+                var lCenter = leader.Position + new Vector2(leader.EffectiveWidth / 2f, leader.EffectiveHeight / 2f);
+                var nearby = new List<Crawler>();
                 foreach (var other in aliveCrawlers)
                 {
-                    if (other == c) continue;
+                    if (other == leader) continue;
                     var oCenter = other.Position + new Vector2(other.EffectiveWidth / 2f, other.EffectiveHeight / 2f);
-                    if (Vector2.Distance(cCenter, oCenter) < 100f)
-                        neighbors.Add(other);
+                    if (Vector2.Distance(lCenter, oCenter) < 150f) // recruitment range
+                        nearby.Add(other);
                 }
-                if (neighbors.Count + 1 >= 4) // 4+ including self = swarm
-                {
-                    c.SwarmActive = true;
-                    foreach (var n in neighbors) n.SwarmActive = true;
 
-                    // Find nearest enemy target (dummy or player)
-                    Crawler nearestTarget = null;
-                    float nearestDist = 600f;
-                    foreach (var t in _crawlers)
+                // Need at least 3 nearby (4 total with leader) to trigger swarm
+                if (nearby.Count >= 3)
+                {
+                    swarmMembers.Add(leader);
+                    foreach (var n in nearby) swarmMembers.Add(n);
+                }
+            }
+
+            // Apply swarm state
+            float playerTargetX = _player.Position.X + _player.SpriteW / 2f;
+            bool swarmJustStarted = false;
+            foreach (var c in aliveCrawlers)
+            {
+                if (swarmMembers.Contains(c))
+                {
+                    if (!c.SwarmActive) swarmJustStarted = true;
+                    c.SwarmActive = true;
+                    c.SwarmTargetX = playerTargetX;
+
+                    // Swarm damage: each swarmer touching player deals tick damage
+                    if (_spawnInvincibility <= 0 && !_isDead)
                     {
-                        if (!t.Alive || !t.IsDummy) continue;
-                        var tCenter = t.Position + new Vector2(t.EffectiveWidth / 2f, t.EffectiveHeight / 2f);
-                        float d = Vector2.Distance(cCenter, tCenter);
-                        if (d < nearestDist) { nearestDist = d; nearestTarget = t; }
-                    }
-                    if (nearestTarget != null)
-                    {
-                        // Converge: set swarm target for crawler AI to handle movement + jumping
-                        float targetX = nearestTarget.Position.X + nearestTarget.EffectiveWidth / 2f;
-                        c.SwarmTargetX = targetX;
-                        foreach (var n in neighbors)
-                            n.SwarmTargetX = targetX;
-                        // Deal collective damage when close enough
-                        float distToTarget = Math.Abs(targetX - (nearestTarget.Position.X + nearestTarget.EffectiveWidth / 2f));
-                        var swarmersTouching = new List<Crawler>();
-                        var targetRect = new Rectangle((int)nearestTarget.Position.X, (int)nearestTarget.Position.Y,
-                            nearestTarget.EffectiveWidth, nearestTarget.EffectiveHeight);
-                        foreach (var s in aliveCrawlers)
+                        var sRect = c.Rect;
+                        var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, _player.SpriteW, _player.SpriteH);
+                        if (sRect.Intersects(pRect) && c.DamageCooldown <= 0)
                         {
-                            if (s == nearestTarget || s.IsDummy) continue;
-                            var sRect = new Rectangle((int)s.Position.X, (int)s.Position.Y, s.EffectiveWidth, s.EffectiveHeight);
-                            if (sRect.Intersects(targetRect)) swarmersTouching.Add(s);
-                        }
-                        if (swarmersTouching.Count >= 4)
-                        {
-                            int swarmDmg = swarmersTouching.Count * 2;
-                            nearestTarget.TakeHit(swarmDmg);
-                            var hitPos = nearestTarget.Position + new Vector2(nearestTarget.EffectiveWidth / 2f, nearestTarget.EffectiveHeight / 2f);
-                            SpawnHitSpray(hitPos, nearestTarget.Position.X > cCenter.X ? 1 : -1, GetEnemyHitColor("crawler"), 1f, false);
+                            int dmg = c.Variant == CrawlerVariant.Leaper ? 5 : 2; // leapers hit harder in swarm
+                            _lastDamageSource = "Crawler Swarm";
+                            _player.TakeDamage(dmg, _player.Position.X - c.Position.X);
+                            c.DamageCooldown = 0.8f;
                         }
                     }
                 }
@@ -1630,6 +1627,18 @@ public class Game1 : Game
                     c.SwarmTargetX = null;
                 }
             }
+
+            // If all leapers in a swarm die, break the swarm
+            // (already handled: no aggroed leapers → no swarmMembers → SwarmActive = false)
+
+            // EVE warns when swarm triggers
+            if (swarmJustStarted && _eveOrbActive)
+            {
+                var warns = new[] { "Multiple hostiles coordinating!", "They're swarming — take out the big one!", "Kill the leader — the rest will scatter!" };
+                EveAlert(warns[_rng.Next(warns.Length)], 3f);
+                _shakeTimer = 0.15f; _shakeIntensity = 2f;
+            }
+        }
         }
 
         // Bullets vs crawlers and thornbacks
