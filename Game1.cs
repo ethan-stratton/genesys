@@ -1596,15 +1596,19 @@ public class Game1 : Game
                 }
             }
 
-            // Apply swarm state
+            // Apply swarm state — once frenzied, PERMANENT (no undo)
             float playerTargetX = _player.Position.X + _player.SpriteW / 2f;
             bool swarmJustStarted = false;
             foreach (var c in aliveCrawlers)
             {
+                if (swarmMembers.Contains(c) && !c.SwarmActive)
+                    swarmJustStarted = true;
                 if (swarmMembers.Contains(c))
+                    c.SwarmActive = true; // permanent — never cleared
+
+                // All frenzied crawlers track player
+                if (c.SwarmActive)
                 {
-                    if (!c.SwarmActive) swarmJustStarted = true;
-                    c.SwarmActive = true;
                     c.SwarmTargetX = playerTargetX;
 
                     // Swarm damage: each swarmer touching player deals tick damage
@@ -1614,27 +1618,19 @@ public class Game1 : Game
                         var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, _player.SpriteW, _player.SpriteH);
                         if (sRect.Intersects(pRect) && c.DamageCooldown <= 0)
                         {
-                            int dmg = c.Variant == CrawlerVariant.Leaper ? 5 : 2; // leapers hit harder in swarm
+                            int dmg = c.Variant == CrawlerVariant.Leaper ? 5 : 2;
                             _lastDamageSource = "Crawler Swarm";
                             _player.TakeDamage(dmg, _player.Position.X - c.Position.X);
                             c.DamageCooldown = 0.8f;
                         }
                     }
                 }
-                else
-                {
-                    c.SwarmActive = false;
-                    c.SwarmTargetX = null;
-                }
             }
-
-            // If all leapers in a swarm die, break the swarm
-            // (already handled: no aggroed leapers → no swarmMembers → SwarmActive = false)
 
             // EVE warns when swarm triggers
             if (swarmJustStarted && _eveOrbActive)
             {
-                var warns = new[] { "Multiple hostiles coordinating!", "They're swarming — take out the big one!", "Kill the leader — the rest will scatter!" };
+                var warns = new[] { "Multiple hostiles coordinating!", "They're swarming!", "They've gone feral — watch yourself!" };
                 EveAlert(warns[_rng.Next(warns.Length)], 3f);
                 _shakeTimer = 0.15f; _shakeIntensity = 2f;
             }
