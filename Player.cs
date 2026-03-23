@@ -835,34 +835,55 @@ public class Player
 
             if (CurrentWeapon == WeaponType.Knife)
             {
-                // Combat knife: SF6-style straight jab hitbox
-                // Fixed rectangular box extending straight out from chest height
-                // No arc/swing — just extends and retracts (rapid stab)
-                int dir = MathF.Abs(AimDir.X) > 0.1f ? Math.Sign(AimDir.X) : FacingDir;
+                // Combat knife: directional stab
+                int dir = FacingDir; // always use facing direction, not aim
                 
-                // Hitbox dimensions: wide but short (like Ken's medium punch)
-                int knifeW = 28; // reach (horizontal)
-                int knifeH = 12; // narrow vertical profile (stabbing, not slashing)
+                int knifeW = 28;
+                int knifeH = 12;
                 
                 // Extension animation: snap out fast, hold briefly, retract
                 float kt = MeleeTimer > 0 ? 1f - (MeleeTimer / CurrentMeleeActiveTime) : 1f;
                 float extend;
                 if (kt < 0.15f)
-                    extend = kt / 0.15f; // snap out (15% of duration)
+                    extend = kt / 0.15f;
                 else if (kt < 0.7f)
-                    extend = 1f; // hold at full extension (55% of duration)
+                    extend = 1f;
                 else
-                    extend = 1f - (kt - 0.7f) / 0.3f; // retract (30% of duration)
+                    extend = 1f - (kt - 0.7f) / 0.3f;
                 
                 // Combo stabs: each step extends slightly further
-                float baseReach = 16f + _comboStep * 4f; // 16, 20, 24 pixels
+                float baseReach = 16f + _comboStep * 4f;
                 float reachNow = baseReach * extend;
                 
-                // Position: chest height, extends in facing direction
-                float hbX = center.X + dir * (Width / 2f + reachNow);
-                float hbY = center.Y - 2f; // slightly above center (chest, not waist)
+                // Determine attack type based on crouch state + input
+                bool holdingDown = Keyboard.GetState().IsKeyDown(Keys.S) || Keyboard.GetState().IsKeyDown(Keys.Down);
+                bool holdingHoriz = Keyboard.GetState().IsKeyDown(Keys.A) || Keyboard.GetState().IsKeyDown(Keys.D)
+                                 || Keyboard.GetState().IsKeyDown(Keys.Left) || Keyboard.GetState().IsKeyDown(Keys.Right);
                 
-                MeleeSwingAngle = dir > 0 ? 0f : MathF.PI; // straight horizontal
+                float hbX, hbY;
+                if (IsCrouching && holdingDown && holdingHoriz)
+                {
+                    // Angled downward stab (crouch + down-left/down-right)
+                    float diagReach = reachNow * 0.7071f; // cos(45°)
+                    hbX = center.X + dir * (Width / 2f + diagReach);
+                    hbY = center.Y + diagReach + 4f; // below + forward
+                    MeleeSwingAngle = dir > 0 ? MathF.PI / 4f : MathF.PI * 3f / 4f;
+                }
+                else if (IsCrouching)
+                {
+                    // Crouch stab: same reach, lower position
+                    hbX = center.X + dir * (Width / 2f + reachNow);
+                    hbY = center.Y + 8f; // lower (knee height)
+                    MeleeSwingAngle = dir > 0 ? 0f : MathF.PI;
+                }
+                else
+                {
+                    // Standing forward stab
+                    hbX = center.X + dir * (Width / 2f + reachNow);
+                    hbY = center.Y - 2f; // chest height
+                    MeleeSwingAngle = dir > 0 ? 0f : MathF.PI;
+                }
+                
                 return new Rectangle(
                     (int)(hbX - knifeW / 2f), (int)(hbY - knifeH / 2f), knifeW, knifeH);
             }
@@ -2639,23 +2660,41 @@ public class Player
             // Knife visual: small blade extending from hand
             if (CurrentWeapon == WeaponType.Knife)
             {
-                int handY = sqY + sqH / 2 - 1; // chest height
+                int handY = sqY + sqH / 2 - 1;
                 if (MeleeTimer > 0)
                 {
-                    // Stabbing: blade extends outward (matches hitbox extension)
                     float t = 1f - (MeleeTimer / CurrentMeleeActiveTime);
                     float extend;
                     if (t < 0.15f) extend = t / 0.15f;
                     else if (t < 0.7f) extend = 1f;
                     else extend = 1f - (t - 0.7f) / 0.3f;
                     int bladeLen = (int)(12f * extend);
-                    int bladeX = FacingDir == 1 ? sqX + sqW : sqX - bladeLen;
-                    spriteBatch.Draw(pixel, new Rectangle(bladeX, handY, bladeLen, 2), Color.Silver);
-                    // Blade tip highlight
-                    if (bladeLen > 3)
+                    
+                    // Check if angled downward stab
+                    bool isDownAngle = MeleeSwingAngle > 0.3f && MeleeSwingAngle < 2.8f; // roughly PI/4 or 3PI/4
+                    if (isDownAngle && bladeLen > 0)
                     {
-                        int tipX = FacingDir == 1 ? bladeX + bladeLen - 2 : bladeX;
-                        spriteBatch.Draw(pixel, new Rectangle(tipX, handY - 1, 2, 1), Color.White);
+                        // Diagonal blade: draw at ~45° down-forward
+                        int diagX = FacingDir == 1 ? sqX + sqW : sqX;
+                        int diagSteps = bladeLen;
+                        for (int ds = 0; ds < diagSteps; ds++)
+                        {
+                            int px = diagX + FacingDir * ds;
+                            int py = handY + ds;
+                            spriteBatch.Draw(pixel, new Rectangle(px, py, 2, 2), Color.Silver);
+                        }
+                    }
+                    else
+                    {
+                        // Horizontal stab (standing or crouch)
+                        int stabY = IsCrouching ? handY + 8 : handY;
+                        int bladeX = FacingDir == 1 ? sqX + sqW : sqX - bladeLen;
+                        spriteBatch.Draw(pixel, new Rectangle(bladeX, stabY, bladeLen, 2), Color.Silver);
+                        if (bladeLen > 3)
+                        {
+                            int tipX = FacingDir == 1 ? bladeX + bladeLen - 2 : bladeX;
+                            spriteBatch.Draw(pixel, new Rectangle(tipX, stabY - 1, 2, 1), Color.White);
+                        }
                     }
                 }
                 else
