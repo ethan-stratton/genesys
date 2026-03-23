@@ -1041,13 +1041,13 @@ public class Game1 : Game
                         break;
                     case 1: // Eyes opening — fade lifts, camera still tight (0-3s)
                         _fadeAlpha = Math.Max(0f, 0.7f - _wakeUpTimer * 0.25f);
-                        _camera.Zoom = 2.5f - _wakeUpTimer * 0.2f; // 2.5 → ~1.9
-                        _camera.TargetZoom = _camera.Zoom;
+                        _camera.TargetZoom = 2.5f - _wakeUpTimer * 0.2f; // 2.5 → ~1.9
+                        _camera.ZoomLerpSpeed = 8f; // fast tracking so it doesn't fight
                         if (_wakeUpTimer >= 3f) { _wakeUpPhase = 2; _wakeUpTimer = 0; }
                         break;
                     case 2: // Look around — camera pulls out more (0-4s)
                         _camera.TargetZoom = 1.4f;
-                        _camera.ZoomLerpSpeed = 0.5f;
+                        _camera.ZoomLerpSpeed = 0.6f;
                         if (_wakeUpTimer >= 1.5f && !_eveOrbActive)
                         {
                             // EVE boots up
