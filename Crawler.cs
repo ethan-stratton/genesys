@@ -162,6 +162,18 @@ public class Crawler
         if (_squashHoldTimer > 0) _squashHoldTimer -= dt;
         else VisualScale = Vector2.Lerp(VisualScale, Vector2.One, 8f * dt);
 
+        // Refresh walkable surface edges dynamically (not just at spawn)
+        if (_onGround && tileGrid != null)
+        {
+            float footY = Position.Y + EffectiveHeight;
+            var edges = EnemyPhysics.FindSurfaceEdges(
+                Position.X, footY, EffectiveWidth,
+                tileGrid, tileSize, platforms, solidFloors,
+                SurfaceLeft, SurfaceRight);
+            SurfaceLeft = edges.Left;
+            SurfaceRight = edges.Right;
+        }
+
         if (IsDummy || Frozen)
         {
             Velocity.X = 0;

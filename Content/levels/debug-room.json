@@ -939,18 +939,6 @@
       "passive": false
     },
     {
-      "id": "skitter-47",
-      "type": "skitter",
-      "x": 1760,
-      "y": 688,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
-    },
-    {
       "id": "leaper-48",
       "type": "leaper",
       "x": 1984,
@@ -14469,8 +14457,8 @@
       1,
       1,
       1,
-      1,
-      1,
+      0,
+      0,
       1,
       1,
       1,

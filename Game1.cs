@@ -560,7 +560,8 @@ public class Game1 : Game
                 case "skitter":
                 case "leaper":
                     float snapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Crawler.Width, Crawler.Height, tg, ts, plats, sFloors, walls, mainFloor);
-                    var c = new Crawler(new Vector2(e.X, snapY), bLeft, bRight, 0, 0, _rng);
+                    var pushOut = EnemyPhysics.PushOutOfSolid(e.X, snapY, Crawler.Width, Crawler.Height, tg, ts);
+                    var c = new Crawler(new Vector2(pushOut.X, pushOut.Y), bLeft, bRight, 0, 0, _rng);
                     c.Frozen = e.Frozen;
                     if (e.Type == "leaper") c.Variant = CrawlerVariant.Leaper;
                     else if (e.Type == "skitter") c.Variant = CrawlerVariant.Skitter;
@@ -1023,7 +1024,7 @@ public class Game1 : Game
                     float bestDist = 200f;
                     string bestType = null;
                     Vector2 bestPos = Vector2.Zero;
-                    foreach (var c in _crawlers) { if (!c.Alive) continue; var ep = c.Position + new Vector2(c.EffectiveWidth/2f, c.EffectiveHeight/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestType = "crawler"; bestPos = ep; } }
+                    foreach (var c in _crawlers) { if (!c.Alive) continue; var ep = c.Position + new Vector2(c.EffectiveWidth/2f, c.EffectiveHeight/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestType = c.Variant.ToString().ToLower(); bestPos = ep; } }
                     foreach (var h in _hoppers) { if (!h.Alive) continue; var ep = h.Position + new Vector2(Hopper.Width/2f, Hopper.Height/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestType = "hopper"; bestPos = ep; } }
                     foreach (var t in _thornbacks) { if (!t.Alive) continue; var ep = t.Position + new Vector2(Thornback.Width/2f, Thornback.Height/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestType = "thornback"; bestPos = ep; } }
                     foreach (var b in _birds) { if (!b.Alive) continue; var ep = b.Position + new Vector2(Bird.Width/2f, Bird.Height/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestType = "bird"; bestPos = ep; } }
@@ -1041,7 +1042,7 @@ public class Game1 : Game
                     float bestDist = 250f;
                     Vector2 bestPos = _scanTargetPos;
                     bool found = false;
-                    if (_scanTarget == "crawler") { foreach (var c in _crawlers) { if (!c.Alive) continue; var ep = c.Position + new Vector2(c.EffectiveWidth/2f, c.EffectiveHeight/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestPos = ep; found = true; } } }
+                    if (_scanTarget == "forager" || _scanTarget == "skitter" || _scanTarget == "leaper") { foreach (var c in _crawlers) { if (!c.Alive) continue; var ep = c.Position + new Vector2(c.EffectiveWidth/2f, c.EffectiveHeight/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestPos = ep; found = true; } } }
                     else if (_scanTarget == "hopper") { foreach (var h in _hoppers) { if (!h.Alive) continue; var ep = h.Position + new Vector2(Hopper.Width/2f, Hopper.Height/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestPos = ep; found = true; } } }
                     else if (_scanTarget == "thornback") { foreach (var t in _thornbacks) { if (!t.Alive) continue; var ep = t.Position + new Vector2(Thornback.Width/2f, Thornback.Height/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestPos = ep; found = true; } } }
                     else if (_scanTarget == "bird") { foreach (var b in _birds) { if (!b.Alive) continue; var ep = b.Position + new Vector2(Bird.Width/2f, Bird.Height/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestPos = ep; found = true; } } }
@@ -1060,7 +1061,15 @@ public class Game1 : Game
                             if (!_scanProgress.ContainsKey(_scanTarget)) _scanProgress[_scanTarget] = 0;
                             if (_scanProgress[_scanTarget] < 3) _scanProgress[_scanTarget]++;
                             int lvl = _scanProgress[_scanTarget];
-                            string reveal = lvl switch { 1 => $"Identified: {_scanTarget.ToUpper()}", 2 => $"Vitals scanned: {_scanTarget.ToUpper()}", 3 => $"Weak point found: {_scanTarget.ToUpper()} (+25% DMG)", _ => "" };
+                            string scanLabel = _scanTarget;
+                            // Use proper scan names for crawler variants
+                            if (_scanTarget == "forager" || _scanTarget == "skitter" || _scanTarget == "leaper")
+                            {
+                                var nearest = _crawlers.Where(c => c.Alive && c.Variant.ToString().ToLower() == _scanTarget)
+                                    .OrderBy(c => Vector2.Distance(pc, c.Position)).FirstOrDefault();
+                                if (nearest != null) scanLabel = nearest.ScanName;
+                            }
+                            string reveal = lvl switch { 1 => $"Identified: {scanLabel}", 2 => $"Vitals scanned: {scanLabel}", 3 => $"Weak point found: {scanLabel} (+25% DMG)", _ => "" };
                             _scanRevealText = reveal;
                             _scanRevealTimer = 2f;
                         }
@@ -1288,7 +1297,7 @@ public class Game1 : Game
                     int prevHp = c.Hp;
                     var ws = WeaponStats.Get(_player.CurrentWeapon);
                     int dmg = finisher ? ws.FinisherDamage : ws.Damage;
-                    dmg = ApplyScanBonus(dmg, c.IsDummy ? "dummy" : "crawler");
+                    dmg = ApplyScanBonus(dmg, c.IsDummy ? "dummy" : c.Variant.ToString().ToLower());
                     float kbDir = _player.FacingDir;
                     bool killed = _knockbackEnabled
                         ? c.TakeHit(dmg, kbDir * ws.KnockbackForce, ws.KnockbackUp)

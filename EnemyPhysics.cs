@@ -206,53 +206,124 @@ public static class EnemyPhysics
         Rectangle[] platforms, Rectangle[] solidFloors,
         float boundsLeft, float boundsRight)
     {
+        // Build a unified walkable surface by merging tiles + platforms at foot level
+        float left = boundsLeft;
+        float right = boundsRight;
+        bool foundAny = false;
+
+        // Start with the tile the entity is standing on
         if (tileGrid != null)
         {
             int footRow = WorldToTileY((int)footY, tileGrid);
-            int startCol = WorldToTileX((int)x, tileGrid);
+            int startCol = WorldToTileX((int)(x + entityW / 2f), tileGrid); // center of entity
 
             if (footRow >= 0 && footRow < tileGrid.Height && startCol >= 0 && startCol < tileGrid.Width
                 && TileProperties.IsSolid(tileGrid.GetTileAt(startCol, footRow)))
             {
-                float left = TileToWorldX(startCol, tileGrid);
+                // Scan left through contiguous solid tiles
+                float tileLeft = TileToWorldX(startCol, tileGrid);
                 for (int tx = startCol - 1; tx >= 0; tx--)
                 {
                     if (TileProperties.IsSolid(tileGrid.GetTileAt(tx, footRow)))
-                        left = TileToWorldX(tx, tileGrid);
+                        tileLeft = TileToWorldX(tx, tileGrid);
                     else
                         break;
                 }
-                float right = TileToWorldX(startCol + 1, tileGrid);
+                // Scan right
+                float tileRight = TileToWorldX(startCol + 1, tileGrid);
                 for (int tx = startCol + 1; tx < tileGrid.Width; tx++)
                 {
                     if (TileProperties.IsSolid(tileGrid.GetTileAt(tx, footRow)))
-                        right = TileToWorldX(tx + 1, tileGrid);
+                        tileRight = TileToWorldX(tx + 1, tileGrid);
                     else
                         break;
                 }
-                return (left, right);
+                left = tileLeft;
+                right = tileRight;
+                foundAny = true;
             }
         }
 
+        // Extend with any platforms that connect at the same Y level (within 4px)
         if (platforms != null)
         {
             foreach (var p in platforms)
             {
-                if (MathF.Abs(footY - p.Y) < 4 && x + entityW > p.X && x < p.Right)
-                    return (p.X, p.Right);
+                if (MathF.Abs(footY - p.Y) < 4)
+                {
+                    if (foundAny)
+                    {
+                        // Extend left/right if platform overlaps or touches our current surface
+                        if (p.Right >= left - 2 && p.X <= right + 2)
+                        {
+                            left = MathF.Min(left, p.X);
+                            right = MathF.Max(right, p.Right);
+                        }
+                    }
+                    else if (x + entityW > p.X && x < p.Right)
+                    {
+                        left = p.X;
+                        right = p.Right;
+                        foundAny = true;
+                    }
+                }
             }
         }
 
+        // Same for solid floors
         if (solidFloors != null)
         {
             foreach (var sf in solidFloors)
             {
-                if (MathF.Abs(footY - sf.Y) < 4 && x + entityW > sf.X && x < sf.Right)
-                    return (sf.X, sf.Right);
+                if (MathF.Abs(footY - sf.Y) < 4)
+                {
+                    if (foundAny)
+                    {
+                        if (sf.Right >= left - 2 && sf.X <= right + 2)
+                        {
+                            left = MathF.Min(left, sf.X);
+                            right = MathF.Max(right, sf.Right);
+                        }
+                    }
+                    else if (x + entityW > sf.X && x < sf.Right)
+                    {
+                        left = sf.X;
+                        right = sf.Right;
+                        foundAny = true;
+                    }
+                }
             }
         }
 
-        return (boundsLeft, boundsRight);
+        // If platform found, also check if tiles extend from it
+        if (foundAny && tileGrid != null)
+        {
+            int footRow = WorldToTileY((int)footY, tileGrid);
+            if (footRow >= 0 && footRow < tileGrid.Height)
+            {
+                // Check tile at left edge
+                int leftCol = WorldToTileX((int)left - 1, tileGrid);
+                for (int tx = leftCol; tx >= 0; tx--)
+                {
+                    if (TileProperties.IsSolid(tileGrid.GetTileAt(tx, footRow)))
+                        left = MathF.Min(left, TileToWorldX(tx, tileGrid));
+                    else break;
+                }
+                // Check tile at right edge
+                int rightCol = WorldToTileX((int)right, tileGrid);
+                for (int tx = rightCol; tx < tileGrid.Width; tx++)
+                {
+                    if (TileProperties.IsSolid(tileGrid.GetTileAt(tx, footRow)))
+                        right = MathF.Max(right, TileToWorldX(tx + 1, tileGrid));
+                    else break;
+                }
+            }
+        }
+
+        if (!foundAny)
+            return (boundsLeft, boundsRight);
+
+        return (left, right);
     }
 
     public static float SnapToSurface(
@@ -315,5 +386,35 @@ public static class EnemyPhysics
         }
 
         return bestY;
+    }
+
+    /// <summary>
+    /// Check if a position is inside a solid tile. If so, push upward to surface.
+    /// </summary>
+    public static Vector2 PushOutOfSolid(float x, float y, int entityW, int entityH,
+        TileGrid tileGrid, int tileSize)
+    {
+        if (tileGrid == null) return new Vector2(x, y);
+
+        int col = WorldToTileX((int)(x + entityW / 2f), tileGrid);
+        int row = WorldToTileY((int)(y + entityH / 2f), tileGrid);
+
+        if (col < 0 || col >= tileGrid.Width || row < 0 || row >= tileGrid.Height)
+            return new Vector2(x, y);
+
+        if (!TileProperties.IsSolid(tileGrid.GetTileAt(col, row)))
+            return new Vector2(x, y);
+
+        // Entity center is inside solid. Scan upward for first non-solid row.
+        for (int ty = row - 1; ty >= 0; ty--)
+        {
+            if (!TileProperties.IsSolid(tileGrid.GetTileAt(col, ty)))
+            {
+                y = TileToWorldY(ty + 1, tileGrid) - entityH;
+                return new Vector2(x, y);
+            }
+        }
+
+        return new Vector2(x, y);
     }
 }
