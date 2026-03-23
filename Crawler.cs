@@ -221,6 +221,7 @@ public class Crawler
             KnockbackVel = Vector2.Zero;
             if (_squashHoldTimer > 0) _squashHoldTimer -= dt;
             else VisualScale = Vector2.Lerp(VisualScale, Vector2.One, 8f * dt);
+            UpdateLegs(dt);
             return;
         }
 
@@ -753,6 +754,15 @@ public class Crawler
 
             Legs[i].FootTarget = new Vector2(footTargetX, footTargetY);
 
+            // Clamp target to max reach
+            Vector2 hipLocal2 = Legs[i].HipOffset;
+            if (Dir < 0) hipLocal2.X = -hipLocal2.X;
+            Vector2 hipW = bodyCenter + hipLocal2;
+            float maxR = Legs[i].UpperLen + Legs[i].LowerLen - 1f;
+            Vector2 toTarget = Legs[i].FootTarget - hipW;
+            if (toTarget.Length() > maxR && toTarget.Length() > 0.001f)
+                Legs[i].FootTarget = hipW + toTarget * (maxR / toTarget.Length());
+
             float distToTarget = Vector2.Distance(Legs[i].FootPos, Legs[i].FootTarget);
             int myGroup = (i % 2 == 0) ? 0 : 1;
 
@@ -833,6 +843,13 @@ public class Crawler
                 // Solve IK for knee position
                 float sideBias = rightSide ? 1f : -1f;
                 Vector2 knee = IKLeg.SolveKnee(hip, foot, Legs[i].UpperLen, Legs[i].LowerLen, sideBias);
+
+                // Clamp foot to max leg reach to prevent stretching glitches
+                float maxReach = Legs[i].UpperLen + Legs[i].LowerLen - 0.5f;
+                Vector2 hipToFoot = foot - hip;
+                float dist = hipToFoot.Length();
+                if (dist > maxReach && dist > 0.001f)
+                    foot = hip + hipToFoot * (maxReach / dist);
 
                 // Draw upper leg (hip → knee)
                 DrawLine(sb, pixel, hip, knee, 3, legColor);
