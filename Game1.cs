@@ -276,6 +276,7 @@ public class Game1 : Game
     private Vector2 _evePos;           // actual world position
     private Vector2 _eveVel;           // velocity
     private bool _evePosInitialized;
+    private SecondOrderDynamics2D _eveSpring; // smooth orbit/scan target
     private enum EveMovementMode { Orbit, FlyTo, Scan }
     private EveMovementMode _eveMode = EveMovementMode.Orbit;
     private Vector2 _eveFlyTarget;     // target for FlyTo
@@ -325,6 +326,7 @@ public class Game1 : Game
         {
             _evePos = EveOrbitPos(playerCenter, _totalTime);
             _eveVel = Vector2.Zero;
+            _eveSpring = new SecondOrderDynamics2D(3f, 0.5f, -0.5f, _evePos);
             _evePosInitialized = true;
         }
         
@@ -336,12 +338,12 @@ public class Game1 : Game
         switch (_eveMode)
         {
             case EveMovementMode.Orbit:
-                target = EveOrbitPos(playerCenter, _totalTime);
+                target = _eveSpring.Update(dt, EveOrbitPos(playerCenter, _totalTime));
                 accel = EveOrbitAccel;
                 drag = EveDrag;
                 break;
             case EveMovementMode.Scan:
-                target = EveScanPos(playerCenter, _totalTime);
+                target = _eveSpring.Update(dt, EveScanPos(playerCenter, _totalTime));
                 accel = EveScanAccel;
                 drag = EveDrag * 0.8f; // slightly less drag for smoother scan
                 break;

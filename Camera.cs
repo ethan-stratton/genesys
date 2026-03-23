@@ -13,7 +13,9 @@ public class Camera
     // Zoom
     public float Zoom { get; set; } = 1f;
     public float TargetZoom { get; set; } = 1f;
-    public float ZoomLerpSpeed { get; set; } = 0.5f; // slow cinematic default
+    public float ZoomLerpSpeed { get; set; } = 0.5f; // kept for cinematic override
+    private SecondOrderDynamics _zoomSpring;
+    private bool _zoomInitialized;
     
     // Smoothing — SecondOrderDynamics replaces raw lerp
     // f=3 (responsive), z=0.7 (slight underdamping for organic feel), r=0 (no anticipation)
@@ -27,8 +29,8 @@ public class Camera
     
     // Forward bias: offset camera ahead of facing direction
     private const float ForwardBias = 80f;
-    private const float BiasLerpSpeed = 3f;
-    private float _currentBias;
+    private SecondOrderDynamics _biasSpring;
+    private bool _biasInitialized;
     
     // Vertical: snap to ground, only follow sustained air
     private const float AirFollowDelay = 0.25f;
@@ -57,11 +59,9 @@ public class Camera
     
     public void Update(float dt, Vector2 playerPos, int playerWidth, int playerHeight, int facingDir, bool isGrounded, float velocityY)
     {
-        // Lerp zoom toward target
-        if (MathF.Abs(Zoom - TargetZoom) > 0.001f)
-            Zoom += (TargetZoom - Zoom) * ZoomLerpSpeed * dt;
-        else
-            Zoom = TargetZoom;
+        // Zoom — second-order dynamics for smooth zoom transitions
+        if (!_zoomInitialized) { _zoomSpring = new SecondOrderDynamics(2f, 0.9f, 0f, Zoom); _zoomInitialized = true; }
+        Zoom = _zoomSpring.Update(dt, TargetZoom);
         Zoom = MathHelper.Clamp(Zoom, 0.5f, 3f);
         
         float evw = EffectiveViewW;
@@ -70,16 +70,17 @@ public class Camera
         float playerCenterX = playerPos.X + playerWidth / 2f;
         float playerCenterY = playerPos.Y + playerHeight / 2f;
         
-        // --- Forward bias (smooth transition when turning) ---
+        // --- Forward bias (spring-driven for organic turn feel) ---
         float targetBias = facingDir * ForwardBias;
-        _currentBias += (targetBias - _currentBias) * BiasLerpSpeed * dt;
+        if (!_biasInitialized) { _biasSpring = new SecondOrderDynamics(1.5f, 0.6f, -0.5f, targetBias); _biasInitialized = true; }
+        float currentBias = _biasSpring.Update(dt, targetBias);
         
         // Camera center = where the camera is currently looking
         float camCenterX = Position.X + evw / 2f;
         float camCenterY = Position.Y + evh / 2f;
         
         // --- Horizontal: dead zone + forward bias ---
-        float idealX = playerCenterX + _currentBias;
+        float idealX = playerCenterX + currentBias;
         float diffX = idealX - camCenterX;
         float targetX;
         if (MathF.Abs(diffX) > DeadZoneX)
@@ -149,6 +150,8 @@ public class Camera
         Position = new Vector2(cx, cy);
         _lastGroundY = playerPos.Y + playerHeight / 2f;
         if (_springInitialized) { _smoothX.Reset(cx); _smoothY.Reset(cy); }
+        if (_zoomInitialized) { _zoomSpring.Reset(Zoom); }
+        if (_biasInitialized) { _biasSpring.Reset(0f); }
     }
     
     public Matrix TransformMatrix =>

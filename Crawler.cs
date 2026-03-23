@@ -89,6 +89,18 @@ public class Crawler : Creature
             _ => EcologicalRole.Herbivore,
         };
         SpeciesName = $"Crawler ({Variant})";
+        
+        // Personality through animation — variant-specific spring parameters
+        // f=frequency(speed), z=damping(bounce), r=response(anticipation)
+        (float f, float z, float r) = Variant switch
+        {
+            CrawlerVariant.Forager => (3f, 0.6f, 0f),       // calm, steady, no overshoot
+            CrawlerVariant.Skitter => (6f, 0.3f, -1.5f),    // nervous, jittery, strong anticipation
+            CrawlerVariant.Leaper => (5f, 0.4f, -2f),       // explosive, springy, big anticipation
+            CrawlerVariant.Bombardier => (2f, 0.9f, 0f),    // sluggish, heavy, critically damped
+            _ => (4f, 0.5f, -1f),
+        };
+        _bodyBobSpring?.SetParams(f, z, r);
     }
     public string ScanName => Variant switch
     {
@@ -131,6 +143,11 @@ public class Crawler : Creature
     
     // Second-order dynamics for organic body motion
     private SecondOrderDynamics _bodyBobSpring; // vertical bob responds to speed changes
+    
+    // Cached tile grid reference for line-of-sight checks
+    private TileGrid _tileGridRef;
+    private int _tileSizeRef;
+    private bool _hasTileGridRef;
 
     // Dummy mode: high HP, no aggro, respawns at original position
     public bool IsDummy;
@@ -207,6 +224,9 @@ public class Crawler : Creature
         TileGrid tileGrid, int tileSize,
         Rectangle[] platforms, Rectangle[] solidFloors, float floorY)
     {
+        // Cache tile grid for LOS checks
+        if (tileGrid != null) { _tileGridRef = tileGrid; _tileSizeRef = tileSize; _hasTileGridRef = true; }
+        
         if (!Alive)
         {
             if (IsDummy)
@@ -277,15 +297,19 @@ public class Crawler : Creature
             bool wasAggroed = Aggroed;
 
             // Only Leapers aggro; Foragers ignore player; Skitters flee
+            // Line-of-sight required for aggro/flee triggers
+            bool canSeePlayer = !_hasTileGridRef || HasLineOfSight(
+                Position + new Vector2(Width / 2f, Height / 2f), playerCenter);
+            
             if (Variant == CrawlerVariant.Leaper)
-                Aggroed = dist < AggroRange;
+                Aggroed = dist < AggroRange && canSeePlayer;
             else if (Variant == CrawlerVariant.Skitter)
                 Aggroed = false; // skitters don't aggro, they flee (handled below)
             else
                 Aggroed = false; // foragers never aggro
 
             // Skitter flee behavior
-            bool fleeing = Variant == CrawlerVariant.Skitter && dist < AggroRange;
+            bool fleeing = Variant == CrawlerVariant.Skitter && dist < AggroRange && canSeePlayer;
 
             // Keep flee timer alive
             if (fleeing) _fleeTimer = 1.5f + (float)_rng.NextDouble() * 1f; // flee 1.5-2.5s after last trigger
@@ -568,11 +592,16 @@ public class Crawler : Creature
             
             if (dist < BombardierRange && BombardierCooldown <= 0 && !BombardierCharging)
             {
-                // Start telegraph
-                BombardierCharging = true;
-                BombardierChargeTimer = BombardierChargeTime;
-                // Stop moving during charge
-                Velocity = new Vector2(0, Velocity.Y);
+                // Line-of-sight check — don't spray through walls
+                var myCenter = Position + new Vector2(EffectiveWidth / 2f, EffectiveHeight / 2f);
+                if (_hasTileGridRef && HasLineOfSight(myCenter, playerCenter))
+                {
+                    // Start telegraph
+                    BombardierCharging = true;
+                    BombardierChargeTimer = BombardierChargeTime;
+                    // Stop moving during charge
+                    Velocity = new Vector2(0, Velocity.Y);
+                }
             }
             
             if (BombardierCharging)
@@ -823,6 +852,34 @@ public class Crawler : Creature
         }
         if (!anyMoving && speed > 5f)
             _gaitGroup = 1 - _gaitGroup;
+    }
+
+    /// <summary>
+    /// Raycast through tile grid to check line of sight between two world points.
+    /// Returns false if any solid tile blocks the path.
+    /// </summary>
+    private bool HasLineOfSight(Vector2 from, Vector2 to)
+    {
+        if (!_hasTileGridRef) return true; // no grid = assume visible
+        var tg = _tileGridRef;
+        int ts = _tileSizeRef;
+        
+        var dir = to - from;
+        float dist = dir.Length();
+        if (dist < 1f) return true;
+        dir /= dist;
+        
+        // Step along ray in half-tile increments
+        float step = ts * 0.5f;
+        for (float d = step; d < dist; d += step)
+        {
+            float wx = from.X + dir.X * d;
+            float wy = from.Y + dir.Y * d;
+            var tile = tg.GetTile(wx, wy, ts);
+            if (TileProperties.IsSolid(tile))
+                return false;
+        }
+        return true;
     }
 
     public override void Draw(SpriteBatch sb, Texture2D pixel)
