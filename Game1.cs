@@ -3671,6 +3671,9 @@ public class Game1 : Game
         // Release — drop entity and rebuild
         if ((mouse.LeftButton == ButtonState.Released || !kb.IsKeyDown(Keys.T)) && _editorMovingEntity != null)
         {
+            // Snap shelter to ground on release
+            if (_editorMovingEntity is ShelterData shDrop)
+                shDrop.Y = SnapToSurface(shDrop.X, shDrop.Y - 32, 4, 0);
             _level.Build();
             SaveLevel();
             SpawnEnemiesFromLevel();
