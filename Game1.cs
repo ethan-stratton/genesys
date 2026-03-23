@@ -1649,7 +1649,7 @@ public class Game1 : Game
             }
 
             // Apply swarm state — once frenzied, PERMANENT (no undo)
-            float playerTargetX = _player.Position.X + _player.SpriteW / 2f;
+            float playerTargetX = _player.Position.X + Player.SpriteW / 2f;
             bool swarmJustStarted = false;
             foreach (var c in aliveCrawlers)
             {
@@ -1667,7 +1667,7 @@ public class Game1 : Game
                     if (_spawnInvincibility <= 0 && !_isDead)
                     {
                         var sRect = c.Rect;
-                        var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, _player.SpriteW, _player.SpriteH);
+                        var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.SpriteW, Player.SpriteH);
                         if (sRect.Intersects(pRect) && c.DamageCooldown <= 0)
                         {
                             int dmg = c.Variant == CrawlerVariant.Leaper ? 5 : 2;
