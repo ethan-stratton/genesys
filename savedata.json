@@ -1,17 +1,20 @@
 {
   "currentLevel": "test-arena",
-  "spawnX": 416,
-  "spawnY": 224,
+  "spawnX": 417.7093,
+  "spawnY": 216,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 14.983279,
+  "playTime": 140.14323,
   "meleeInventory": [],
   "rangedInventory": [],
   "meleeIndex": -1,
   "rangedIndex": -1,
-  "collectedItems": [],
+  "collectedItems": [
+    "grapple-1",
+    "grapple-2"
+  ],
   "windowSizeIndex": 0,
   "crtEnabled": false,
   "moveTier": 1,
