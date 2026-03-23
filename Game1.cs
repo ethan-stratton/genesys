@@ -2455,10 +2455,10 @@ public class Game1 : Game
             if (p.DamagesPlayer && p.Damage > 0 && _spawnInvincibility <= 0 && !_isDead)
             {
                 var pRect = new Rectangle((int)p.Position.X - p.Size / 2, (int)p.Position.Y - p.Size / 2, p.Size, p.Size);
-                if (pRect.Intersects(playerRect2))
+                if (pRect.Intersects(_player.CollisionRect))
                 {
-                    _player.CurrentHp -= p.Damage;
-                    _player.HitFlash = 0.15f;
+                    _player.Hp -= p.Damage;
+                    _shakeTimer = 0.05f; _shakeIntensity = 1f;
                     _particles.RemoveAt(i);
                     continue;
                 }
