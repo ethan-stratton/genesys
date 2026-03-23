@@ -41,6 +41,7 @@ public class Game1 : Game
     private float _prologueFadeAlpha;  // for fades between phases
     private bool _prologueSkipHeld;    // ESC hold-to-skip
     private float _prologueSkipTimer;  // 1.0s hold required
+    private bool _prologueSkipped;      // true if player skipped prologue (no EVE)
     
     // Wake-up cinematic sequence
     private float _wakeUpTimer;
@@ -945,6 +946,7 @@ public class Game1 : Game
                         SaveData.Delete();
                         _saveData = new SaveData();
                         _eveOrbActive = false;
+                        _prologueSkipped = false;
                         _eveDialogueExhausted = false;
                         _meleeInventory = Array.Empty<WeaponType>();
                         _meleeIndex = -1;
@@ -1236,6 +1238,9 @@ public class Game1 : Game
                                 _eveMode = EveMovementMode.Orbit;
                             });
                             EveAlert("Try to move. Carefully.", 3f);
+                            // Save EVE state so Continue remembers her
+                            _saveData.Flags["eveOrbActive"] = true;
+                            SyncInventoryToSave(); _saveData.Save();
                         }
                         break;
                     }
@@ -5747,6 +5752,7 @@ public class Game1 : Game
             _prologueSkipTimer += dt;
             if (_prologueSkipTimer >= 1.0f)
             {
+                _prologueSkipped = true;
                 StartFadeTo(GameState.TitleCard, 2f);
                 return;
             }
@@ -5912,16 +5918,27 @@ public class Game1 : Game
             _titleCardTimer = 0f;
             _fadeAlpha = 1f; // start gameplay from black, fade in
             
-            // Cinematic zoom: driven directly per-frame in wake-up phases
-            _camera.Zoom = 2.5f;
-            _camera.TargetZoom = 2.5f;
-            _camera.ZoomLerpSpeed = 0.5f;
-            _camera.SnapTo(_player.Position, Player.Width, Player.Height);
-            _wakeUpTimer = 0f;
-            _wakeUpPhase = 0;
-            // Adam starts lying down
-            _player.IsLyingDown = true;
-            _player.StandUpProgress = 0f;
+            if (_prologueSkipped)
+            {
+                // Skipped prologue — no wake-up, no EVE. Player must find her.
+                _wakeUpComplete = true;
+                _player.IsLyingDown = false;
+                _camera.Zoom = 1f;
+                _camera.TargetZoom = 1f;
+                _eveOrbActive = false;
+            }
+            else
+            {
+                // Full cinematic wake-up sequence
+                _camera.Zoom = 2.5f;
+                _camera.TargetZoom = 2.5f;
+                _camera.ZoomLerpSpeed = 0.5f;
+                _camera.SnapTo(_player.Position, Player.Width, Player.Height);
+                _wakeUpTimer = 0f;
+                _wakeUpPhase = 0;
+                _player.IsLyingDown = true;
+                _player.StandUpProgress = 0f;
+            }
         }
     }
 
@@ -8130,45 +8147,58 @@ public class Game1 : Game
             float orbX = _evePos.X, orbY = _evePos.Y;
             var playerCenter = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
             
-            // Triangulation scan during scan mode
+            // Triangulation scan — anchor at EVE, two morphing vertices on Adam
             if (_eveMode == EveMovementMode.Scan)
             {
-                float scanAlpha = 0.12f + 0.08f * MathF.Sin(_totalTime * 2f);
-                float scanY = playerCenter.Y + MathF.Sin(_totalTime * 1.5f) * 20f; // sweeps up and down Adam's body
+                float scanAlpha = 0.15f + 0.1f * MathF.Sin(_totalTime * 2.5f);
+                Vector2 anchor = new(orbX, orbY); // fixed point: EVE
                 
-                // Three scan lines from EVE to different points on Adam (triangulation)
-                float spreadY = 14f; // vertical spread of the triangle
-                Vector2 p1 = new(playerCenter.X - 2, scanY - spreadY); // top point
-                Vector2 p2 = new(playerCenter.X, scanY);                // center point  
-                Vector2 p3 = new(playerCenter.X - 2, scanY + spreadY); // bottom point
-                Vector2 eve = new(orbX, orbY);
+                // Two scan points that orbit/shift around Adam's body independently
+                float t1 = _totalTime * 1.3f;
+                float t2 = _totalTime * 0.9f + 2.1f; // offset phase so they're desynchronized
                 
-                // Draw three scan lines (pixel-by-pixel for thin lines)
-                void DrawScanLine(Vector2 a, Vector2 b, float alpha)
+                // Point A: traces an ellipse on Adam (wider horizontal, sweeps his torso)
+                Vector2 pA = new(
+                    playerCenter.X + MathF.Cos(t1) * 10f,
+                    playerCenter.Y + MathF.Sin(t1 * 1.7f) * 22f);
+                
+                // Point B: traces a different ellipse (narrower, different frequency)
+                Vector2 pB = new(
+                    playerCenter.X + MathF.Cos(t2 * 1.4f) * 8f,
+                    playerCenter.Y + MathF.Sin(t2) * 20f);
+                
+                // Draw the shifting triangle: EVE → A → B → EVE
+                void DrawScanLine(Vector2 a, Vector2 b, Color col)
                 {
                     int steps = (int)Math.Max(Math.Abs(b.X - a.X), Math.Abs(b.Y - a.Y));
                     if (steps < 1) return;
-                    for (int i = 0; i <= steps; i += 2) // every other pixel for dashed look
+                    for (int i = 0; i <= steps; i += 2)
                     {
-                        float t = i / (float)steps;
-                        int px = (int)MathHelper.Lerp(a.X, b.X, t);
-                        int py = (int)MathHelper.Lerp(a.Y, b.Y, t);
-                        _spriteBatch.Draw(_pixel, new Rectangle(px, py, 1, 1), Color.Cyan * alpha);
+                        float lt = i / (float)steps;
+                        int px = (int)MathHelper.Lerp(a.X, b.X, lt);
+                        int py = (int)MathHelper.Lerp(a.Y, b.Y, lt);
+                        _spriteBatch.Draw(_pixel, new Rectangle(px, py, 1, 1), col);
                     }
                 }
                 
-                DrawScanLine(eve, p1, scanAlpha * 0.7f);
-                DrawScanLine(eve, p2, scanAlpha);
-                DrawScanLine(eve, p3, scanAlpha * 0.7f);
+                var lineColor = Color.Cyan * scanAlpha;
+                var edgeColor = Color.Cyan * (scanAlpha * 1.2f); // brighter triangle edges on body
                 
-                // Small triangle outline on Adam's body (the scan target area)
-                DrawScanLine(p1, p2, scanAlpha * 0.5f);
-                DrawScanLine(p2, p3, scanAlpha * 0.5f);
-                DrawScanLine(p3, p1, scanAlpha * 0.5f);
+                // Two lines from EVE anchor to the moving points
+                DrawScanLine(anchor, pA, lineColor);
+                DrawScanLine(anchor, pB, lineColor);
                 
-                // Pulsing dot at scan center
-                float dotPulse = 0.4f + 0.4f * MathF.Sin(_totalTime * 4f);
-                _spriteBatch.Draw(_pixel, new Rectangle((int)p2.X - 1, (int)p2.Y - 1, 3, 3), Color.Cyan * dotPulse);
+                // Closing edge between the two scan points (the "base" of the triangle on Adam)
+                DrawScanLine(pA, pB, edgeColor);
+                
+                // Dots at the two moving vertices
+                float pulse = 0.5f + 0.5f * MathF.Sin(_totalTime * 5f);
+                _spriteBatch.Draw(_pixel, new Rectangle((int)pA.X - 1, (int)pA.Y - 1, 3, 3), Color.Cyan * pulse);
+                _spriteBatch.Draw(_pixel, new Rectangle((int)pB.X - 1, (int)pB.Y - 1, 3, 3), Color.Cyan * (1f - pulse)); // alternating pulse
+                
+                // Small crosshair at EVE anchor
+                _spriteBatch.Draw(_pixel, new Rectangle((int)anchor.X - 2, (int)anchor.Y, 5, 1), Color.Cyan * (scanAlpha * 0.6f));
+                _spriteBatch.Draw(_pixel, new Rectangle((int)anchor.X, (int)anchor.Y - 2, 1, 5), Color.Cyan * (scanAlpha * 0.6f));
             }
             
             // Sparks during wake-up (EVE is damaged/rebooting)
