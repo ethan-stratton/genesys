@@ -1146,9 +1146,9 @@ public class Game1 : Game
                         if (_wakeUpTimer >= 3f) { _wakeUpPhase = 2; _wakeUpTimer = 0; }
                         break;
                     }
-                    case 2: // EVE arrives + scans (0-4s) — zoom 1.9 → 1.2
+                    case 2: // EVE arrives + scans (0-8s) — zoom 1.9 → 1.2
                     {
-                        float t2 = _wakeUpTimer / 4f;
+                        float t2 = _wakeUpTimer / 8f;
                         float z2 = MathHelper.Lerp(1.9f, 1.2f, t2);
                         _camera.Zoom = z2;
                         _camera.TargetZoom = z2;
@@ -1170,7 +1170,7 @@ public class Game1 : Game
                                 EveAlert("Sys... systems rebooting. Adam? Can you hear me?", 4f);
                             };
                         }
-                        if (_wakeUpTimer >= 4f) { _wakeUpPhase = 3; _wakeUpTimer = 0; }
+                        if (_wakeUpTimer >= 8f) { _wakeUpPhase = 3; _wakeUpTimer = 0; }
                         break;
                     }
                     case 3: // Control given (0-2s) — zoom 1.2 → 1.0
