@@ -1,26 +1,22 @@
 {
   "currentLevel": "test-arena",
-  "spawnX": 118.49945,
-  "spawnY": 388,
+  "spawnX": 416,
+  "spawnY": 192,
   "unlockedAbilities": [],
   "flags": {},
-  "playTime": 17.616573,
-  "meleeInventory": [
-    "Stick"
-  ],
+  "playTime": 0,
+  "meleeInventory": [],
   "rangedInventory": [],
-  "meleeIndex": 0,
+  "meleeIndex": -1,
   "rangedIndex": -1,
-  "collectedItems": [
-    "stick-1"
-  ],
+  "collectedItems": [],
   "windowSizeIndex": 0,
   "crtEnabled": false,
   "moveTier": 1,
   "upgrades": [],
-  "shelterLevel": "test-arena",
-  "shelterX": 319.6119,
-  "shelterY": 471,
+  "shelterLevel": "",
+  "shelterX": 0,
+  "shelterY": 0,
   "deathCount": 0,
   "hp": 100
 }

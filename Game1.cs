@@ -4735,7 +4735,7 @@ public class Game1 : Game
         {
             foreach (var sh in _level.Shelters)
             {
-                int sx = (int)sh.X - 16, sy = (int)sh.Y - 24;
+                int sx = (int)sh.X - 16, sy = (int)sh.Y - 32;
                 _spriteBatch.Draw(_pixel, new Rectangle(sx, sy, 32, 32), new Color(50, 90, 35) * 0.6f);
                 _spriteBatch.Draw(_pixel, new Rectangle(sx + 12, sy + 12, 8, 16), new Color(90, 60, 30) * 0.8f);
                 DrawOutlinedString(_fontSmall, SafeText(sh.Name), new Vector2(sx - 4, sy - 14), Color.Green * 0.9f);
@@ -7595,7 +7595,7 @@ public class Game1 : Game
         {
             foreach (var sh in _level.Shelters)
             {
-                int sx = (int)sh.X - 16, sy = (int)sh.Y - 24;
+                int sx = (int)sh.X - 16, sy = (int)sh.Y - 32;
                 // Leaf shelter: triangular roof + trunk
                 var leafGreen = new Color(50, 90, 35);
                 var leafDark = new Color(30, 60, 20);
