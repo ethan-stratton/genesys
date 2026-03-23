@@ -485,11 +485,11 @@ public class Game1 : Game
     private bool _enemyVariantExpanded; // Right arrow expands variants
     private string SelectedEnemyType => EnemyCategories[_enemyCategoryCursor].variants[_enemyVariantCursor];
     private int _editorEnemyCursor; // legacy, unused now
-    private static readonly string[] ItemTypes = { "knife", "stick", "dagger", "sword", "axe", "club", "hammer", "greatsword", "greatclub", "whip", "sling", "bow", "gun", "heart" };
+    private static readonly string[] ItemTypes = { "knife", "grapple", "stick", "dagger", "sword", "axe", "club", "hammer", "greatsword", "greatclub", "whip", "sling", "bow", "gun", "heart" };
     private int _editorItemCursor;
 
     // Item placement palette (P key in editor)
-    private static readonly string[] ItemPaletteTypes = { "knife", "stick", "dagger", "sword", "axe", "club", "hammer", "greatsword", "greatclub", "whip", "sling", "bow", "gun", "heart", "shelter" };
+    private static readonly string[] ItemPaletteTypes = { "knife", "grapple", "stick", "dagger", "sword", "axe", "club", "hammer", "greatsword", "greatclub", "whip", "sling", "bow", "gun", "heart", "shelter" };
     private bool _itemPaletteOpen;
     private int _itemPaletteCursor;
     private bool _entityPaletteOpen;
@@ -934,6 +934,7 @@ public class Game1 : Game
                             // Skip wake-up on continue
                             _wakeUpComplete = true;
                             _player.IsLyingDown = false;
+                            _player.HasGrapple = _saveData?.CollectedItems?.Any(id => id.StartsWith("grapple")) == true;
                             _camera.Zoom = 1f;
                             _camera.TargetZoom = 1f;
 
@@ -1417,6 +1418,29 @@ public class Game1 : Game
         var mouseWorld = Vector2.Transform(mouseScreen, Matrix.Invert(_camera.TransformMatrix));
         _player.Update(dt, kb, _level.Floor.Y, _level.AllPlatforms, ropesToPass, ropeTopsToPass, ropeBottomsToPass, wallsToPass, wallSidesToPass, _level.WallRects, _level.CeilingRects, _level.SolidFloorRects, _level.TileGridInstance, mouseWorld, mouseState);
         _player.UpdateRegen(dt);
+        
+        // Grapple hook collision — check if hook hit solid terrain
+        if (_player.IsGrappleFiring && _level.TileGridInstance != null)
+        {
+            var hp = _player.GrappleHookPos;
+            int col = (int)(hp.X / 32);
+            int row = (int)(hp.Y / 32);
+            var grid = _level.TileGridInstance;
+            if (col >= 0 && col < grid.Cols && row >= 0 && row < grid.Rows)
+            {
+                var tile = grid.GetTile(col, row);
+                if (tile != TileType.Empty && tile != TileType.Water && tile != TileType.Lava && tile != TileType.Acid)
+                {
+                    // Hook hit solid terrain — attach
+                    _player.AttachGrapple(hp);
+                }
+            }
+            else
+            {
+                // Hook went off-grid — cancel
+                _player.CancelGrappleFire();
+            }
+        }
         }
 
         // Track play time
@@ -2441,6 +2465,7 @@ public class Game1 : Game
                     switch (item.ItemType)
                     {
                         case "knife": EquipMelee(WeaponType.Knife); break;
+                        case "grapple": _player.HasGrapple = true; EveAlert("Partially functional. Battery drain, but better than nothing.", 4f); break;
                         case "stick": EquipMelee(WeaponType.Stick); break;
                         case "whip": EquipMelee(WeaponType.Whip); break;
                         case "dagger": EquipMelee(WeaponType.Dagger); break;
@@ -4958,6 +4983,7 @@ public class Game1 : Game
                 var itemColor = item.ItemType switch
                 {
                     "knife" => new Color(200, 200, 210),
+                    "grapple" => new Color(70, 90, 110),
                     "stick" => new Color(139, 90, 43),
                     "whip" => new Color(100, 60, 30),
                     "dagger" => new Color(180, 180, 200),
@@ -7929,6 +7955,7 @@ public class Game1 : Game
                 var itemColor = item.ItemType switch
                 {
                     "knife" => new Color(200, 200, 210),
+                    "grapple" => new Color(70, 90, 110),
                     "stick" => new Color(139, 90, 43),
                     "whip" => new Color(100, 60, 30),
                     "dagger" => new Color(180, 180, 200),
@@ -8257,6 +8284,40 @@ public class Game1 : Game
         // Draw bullets
         _bullets.ForEach(b => b.Draw(_spriteBatch, _pixel));
 
+        // === Grapple rope + hook rendering ===
+        if (_player.IsGrappling || _player.IsGrappleFiring)
+        {
+            var playerCenter = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
+            var hookEnd = _player.IsGrappling ? _player.GrappleAnchor : _player.GrappleHookPos;
+            
+            // Draw rope (pixel-by-pixel line)
+            var ropeDiff = hookEnd - playerCenter;
+            int steps = (int)MathF.Max(MathF.Abs(ropeDiff.X), MathF.Abs(ropeDiff.Y));
+            if (steps > 0)
+            {
+                for (int i = 0; i <= steps; i += 2) // every other pixel for cable look
+                {
+                    float t = i / (float)steps;
+                    int rx = (int)MathHelper.Lerp(playerCenter.X, hookEnd.X, t);
+                    int ry = (int)MathHelper.Lerp(playerCenter.Y, hookEnd.Y, t);
+                    // Slight sag in the middle (catenary approximation)
+                    float sag = MathF.Sin(t * MathF.PI) * MathF.Min(8f, steps * 0.05f);
+                    ry += (int)sag;
+                    _spriteBatch.Draw(_pixel, new Rectangle(rx, ry, 1, 1), new Color(120, 120, 130));
+                }
+            }
+            
+            // Draw hook (small crosshair at anchor/hook position)
+            int hx = (int)hookEnd.X, hy = (int)hookEnd.Y;
+            _spriteBatch.Draw(_pixel, new Rectangle(hx - 2, hy, 5, 1), Color.White);
+            _spriteBatch.Draw(_pixel, new Rectangle(hx, hy - 2, 1, 5), Color.White);
+            
+            // Draw small indicator at player's hand
+            int handX = (int)playerCenter.X + _player.FacingDir * (Player.Width / 2);
+            int handY = (int)playerCenter.Y;
+            _spriteBatch.Draw(_pixel, new Rectangle(handX - 1, handY - 1, 3, 3), new Color(80, 80, 90));
+        }
+        
         // Draw crosshair reticle at mouse position (world space) — hidden during wake-up
         if (_wakeUpComplete)
         {
