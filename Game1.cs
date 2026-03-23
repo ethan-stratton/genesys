@@ -266,6 +266,86 @@ public class Game1 : Game
         _eveMessageTimer = duration;
     }
 
+    // EVE world position + movement system
+    private Vector2 _evePos;           // actual world position
+    private bool _evePosInitialized;
+    private enum EveMovementMode { Orbit, FlyTo, Scan }
+    private EveMovementMode _eveMode = EveMovementMode.Orbit;
+    private Vector2 _eveFlyTarget;     // target for FlyTo
+    private float _eveFlySpeed = 120f;
+    private Action? _eveFlyCallback;   // called when FlyTo arrives
+    
+    /// <summary>Command EVE to fly to a world position, then call onArrive.</summary>
+    private void EveFlyTo(Vector2 target, float speed = 120f, Action? onArrive = null)
+    {
+        _eveMode = EveMovementMode.FlyTo;
+        _eveFlyTarget = target;
+        _eveFlySpeed = speed;
+        _eveFlyCallback = onArrive;
+    }
+    
+    /// <summary>Get EVE's current orbit target position.</summary>
+    private Vector2 EveOrbitPos(Vector2 playerCenter, float time)
+    {
+        float angle = time * 2f;
+        return playerCenter + new Vector2(MathF.Cos(angle) * 30f, MathF.Sin(angle) * 30f);
+    }
+    
+    /// <summary>Get EVE's lissajous scan position.</summary>
+    private Vector2 EveScanPos(Vector2 playerCenter, float time)
+    {
+        float t = time * 1.2f;
+        return new Vector2(
+            playerCenter.X + 20f + MathF.Sin(t * 2f) * 12f,
+            playerCenter.Y + MathF.Sin(t) * 28f);
+    }
+    
+    /// <summary>Update EVE position each frame.</summary>
+    private void UpdateEvePosition(float dt, Vector2 playerCenter)
+    {
+        if (!_evePosInitialized)
+        {
+            _evePos = EveOrbitPos(playerCenter, _totalTime);
+            _evePosInitialized = true;
+        }
+        
+        switch (_eveMode)
+        {
+            case EveMovementMode.Orbit:
+            {
+                var target = EveOrbitPos(playerCenter, _totalTime);
+                _evePos += (target - _evePos) * Math.Min(1f, 6f * dt); // smooth follow
+                break;
+            }
+            case EveMovementMode.FlyTo:
+            {
+                var diff = _eveFlyTarget - _evePos;
+                float dist = diff.Length();
+                if (dist < 3f)
+                {
+                    _evePos = _eveFlyTarget;
+                    var cb = _eveFlyCallback;
+                    _eveFlyCallback = null;
+                    _eveMode = EveMovementMode.Orbit;
+                    cb?.Invoke();
+                }
+                else
+                {
+                    var dir = diff / dist;
+                    float speed = MathF.Min(_eveFlySpeed * dt, dist);
+                    _evePos += dir * speed;
+                }
+                break;
+            }
+            case EveMovementMode.Scan:
+            {
+                var target = EveScanPos(playerCenter, _totalTime);
+                _evePos += (target - _evePos) * Math.Min(1f, 4f * dt); // smooth follow to scan path
+                break;
+            }
+        }
+    }
+
     // --- Weather system ---
     private bool _weatherRain;
     private bool _weatherStorm;
@@ -969,6 +1049,13 @@ public class Game1 : Game
 
         _totalTime += dt;
         if (_eveMessageTimer > 0) _eveMessageTimer -= dt;
+        
+        // Update EVE position every frame
+        if (_eveOrbActive)
+        {
+            var pc = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
+            UpdateEvePosition(dt, pc);
+        }
 
         // Update retractable spike timer
         if (_level.TileGridInstance != null)
@@ -1037,12 +1124,14 @@ public class Game1 : Game
                 {
                     case 0: // Black screen, breathing sounds (0-2s)
                         _fadeAlpha = Math.Max(0.7f, 1f - _wakeUpTimer * 0.15f);
+                        _camera.SnapTo(_player.Position, Player.Width, Player.Height);
                         if (_wakeUpTimer >= 2f) { _wakeUpPhase = 1; _wakeUpTimer = 0; }
                         break;
                     case 1: // Eyes opening — fade lifts, camera still tight (0-3s)
                         _fadeAlpha = Math.Max(0f, 0.7f - _wakeUpTimer * 0.25f);
                         _camera.TargetZoom = 2.5f - _wakeUpTimer * 0.2f; // 2.5 → ~1.9
                         _camera.ZoomLerpSpeed = 8f; // fast tracking so it doesn't fight
+                        _camera.SnapTo(_player.Position, Player.Width, Player.Height);
                         if (_wakeUpTimer >= 3f) { _wakeUpPhase = 2; _wakeUpTimer = 0; }
                         break;
                     case 2: // Look around — camera pulls out more (0-4s)
@@ -1050,18 +1139,32 @@ public class Game1 : Game
                         _camera.ZoomLerpSpeed = 0.6f;
                         if (_wakeUpTimer >= 1.5f && !_eveOrbActive)
                         {
-                            // EVE boots up
+                            // EVE boots up — spawn off-screen right, fly to Adam
                             _eveOrbActive = true;
-                            EveAlert("Sys... systems rebooting. Adam? Can you hear me?", 4f);
+                            var pc = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
+                            _evePos = pc + new Vector2(80f, -40f); // start off to the right/above
+                            _evePosInitialized = true;
+                            _eveMode = EveMovementMode.FlyTo;
+                            _eveFlyTarget = EveScanPos(pc, _totalTime);
+                            _eveFlySpeed = 60f; // slow approach
+                            _eveFlyCallback = () => {
+                                _eveMode = EveMovementMode.Scan;
+                                EveAlert("Sys... systems rebooting. Adam? Can you hear me?", 4f);
+                            };
                         }
                         if (_wakeUpTimer >= 4f) { _wakeUpPhase = 3; _wakeUpTimer = 0; }
                         break;
                     case 3: // Control given — zoom settles to 1x (0-3s)
                         _camera.TargetZoom = 1f;
                         _camera.ZoomLerpSpeed = 0.4f;
-                        if (_wakeUpTimer >= 1f)
+                        if (_wakeUpTimer >= 1f && !_wakeUpComplete)
                         {
                             _wakeUpComplete = true;
+                            // Transition EVE from scan to orbit smoothly
+                            var pc3 = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
+                            EveFlyTo(EveOrbitPos(pc3, _totalTime), 80f, () => {
+                                _eveMode = EveMovementMode.Orbit;
+                            });
                             EveAlert("Try to move. Carefully.", 3f);
                         }
                         break;
@@ -1073,11 +1176,8 @@ public class Game1 : Game
                     float sparkRate = (_wakeUpPhase == 2) ? 8f : 4f; // more sparks early
                     if (_rng.NextDouble() < sparkRate * dt)
                     {
-                        // Match lissajous scan position
-                        float scanTime = _totalTime * 1.2f;
-                        var pc = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
-                        float ex = pc.X + 20f + MathF.Sin(scanTime * 2f) * 12f;
-                        float ey = pc.Y + MathF.Sin(scanTime) * 28f;
+                        float ex = _evePos.X;
+                        float ey = _evePos.Y;
                         float vx = (_rng.NextSingle() - 0.5f) * 80f;
                         float vy = -_rng.NextSingle() * 60f + 20f; // mostly upward/sideways
                         float life = 0.3f + _rng.NextSingle() * 0.5f;
@@ -7953,41 +8053,23 @@ public class Game1 : Game
         // Draw EVE orbiting companion
         if (_eveOrbActive && !_isDead)
         {
+            float orbX = _evePos.X, orbY = _evePos.Y;
             var playerCenter = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
-            float orbX, orbY;
             
-            if (!_wakeUpComplete)
+            // Scan line during scan mode
+            if (_eveMode == EveMovementMode.Scan)
             {
-                // Lissajous scan pattern — EVE scans Adam's body vertically
-                // Narrow horizontal, tall vertical: figure-8ish health scan
-                float scanTime = _totalTime * 1.2f; // gentle speed
-                float scanW = 12f;  // narrow horizontal range
-                float scanH = 28f;  // tall vertical range (covers Adam's body)
-                orbX = playerCenter.X + 20f + MathF.Sin(scanTime * 2f) * scanW;
-                orbY = playerCenter.Y + MathF.Sin(scanTime) * scanH;
-                
-                // Draw faint scan line from EVE to player
                 float scanAlpha = 0.15f + 0.1f * MathF.Sin(_totalTime * 2f);
                 int lineX1 = (int)orbX, lineY1 = (int)orbY;
-                int lineX2 = (int)playerCenter.X, lineY2 = (int)orbY;
+                int lineX2 = (int)playerCenter.X;
                 int lineW = Math.Abs(lineX2 - lineX1);
                 if (lineW > 0)
                     _spriteBatch.Draw(_pixel, new Rectangle(Math.Min(lineX1, lineX2), lineY1, lineW, 1), Color.Cyan * scanAlpha);
-            }
-            else
-            {
-                // Normal orbit
-                float angle = _totalTime * 2f;
-                float orbRadius = 30f;
-                orbX = playerCenter.X + MathF.Cos(angle) * orbRadius;
-                orbY = playerCenter.Y + MathF.Sin(angle) * orbRadius;
             }
             
             // Sparks during wake-up (EVE is damaged/rebooting)
             if (!_wakeUpComplete)
             {
-                float sparkIntensity = 1f - MathHelper.Clamp(_wakeUpPhase - 2 + _wakeUpTimer / 4f, 0, 1);
-                // Draw recent spark particles
                 foreach (var sp in _eveSparkParticles)
                 {
                     if (sp.Life <= 0) continue;
@@ -8014,7 +8096,6 @@ public class Game1 : Game
                 var msgSize = _fontSmall.MeasureString(_eveMessage);
                 float bubbleX = orbX - msgSize.X / 2f;
                 float bubbleY = orbY - 24 - msgSize.Y;
-                // Background
                 _spriteBatch.Draw(_pixel, new Rectangle((int)bubbleX - 4, (int)bubbleY - 2, (int)msgSize.X + 8, (int)msgSize.Y + 4), Color.Black * (0.7f * alpha));
                 DrawOutlinedString(_fontSmall, _eveMessage, new Vector2(bubbleX, bubbleY), Color.Cyan * alpha);
             }
