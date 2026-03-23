@@ -1,11 +1,9 @@
 # GENESIS — Master Task List: First 30 Minutes
-# Last updated: 2026-03-23
+# Last updated: 2026-03-22
 
 *Every task needed to make minutes 0-30 playable, fun, and shippable.*
 *Tasks are in dependency order. Build from top to bottom.*
 *[EXISTING] = already built in current prototype. [MODIFY] = needs changes. [NEW] = from scratch.*
-
-**Legend:** [x] = done, [~] = partial/placeholder, [ ] = not started
 
 ---
 
@@ -14,22 +12,22 @@
 
 ### 0.1 — Project Identity
 - [ ] 001. Rename project from "arena-shooter" to "genesis" (solution, namespaces, folder)
-- [x] 002. Create `GameState.Prologue` state (cutscene playback)
-- [x] 003. Create `GameState.Gameplay` state (replaces current gameplay, keeps editor)
-- [x] 004. Create `GameState.TitleCard` state (black screen + title text + fade)
-- [x] 005. Add state transition system: Prologue → TitleCard → Gameplay (with fade effects)
+- [ ] 002. Create `GameState.Prologue` state (cutscene playback)
+- [ ] 003. Create `GameState.Gameplay` state (replaces current gameplay, keeps editor)
+- [ ] 004. Create `GameState.TitleCard` state (black screen + title text + fade)
+- [ ] 005. Add state transition system: Prologue → TitleCard → Gameplay (with fade effects)
 
 ### 0.2 — Save/Load Foundation
-- [x] 006. Define `SaveData` class: player position, health, suit integrity, battery, inventory list, scavenger-killed flag, scan log, shelter-unlocked flags, world time, weather state
-- [x] 007. JSON serialize/deserialize for SaveData
-- [x] 008. Save trigger at shelter points (auto-save on rest)
-- [x] 009. Load on game start (if save exists) or start fresh
-- [x] 010. Death → reload last save (fade to black, respawn at shelter)
+- [ ] 006. Define `SaveData` class: player position, health, suit integrity, battery, inventory list, scavenger-killed flag, scan log, shelter-unlocked flags, world time, weather state
+- [ ] 007. JSON serialize/deserialize for SaveData
+- [ ] 008. Save trigger at shelter points (auto-save on rest)
+- [ ] 009. Load on game start (if save exists) or start fresh
+- [ ] 010. Death → reload last save (fade to black, respawn at shelter)
 
 ### 0.3 — Camera Overhaul
 - [x] 011. Basic camera follow player [EXISTING]
 - [ ] 012. Dynamic camera zoom: tight (10-tile view) during crash site, pulls back when entering forest
-- [x] 013. Camera zoom transition system (smooth lerp between zoom levels)
+- [ ] 013. Camera zoom transition system (smooth lerp between zoom levels)
 - [ ] 014. Camera bounds per area (don't show void beyond level edges)
 
 ---
@@ -48,7 +46,7 @@
 - [ ] 022. Remove/disable all advanced movement at game start (no slide, vault kick, blade dash, uppercut, cartwheel, flip — these are mid/late-game bio unlocks)
 - [ ] 023. Basic jump only — no double jump, no wall cling, no wall climb at start
 - [ ] 024. Crouch/duck under low obstacles (new, replaces slide for now)
-- [x] 025. Mouse-direction aiming system (replace 8-direction lock)
+- [ ] 025. Mouse-direction aiming system (replace 8-direction lock)
 - [ ] 026. Aim-assist when suit integrity > 50% (subtle crosshair magnetism, fades as suit degrades)
 
 ### 1.2 — Combat Knife (Melee)
@@ -93,7 +91,7 @@
 - [ ] 052. EVE visual states: healthy (bright, smooth orbit), damaged (flickering, erratic orbit), offline (dark, stationary)
 - [ ] 053. EVE boot sequence: spawn glitchy at minute 1:15, stabilize over 5 seconds
 - [ ] 054. EVE orb physics: shakes off water droplets in rain, recoils from explosions, dims when player kills passive creatures
-- [x] 055. EVE speech bubble system [EXISTING — modify for scan level colors]
+- [ ] 055. EVE speech bubble system [EXISTING — modify for scan level colors]
 
 ### 2.2 — Scan Level 1 (Passive)
 - [ ] 056. Auto-scan system: EVE detects scannable objects within radius (~6 tiles)
@@ -303,23 +301,23 @@
 *The 30-second hook.*
 
 ### 7.1 — Cutscene System
-- [x] 192. Cutscene state: disables player input, plays scripted sequence
-- [x] 193. Cutscene timeline: list of timed events (show image, play sound, display text, fade)
-- [x] 194. Skip option: hold [ESC] for 1 second to skip (don't let accident-skip)
+- [ ] 192. Cutscene state: disables player input, plays scripted sequence
+- [ ] 193. Cutscene timeline: list of timed events (show image, play sound, display text, fade)
+- [ ] 194. Skip option: hold [ESC] for 1 second to skip (don't let accident-skip)
 
 ### 7.2 — Prologue Scenes
-- [~] 195. Phase 1 art: Ship cockpit interior (pixel art, 320x180 or game resolution). Screens, stars, EVE orb
-- [~] 196. Phase 2 art: Adam's hands on controls. Signal display
-- [~] 197. Phase 3 art: Ship exterior descending into atmosphere, trailing smoke. Planet below
-- [~] 198. Phase 4 art: THE EYE. Single red mechanical eye on black. This needs to be ICONIC
-- [x] 199. Phase transitions: fade/cut between phases, white flash before the eye
-- [~] 200. Audio: ship alarm SFX, system failure SFX, EVE voice lines (text + SFX), impact SFX
-- [~] 201. The Dragon resonance sound: deep bass vibration, used during the Eye and again at minute 22
+- [ ] 195. Phase 1 art: Ship cockpit interior (pixel art, 320x180 or game resolution). Screens, stars, EVE orb
+- [ ] 196. Phase 2 art: Adam's hands on controls. Signal display
+- [ ] 197. Phase 3 art: Ship exterior descending into atmosphere, trailing smoke. Planet below
+- [ ] 198. Phase 4 art: THE EYE. Single red mechanical eye on black. This needs to be ICONIC
+- [ ] 199. Phase transitions: fade/cut between phases, white flash before the eye
+- [ ] 200. Audio: ship alarm SFX, system failure SFX, EVE voice lines (text + SFX), impact SFX
+- [ ] 201. The Dragon resonance sound: deep bass vibration, used during the Eye and again at minute 22
 
 ### 7.3 — Title Card
-- [x] 202. "GENESIS" text: large, centered, clean font. Appears on black
-- [~] 203. Ambient sound crossfade: silence → wind + wildlife during title hold
-- [x] 204. Fade to gameplay: title fades, camera fades in on Adam face-down
+- [ ] 202. "GENESIS" text: large, centered, clean font. Appears on black
+- [ ] 203. Ambient sound crossfade: silence → wind + wildlife during title hold
+- [ ] 204. Fade to gameplay: title fades, camera fades in on Adam face-down
 
 ---
 
@@ -487,8 +485,8 @@
 *What separates "functional" from "fun."*
 
 ### 13.1 — Screen Effects
-- [x] 318. Fade to black / fade from black (transitions, death, shelter rest)
-- [x] 319. Screen shake: on explosions, predator charge impact, Dragon scream
+- [ ] 318. Fade to black / fade from black (transitions, death, shelter rest)
+- [ ] 319. Screen shake: on explosions, predator charge impact, Dragon scream
 - [ ] 320. HUD glitch: random pixel displacement on HUD elements, intensity scales with suit damage
 - [ ] 321. Vignette: subtle edge darkening, increases in dark/foggy conditions
 - [ ] 322. White flash: prologue Phase 4 (before the Eye)
