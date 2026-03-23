@@ -167,3 +167,68 @@ Transition Genesis from sprite-based rectangle rendering to Rain World-style pro
 - Rain World GDC talks and devlog
 - Research notes: `video-research-2026-03-23-ecosystems.md`
 - Enemy design principles: `video-research-2026-03-23-enemies.md`
+
+---
+
+## Architecture Foundation (DO FIRST — prevents refactoring)
+
+These are structural decisions that become exponentially harder to change later. Lay them down before building more creatures.
+
+### 1. `Creature` Base Class
+- All enemies inherit: Crawler, Bird, Wingbeater, and all future types
+- Shared: Position, Velocity, Hp, MaxHp, Alive, HitFlash, VisualScale, Dir
+- Shared: CreatureNeeds (hunger, fatigue, safety)
+- Shared: CreatureId (persistent Guid, survives room transitions and save/load)
+- Shared: HomeNode, GoalNode (WorldNode references for long-range goals)
+- Shared: Update(dt), Draw(sb, pixel), TakeDamage(), Die()
+- Variant-specific behavior via override or composition
+
+### 2. `CreatureNeeds` Struct
+```
+float Hunger;    // 0 = full, 1 = starving. Increases over time.
+float Fatigue;   // 0 = rested, 1 = exhausted. Increases with activity.
+float Safety;    // 0 = terrified, 1 = safe. Decreases near threats.
+```
+Every creature carries this from spawn. Behavior systems read it later.
+
+### 3. `WorldNode` Graph
+- Each room/area = a node with Id, name, entry/exit points
+- Edges = connections between rooms (which exit leads where)
+- Creatures store CurrentNode + GoalNode
+- Off-screen creatures pathfind on this graph abstractly
+- On-screen creatures use full physics
+
+### 4. Persistent Creature IDs
+- Each creature gets a Guid at spawn
+- Save/load serializes creature state by Id
+- Room transitions preserve creature identity
+- Enables: reputation tracking, lineage, "this specific lizard remembers you"
+
+### Priority Order
+1. Creature base class (NOW — every new enemy type makes this harder)
+2. CreatureNeeds fields (NOW — just data, zero behavior change)
+3. Persistent IDs (NOW — trivial to add, painful to retrofit)
+4. WorldNode graph (SOON — before second area is built)
+5. Everything else (LATER — builds on top of these)
+
+## Off-Screen Simulation Design
+
+### How It Works
+- Player is in Room A. Creatures in Room B, C, D still exist.
+- Off-screen creatures run simplified tick every ~2 seconds:
+  - Advance along WorldNode graph toward GoalNode
+  - Consume needs (hunger++, fatigue++)
+  - Make decisions (find food, return home, flee predator)
+  - NO physics, NO collision, NO rendering
+- When creature's CurrentNode == player's room → materialize with full simulation
+- When player leaves a room → creatures in that room switch to off-screen mode
+
+### What This Enables
+- Enter a room and find two species already fighting
+- Creatures migrate between areas seeking food
+- Predators follow prey across rooms
+- Kill all crawlers in an area → they're actually gone (until lineage respawns)
+- The world has a pulse whether you're watching or not
+
+### Rain World's Key Insight
+"The player is just another creature. There are no special cases for the player."
