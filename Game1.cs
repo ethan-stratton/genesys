@@ -2970,11 +2970,11 @@ public class Game1 : Game
                 string itype = ItemPaletteTypes[_itemPaletteCursor];
                 if (itype == "shelter")
                 {
-                    // Place shelter
+                    // Place shelter base at bottom of grid cell (ground level)
                     var shelterList = new List<ShelterData>(_level.Shelters ?? Array.Empty<ShelterData>());
-                    shelterList.Add(new ShelterData { Id = $"shelter-{shelterList.Count}", X = cx, Y = cy, Name = "Leaf Shelter" });
+                    shelterList.Add(new ShelterData { Id = $"shelter-{shelterList.Count}", X = cx + 16, Y = cy + 32, Name = "Leaf Shelter" });
                     _level.Shelters = shelterList.ToArray();
-                    SetEditorStatus($"Placed shelter at ({(int)cx}, {(int)cy})");
+                    SetEditorStatus($"Placed shelter at ({(int)cx}, {(int)(cy + 32)})");
                 }
                 else
                 {

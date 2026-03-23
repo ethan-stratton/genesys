@@ -1,33 +1,26 @@
 {
   "currentLevel": "test-arena",
-  "spawnX": 213.3335,
-  "spawnY": 251.33292,
+  "spawnX": 118.49945,
+  "spawnY": 388,
   "unlockedAbilities": [],
-  "flags": {
-    "eveOrbActive": true
-  },
-  "playTime": 939.748,
+  "flags": {},
+  "playTime": 17.616573,
   "meleeInventory": [
-    "Stick",
-    "Hammer"
+    "Stick"
   ],
-  "rangedInventory": [
-    "Bow"
-  ],
-  "meleeIndex": 1,
-  "rangedIndex": 0,
+  "rangedInventory": [],
+  "meleeIndex": 0,
+  "rangedIndex": -1,
   "collectedItems": [
-    "stick-1",
-    "debug_bow_639098175594549170",
-    "hammer-0"
+    "stick-1"
   ],
-  "windowSizeIndex": 1,
+  "windowSizeIndex": 0,
   "crtEnabled": false,
   "moveTier": 1,
   "upgrades": [],
-  "shelterLevel": "",
-  "shelterX": 0,
-  "shelterY": 0,
+  "shelterLevel": "test-arena",
+  "shelterX": 319.6119,
+  "shelterY": 471,
   "deathCount": 0,
   "hp": 100
 }
