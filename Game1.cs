@@ -3082,7 +3082,7 @@ public class Game1 : Game
             _editorShowGrid = !_editorShowGrid;
 
         // Camera follows cursor
-        _camera.SnapTo(_editorCursor, 0, 0);
+        _camera.SnapTo(_editorCursor, 0, 0, unclamped: true);
 
         // Convert mouse to world coordinates
         var worldMouse = Vector2.Transform(

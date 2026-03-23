@@ -110,12 +110,15 @@ public class Camera
         Position = new Vector2(newX, newY);
     }
     
-    public void SnapTo(Vector2 playerPos, int playerWidth, int playerHeight)
+    public void SnapTo(Vector2 playerPos, int playerWidth, int playerHeight, bool unclamped = false)
     {
         float cx = playerPos.X + playerWidth / 2f - _viewWidth / 2f;
         float cy = playerPos.Y + playerHeight / 2f - _viewHeight / 2f;
-        cx = MathHelper.Clamp(cx, _worldLeft, _worldRight - _viewWidth);
-        cy = MathHelper.Clamp(cy, _worldTop, _worldBottom - _viewHeight);
+        if (!unclamped)
+        {
+            cx = MathHelper.Clamp(cx, _worldLeft, _worldRight - _viewWidth);
+            cy = MathHelper.Clamp(cy, _worldTop, _worldBottom - _viewHeight);
+        }
         Position = new Vector2(cx, cy);
         _lastGroundY = playerPos.Y + playerHeight / 2f;
     }

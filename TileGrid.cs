@@ -116,7 +116,7 @@ public static class TileProperties
         || (t >= TileType.RetractSpikesLeft && t <= TileType.RetractHalfSpikesRight);
     /// <summary>Full-size hazards only (for merged rect collision). Half spikes use per-tile hitboxes.</summary>
     public static bool IsFullHazard(TileType t) => t >= TileType.Spikes && t <= TileType.SpikesRight;
-    public static bool IsBackground(TileType t) => (int)t >= 100;
+    public static bool IsBackground(TileType t) => (int)t >= 100 && !IsRetractable(t);
     public static bool IsSlope(TileType t) => (t >= TileType.SlopeUpRight && t <= TileType.ShavedCeilLeft)
         || (t >= TileType.Gentle4UpRightA && t <= TileType.Gentle4UpLeftD)
         || (t >= TileType.Gentle4CeilRightA && t <= TileType.Gentle4CeilLeftD);
