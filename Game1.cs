@@ -277,11 +277,11 @@ public class Game1 : Game
     private Action? _eveFlyCallback;   // called when FlyTo arrives
     
     // EVE physics constants
-    private const float EveMaxSpeed = 200f;
-    private const float EveAccel = 400f;      // how fast she speeds up
-    private const float EveDrag = 4f;          // velocity damping (higher = more drag)
-    private const float EveOrbitAccel = 500f;  // orbit tracking force
-    private const float EveScanAccel = 350f;   // scan pattern tracking
+    private const float EveMaxSpeed = 350f;
+    private const float EveAccel = 600f;
+    private const float EveDrag = 3.5f;
+    private const float EveOrbitAccel = 800f;
+    private const float EveScanAccel = 500f;
     
     /// <summary>Command EVE to fly to a world position, then call onArrive.</summary>
     private void EveFlyTo(Vector2 target, float speed = 120f, Action? onArrive = null)
@@ -366,17 +366,21 @@ public class Game1 : Game
                 return;
         }
         
-        // Steering: accelerate toward target
+        // Steering: accelerate toward target — faster when far, ease near
         var toTarget = target - _evePos;
         float tDist = toTarget.Length();
         if (tDist > 0.5f)
         {
-            var desired = (toTarget / tDist) * Math.Min(accel, tDist * accel * 0.1f + accel * 0.5f);
+            // Distance-based multiplier: ramps up with distance, eases near target
+            float distMult = MathF.Min(3f, 0.3f + tDist / 30f); // 0.3x close, up to 3x far
+            var desired = (toTarget / tDist) * accel * distMult;
             _eveVel += desired * dt;
         }
         
-        // Drag
-        _eveVel *= MathF.Max(0f, 1f - drag * dt);
+        // Distance-based drag: more drag when close (braking), less when far (momentum)
+        float distFromPlayer = (playerCenter - _evePos).Length();
+        float dynamicDrag = drag * (0.6f + 0.8f / (1f + distFromPlayer / 40f));
+        _eveVel *= MathF.Max(0f, 1f - dynamicDrag * dt);
         
         // Clamp speed
         float speed = _eveVel.Length();
@@ -8126,15 +8130,45 @@ public class Game1 : Game
             float orbX = _evePos.X, orbY = _evePos.Y;
             var playerCenter = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
             
-            // Scan line during scan mode
+            // Triangulation scan during scan mode
             if (_eveMode == EveMovementMode.Scan)
             {
-                float scanAlpha = 0.15f + 0.1f * MathF.Sin(_totalTime * 2f);
-                int lineX1 = (int)orbX, lineY1 = (int)orbY;
-                int lineX2 = (int)playerCenter.X;
-                int lineW = Math.Abs(lineX2 - lineX1);
-                if (lineW > 0)
-                    _spriteBatch.Draw(_pixel, new Rectangle(Math.Min(lineX1, lineX2), lineY1, lineW, 1), Color.Cyan * scanAlpha);
+                float scanAlpha = 0.12f + 0.08f * MathF.Sin(_totalTime * 2f);
+                float scanY = playerCenter.Y + MathF.Sin(_totalTime * 1.5f) * 20f; // sweeps up and down Adam's body
+                
+                // Three scan lines from EVE to different points on Adam (triangulation)
+                float spreadY = 14f; // vertical spread of the triangle
+                Vector2 p1 = new(playerCenter.X - 2, scanY - spreadY); // top point
+                Vector2 p2 = new(playerCenter.X, scanY);                // center point  
+                Vector2 p3 = new(playerCenter.X - 2, scanY + spreadY); // bottom point
+                Vector2 eve = new(orbX, orbY);
+                
+                // Draw three scan lines (pixel-by-pixel for thin lines)
+                void DrawScanLine(Vector2 a, Vector2 b, float alpha)
+                {
+                    int steps = (int)Math.Max(Math.Abs(b.X - a.X), Math.Abs(b.Y - a.Y));
+                    if (steps < 1) return;
+                    for (int i = 0; i <= steps; i += 2) // every other pixel for dashed look
+                    {
+                        float t = i / (float)steps;
+                        int px = (int)MathHelper.Lerp(a.X, b.X, t);
+                        int py = (int)MathHelper.Lerp(a.Y, b.Y, t);
+                        _spriteBatch.Draw(_pixel, new Rectangle(px, py, 1, 1), Color.Cyan * alpha);
+                    }
+                }
+                
+                DrawScanLine(eve, p1, scanAlpha * 0.7f);
+                DrawScanLine(eve, p2, scanAlpha);
+                DrawScanLine(eve, p3, scanAlpha * 0.7f);
+                
+                // Small triangle outline on Adam's body (the scan target area)
+                DrawScanLine(p1, p2, scanAlpha * 0.5f);
+                DrawScanLine(p2, p3, scanAlpha * 0.5f);
+                DrawScanLine(p3, p1, scanAlpha * 0.5f);
+                
+                // Pulsing dot at scan center
+                float dotPulse = 0.4f + 0.4f * MathF.Sin(_totalTime * 4f);
+                _spriteBatch.Draw(_pixel, new Rectangle((int)p2.X - 1, (int)p2.Y - 1, 3, 3), Color.Cyan * dotPulse);
             }
             
             // Sparks during wake-up (EVE is damaged/rebooting)
