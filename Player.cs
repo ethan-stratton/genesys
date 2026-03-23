@@ -624,6 +624,40 @@ public class Player
                     (int)(hbCenterX - hw / 2f), (int)(hbCenterY - hh / 2f), hw, hh);
             }
 
+            if (CurrentWeapon == WeaponType.Knife)
+            {
+                // Combat knife: SF6-style straight jab hitbox
+                // Fixed rectangular box extending straight out from chest height
+                // No arc/swing — just extends and retracts (rapid stab)
+                int dir = MathF.Abs(AimDir.X) > 0.1f ? Math.Sign(AimDir.X) : FacingDir;
+                
+                // Hitbox dimensions: wide but short (like Ken's medium punch)
+                int knifeW = 28; // reach (horizontal)
+                int knifeH = 12; // narrow vertical profile (stabbing, not slashing)
+                
+                // Extension animation: snap out fast, hold briefly, retract
+                float t = MeleeTimer > 0 ? 1f - (MeleeTimer / CurrentMeleeActiveTime) : 1f;
+                float extend;
+                if (t < 0.15f)
+                    extend = t / 0.15f; // snap out (15% of duration)
+                else if (t < 0.7f)
+                    extend = 1f; // hold at full extension (55% of duration)
+                else
+                    extend = 1f - (t - 0.7f) / 0.3f; // retract (30% of duration)
+                
+                // Combo stabs: each step extends slightly further
+                float baseReach = 16f + _comboStep * 4f; // 16, 20, 24 pixels
+                float reachNow = baseReach * extend;
+                
+                // Position: chest height, extends in facing direction
+                float hbX = center.X + dir * (Width / 2f + reachNow);
+                float hbY = center.Y - 2f; // slightly above center (chest, not waist)
+                
+                MeleeSwingAngle = dir > 0 ? 0f : MathF.PI; // straight horizontal
+                return new Rectangle(
+                    (int)(hbX - knifeW / 2f), (int)(hbY - knifeH / 2f), knifeW, knifeH);
+            }
+
             // Tier-aware melee styles
             float t = MeleeTimer > 0 ? 1f - (MeleeTimer / CurrentMeleeActiveTime) : 1f;
             float baseAngle = MathF.Atan2(MeleeDirection.Y, MeleeDirection.X);
@@ -697,7 +731,8 @@ public class Player
             if (_comboWindow <= 0)
             {
                 // Combo window expired — reset combo and start cooldown
-                float cd = CurrentWeapon == WeaponType.Stick ? 0.35f : 0.25f;
+                float cd = CurrentWeapon == WeaponType.Stick ? 0.35f :
+                           CurrentWeapon == WeaponType.Knife ? 0.18f : 0.25f;
                 _comboCooldown = cd;
                 ResetCombo();
             }
@@ -1632,7 +1667,7 @@ public class Player
 
         if (HasMeleeWeapon && !IsSpinningMelee && kPressed && !_meleeHeld && _comboCooldown <= 0f)
         {
-            int maxCombo = CurrentWeapon == WeaponType.None ? 1 : 2; // Fists=2-hit, all others=3-hit
+            int maxCombo = CurrentWeapon == WeaponType.None ? 1 : 2; // Fists=2-hit, weapons=3-hit
             if (_comboStep == 0 && _comboWindow <= 0 && MeleeTimer <= 0)
             {
                 // First hit
@@ -1660,6 +1695,7 @@ public class Player
                 float finisherTime = CurrentWeapon switch
                 {
                     WeaponType.None => 0.08f,
+                    WeaponType.Knife => 0.08f,  // fast stab, same as fists
                     WeaponType.Dagger => 0.12f,
                     WeaponType.Stick => 0.14f,
                     WeaponType.Whip => 0.14f,
@@ -1676,6 +1712,7 @@ public class Player
                 // Forward burst scales by weapon
                 float burst = CurrentWeapon switch
                 {
+                    WeaponType.Knife => 80f,    // small forward lunge
                     WeaponType.Dagger => 100f,
                     WeaponType.Stick => 150f,
                     WeaponType.Sword => 180f,
@@ -2354,6 +2391,37 @@ public class Player
             spriteBatch.Draw(pixel,
                 new Rectangle(notchX, sqY + sqH / 2 - 3, 4, 6),
                 Color.LightGray);
+            
+            // Knife visual: small blade extending from hand
+            if (CurrentWeapon == WeaponType.Knife)
+            {
+                int handY = sqY + sqH / 2 - 1; // chest height
+                if (MeleeTimer > 0)
+                {
+                    // Stabbing: blade extends outward (matches hitbox extension)
+                    float t = 1f - (MeleeTimer / CurrentMeleeActiveTime);
+                    float extend;
+                    if (t < 0.15f) extend = t / 0.15f;
+                    else if (t < 0.7f) extend = 1f;
+                    else extend = 1f - (t - 0.7f) / 0.3f;
+                    int bladeLen = (int)(12f * extend);
+                    int bladeX = FacingDir == 1 ? sqX + sqW : sqX - bladeLen;
+                    spriteBatch.Draw(pixel, new Rectangle(bladeX, handY, bladeLen, 2), Color.Silver);
+                    // Blade tip highlight
+                    if (bladeLen > 3)
+                    {
+                        int tipX = FacingDir == 1 ? bladeX + bladeLen - 2 : bladeX;
+                        spriteBatch.Draw(pixel, new Rectangle(tipX, handY - 1, 2, 1), Color.White);
+                    }
+                }
+                else
+                {
+                    // Idle: short blade at side
+                    int bladeLen = 6;
+                    int bladeX = FacingDir == 1 ? sqX + sqW : sqX - bladeLen;
+                    spriteBatch.Draw(pixel, new Rectangle(bladeX, handY, bladeLen, 2), Color.Silver * 0.8f);
+                }
+            }
         }
     }
 

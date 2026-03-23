@@ -10,7 +10,7 @@ using FontStashSharp;
 
 namespace Genesis;
 
-public enum WeaponType { None, Stick, Whip, Dagger, Sword, GreatSword, Axe, Club, GreatClub, Hammer, Sling, Bow, Gun }
+public enum WeaponType { None, Knife, Stick, Whip, Dagger, Sword, GreatSword, Axe, Club, GreatClub, Hammer, Sling, Bow, Gun }
 
 public class ItemPickup
 {
@@ -485,11 +485,11 @@ public class Game1 : Game
     private bool _enemyVariantExpanded; // Right arrow expands variants
     private string SelectedEnemyType => EnemyCategories[_enemyCategoryCursor].variants[_enemyVariantCursor];
     private int _editorEnemyCursor; // legacy, unused now
-    private static readonly string[] ItemTypes = { "stick", "dagger", "sword", "axe", "club", "hammer", "greatsword", "greatclub", "whip", "sling", "bow", "gun", "heart" };
+    private static readonly string[] ItemTypes = { "knife", "stick", "dagger", "sword", "axe", "club", "hammer", "greatsword", "greatclub", "whip", "sling", "bow", "gun", "heart" };
     private int _editorItemCursor;
 
     // Item placement palette (P key in editor)
-    private static readonly string[] ItemPaletteTypes = { "stick", "dagger", "sword", "axe", "club", "hammer", "greatsword", "greatclub", "whip", "sling", "bow", "gun", "heart", "shelter" };
+    private static readonly string[] ItemPaletteTypes = { "knife", "stick", "dagger", "sword", "axe", "club", "hammer", "greatsword", "greatclub", "whip", "sling", "bow", "gun", "heart", "shelter" };
     private bool _itemPaletteOpen;
     private int _itemPaletteCursor;
     private bool _entityPaletteOpen;
@@ -2440,6 +2440,7 @@ public class Game1 : Game
                         _saveData.CollectedItems.Add(item.Id);
                     switch (item.ItemType)
                     {
+                        case "knife": EquipMelee(WeaponType.Knife); break;
                         case "stick": EquipMelee(WeaponType.Stick); break;
                         case "whip": EquipMelee(WeaponType.Whip); break;
                         case "dagger": EquipMelee(WeaponType.Dagger); break;
@@ -4956,6 +4957,7 @@ public class Game1 : Game
             {
                 var itemColor = item.ItemType switch
                 {
+                    "knife" => new Color(200, 200, 210),
                     "stick" => new Color(139, 90, 43),
                     "whip" => new Color(100, 60, 30),
                     "dagger" => new Color(180, 180, 200),
@@ -7926,6 +7928,7 @@ public class Game1 : Game
             {
                 var itemColor = item.ItemType switch
                 {
+                    "knife" => new Color(200, 200, 210),
                     "stick" => new Color(139, 90, 43),
                     "whip" => new Color(100, 60, 30),
                     "dagger" => new Color(180, 180, 200),
