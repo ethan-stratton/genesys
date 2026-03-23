@@ -268,12 +268,20 @@ public class Game1 : Game
 
     // EVE world position + movement system
     private Vector2 _evePos;           // actual world position
+    private Vector2 _eveVel;           // velocity
     private bool _evePosInitialized;
     private enum EveMovementMode { Orbit, FlyTo, Scan }
     private EveMovementMode _eveMode = EveMovementMode.Orbit;
     private Vector2 _eveFlyTarget;     // target for FlyTo
     private float _eveFlySpeed = 120f;
     private Action? _eveFlyCallback;   // called when FlyTo arrives
+    
+    // EVE physics constants
+    private const float EveMaxSpeed = 200f;
+    private const float EveAccel = 400f;      // how fast she speeds up
+    private const float EveDrag = 4f;          // velocity damping (higher = more drag)
+    private const float EveOrbitAccel = 500f;  // orbit tracking force
+    private const float EveScanAccel = 350f;   // scan pattern tracking
     
     /// <summary>Command EVE to fly to a world position, then call onArrive.</summary>
     private void EveFlyTo(Vector2 target, float speed = 120f, Action? onArrive = null)
@@ -284,72 +292,99 @@ public class Game1 : Game
         _eveFlyCallback = onArrive;
     }
     
-    /// <summary>Get EVE's current orbit target position.</summary>
+    /// <summary>Get EVE's current orbit target position (clockwise).</summary>
     private Vector2 EveOrbitPos(Vector2 playerCenter, float time)
     {
+        // Negative sin for clockwise to match scan direction
         float angle = time * 2f;
-        return playerCenter + new Vector2(MathF.Cos(angle) * 30f, MathF.Sin(angle) * 30f);
+        return playerCenter + new Vector2(MathF.Cos(angle) * 30f, -MathF.Sin(angle) * 30f);
     }
     
-    /// <summary>Get EVE's lissajous scan position.</summary>
-    /// <summary>Lissajous health scan — EVE traces a full figure-8 beside Adam.</summary>
+    /// <summary>Lissajous health scan — EVE traces a full figure-8 beside Adam (clockwise).</summary>
     private Vector2 EveScanPos(Vector2 playerCenter, float time)
     {
-        // Lissajous: x = A*sin(at + δ), y = B*sin(bt)
-        // a:b = 2:1 gives figure-8, phase shift δ = π/4 tilts it
-        float t = time * 0.8f; // slow, deliberate scan pace
-        float xAmp = 18f;     // horizontal spread
-        float yAmp = 36f;     // vertical range (head to feet)
-        float xOffset = 24f;  // hover to Adam's right
+        float t = time * 0.8f;
+        float xAmp = 18f;
+        float yAmp = 36f;
+        float xOffset = 24f;
         return new Vector2(
             playerCenter.X + xOffset + MathF.Sin(t * 2f + MathF.PI * 0.25f) * xAmp,
-            playerCenter.Y + MathF.Sin(t) * yAmp);
+            playerCenter.Y - MathF.Sin(t) * yAmp); // negative to match orbit rotation
     }
     
-    /// <summary>Update EVE position each frame.</summary>
+    /// <summary>Update EVE position each frame using velocity-based physics.</summary>
     private void UpdateEvePosition(float dt, Vector2 playerCenter)
     {
         if (!_evePosInitialized)
         {
             _evePos = EveOrbitPos(playerCenter, _totalTime);
+            _eveVel = Vector2.Zero;
             _evePosInitialized = true;
         }
+        
+        // Calculate desired target based on mode
+        Vector2 target;
+        float accel;
+        float drag;
         
         switch (_eveMode)
         {
             case EveMovementMode.Orbit:
-            {
-                var target = EveOrbitPos(playerCenter, _totalTime);
-                _evePos += (target - _evePos) * Math.Min(1f, 6f * dt); // smooth follow
+                target = EveOrbitPos(playerCenter, _totalTime);
+                accel = EveOrbitAccel;
+                drag = EveDrag;
                 break;
-            }
+            case EveMovementMode.Scan:
+                target = EveScanPos(playerCenter, _totalTime);
+                accel = EveScanAccel;
+                drag = EveDrag * 0.8f; // slightly less drag for smoother scan
+                break;
             case EveMovementMode.FlyTo:
             {
                 var diff = _eveFlyTarget - _evePos;
                 float dist = diff.Length();
-                if (dist < 3f)
+                if (dist < 6f && _eveVel.Length() < 20f)
                 {
+                    // Arrived
                     _evePos = _eveFlyTarget;
+                    _eveVel *= 0.5f;
                     var cb = _eveFlyCallback;
                     _eveFlyCallback = null;
                     _eveMode = EveMovementMode.Orbit;
                     cb?.Invoke();
+                    return;
                 }
-                else
-                {
-                    var dir = diff / dist;
-                    float speed = MathF.Min(_eveFlySpeed * dt, dist);
-                    _evePos += dir * speed;
-                }
+                // Accelerate toward target, decelerate near it
+                float decelDist = _eveFlySpeed * 0.8f; // start slowing down
+                float speedMult = dist < decelDist ? (dist / decelDist) * 0.8f + 0.2f : 1f;
+                target = _eveFlyTarget;
+                accel = EveAccel * speedMult * (_eveFlySpeed / 120f);
+                drag = EveDrag * 0.5f; // less drag during fly-to for momentum
                 break;
             }
-            case EveMovementMode.Scan:
-            {
-                var target = EveScanPos(playerCenter, _totalTime);
-                _evePos += (target - _evePos) * Math.Min(1f, 4f * dt); // smooth follow to scan path
-                break;
-            }
+            default:
+                return;
         }
+        
+        // Steering: accelerate toward target
+        var toTarget = target - _evePos;
+        float tDist = toTarget.Length();
+        if (tDist > 0.5f)
+        {
+            var desired = (toTarget / tDist) * Math.Min(accel, tDist * accel * 0.1f + accel * 0.5f);
+            _eveVel += desired * dt;
+        }
+        
+        // Drag
+        _eveVel *= MathF.Max(0f, 1f - drag * dt);
+        
+        // Clamp speed
+        float speed = _eveVel.Length();
+        if (speed > EveMaxSpeed)
+            _eveVel = (_eveVel / speed) * EveMaxSpeed;
+        
+        // Integrate
+        _evePos += _eveVel * dt;
     }
 
     // --- Weather system ---
