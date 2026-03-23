@@ -671,45 +671,41 @@ public class Crawler
     private void InitLegs()
     {
         Legs = new IKLeg[LegCount];
-        // Variant-specific leg dimensions
         float upper, lower;
         switch (Variant)
         {
-            case CrawlerVariant.Skitter: upper = 5f; lower = 5f; break;
-            case CrawlerVariant.Leaper: upper = 4f; lower = 6f; break;  // longer lower = grasshopper
-            case CrawlerVariant.Bombardier: upper = 3f; lower = 3f; break; // stubby
-            default: upper = 3.5f; lower = 3.5f; break; // Forager
+            case CrawlerVariant.Skitter: upper = 9f; lower = 9f; break;
+            case CrawlerVariant.Leaper: upper = 7f; lower = 11f; break;
+            case CrawlerVariant.Bombardier: upper = 5f; lower = 5f; break;
+            default: upper = 7f; lower = 7f; break; // Forager
         }
 
         float bodyW = EffectiveWidth;
         float bodyH = EffectiveHeight;
-        // 3 legs per side, evenly spaced along body length
         for (int i = 0; i < LegCount; i++)
         {
             bool rightSide = i < 3;
-            int legIndex = rightSide ? i : i - 3; // 0,1,2 per side
-            float xFrac = 0.2f + legIndex * 0.3f; // 0.2, 0.5, 0.8 along body
+            int legIndex = rightSide ? i : i - 3;
+            float xFrac = 0.15f + legIndex * 0.35f; // 0.15, 0.5, 0.85
 
-            // Leaper: rear legs longer
             float thisUpper = upper;
             float thisLower = lower;
             if (Variant == CrawlerVariant.Leaper && legIndex == 2)
             {
-                thisUpper *= 1.4f;
-                thisLower *= 1.4f;
+                thisUpper *= 1.5f;
+                thisLower *= 1.5f;
             }
 
             Legs[i].UpperLen = thisUpper;
             Legs[i].LowerLen = thisLower;
             Legs[i].HipOffset = new Vector2(
                 (xFrac - 0.5f) * bodyW,
-                bodyH * 0.3f  // hips near bottom of body
+                bodyH * 0.3f
             );
 
-            // Initial foot position: directly below hip, on the ground
             float hipWorldX = Position.X + bodyW * xFrac;
-            float footY = Position.Y + bodyH + thisUpper + thisLower * 0.5f;
-            float footXSpread = rightSide ? 3f : -3f;
+            float footY = Position.Y + bodyH + thisUpper * 0.6f;
+            float footXSpread = rightSide ? 6f : -6f;
             Legs[i].FootPos = new Vector2(hipWorldX + footXSpread, footY);
             Legs[i].FootTarget = Legs[i].FootPos;
         }
@@ -724,28 +720,40 @@ public class Crawler
         Vector2 bodyCenter = new(Position.X + bodyW * 0.5f, Position.Y + bodyH * 0.5f);
         float speed = MathF.Abs(Velocity.X);
 
+        // When latched or airborne, legs dangle — no ground targeting
+        bool dangling = IsLatched || !_onGround;
+
         for (int i = 0; i < LegCount; i++)
         {
             bool rightSide = i < 3;
             int legIndex = rightSide ? i : i - 3;
-            float xFrac = 0.2f + legIndex * 0.3f;
+            float xFrac = 0.15f + legIndex * 0.35f;
 
-            // Compute hip world position
             Vector2 hipLocal = Legs[i].HipOffset;
-            if (Dir < 0) hipLocal.X = -hipLocal.X; // mirror for facing direction
+            if (Dir < 0) hipLocal.X = -hipLocal.X;
             Vector2 hip = bodyCenter + hipLocal;
 
-            // Ideal foot target: below hip + spread outward + forward offset based on velocity
-            float spreadX = rightSide ? 3.5f : -3.5f;
-            float velOffset = Velocity.X * 0.04f; // lean into movement
-            float footTargetX = hip.X + spreadX + velOffset;
-            float footTargetY = Position.Y + bodyH + 1f; // ground level (just below body)
+            if (dangling)
+            {
+                // Legs dangle downward with slight sway
+                float sway = MathF.Sin((_antennaeTimer + i * 1.1f) * 4f) * 2f;
+                float spreadX = rightSide ? 2f : -2f;
+                Legs[i].FootTarget = hip + new Vector2(spreadX + sway, Legs[i].UpperLen + Legs[i].LowerLen * 0.7f);
+                // Smoothly move feet toward dangle position
+                Legs[i].FootPos = Vector2.Lerp(Legs[i].FootPos, Legs[i].FootTarget, dt * 12f);
+                Legs[i].IsMoving = false;
+                continue;
+            }
+
+            // Ground-based foot targeting
+            float spreadXGround = rightSide ? 7f : -7f;
+            float velOffset = Velocity.X * 0.05f;
+            float footTargetX = hip.X + spreadXGround + velOffset;
+            float footTargetY = Position.Y + bodyH + 1f;
 
             Legs[i].FootTarget = new Vector2(footTargetX, footTargetY);
 
-            // Check if this leg needs to step
             float distToTarget = Vector2.Distance(Legs[i].FootPos, Legs[i].FootTarget);
-            // Tripod gait: legs 0,2,4 step together, 1,3,5 step together
             int myGroup = (i % 2 == 0) ? 0 : 1;
 
             if (!Legs[i].IsMoving && distToTarget > IKLeg.StepThreshold && myGroup == _gaitGroup)
@@ -755,7 +763,6 @@ public class Crawler
                 Legs[i].StepFrom = Legs[i].FootPos;
             }
 
-            // Animate step
             if (Legs[i].IsMoving)
             {
                 Legs[i].StepTimer += dt / IKLeg.StepDuration;
@@ -768,16 +775,14 @@ public class Crawler
                 else
                 {
                     float t = Legs[i].StepTimer;
-                    // Smooth step with arc
-                    float smoothT = t * t * (3f - 2f * t); // smoothstep
+                    float smoothT = t * t * (3f - 2f * t);
                     Legs[i].FootPos = Vector2.Lerp(Legs[i].StepFrom, Legs[i].FootTarget, smoothT);
-                    // Arc upward in middle of step
                     Legs[i].FootPos.Y -= MathF.Sin(t * MathF.PI) * IKLeg.StepHeight;
                 }
             }
         }
 
-        // Alternate gait groups when any leg in current group finishes
+        // Alternate gait groups
         bool anyMoving = false;
         for (int i = 0; i < LegCount; i++)
         {
@@ -830,11 +835,11 @@ public class Crawler
                 Vector2 knee = IKLeg.SolveKnee(hip, foot, Legs[i].UpperLen, Legs[i].LowerLen, sideBias);
 
                 // Draw upper leg (hip → knee)
-                DrawLine(sb, pixel, hip, knee, 2, legColor);
+                DrawLine(sb, pixel, hip, knee, 3, legColor);
                 // Draw lower leg (knee → foot)
-                DrawLine(sb, pixel, knee, foot, 1, legColor);
+                DrawLine(sb, pixel, knee, foot, 2, legColor);
                 // Foot dot
-                sb.Draw(pixel, new Rectangle((int)foot.X, (int)foot.Y, 2, 1), legColor);
+                sb.Draw(pixel, new Rectangle((int)foot.X - 1, (int)foot.Y, 3, 2), legColor);
             }
         }
         else

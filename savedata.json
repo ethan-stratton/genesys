@@ -1,12 +1,12 @@
 {
-  "currentLevel": "test-arena",
-  "spawnX": 452.00128,
-  "spawnY": 216,
+  "currentLevel": "debug-room",
+  "spawnX": 1721.222,
+  "spawnY": 584,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 47.632782,
+  "playTime": 126.02911,
   "meleeInventory": [
     "Knife"
   ],
