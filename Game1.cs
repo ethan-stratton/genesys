@@ -46,6 +46,10 @@ public class Game1 : Game
     private float _wakeUpTimer;
     private int _wakeUpPhase;          // 0=blackout, 1=eyes opening, 2=look around, 3=control given
     private bool _wakeUpComplete;
+    
+    // EVE spark particles (during boot-up)
+    private struct EveSpark { public float X, Y, VX, VY, Life, MaxLife; public bool IsBlue; }
+    private List<EveSpark> _eveSparkParticles = new();
     private float _titleCardTimer;     // 3-second "GENESIS" display
     private float _titleCardFade;      // fade in/out alpha
     private float _tierSwitchFlash;    // flash timer on tier change
@@ -1062,6 +1066,36 @@ public class Game1 : Game
                         }
                         break;
                 }
+                // Update EVE sparks during wake-up
+                if (_eveOrbActive)
+                {
+                    // Spawn sparks from EVE's position
+                    float sparkRate = (_wakeUpPhase == 2) ? 8f : 4f; // more sparks early
+                    if (_rng.NextDouble() < sparkRate * dt)
+                    {
+                        float angle = _totalTime * 0.5f; // slow orbit during boot
+                        float orbRadius = 30f;
+                        var pc = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
+                        float ex = pc.X + MathF.Cos(angle) * orbRadius;
+                        float ey = pc.Y + MathF.Sin(angle) * orbRadius;
+                        float vx = (_rng.NextSingle() - 0.5f) * 80f;
+                        float vy = -_rng.NextSingle() * 60f + 20f; // mostly upward/sideways
+                        float life = 0.3f + _rng.NextSingle() * 0.5f;
+                        _eveSparkParticles.Add(new EveSpark { X = ex, Y = ey, VX = vx, VY = vy, Life = life, MaxLife = life, IsBlue = _rng.NextDouble() > 0.4 });
+                    }
+                }
+                // Update existing sparks
+                for (int si = _eveSparkParticles.Count - 1; si >= 0; si--)
+                {
+                    var sp = _eveSparkParticles[si];
+                    sp.X += sp.VX * dt;
+                    sp.Y += sp.VY * dt;
+                    sp.VY += 120f * dt; // gravity on sparks
+                    sp.Life -= dt;
+                    if (sp.Life <= 0) { _eveSparkParticles.RemoveAt(si); continue; }
+                    _eveSparkParticles[si] = sp;
+                }
+                _totalTime += dt; // keep _totalTime advancing for orbit
                 // Block player input during wake-up
                 _prevKb = kb;
                 _prevMouse = Mouse.GetState();
@@ -7922,15 +7956,49 @@ public class Game1 : Game
         // Draw EVE orbiting companion
         if (_eveOrbActive && !_isDead)
         {
-            float angle = _totalTime * 2f;
+            // Orbit speed: sluggish during wake-up, normal after
+            float orbitSpeed;
+            if (!_wakeUpComplete)
+            {
+                // Slow, stuttering orbit during boot-up
+                float bootProgress = MathHelper.Clamp((_wakeUpPhase - 2 + _wakeUpTimer / 4f), 0, 1);
+                orbitSpeed = 0.3f + bootProgress * 1.7f; // 0.3 → 2.0
+                // Add jitter/stutter
+                orbitSpeed += MathF.Sin(_totalTime * 12f) * 0.15f * (1f - bootProgress);
+            }
+            else
+                orbitSpeed = 2f;
+            
+            float angle = _totalTime * orbitSpeed;
             float orbRadius = 30f;
             var playerCenter = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
             float orbX = playerCenter.X + MathF.Cos(angle) * orbRadius;
             float orbY = playerCenter.Y + MathF.Sin(angle) * orbRadius;
-            // Outer glow
-            _spriteBatch.Draw(_pixel, new Rectangle((int)(orbX - 6), (int)(orbY - 6), 12, 12), Color.CornflowerBlue * 0.4f);
-            // Core
-            _spriteBatch.Draw(_pixel, new Rectangle((int)(orbX - 4), (int)(orbY - 4), 8, 8), Color.Cyan);
+            
+            // Sparks during wake-up (EVE is damaged/rebooting)
+            if (!_wakeUpComplete)
+            {
+                float sparkIntensity = 1f - MathHelper.Clamp(_wakeUpPhase - 2 + _wakeUpTimer / 4f, 0, 1);
+                // Draw recent spark particles
+                foreach (var sp in _eveSparkParticles)
+                {
+                    if (sp.Life <= 0) continue;
+                    float a = sp.Life / sp.MaxLife;
+                    var sparkColor = sp.IsBlue ? Color.Cyan * (a * 0.9f) : Color.Yellow * (a * 0.8f);
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)sp.X, (int)sp.Y, sp.IsBlue ? 2 : 1, sp.IsBlue ? 2 : 1), sparkColor);
+                }
+            }
+            
+            // Outer glow (flickers during boot)
+            float glowAlpha = 0.4f;
+            if (!_wakeUpComplete)
+                glowAlpha *= 0.3f + 0.7f * (0.5f + 0.5f * MathF.Sin(_totalTime * 8f));
+            _spriteBatch.Draw(_pixel, new Rectangle((int)(orbX - 6), (int)(orbY - 6), 12, 12), Color.CornflowerBlue * glowAlpha);
+            // Core (flickers during boot)
+            float coreAlpha = 1f;
+            if (!_wakeUpComplete)
+                coreAlpha = 0.4f + 0.6f * (0.5f + 0.5f * MathF.Sin(_totalTime * 15f));
+            _spriteBatch.Draw(_pixel, new Rectangle((int)(orbX - 4), (int)(orbY - 4), 8, 8), Color.Cyan * coreAlpha);
             // EVE speech bubble
             if (_eveMessageTimer > 0 && !string.IsNullOrEmpty(_eveMessage))
             {
