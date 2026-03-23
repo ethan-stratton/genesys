@@ -4,25 +4,26 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace Genesis;
 
-public class Thornback
+public class Thornback : Creature
 {
-    public Vector2 Position;
-    public bool Alive = true;
-    public int Hp = 20;
     public const int Width = 32, Height = 28;
     public float DamageCooldown;
-    public float HitFlash;
     public float MeleeHitCooldown;
-    public Vector2 VisualScale = Vector2.One;
     public float SquashResistance = 0.7f;
     private float _squashHoldTimer;
 
     public Thornback(Vector2 pos)
     {
         Position = pos;
+        Hp = 20; MaxHp = 20;
+        SpeciesName = "Thornback";
+        Role = EcologicalRole.Defensive;
+        Needs = CreatureNeeds.Default;
     }
 
-    public Rectangle Rect => new((int)Position.X, (int)Position.Y, Width, Height);
+    public override int CreatureWidth => Width;
+    public override int CreatureHeight => Height;
+    public override Rectangle Rect => new((int)Position.X, (int)Position.Y, Width, Height);
 
     public void Update(float dt)
     {
@@ -60,7 +61,7 @@ public class Thornback
         return false;
     }
 
-    public void Draw(SpriteBatch sb, Texture2D pixel)
+    public override void Draw(SpriteBatch sb, Texture2D pixel)
     {
         if (!Alive) return;
         Color baseColor = HitFlash > 0 ? Color.White : new Color(60, 100, 30);

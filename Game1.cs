@@ -150,6 +150,9 @@ public class Game1 : Game
     private List<Bird> _birds = new();
     private List<Wingbeater> _wingbeaters = new();
 
+    // Unified creature list — ALL creatures go here. Typed lists above are derived views.
+    private List<Creature> _creatures = new();
+
     private Random _rng;
 
     private bool _isDead;
@@ -585,6 +588,7 @@ public class Game1 : Game
 
         // Clear enemies (SpawnEnemiesFromLevel re-populates if needed)
         _swarms.Clear();
+        _creatures.Clear();
         _crawlers.Clear();
         _hoppers.Clear();
         _thornbacks.Clear();
@@ -681,6 +685,7 @@ public class Game1 : Game
     private void SpawnEnemiesFromLevel()
     {
         _swarms.Clear();
+        _creatures.Clear();
         _crawlers.Clear();
         _hoppers.Clear();
         _thornbacks.Clear();
@@ -718,26 +723,28 @@ public class Game1 : Game
                     else c.Variant = CrawlerVariant.Forager;
                     c.ApplyVariantRole();
                     c.UpdateSurfaceEdges(tg, ts, plats, sFloors, bLeft, bRight);
-                    _crawlers.Add(c);
+                    _crawlers.Add(c); _creatures.Add(c);
                     break;
                 case "thornback":
                     float tSnapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Thornback.Width, Thornback.Height, tg, ts, plats, sFloors, walls, mainFloor);
-                    _thornbacks.Add(new Thornback(new Vector2(e.X, tSnapY)));
+                    var tb = new Thornback(new Vector2(e.X, tSnapY));
+                    _thornbacks.Add(tb); _creatures.Add(tb);
                     break;
                 case "hopper":
                     float hSnapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Hopper.Width, Hopper.Height, tg, ts, plats, sFloors, walls, mainFloor);
-                    _hoppers.Add(new Hopper(new Vector2(e.X, hSnapY), hSnapY + Hopper.Height));
+                    var hop = new Hopper(new Vector2(e.X, hSnapY), hSnapY + Hopper.Height);
+                    _hoppers.Add(hop); _creatures.Add(hop);
                     break;
                 case "bird":
                     float bSnapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Bird.Width, Bird.Height, tg, ts, plats, sFloors, walls, mainFloor);
                     var bird = new Bird(new Vector2(e.X, bSnapY), 0, 0, _rng);
                     bird.UpdateSurfaceEdges(tg, ts, plats, sFloors, bLeft, bRight);
-                    _birds.Add(bird);
+                    _birds.Add(bird); _creatures.Add(bird);
                     break;
                 case "wingbeater":
                     var wb = new Wingbeater(new Vector2(e.X, e.Y));
                     wb.Passive = e.Passive;
-                    _wingbeaters.Add(wb);
+                    _wingbeaters.Add(wb); _creatures.Add(wb);
                     break;
                 case "dummy":
                     float dSnapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Crawler.Width, Crawler.Height, tg, ts, plats, sFloors, walls, mainFloor);
@@ -750,7 +757,7 @@ public class Game1 : Game
                     dummy.Position.Y -= (dummy.EffectiveHeight - Crawler.Height);
                     dummy.SetSpawnPos(dummy.Position);
                     dummy.UpdateSurfaceEdges(tg, ts, plats, sFloors, bLeft, bRight);
-                    _crawlers.Add(dummy);
+                    _crawlers.Add(dummy); _creatures.Add(dummy);
                     break;
                 case "crit-dummy":
                     float cdSnapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Crawler.Width, Crawler.Height, tg, ts, plats, sFloors, walls, mainFloor);
@@ -762,7 +769,7 @@ public class Game1 : Game
                     critDummy.Position.Y -= (critDummy.EffectiveHeight - Crawler.Height);
                     critDummy.SetSpawnPos(critDummy.Position);
                     critDummy.UpdateSurfaceEdges(tg, ts, plats, sFloors, bLeft, bRight);
-                    _crawlers.Add(critDummy);
+                    _crawlers.Add(critDummy); _creatures.Add(critDummy);
                     break;
             }
         }
@@ -2039,6 +2046,7 @@ public class Game1 : Game
         }
 
         _birds.RemoveAll(b => !b.Alive);
+        _creatures.RemoveAll(c => !c.Alive);
 
         // --- Wingbeater update ---
         foreach (var wb in _wingbeaters)

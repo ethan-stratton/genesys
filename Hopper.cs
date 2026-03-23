@@ -9,20 +9,14 @@ namespace Genesis;
 /// Pauses between hops — player can exploit the timing.
 /// Now uses EnemyPhysics for tile-aware collision.
 /// </summary>
-public class Hopper
+public class Hopper : Creature
 {
-    public Vector2 Position;
-    public Vector2 Velocity;
-    public bool Alive = true;
-    public int Hp = 4;
     public const int Width = 20, Height = 16;
     public float AggroRange = 180f;
     public bool Aggroed;
     public float DamageCooldown;
-    public float HitFlash;
     public float MeleeHitCooldown;
     public Vector2 KnockbackVel;
-    public Vector2 VisualScale = Vector2.One;
     public float SquashResistance = 0.1f;
     private float _squashHoldTimer;
 
@@ -49,11 +43,17 @@ public class Hopper
     {
         Position = pos;
         Velocity = Vector2.Zero;
+        Hp = 4; MaxHp = 4;
+        SpeciesName = "Hopper";
+        Role = EcologicalRole.Herbivore;
+        Needs = CreatureNeeds.Default;
         _state = State.Grounded;
         _stateTimer = RestTime * 0.5f;
     }
 
-    public Rectangle Rect => new((int)Position.X, (int)Position.Y, Width, Height);
+    public override int CreatureWidth => Width;
+    public override int CreatureHeight => Height;
+    public override Rectangle Rect => new((int)Position.X, (int)Position.Y, Width, Height);
 
     public void Update(float dt, Vector2 playerCenter,
         TileGrid tileGrid, int tileSize,
@@ -160,7 +160,7 @@ public class Hopper
         return false;
     }
 
-    public void Draw(SpriteBatch sb, Texture2D pixel)
+    public override void Draw(SpriteBatch sb, Texture2D pixel)
     {
         if (!Alive) return;
 
