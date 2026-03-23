@@ -4593,15 +4593,34 @@ public class Game1 : Game
             Color ec = e.Type switch
             {
                 "swarm" => Color.OrangeRed,
-                "crawler" => new Color(120, 60, 20),
+                "forager" or "crawler" => new Color(80, 50, 20),
+                "skitter" => new Color(60, 80, 50),
+                "leaper" => new Color(140, 80, 20),
                 "hopper" => new Color(80, 140, 60),
                 "thornback" => new Color(60, 100, 30),
                 "dummy" => new Color(140, 100, 160),
+                "bird" => new Color(100, 130, 170),
+                "wingbeater" => new Color(160, 80, 80),
                 _ => Color.White
             };
             int size = e.Type == "thornback" ? 32 : (e.Type == "hopper" ? 20 : (e.Type == "swarm" ? 20 : 16));
             _spriteBatch.Draw(_pixel, new Rectangle((int)e.X, (int)e.Y, size, size), ec * 0.6f);
-            _spriteBatch.DrawString(_font, SafeText(e.Type), new Vector2(e.X, e.Y - 14), ec * 0.8f);
+            _spriteBatch.DrawString(_fontSmall, SafeText(e.Type), new Vector2(e.X, e.Y - 14), ec * 0.8f);
+            // Off-screen indicator: draw arrow at edge of view
+            var cam = _camera.TransformMatrix;
+            var screenPos = Vector2.Transform(new Vector2(e.X, e.Y), cam);
+            if (screenPos.Y > ViewH - 20)
+            {
+                var edgeWorld = Vector2.Transform(new Vector2(screenPos.X, ViewH - 24), Matrix.Invert(cam));
+                _spriteBatch.Draw(_pixel, new Rectangle((int)edgeWorld.X - 6, (int)edgeWorld.Y, 12, 4), ec);
+                _spriteBatch.DrawString(_fontSmall, SafeText($"▼ {e.Type}"), new Vector2(edgeWorld.X - 20, edgeWorld.Y - 14), ec);
+            }
+            else if (screenPos.Y < 20)
+            {
+                var edgeWorld = Vector2.Transform(new Vector2(screenPos.X, 24), Matrix.Invert(cam));
+                _spriteBatch.Draw(_pixel, new Rectangle((int)edgeWorld.X - 6, (int)edgeWorld.Y, 12, 4), ec);
+                _spriteBatch.DrawString(_fontSmall, SafeText($"▲ {e.Type}"), new Vector2(edgeWorld.X - 20, edgeWorld.Y + 6), ec);
+            }
         }
 
         // Draw env objects (trees etc) in editor

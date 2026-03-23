@@ -1,12 +1,12 @@
 {
-  "currentLevel": "debug-room",
-  "spawnX": 1788.2068,
-  "spawnY": 476,
+  "currentLevel": "training-hall",
+  "spawnX": 1001.66785,
+  "spawnY": 212,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 706.1217,
+  "playTime": 785.9522,
   "meleeInventory": [
     "Stick",
     "Hammer"
@@ -21,7 +21,7 @@
     "debug_bow_639098175594549170",
     "hammer-0"
   ],
-  "windowSizeIndex": 0,
+  "windowSizeIndex": 1,
   "crtEnabled": false,
   "moveTier": 1,
   "upgrades": []
