@@ -3218,10 +3218,11 @@ public class Game1 : Game
 
         // Continue to T-drag and other tools (no early return)
 
-        // Right click or X+Left click — delete nearest object
+        // Right click, X+Left click, or Delete key — delete nearest object
         {
             bool deleteClick = (mouse.RightButton == ButtonState.Pressed && _prevMouse.RightButton == ButtonState.Released) ||
-                               (kb.IsKeyDown(Keys.X) && mouse.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released);
+                               (kb.IsKeyDown(Keys.X) && mouse.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released) ||
+                               (kb.IsKeyDown(Keys.Delete) && _prevKb.IsKeyUp(Keys.Delete));
             if (deleteClick)
             {
                 var wp = new Point((int)worldMouse.X, (int)worldMouse.Y);
@@ -3230,6 +3231,8 @@ public class Game1 : Game
                     SetEditorStatus("Deleted");
                     SaveLevel();
                 }
+                else
+                    SetEditorStatus("Nothing to delete here");
             }
         }
 
@@ -4712,7 +4715,7 @@ public class Game1 : Game
             // Semi-transparent background
             _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), Color.Black * 0.7f);
 
-            string[] paletteNames = { "Solid Floor", "Platform", "Rope", "Wall", "Spike", "Exit", "Spawn", "Wall Spike", "Overworld Exit", "Ceiling", "Tile Paint" };
+            string[] paletteNames = { "Solid Floor", "Platform", "Rope", "Wall", "Spike", "Exit", "Spawn", "Wall Spike", "Overworld Exit", "Ceiling", "Tile Paint", "Enemy (E)", "Item (P)" };
             int paletteCount = paletteNames.Length;
             float palW = 260f;
             float palLineH = 24f;
