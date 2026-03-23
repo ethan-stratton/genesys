@@ -4,7 +4,7 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace Genesis;
 
-public enum CrawlerVariant { Forager, Skitter, Leaper }
+public enum CrawlerVariant { Forager, Skitter, Leaper, Bombardier }
 
 public class Crawler
 {
@@ -39,6 +39,7 @@ public class Crawler
         CrawlerVariant.Forager => "Forest Crawler — Forager",
         CrawlerVariant.Skitter => "Forest Crawler — Skitter",
         CrawlerVariant.Leaper => "Forest Crawler — Leaper",
+        CrawlerVariant.Bombardier => "Forest Crawler — Bombardier",
         _ => "Unknown Crawler"
     };
     public string ScanDescription => Variant switch
@@ -46,6 +47,7 @@ public class Crawler
         CrawlerVariant.Forager => "Harmless detritivore. Feeds on decaying plant matter. Dies easily underfoot.",
         CrawlerVariant.Skitter => "Nervous herbivore. Flees at the first sign of danger. Completely harmless.",
         CrawlerVariant.Leaper => "Aggressive ambush predator. Leaps at prey from cover. Can latch onto larger organisms.",
+        CrawlerVariant.Bombardier => "Chemical defense specialist. Sprays superheated fluid when threatened. Keep your distance.",
         _ => ""
     };
 
@@ -78,6 +80,20 @@ public class Crawler
     public float? SwarmTargetX;
     public bool AlwaysCrit;
     public float DummyScale = 1f;
+
+    // Bombardier spray system
+    public float BombardierChargeTimer;     // telegraph timer (glows before spray)
+    public float BombardierCooldown;        // time between sprays
+    public bool BombardierCharging;         // currently telegraphing
+    private const float BombardierChargeTime = 0.5f;  // telegraph duration
+    private const float BombardierCooldownTime = 3.0f; // seconds between sprays
+    private const float BombardierRange = 150f;        // aggro range for spray
+    private const float BombardierSpraySpeed = 300f;   // pixel speed of spray particles
+    private const int BombardierSprayCount = 8;        // particles per spray
+    
+    // Bombardier spray event: Game1 reads this each frame and spawns particles
+    public bool BombardierSprayed;          // true on the frame spray fires
+    public Vector2 BombardierSprayDir;      // direction of spray (away from player, predicted)
     public float DummyScaleX = 0f;
     public float DummyScaleY = 0f;
 
@@ -461,9 +477,47 @@ public class Crawler
                 }
             }
         }
+        
+        // === BOMBARDIER SPRAY LOGIC ===
+        BombardierSprayed = false;
+        if (Variant == CrawlerVariant.Bombardier && !Frozen && !IsLatched)
+        {
+            BombardierCooldown -= dt;
+            float dist = Vector2.Distance(Position + new Vector2(EffectiveWidth / 2f, EffectiveHeight / 2f), playerCenter);
+            
+            if (dist < BombardierRange && BombardierCooldown <= 0 && !BombardierCharging)
+            {
+                // Start telegraph
+                BombardierCharging = true;
+                BombardierChargeTimer = BombardierChargeTime;
+                // Stop moving during charge
+                Velocity = new Vector2(0, Velocity.Y);
+            }
+            
+            if (BombardierCharging)
+            {
+                BombardierChargeTimer -= dt;
+                // Face away from player (beetles spray backward)
+                var toPlayer = playerCenter - Position;
+                Dir = toPlayer.X > 0 ? -1 : 1; // face AWAY
+                
+                if (BombardierChargeTimer <= 0)
+                {
+                    // FIRE — predict where player will be
+                    var myCenter = Position + new Vector2(EffectiveWidth / 2f, EffectiveHeight / 2f);
+                    BombardierSprayed = true;
+                    // Spray direction: away from self toward player (from abdomen)
+                    var sprayDir = playerCenter - myCenter;
+                    if (sprayDir.Length() > 0.001f) sprayDir = Vector2.Normalize(sprayDir);
+                    else sprayDir = new Vector2(-Dir, 0);
+                    BombardierSprayDir = sprayDir;
+                    
+                    BombardierCharging = false;
+                    BombardierCooldown = BombardierCooldownTime;
+                }
+            }
+        }
     }
-
-    /// <summary>
     /// Refresh surface edge detection using tile-aware method.
     /// </summary>
     public void UpdateSurfaceEdges(TileGrid tileGrid, int tileSize,
@@ -565,13 +619,24 @@ public class Crawler
             : IsLatched ? new Color(160, 40, 40)
             : SwarmActive ? (Variant == CrawlerVariant.Leaper ? new Color(200, 40, 20) : Variant == CrawlerVariant.Skitter ? new Color(140, 60, 40) : new Color(160, 50, 30))
             : Variant == CrawlerVariant.Leaper ? (Aggroed ? new Color(140, 80, 20) : new Color(100, 70, 30))
-            : Variant == CrawlerVariant.Skitter ? new Color(60, 80, 50) // greenish
-            : new Color(80, 50, 20); // forager: plain brown
+            : Variant == CrawlerVariant.Skitter ? new Color(60, 80, 50)
+            : Variant == CrawlerVariant.Bombardier ? (BombardierCharging ? new Color(255, 120, 30) : new Color(120, 60, 20)) // dark brown, orange when charging
+            : new Color(80, 50, 20);
         int scaledW = (int)(ew * VisualScale.X);
         int scaledH = (int)(eh * VisualScale.Y);
         int drawX = (int)Position.X + ew / 2 - scaledW / 2;
         int drawY = (int)Position.Y + eh - scaledH;
         sb.Draw(pixel, new Rectangle(drawX, drawY, scaledW, scaledH), bodyColor);
+        
+        // Bombardier abdomen glow (rear half of body, orange-red)
+        if (Variant == CrawlerVariant.Bombardier && !IsDummy)
+        {
+            int abdX = Dir == 1 ? drawX : drawX + scaledW / 2;
+            int abdW = scaledW / 2;
+            float glow = BombardierCharging ? 0.8f + 0.2f * MathF.Sin(BombardierChargeTimer * 20f) : 0.3f;
+            sb.Draw(pixel, new Rectangle(abdX, drawY + 1, abdW, scaledH - 2),
+                new Color(255, 80, 20) * glow);
+        }
 
         // Legs
         sb.Draw(pixel, new Rectangle((int)Position.X + 2, (int)Position.Y + eh, 2, 3), new Color(60, 30, 10));

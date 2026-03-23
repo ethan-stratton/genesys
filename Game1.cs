@@ -125,6 +125,8 @@ public class Game1 : Game
         public float MaxLife;
         public Color Color;
         public int Size;
+        public bool DamagesPlayer; // bombardier spray particles
+        public int Damage;         // damage per hit (0 = no damage)
     }
     private List<Particle> _particles = new();
 
@@ -474,7 +476,7 @@ public class Game1 : Game
 
     // Enemy/item editor placement — accordion structure
     private static readonly (string category, string[] variants)[] EnemyCategories = {
-        ("Crawler", new[] { "forager", "skitter", "leaper" }),
+        ("Crawler", new[] { "forager", "skitter", "leaper", "bombardier" }),
         ("Wingbeater", new[] { "wingbeater" }),
         ("Bird", new[] { "bird" }),
         ("Dummy", new[] { "dummy", "crit-dummy" }),
@@ -705,12 +707,14 @@ public class Game1 : Game
                 case "forager":
                 case "skitter":
                 case "leaper":
+                case "bombardier":
                     float snapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Crawler.Width, Crawler.Height, tg, ts, plats, sFloors, walls, mainFloor);
                     var pushOut = EnemyPhysics.PushOutOfSolid(e.X, snapY, Crawler.Width, Crawler.Height, tg, ts);
                     var c = new Crawler(new Vector2(pushOut.X, pushOut.Y), bLeft, bRight, 0, 0, _rng);
                     c.Frozen = e.Frozen;
                     if (e.Type == "leaper") c.Variant = CrawlerVariant.Leaper;
                     else if (e.Type == "skitter") c.Variant = CrawlerVariant.Skitter;
+                    else if (e.Type == "bombardier") c.Variant = CrawlerVariant.Bombardier;
                     else c.Variant = CrawlerVariant.Forager;
                     c.UpdateSurfaceEdges(tg, ts, plats, sFloors, bLeft, bRight);
                     _crawlers.Add(c);
@@ -1355,7 +1359,7 @@ public class Game1 : Game
                     float bestDist = 250f;
                     Vector2 bestPos = _scanTargetPos;
                     bool found = false;
-                    if (_scanTarget == "forager" || _scanTarget == "skitter" || _scanTarget == "leaper") { foreach (var c in _crawlers) { if (!c.Alive) continue; var ep = c.Position + new Vector2(c.EffectiveWidth/2f, c.EffectiveHeight/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestPos = ep; found = true; } } }
+                    if (_scanTarget == "forager" || _scanTarget == "skitter" || _scanTarget == "leaper" || _scanTarget == "bombardier") { foreach (var c in _crawlers) { if (!c.Alive) continue; var ep = c.Position + new Vector2(c.EffectiveWidth/2f, c.EffectiveHeight/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestPos = ep; found = true; } } }
                     else if (_scanTarget == "hopper") { foreach (var h in _hoppers) { if (!h.Alive) continue; var ep = h.Position + new Vector2(Hopper.Width/2f, Hopper.Height/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestPos = ep; found = true; } } }
                     else if (_scanTarget == "thornback") { foreach (var t in _thornbacks) { if (!t.Alive) continue; var ep = t.Position + new Vector2(Thornback.Width/2f, Thornback.Height/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestPos = ep; found = true; } } }
                     else if (_scanTarget == "bird") { foreach (var b in _birds) { if (!b.Alive) continue; var ep = b.Position + new Vector2(Bird.Width/2f, Bird.Height/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestPos = ep; found = true; } } }
@@ -1376,7 +1380,7 @@ public class Game1 : Game
                             int lvl = _scanProgress[_scanTarget];
                             string scanLabel = _scanTarget;
                             // Use proper scan names for crawler variants
-                            if (_scanTarget == "forager" || _scanTarget == "skitter" || _scanTarget == "leaper")
+                            if (_scanTarget == "forager" || _scanTarget == "skitter" || _scanTarget == "leaper" || _scanTarget == "bombardier")
                             {
                                 var nearest = _crawlers.Where(c => c.Alive && c.Variant.ToString().ToLower() == _scanTarget)
                                     .OrderBy(c => Vector2.Distance(pc, c.Position)).FirstOrDefault();
@@ -1796,6 +1800,39 @@ public class Game1 : Game
             c.Update(dt, playerCenter2,
                 _level.TileGridInstance, _level.TileGrid?.TileSize ?? 32,
                 _level.AllPlatforms, _level.SolidFloorRects, _level.Floor.Y);
+            
+            // Bombardier spray: spawn hot particles when spray fires
+            if (c.BombardierSprayed)
+            {
+                var sprayOrigin = c.Position + new Vector2(c.EffectiveWidth / 2f, c.EffectiveHeight * 0.8f);
+                // Predict player position for aiming
+                var playerVel = _player.Velocity;
+                float leadTime = 0.3f;
+                var predicted = playerCenter2 + playerVel * leadTime;
+                var aimDir = predicted - sprayOrigin;
+                if (aimDir.Length() > 0.001f) aimDir = Vector2.Normalize(aimDir);
+                
+                for (int si = 0; si < 8; si++)
+                {
+                    // Fan spread: ±25° around aim direction
+                    float spread = ((float)_rng.NextDouble() - 0.5f) * 0.87f; // ~±25°
+                    float cos = MathF.Cos(spread), sin = MathF.Sin(spread);
+                    var dir = new Vector2(aimDir.X * cos - aimDir.Y * sin, aimDir.X * sin + aimDir.Y * cos);
+                    float speed = 200f + (float)_rng.NextDouble() * 150f;
+                    _particles.Add(new Particle
+                    {
+                        Position = sprayOrigin + dir * 4f,
+                        Velocity = dir * speed + new Vector2(0, -30f), // slight upward arc
+                        Life = 0.6f + (float)_rng.NextDouble() * 0.3f,
+                        MaxLife = 0.9f,
+                        Color = new Color(255, 140 + _rng.Next(60), 20), // orange-hot
+                        Size = 2 + _rng.Next(2),
+                        DamagesPlayer = true,
+                        Damage = 1
+                    });
+                }
+                _shakeTimer = 0.08f; _shakeIntensity = 1.5f;
+            }
 
             // Latch-on: aggroed crawler touches player → latches instead of contact damage
             if (_spawnInvincibility <= 0 && !_isDead && !c.IsLatched)
@@ -2413,6 +2450,20 @@ public class Game1 : Game
             }
 
             if (p.Life <= 0) { _particles.RemoveAt(i); continue; }
+            
+            // Bombardier spray particles damage player on contact
+            if (p.DamagesPlayer && p.Damage > 0 && _spawnInvincibility <= 0 && !_isDead)
+            {
+                var pRect = new Rectangle((int)p.Position.X - p.Size / 2, (int)p.Position.Y - p.Size / 2, p.Size, p.Size);
+                if (pRect.Intersects(playerRect2))
+                {
+                    _player.CurrentHp -= p.Damage;
+                    _player.HitFlash = 0.15f;
+                    _particles.RemoveAt(i);
+                    continue;
+                }
+            }
+            
             _particles[i] = p;
         }
 
@@ -5260,6 +5311,7 @@ public class Game1 : Game
                 "forager" or "crawler" => new Color(80, 50, 20),
                 "skitter" => new Color(60, 80, 50),
                 "leaper" => new Color(140, 80, 20),
+                "bombardier" => new Color(120, 60, 20),
                 "hopper" => new Color(80, 140, 60),
                 "thornback" => new Color(60, 100, 30),
                 "dummy" => new Color(140, 100, 160),
