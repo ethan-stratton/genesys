@@ -8030,19 +8030,79 @@ public class Game1 : Game
         }
 
         // --- EVE Scan overlays (world-space) ---
-        // Scan beam during scanning
+        // Reusable triangulation scan effect
+        void DrawTriangulationScan(Vector2 anchor, Vector2 targetCenter, float time, float alpha)
+        {
+            // Two vertices orbit independently around the target
+            float t1 = time * 1.3f;
+            float t2 = time * 0.9f + 2.1f;
+            Vector2 pA = new(
+                targetCenter.X + MathF.Cos(t1) * 10f,
+                targetCenter.Y + MathF.Sin(t1 * 1.7f) * 22f);
+            Vector2 pB = new(
+                targetCenter.X + MathF.Cos(t2 * 1.4f) * 8f,
+                targetCenter.Y + MathF.Sin(t2) * 20f);
+            
+            // Fill triangle (semi-transparent)
+            // Scanline fill: for each row between min/max Y, draw horizontal span
+            int minY = (int)Math.Min(anchor.Y, Math.Min(pA.Y, pB.Y));
+            int maxY = (int)Math.Max(anchor.Y, Math.Max(pA.Y, pB.Y));
+            float fillAlpha = alpha * 0.25f;
+            for (int row = minY; row <= maxY; row += 2) // every other row for scanline look
+            {
+                // Find x-intercepts of triangle edges at this row
+                float[] xs = new float[6];
+                int xCount = 0;
+                void EdgeIntersect(Vector2 e1, Vector2 e2)
+                {
+                    if ((e1.Y <= row && e2.Y >= row) || (e2.Y <= row && e1.Y >= row))
+                    {
+                        float ey = e2.Y - e1.Y;
+                        if (MathF.Abs(ey) < 0.01f) return;
+                        float t = (row - e1.Y) / ey;
+                        if (xCount < 6) xs[xCount++] = e1.X + t * (e2.X - e1.X);
+                    }
+                }
+                EdgeIntersect(anchor, pA);
+                EdgeIntersect(pA, pB);
+                EdgeIntersect(pB, anchor);
+                if (xCount >= 2)
+                {
+                    float xMin = Math.Min(xs[0], xs[1]);
+                    float xMax = Math.Max(xs[0], xs[1]);
+                    int w = Math.Max(1, (int)(xMax - xMin));
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)xMin, row, w, 1), Color.Cyan * fillAlpha);
+                }
+            }
+            
+            // Triangle edges (dashed)
+            void DrawScanEdge(Vector2 a, Vector2 b, float edgeAlpha)
+            {
+                int steps = (int)Math.Max(Math.Abs(b.X - a.X), Math.Abs(b.Y - a.Y));
+                if (steps < 1) return;
+                for (int i = 0; i <= steps; i += 2)
+                {
+                    float lt = i / (float)steps;
+                    int px = (int)MathHelper.Lerp(a.X, b.X, lt);
+                    int py = (int)MathHelper.Lerp(a.Y, b.Y, lt);
+                    _spriteBatch.Draw(_pixel, new Rectangle(px, py, 1, 1), Color.Cyan * edgeAlpha);
+                }
+            }
+            DrawScanEdge(anchor, pA, alpha);
+            DrawScanEdge(anchor, pB, alpha);
+            DrawScanEdge(pA, pB, alpha * 1.2f);
+            
+            // Pulsing dots at vertices
+            float pulse = 0.5f + 0.5f * MathF.Sin(time * 5f);
+            _spriteBatch.Draw(_pixel, new Rectangle((int)pA.X - 1, (int)pA.Y - 1, 3, 3), Color.Cyan * pulse);
+            _spriteBatch.Draw(_pixel, new Rectangle((int)pB.X - 1, (int)pB.Y - 1, 3, 3), Color.Cyan * (1f - pulse));
+        }
+        
+        // Scan beam during scanning (enemy scan)
         if (_isScanning)
         {
             float beamAlpha = 0.4f + 0.3f * MathF.Sin(_scanPulseTimer * 8f);
-            var pc = PlayerCenter;
-            // Draw a line from player to target using thin rectangles
-            var diff = _scanTargetPos - pc;
-            float len = diff.Length();
-            if (len > 1)
-            {
-                float angle = MathF.Atan2(diff.Y, diff.X);
-                _spriteBatch.Draw(_pixel, pc, null, Color.LimeGreen * beamAlpha, angle, Vector2.Zero, new Vector2(len, 1), Microsoft.Xna.Framework.Graphics.SpriteEffects.None, 0);
-            }
+            DrawTriangulationScan(_eveOrbActive ? _evePos : PlayerCenter, _scanTargetPos, _totalTime, beamAlpha);
             // Scan progress bar above target
             float progress = 1f - _scanTimer / ScanDuration;
             int barW = 24, barH = 3;
@@ -8050,6 +8110,13 @@ public class Game1 : Game
             int barY = (int)(_scanTargetPos.Y - 16);
             _spriteBatch.Draw(_pixel, new Rectangle(barX, barY, barW, barH), Color.Black * 0.5f);
             _spriteBatch.Draw(_pixel, new Rectangle(barX, barY, (int)(barW * progress), barH), Color.LimeGreen);
+        }
+        // EVE wake-up scan (uses same triangulation)
+        if (_eveOrbActive && _eveMode == EveMovementMode.Scan)
+        {
+            float scanAlpha = 0.15f + 0.1f * MathF.Sin(_totalTime * 2.5f);
+            var pc2 = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
+            DrawTriangulationScan(_evePos, pc2, _totalTime, scanAlpha);
         }
         // Enemy labels and HP bars based on scan level
         void DrawScanOverlay(string type, Vector2 pos, int w, int h, int hp, int maxHp)
@@ -8147,59 +8214,8 @@ public class Game1 : Game
             float orbX = _evePos.X, orbY = _evePos.Y;
             var playerCenter = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
             
-            // Triangulation scan — anchor at EVE, two morphing vertices on Adam
-            if (_eveMode == EveMovementMode.Scan)
-            {
-                float scanAlpha = 0.15f + 0.1f * MathF.Sin(_totalTime * 2.5f);
-                Vector2 anchor = new(orbX, orbY); // fixed point: EVE
-                
-                // Two scan points that orbit/shift around Adam's body independently
-                float t1 = _totalTime * 1.3f;
-                float t2 = _totalTime * 0.9f + 2.1f; // offset phase so they're desynchronized
-                
-                // Point A: traces an ellipse on Adam (wider horizontal, sweeps his torso)
-                Vector2 pA = new(
-                    playerCenter.X + MathF.Cos(t1) * 10f,
-                    playerCenter.Y + MathF.Sin(t1 * 1.7f) * 22f);
-                
-                // Point B: traces a different ellipse (narrower, different frequency)
-                Vector2 pB = new(
-                    playerCenter.X + MathF.Cos(t2 * 1.4f) * 8f,
-                    playerCenter.Y + MathF.Sin(t2) * 20f);
-                
-                // Draw the shifting triangle: EVE → A → B → EVE
-                void DrawScanLine(Vector2 a, Vector2 b, Color col)
-                {
-                    int steps = (int)Math.Max(Math.Abs(b.X - a.X), Math.Abs(b.Y - a.Y));
-                    if (steps < 1) return;
-                    for (int i = 0; i <= steps; i += 2)
-                    {
-                        float lt = i / (float)steps;
-                        int px = (int)MathHelper.Lerp(a.X, b.X, lt);
-                        int py = (int)MathHelper.Lerp(a.Y, b.Y, lt);
-                        _spriteBatch.Draw(_pixel, new Rectangle(px, py, 1, 1), col);
-                    }
-                }
-                
-                var lineColor = Color.Cyan * scanAlpha;
-                var edgeColor = Color.Cyan * (scanAlpha * 1.2f); // brighter triangle edges on body
-                
-                // Two lines from EVE anchor to the moving points
-                DrawScanLine(anchor, pA, lineColor);
-                DrawScanLine(anchor, pB, lineColor);
-                
-                // Closing edge between the two scan points (the "base" of the triangle on Adam)
-                DrawScanLine(pA, pB, edgeColor);
-                
-                // Dots at the two moving vertices
-                float pulse = 0.5f + 0.5f * MathF.Sin(_totalTime * 5f);
-                _spriteBatch.Draw(_pixel, new Rectangle((int)pA.X - 1, (int)pA.Y - 1, 3, 3), Color.Cyan * pulse);
-                _spriteBatch.Draw(_pixel, new Rectangle((int)pB.X - 1, (int)pB.Y - 1, 3, 3), Color.Cyan * (1f - pulse)); // alternating pulse
-                
-                // Small crosshair at EVE anchor
-                _spriteBatch.Draw(_pixel, new Rectangle((int)anchor.X - 2, (int)anchor.Y, 5, 1), Color.Cyan * (scanAlpha * 0.6f));
-                _spriteBatch.Draw(_pixel, new Rectangle((int)anchor.X, (int)anchor.Y - 2, 1, 5), Color.Cyan * (scanAlpha * 0.6f));
-            }
+            // Triangulation scan — reuses shared DrawTriangulationScan (drawn in scan overlay section)
+            // The scan overlay section handles this when _eveMode == Scan
             
             // Sparks during wake-up (EVE is damaged/rebooting)
             if (!_wakeUpComplete)
