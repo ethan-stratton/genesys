@@ -1155,14 +1155,16 @@ public class Game1 : Game
                         _camera.SnapTo(_player.Position, Player.Width, Player.Height);
                         if (_wakeUpTimer >= 1.5f && !_eveOrbActive)
                         {
-                            // EVE boots up — spawn off-screen right, fly to Adam
+                            // EVE boots up — spawn at right edge of visible area, fly to scan position
                             _eveOrbActive = true;
                             var pc = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
-                            _evePos = pc + new Vector2(80f, -40f); // start off to the right/above
+                            // Visible half-width at current zoom
+                            float visHalfW = (ViewW / _camera.Zoom) * 0.5f;
+                            _evePos = new Vector2(pc.X + visHalfW + 8f, pc.Y); // just off right edge, same height as Adam
                             _evePosInitialized = true;
                             _eveMode = EveMovementMode.FlyTo;
                             _eveFlyTarget = EveScanPos(pc, _totalTime);
-                            _eveFlySpeed = 60f; // slow approach
+                            _eveFlySpeed = 80f; // steady approach
                             _eveFlyCallback = () => {
                                 _eveMode = EveMovementMode.Scan;
                                 EveAlert("Sys... systems rebooting. Adam? Can you hear me?", 4f);
@@ -1177,11 +1179,10 @@ public class Game1 : Game
                         float z3 = MathHelper.Lerp(1.2f, 1f, t3);
                         _camera.Zoom = z3;
                         _camera.TargetZoom = z3;
-                        if (_wakeUpTimer >= 1f && !_wakeUpComplete)
+                        _camera.SnapTo(_player.Position, Player.Width, Player.Height);
+                        if (_wakeUpTimer >= 2f && !_wakeUpComplete)
                         {
                             _wakeUpComplete = true;
-                            _camera.Zoom = 1f;
-                            _camera.TargetZoom = 1f;
                             // Transition EVE from scan to orbit smoothly
                             var pc3 = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
                             EveFlyTo(EveOrbitPos(pc3, _totalTime), 80f, () => {
