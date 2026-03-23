@@ -1073,11 +1073,11 @@ public class Game1 : Game
                     float sparkRate = (_wakeUpPhase == 2) ? 8f : 4f; // more sparks early
                     if (_rng.NextDouble() < sparkRate * dt)
                     {
-                        float angle = _totalTime * 0.5f; // slow orbit during boot
-                        float orbRadius = 30f;
+                        // Match lissajous scan position
+                        float scanTime = _totalTime * 1.2f;
                         var pc = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
-                        float ex = pc.X + MathF.Cos(angle) * orbRadius;
-                        float ey = pc.Y + MathF.Sin(angle) * orbRadius;
+                        float ex = pc.X + 20f + MathF.Sin(scanTime * 2f) * 12f;
+                        float ey = pc.Y + MathF.Sin(scanTime) * 28f;
                         float vx = (_rng.NextSingle() - 0.5f) * 80f;
                         float vy = -_rng.NextSingle() * 60f + 20f; // mostly upward/sideways
                         float life = 0.3f + _rng.NextSingle() * 0.5f;
@@ -7953,24 +7953,35 @@ public class Game1 : Game
         // Draw EVE orbiting companion
         if (_eveOrbActive && !_isDead)
         {
-            // Orbit speed: sluggish during wake-up, normal after
-            float orbitSpeed;
+            var playerCenter = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
+            float orbX, orbY;
+            
             if (!_wakeUpComplete)
             {
-                // Slow, stuttering orbit during boot-up
-                float bootProgress = MathHelper.Clamp((_wakeUpPhase - 2 + _wakeUpTimer / 4f), 0, 1);
-                orbitSpeed = 0.3f + bootProgress * 1.7f; // 0.3 → 2.0
-                // Add jitter/stutter
-                orbitSpeed += MathF.Sin(_totalTime * 3f) * 0.15f * (1f - bootProgress);
+                // Lissajous scan pattern — EVE scans Adam's body vertically
+                // Narrow horizontal, tall vertical: figure-8ish health scan
+                float scanTime = _totalTime * 1.2f; // gentle speed
+                float scanW = 12f;  // narrow horizontal range
+                float scanH = 28f;  // tall vertical range (covers Adam's body)
+                orbX = playerCenter.X + 20f + MathF.Sin(scanTime * 2f) * scanW;
+                orbY = playerCenter.Y + MathF.Sin(scanTime) * scanH;
+                
+                // Draw faint scan line from EVE to player
+                float scanAlpha = 0.15f + 0.1f * MathF.Sin(_totalTime * 2f);
+                int lineX1 = (int)orbX, lineY1 = (int)orbY;
+                int lineX2 = (int)playerCenter.X, lineY2 = (int)orbY;
+                int lineW = Math.Abs(lineX2 - lineX1);
+                if (lineW > 0)
+                    _spriteBatch.Draw(_pixel, new Rectangle(Math.Min(lineX1, lineX2), lineY1, lineW, 1), Color.Cyan * scanAlpha);
             }
             else
-                orbitSpeed = 2f;
-            
-            float angle = _totalTime * orbitSpeed;
-            float orbRadius = 30f;
-            var playerCenter = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
-            float orbX = playerCenter.X + MathF.Cos(angle) * orbRadius;
-            float orbY = playerCenter.Y + MathF.Sin(angle) * orbRadius;
+            {
+                // Normal orbit
+                float angle = _totalTime * 2f;
+                float orbRadius = 30f;
+                orbX = playerCenter.X + MathF.Cos(angle) * orbRadius;
+                orbY = playerCenter.Y + MathF.Sin(angle) * orbRadius;
+            }
             
             // Sparks during wake-up (EVE is damaged/rebooting)
             if (!_wakeUpComplete)
