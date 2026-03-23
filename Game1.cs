@@ -4299,6 +4299,20 @@ public class Game1 : Game
                 }
             }
         }
+        // Check items (knives, grapples, etc.)
+        for (int i = _level.Items.Length - 1; i >= 0; i--)
+        {
+            var item = _level.Items[i];
+            if (new Rectangle((int)item.X - tolerance, (int)item.Y - tolerance, item.W + tolerance * 2, item.H + tolerance * 2).Contains(p))
+            {
+                var list = new List<ItemData>(_level.Items);
+                list.RemoveAt(i);
+                _level.Items = list.ToArray();
+                // Also remove from runtime pickups
+                _itemPickups.RemoveAll(ip => ip.Id == item.Id);
+                return true;
+            }
+        }
         return false;
     }
 
