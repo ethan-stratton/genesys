@@ -1428,6 +1428,44 @@ public class Game1 : Game
             {
                 var pt = new Point((int)sp.X, (int)sp.Y);
                 
+                // Check enemies first (before terrain — hook grabs closest thing)
+                // Crawlers
+                for (int ei = 0; ei < _crawlers.Count; ei++)
+                {
+                    var c = _crawlers[ei];
+                    if (c.IsDummy || c.Hp <= 0) continue;
+                    if (c.Rect.Contains(pt))
+                    {
+                        _player.GrappleEnemy(ei, "crawler", c.Position + new Vector2(c.EffectiveWidth / 2f, c.EffectiveHeight / 2f));
+                        hit = true; break;
+                    }
+                }
+                if (hit) break;
+                // Birds
+                for (int ei = 0; ei < _birds.Count; ei++)
+                {
+                    var b = _birds[ei];
+                    if (b.Hp <= 0) continue;
+                    if (new Rectangle((int)b.Position.X, (int)b.Position.Y, Bird.Width, Bird.Height).Contains(pt))
+                    {
+                        _player.GrappleEnemy(ei, "bird", b.Position + new Vector2(Bird.Width / 2f, Bird.Height / 2f));
+                        hit = true; break;
+                    }
+                }
+                if (hit) break;
+                // Wingbeaters — grapple yanks them down, damages them
+                for (int ei = 0; ei < _wingbeaters.Count; ei++)
+                {
+                    var w = _wingbeaters[ei];
+                    if (w.Hp <= 0) continue;
+                    if (w.Rect.Contains(pt))
+                    {
+                        _player.GrappleEnemy(ei, "wingbeater", w.Position + new Vector2(w.Width / 2f, w.Height / 2f));
+                        hit = true; break;
+                    }
+                }
+                if (hit) break;
+                
                 // Check solid tiles (not background, not liquid, not empty)
                 if (_level.TileGridInstance != null)
                 {
@@ -1453,6 +1491,95 @@ public class Game1 : Game
             }
             if (!hit)
                 _player.AdvanceHook(dt);
+        }
+        
+        // Grapple enemy pull — update each frame while pulling
+        if (_player.IsGrapplePulling)
+        {
+            var playerCenter = _player.Position + new Vector2(_player.Width / 2f, _player.Height / 2f);
+            float pullSpeed = 400f;
+            bool done = false;
+            
+            if (_player.GrappleEnemyType == "crawler" && _player.GrappleEnemyIndex < _crawlers.Count)
+            {
+                var c = _crawlers[_player.GrappleEnemyIndex];
+                if (c.Hp <= 0) { _player.ReleaseGrapple(); done = true; }
+                else
+                {
+                    var dir = playerCenter - c.Position - new Vector2(c.EffectiveWidth / 2f, c.EffectiveHeight / 2f);
+                    float dist = dir.Length();
+                    if (dist < 20f)
+                    {
+                        // Arrived — deal damage and release
+                        c.Hp -= 2;
+                        c.Velocity = new Vector2(0, -150f); // small upward pop
+                        _player.ReleaseGrapple();
+                        done = true;
+                    }
+                    else
+                    {
+                        dir /= dist;
+                        c.Position += dir * pullSpeed * dt;
+                        c.Velocity = dir * pullSpeed; // override AI movement
+                        _player.GrappleAnchor = c.Position + new Vector2(c.EffectiveWidth / 2f, c.EffectiveHeight / 2f);
+                    }
+                }
+            }
+            else if (_player.GrappleEnemyType == "bird" && _player.GrappleEnemyIndex < _birds.Count)
+            {
+                var b = _birds[_player.GrappleEnemyIndex];
+                if (b.Hp <= 0) { _player.ReleaseGrapple(); done = true; }
+                else
+                {
+                    var dir = playerCenter - b.Position - new Vector2(Bird.Width / 2f, Bird.Height / 2f);
+                    float dist = dir.Length();
+                    if (dist < 20f)
+                    {
+                        b.Hp -= 2;
+                        b.Velocity = new Vector2(0, -100f);
+                        _player.ReleaseGrapple();
+                        done = true;
+                    }
+                    else
+                    {
+                        dir /= dist;
+                        b.Position += dir * pullSpeed * dt;
+                        b.Velocity = dir * pullSpeed;
+                        _player.GrappleAnchor = b.Position + new Vector2(Bird.Width / 2f, Bird.Height / 2f);
+                    }
+                }
+            }
+            else if (_player.GrappleEnemyType == "wingbeater" && _player.GrappleEnemyIndex < _wingbeaters.Count)
+            {
+                var w = _wingbeaters[_player.GrappleEnemyIndex];
+                if (w.Hp <= 0) { _player.ReleaseGrapple(); done = true; }
+                else
+                {
+                    // Wingbeater: yank downward — hollow bones, can't support grapple
+                    // Apply strong downward force + damage
+                    w.Velocity = new Vector2(w.Velocity.X * 0.5f, 500f); // slam downward
+                    w.Hp -= 3; // significant damage (hollow bones!)
+                    _shakeTimer = 0.15f;
+                    _shakeIntensity = 3f;
+                    EveAlert("Hollow bones. They can't take that.", 3f);
+                    _player.ReleaseGrapple();
+                    done = true;
+                }
+            }
+            else
+            {
+                // Enemy died or index invalid
+                _player.ReleaseGrapple();
+                done = true;
+            }
+            
+            // Release on E press while pulling
+            if (!done)
+            {
+                bool ePressed = kb.IsKeyDown(Keys.E);
+                if (ePressed && _prevKb.IsKeyUp(Keys.E))
+                    _player.ReleaseGrapple();
+            }
         }
         
         // Terrain collision while swinging — push player out of tiles, don't auto-release
@@ -8388,17 +8515,21 @@ public class Game1 : Game
         _bullets.ForEach(b => b.Draw(_spriteBatch, _pixel));
 
         // === Grapple rope + hook rendering ===
-        if (_player.IsGrappling || _player.IsGrappleFiring || _player.IsGrappleRetracting)
+        if (_player.IsGrappling || _player.IsGrappleFiring || _player.IsGrappleRetracting || _player.IsGrapplePulling)
         {
             var playerCenter = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
-            var hookEnd = _player.IsGrappling ? _player.GrappleAnchor : _player.GrappleHookPos;
+            var hookEnd = _player.IsGrappling ? _player.GrappleAnchor
+                        : _player.IsGrapplePulling ? _player.GrappleAnchor
+                        : _player.GrappleHookPos;
             
             // Draw rope
             var ropeDiff = hookEnd - playerCenter;
             int steps = (int)MathF.Max(MathF.Abs(ropeDiff.X), MathF.Abs(ropeDiff.Y));
             if (steps > 0)
             {
-                var ropeColor = _player.IsGrappling ? new Color(140, 140, 150) : new Color(100, 100, 110);
+                var ropeColor = _player.IsGrappling ? new Color(140, 140, 150)
+                              : _player.IsGrapplePulling ? new Color(200, 120, 80) // orange tint when pulling enemy
+                              : new Color(100, 100, 110);
                 for (int i = 0; i <= steps; i += 2)
                 {
                     float t = i / (float)steps;

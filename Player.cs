@@ -475,12 +475,19 @@ public class Player
 
     // === GRAPPLE SYSTEM ===
     public bool HasGrapple;                  // whether player has found the grapple module
-    public bool IsGrappling { get; private set; }  // actively swinging
+    public bool IsGrappling { get; private set; }  // actively swinging on terrain
     public bool IsGrappleFiring { get; private set; } // hook in flight
     public bool IsGrappleRetracting { get; private set; } // hook flying back (visual only)
+    public bool IsGrapplePulling { get; private set; } // pulling an enemy toward player (or vice versa)
     public Vector2 GrappleAnchor;            // world position of the hook point
     public Vector2 GrappleHookPos;           // current hook projectile position (during firing/retracting)
     public float GrappleRopeLength;          // current rope length
+    
+    // Enemy grapple state
+    public int GrappleEnemyIndex = -1;       // index into enemy list (-1 = none)
+    public string GrappleEnemyType = "";     // "crawler", "wingbeater", "bird"
+    private const float GrapplePullSpeed = 400f;  // speed to pull small enemies toward player
+    private const float GrappleEnemyDamage = 2f;  // damage on arrival
     
     // Player weight — affects grapple swing speed, fall speed with grapple, etc.
     // Base = 1.0. Heavier equipment increases this. Lighter bio upgrades decrease it.
@@ -547,6 +554,19 @@ public class Player
         
         IsGrappling = false;
         IsGrappleFiring = false;
+        IsGrapplePulling = false;
+        GrappleEnemyIndex = -1;
+        GrappleEnemyType = "";
+    }
+    
+    /// <summary>Start pulling an enemy (hook hit an enemy, not terrain).</summary>
+    public void GrappleEnemy(int enemyIndex, string enemyType, Vector2 enemyCenter)
+    {
+        IsGrappleFiring = false;
+        IsGrapplePulling = true;
+        GrappleEnemyIndex = enemyIndex;
+        GrappleEnemyType = enemyType;
+        GrappleAnchor = enemyCenter; // track enemy pos (updated externally each frame)
     }
     
     /// <summary>Nudge grapple velocity (for terrain bounce during swing).</summary>
