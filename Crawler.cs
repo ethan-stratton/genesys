@@ -34,6 +34,20 @@ public class Crawler
 
     // Variant
     public CrawlerVariant Variant = CrawlerVariant.Forager;
+    public string ScanName => Variant switch
+    {
+        CrawlerVariant.Forager => "Forest Crawler — Forager",
+        CrawlerVariant.Skitter => "Forest Crawler — Skitter",
+        CrawlerVariant.Leaper => "Forest Crawler — Leaper",
+        _ => "Unknown Crawler"
+    };
+    public string ScanDescription => Variant switch
+    {
+        CrawlerVariant.Forager => "Harmless detritivore. Feeds on decaying plant matter. Dies easily underfoot.",
+        CrawlerVariant.Skitter => "Nervous herbivore. Flees at the first sign of danger. Completely harmless.",
+        CrawlerVariant.Leaper => "Aggressive ambush predator. Leaps at prey from cover. Can latch onto larger organisms.",
+        _ => ""
+    };
 
     // Jump behavior
     private float _jumpCooldown;
@@ -54,6 +68,7 @@ public class Crawler
     private float _antennaeTimer; // visual wiggle
     private bool _edgeSniffDecided; // has the crawler decided what to do at the edge?
     private float _startleTimer;
+    private float _fleeTimer; // skitters keep running after player leaves range
     private readonly Random _rng;
 
     // Dummy mode: high HP, no aggro, respawns at original position
@@ -171,8 +186,12 @@ public class Crawler
             // Skitter flee behavior
             bool fleeing = Variant == CrawlerVariant.Skitter && dist < AggroRange;
 
+            // Keep flee timer alive
+            if (fleeing) _fleeTimer = 1.5f + (float)_rng.NextDouble() * 1f; // flee 1.5-2.5s after last trigger
+            bool isFleeing = fleeing || _fleeTimer > 0;
+
             // Startle: transition from calm to aggroed/fleeing
-            if ((Aggroed || fleeing) && !wasAggroed && _bugState != BugState.Startled && _bugState != BugState.Fleeing)
+            if ((Aggroed || isFleeing) && !wasAggroed && _bugState != BugState.Startled && _bugState != BugState.Fleeing)
             {
                 _bugState = BugState.Startled;
                 _startleTimer = 0.1f + (float)_rng.NextDouble() * 0.1f;
@@ -203,19 +222,21 @@ public class Crawler
                 if (_startleTimer <= 0)
                 {
                     if (Aggroed) _bugState = BugState.Chasing;
-                    else if (fleeing) _bugState = BugState.Fleeing;
+                    if (Aggroed) _bugState = BugState.Chasing;
+                    else if (isFleeing) _bugState = BugState.Fleeing;
                     else _bugState = BugState.Walking;
                 }
             }
-            else if (_bugState == BugState.Fleeing || fleeing)
+            else if (_bugState == BugState.Fleeing || isFleeing)
             {
                 // Skitter: run away from player at high speed
                 _bugState = BugState.Fleeing;
-                Dir = dx > 0 ? -1 : 1; // away from player
-                float fleeSpeed = ChaseSpeed * 1.3f;
+                if (fleeing) Dir = dx > 0 ? -1 : 1; // update direction only while player is near
+                float fleeSpeed = ChaseSpeed * 2f; // much faster flee
                 Velocity.X = Dir * fleeSpeed;
-                // If player leaves range, calm down
-                if (!fleeing)
+                _fleeTimer -= dt;
+                // Stop fleeing when timer expires
+                if (_fleeTimer <= 0)
                 {
                     _bugState = BugState.Paused;
                     _bugStateTimer = 0.5f + (float)_rng.NextDouble() * 1f;
@@ -417,16 +438,19 @@ public class Crawler
         PatrolRight = MathF.Min(PatrolRight, SurfaceRight);
     }
 
-    public int CheckPlayerDamage(Rectangle playerRect)
+    public int CheckPlayerDamage(Rectangle playerRect, float playerVelY = 0f)
     {
         if (!Alive || DamageCooldown > 0) return 0;
         if (!Rect.Intersects(playerRect)) return 0;
         
-        // Foragers die when stepped on, deal no damage
+        // Foragers die when stomped (player falling onto them from above)
         if (Variant == CrawlerVariant.Forager)
         {
-            Alive = false;
-            return 0;
+            if (playerVelY > 0 && playerRect.Bottom <= Rect.Top + 8)
+            {
+                Alive = false; // squished!
+            }
+            return 0; // never deals damage
         }
         // Skitters don't deal contact damage either
         if (Variant == CrawlerVariant.Skitter) return 0;
@@ -528,6 +552,15 @@ public class Crawler
                 sb.Draw(pixel, new Rectangle((int)Position.X + ew / 2 - 1, (int)Position.Y + eh, 2, 4), new Color(70, 40, 15));
                 // Stripe marking
                 sb.Draw(pixel, new Rectangle(drawX + scaledW / 4, drawY + 1, scaledW / 2, 2), new Color(160, 100, 30) * 0.6f);
+            }
+            // Skitter: thin legs, lighter body spot (looks nervous/fast)
+            else if (Variant == CrawlerVariant.Skitter)
+            {
+                // Extra thin middle legs (speed look)
+                sb.Draw(pixel, new Rectangle((int)Position.X + ew / 3, (int)Position.Y + eh, 1, 4), new Color(50, 60, 35));
+                sb.Draw(pixel, new Rectangle((int)Position.X + ew * 2 / 3, (int)Position.Y + eh, 1, 4), new Color(50, 60, 35));
+                // Light spot on back
+                sb.Draw(pixel, new Rectangle(drawX + scaledW / 3, drawY + 2, scaledW / 3, 2), new Color(90, 110, 70) * 0.5f);
             }
         }
 

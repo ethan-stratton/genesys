@@ -913,6 +913,66 @@
       "scaleY": 0,
       "frozen": false,
       "passive": false
+    },
+    {
+      "id": "forager-45",
+      "type": "forager",
+      "x": 1760,
+      "y": 880,
+      "count": 0,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
+    },
+    {
+      "id": "forager-46",
+      "type": "forager",
+      "x": 1856,
+      "y": 720,
+      "count": 0,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
+    },
+    {
+      "id": "skitter-47",
+      "type": "skitter",
+      "x": 1760,
+      "y": 688,
+      "count": 0,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
+    },
+    {
+      "id": "leaper-48",
+      "type": "leaper",
+      "x": 1984,
+      "y": 688,
+      "count": 0,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
+    },
+    {
+      "id": "skitter-50",
+      "type": "skitter",
+      "x": 1856,
+      "y": 592,
+      "count": 0,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     }
   ],
   "switches": [],

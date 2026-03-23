@@ -1,23 +1,25 @@
 {
   "currentLevel": "debug-room",
-  "spawnX": 2017.5632,
+  "spawnX": 1660.2086,
   "spawnY": 476,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 454.8164,
+  "playTime": 545.3443,
   "meleeInventory": [
-    "Stick"
+    "Stick",
+    "Hammer"
   ],
   "rangedInventory": [
     "Bow"
   ],
-  "meleeIndex": 0,
+  "meleeIndex": 1,
   "rangedIndex": 0,
   "collectedItems": [
     "stick-1",
-    "debug_bow_639098175594549170"
+    "debug_bow_639098175594549170",
+    "hammer-0"
   ],
   "windowSizeIndex": 0,
   "crtEnabled": false,

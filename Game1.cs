@@ -1275,7 +1275,7 @@ public class Game1 : Game
                 else
                 {
                     // Normal contact damage for non-latchable crawlers (dummies, frozen, etc.)
-                    int dmg = c.CheckPlayerDamage(playerRect2);
+                    int dmg = c.CheckPlayerDamage(playerRect2, _player.Velocity.Y);
                     if (dmg > 0) { _lastDamageSource = "Crawler"; _player.TakeDamage(dmg, _player.Position.X - c.Position.X); }
                 }
             }
@@ -2952,7 +2952,8 @@ public class Game1 : Game
                     _enemyVariantCursor = (_enemyVariantCursor - 1 + variants.Length) % variants.Length;
                 if (kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S))
                     _enemyVariantCursor = (_enemyVariantCursor + 1) % variants.Length;
-                if (kb.IsKeyDown(Keys.Left) && _prevKb.IsKeyUp(Keys.Left))
+                if (kb.IsKeyDown(Keys.Left) && _prevKb.IsKeyUp(Keys.Left) ||
+                    kb.IsKeyDown(Keys.A) && _prevKb.IsKeyUp(Keys.A))
                     _enemyVariantExpanded = false; // collapse back to categories
             }
             else
@@ -2962,7 +2963,8 @@ public class Game1 : Game
                     _enemyCategoryCursor = (_enemyCategoryCursor - 1 + EnemyCategories.Length) % EnemyCategories.Length;
                 if (kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S))
                     _enemyCategoryCursor = (_enemyCategoryCursor + 1) % EnemyCategories.Length;
-                if (kb.IsKeyDown(Keys.Right) && _prevKb.IsKeyUp(Keys.Right))
+                if (kb.IsKeyDown(Keys.Right) && _prevKb.IsKeyUp(Keys.Right) ||
+                    kb.IsKeyDown(Keys.D) && _prevKb.IsKeyUp(Keys.D))
                 {
                     if (EnemyCategories[_enemyCategoryCursor].variants.Length > 1)
                     {
