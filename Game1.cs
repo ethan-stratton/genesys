@@ -1420,21 +1420,36 @@ public class Game1 : Game
         _player.UpdateRegen(dt);
         
         // Grapple hook collision — raycast along hook path
-        if (_player.IsGrappleFiring && _level.TileGridInstance != null)
+        if (_player.IsGrappleFiring)
         {
-            var grid = _level.TileGridInstance;
             var steps = _player.GetHookRaySteps(dt);
             bool hit = false;
             foreach (var sp in steps)
             {
-                // GetTile takes world coordinates, not tile indices
-                var tile = grid.GetTile((int)sp.X, (int)sp.Y);
-                if (tile != TileType.Empty && tile != TileType.Water && tile != TileType.Lava && tile != TileType.Acid)
+                var pt = new Point((int)sp.X, (int)sp.Y);
+                
+                // Check solid tiles (not background, not liquid, not empty)
+                if (_level.TileGridInstance != null)
                 {
-                    _player.AttachGrapple(sp);
-                    hit = true;
-                    break;
+                    var tile = _level.TileGridInstance.GetTile(pt.X, pt.Y);
+                    if (TileProperties.IsSolid(tile))
+                    {
+                        _player.AttachGrapple(sp);
+                        hit = true;
+                        break;
+                    }
                 }
+                
+                // Check entity-based walls, solid floors, ceilings
+                foreach (var r in _level.WallRects)
+                    if (r.Contains(pt)) { _player.AttachGrapple(sp); hit = true; break; }
+                if (hit) break;
+                foreach (var r in _level.SolidFloorRects)
+                    if (r.Contains(pt)) { _player.AttachGrapple(sp); hit = true; break; }
+                if (hit) break;
+                foreach (var r in _level.CeilingRects)
+                    if (r.Contains(pt)) { _player.AttachGrapple(sp); hit = true; break; }
+                if (hit) break;
             }
             if (!hit)
                 _player.AdvanceHook(dt);
@@ -8283,10 +8298,10 @@ public class Game1 : Game
         _bullets.ForEach(b => b.Draw(_spriteBatch, _pixel));
 
         // === Grapple rope + hook rendering ===
-        if (_player.IsGrappling || _player.IsGrappleFiring)
+        if (_player.IsGrappling || _player.IsGrappleFiring || _player.IsGrappleRetracting)
         {
             var playerCenter = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
-            var hookEnd = _player.IsGrappleFiring ? _player.GrappleHookPos : _player.GrappleAnchor;
+            var hookEnd = _player.IsGrappling ? _player.GrappleAnchor : _player.GrappleHookPos;
             
             // Draw rope
             var ropeDiff = hookEnd - playerCenter;

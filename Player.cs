@@ -477,8 +477,9 @@ public class Player
     public bool HasGrapple;                  // whether player has found the grapple module
     public bool IsGrappling { get; private set; }  // actively swinging
     public bool IsGrappleFiring { get; private set; } // hook in flight
+    public bool IsGrappleRetracting { get; private set; } // hook flying back (visual only)
     public Vector2 GrappleAnchor;            // world position of the hook point
-    public Vector2 GrappleHookPos;           // current hook projectile position (during firing)
+    public Vector2 GrappleHookPos;           // current hook projectile position (during firing/retracting)
     public float GrappleRopeLength;          // current rope length
     
     // Player weight — affects grapple swing speed, fall speed with grapple, etc.
@@ -502,7 +503,7 @@ public class Player
     /// <summary>Fire grapple toward target.</summary>
     public bool FireGrapple(Vector2 target)
     {
-        if (!HasGrapple || IsGrappling || IsGrappleFiring) return false;
+        if (!HasGrapple || IsGrappling || IsGrappleFiring || IsGrappleRetracting) return false;
         IsGrappleFiring = true;
         var center = Position + new Vector2(Width / 2f, Height / 2f);
         var dir = target - center;
@@ -544,10 +545,27 @@ public class Player
         IsGrappleFiring = false;
     }
     
-    /// <summary>Cancel grapple firing (missed / out of range).</summary>
+    /// <summary>Cancel grapple firing — start retract animation.</summary>
     public void CancelGrappleFire()
     {
         IsGrappleFiring = false;
+        IsGrappleRetracting = true;
+    }
+    
+    /// <summary>Update retract animation — hook flies back to player.</summary>
+    public void UpdateGrappleRetract(float dt)
+    {
+        if (!IsGrappleRetracting) return;
+        var center = Position + new Vector2(Width / 2f, Height / 2f);
+        var dir = center - GrappleHookPos;
+        float dist = dir.Length();
+        if (dist < 16f)
+        {
+            IsGrappleRetracting = false;
+            return;
+        }
+        dir /= dist;
+        GrappleHookPos += dir * GrappleHookSpeed * 1.5f * dt;
     }
     
     /// <summary>Raycast hook movement — returns steps along the path for Game1 to collision-check.</summary>
@@ -1928,15 +1946,17 @@ public class Player
         
         // Update grapple pendulum physics (does nothing if not grappling)
         UpdateGrapple(dt, kb);
+        UpdateGrappleRetract(dt);
         
-        // If grappling, skip normal velocity — pendulum handles position
+        // If grappling, pendulum handles position — skip normal movement
         if (IsGrappling)
         {
-            Velocity = vel;
+            _prevKb = kb;
             return;
         }
 
-        // Apply velocity
+        // Apply velocity (use Velocity which may have been set by ReleaseGrapple)
+        vel = Velocity;
         var pos = Position + vel * dt;
 
         // --- Collision (always full Height) ---
