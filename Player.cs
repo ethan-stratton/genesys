@@ -636,14 +636,14 @@ public class Player
                 int knifeH = 12; // narrow vertical profile (stabbing, not slashing)
                 
                 // Extension animation: snap out fast, hold briefly, retract
-                float t = MeleeTimer > 0 ? 1f - (MeleeTimer / CurrentMeleeActiveTime) : 1f;
+                float kt = MeleeTimer > 0 ? 1f - (MeleeTimer / CurrentMeleeActiveTime) : 1f;
                 float extend;
-                if (t < 0.15f)
-                    extend = t / 0.15f; // snap out (15% of duration)
-                else if (t < 0.7f)
+                if (kt < 0.15f)
+                    extend = kt / 0.15f; // snap out (15% of duration)
+                else if (kt < 0.7f)
                     extend = 1f; // hold at full extension (55% of duration)
                 else
-                    extend = 1f - (t - 0.7f) / 0.3f; // retract (30% of duration)
+                    extend = 1f - (kt - 0.7f) / 0.3f; // retract (30% of duration)
                 
                 // Combo stabs: each step extends slightly further
                 float baseReach = 16f + _comboStep * 4f; // 16, 20, 24 pixels
