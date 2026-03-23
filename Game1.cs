@@ -2970,11 +2970,13 @@ public class Game1 : Game
                 string itype = ItemPaletteTypes[_itemPaletteCursor];
                 if (itype == "shelter")
                 {
-                    // Place shelter base at bottom of grid cell (ground level)
+                    // Snap shelter to ground surface
+                    float groundY = SnapToSurface(cx + 16, cy, 32, 32);
+                    if (groundY < 0) groundY = cy; // fallback if no ground found
                     var shelterList = new List<ShelterData>(_level.Shelters ?? Array.Empty<ShelterData>());
-                    shelterList.Add(new ShelterData { Id = $"shelter-{shelterList.Count}", X = cx + 16, Y = cy + 32, Name = "Leaf Shelter" });
+                    shelterList.Add(new ShelterData { Id = $"shelter-{shelterList.Count}", X = cx + 16, Y = groundY, Name = "Leaf Shelter" });
                     _level.Shelters = shelterList.ToArray();
-                    SetEditorStatus($"Placed shelter at ({(int)cx}, {(int)(cy + 32)})");
+                    SetEditorStatus($"Placed shelter at ({(int)cx}, {(int)groundY})");
                 }
                 else
                 {
@@ -4735,7 +4737,7 @@ public class Game1 : Game
         {
             foreach (var sh in _level.Shelters)
             {
-                int sx = (int)sh.X - 16, sy = (int)sh.Y - 32;
+                int sx = (int)sh.X - 16, sy = (int)sh.Y - 30;
                 _spriteBatch.Draw(_pixel, new Rectangle(sx, sy, 32, 32), new Color(50, 90, 35) * 0.6f);
                 _spriteBatch.Draw(_pixel, new Rectangle(sx + 12, sy + 12, 8, 16), new Color(90, 60, 30) * 0.8f);
                 DrawOutlinedString(_fontSmall, SafeText(sh.Name), new Vector2(sx - 4, sy - 14), Color.Green * 0.9f);
@@ -7595,7 +7597,7 @@ public class Game1 : Game
         {
             foreach (var sh in _level.Shelters)
             {
-                int sx = (int)sh.X - 16, sy = (int)sh.Y - 32;
+                int sx = (int)sh.X - 16, sy = (int)sh.Y - 30;
                 // Leaf shelter: triangular roof + trunk
                 var leafGreen = new Color(50, 90, 35);
                 var leafDark = new Color(30, 60, 20);

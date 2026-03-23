@@ -1,10 +1,10 @@
 {
   "currentLevel": "test-arena",
-  "spawnX": 416,
-  "spawnY": 192,
+  "spawnX": 496,
+  "spawnY": 472,
   "unlockedAbilities": [],
   "flags": {},
-  "playTime": 0,
+  "playTime": 4.2833366,
   "meleeInventory": [],
   "rangedInventory": [],
   "meleeIndex": -1,

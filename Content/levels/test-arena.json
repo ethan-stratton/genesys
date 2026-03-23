@@ -316,14 +316,7 @@
   "switches": [],
   "labels": [],
   "retractableSpikes": [],
-  "shelters": [
-    {
-      "id": "shelter-0",
-      "x": 413.5563,
-      "y": 520,
-      "name": "Leaf Shelter"
-    }
-  ],
+  "shelters": [],
   "tileGrid": {
     "width": 65,
     "height": 27,
