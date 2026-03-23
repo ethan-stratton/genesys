@@ -162,15 +162,7 @@
   ],
   "ceilings": [],
   "solidFloors": [],
-  "wallSpikes": [
-    {
-      "x": 567,
-      "y": 352,
-      "w": 12,
-      "h": 64,
-      "side": 1
-    }
-  ],
+  "wallSpikes": [],
   "exits": [
     {
       "x": 1140,
@@ -319,8 +311,8 @@
   "shelters": [
     {
       "id": "shelter-0",
-      "x": 379.2225,
-      "y": 536,
+      "x": 400,
+      "y": 544,
       "name": "Leaf Shelter"
     }
   ],

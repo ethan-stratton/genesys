@@ -10,6 +10,11 @@ public class Camera
     private readonly int _viewWidth;
     private readonly int _viewHeight;
     
+    // Zoom
+    public float Zoom { get; set; } = 1f;
+    public float TargetZoom { get; set; } = 1f;
+    public float ZoomLerpSpeed { get; set; } = 0.5f; // slow cinematic default
+    
     // Smoothing
     private const float LerpSpeedX = 4f;
     private const float LerpSpeedY = 6f;
@@ -44,8 +49,22 @@ public class Camera
         _worldBottom = worldBottom;
     }
     
+    /// <summary>Effective view dimensions accounting for zoom.</summary>
+    public float EffectiveViewW => _viewWidth / Zoom;
+    public float EffectiveViewH => _viewHeight / Zoom;
+    
     public void Update(float dt, Vector2 playerPos, int playerWidth, int playerHeight, int facingDir, bool isGrounded, float velocityY)
     {
+        // Lerp zoom toward target
+        if (MathF.Abs(Zoom - TargetZoom) > 0.001f)
+            Zoom += (TargetZoom - Zoom) * ZoomLerpSpeed * dt;
+        else
+            Zoom = TargetZoom;
+        Zoom = MathHelper.Clamp(Zoom, 0.5f, 3f);
+        
+        float evw = EffectiveViewW;
+        float evh = EffectiveViewH;
+        
         float playerCenterX = playerPos.X + playerWidth / 2f;
         float playerCenterY = playerPos.Y + playerHeight / 2f;
         
@@ -54,23 +73,21 @@ public class Camera
         _currentBias += (targetBias - _currentBias) * BiasLerpSpeed * dt;
         
         // Camera center = where the camera is currently looking
-        float camCenterX = Position.X + _viewWidth / 2f;
-        float camCenterY = Position.Y + _viewHeight / 2f;
+        float camCenterX = Position.X + evw / 2f;
+        float camCenterY = Position.Y + evh / 2f;
         
         // --- Horizontal: dead zone + forward bias ---
-        // Ideal position is player + bias, but only move if player exits dead zone
         float idealX = playerCenterX + _currentBias;
         float diffX = idealX - camCenterX;
         float targetX;
         if (MathF.Abs(diffX) > DeadZoneX)
         {
-            // Player pushed past dead zone — target moves to keep them at edge
             float sign = MathF.Sign(diffX);
-            targetX = idealX - sign * DeadZoneX - _viewWidth / 2f;
+            targetX = idealX - sign * DeadZoneX - evw / 2f;
         }
         else
         {
-            targetX = Position.X; // stay put
+            targetX = Position.X;
         }
         
         // --- Vertical: dead zone + ground snap ---
@@ -92,7 +109,7 @@ public class Camera
         if (MathF.Abs(diffY) > DeadZoneY)
         {
             float sign = MathF.Sign(diffY);
-            targetY = verticalRef - sign * DeadZoneY - _viewHeight / 2f;
+            targetY = verticalRef - sign * DeadZoneY - evh / 2f;
         }
         else
         {
@@ -103,25 +120,29 @@ public class Camera
         float newX = Position.X + (targetX - Position.X) * LerpSpeedX * dt;
         float newY = Position.Y + (targetY - Position.Y) * LerpSpeedY * dt;
         
-        // Clamp to world bounds
-        newX = MathHelper.Clamp(newX, _worldLeft, _worldRight - _viewWidth);
-        newY = MathHelper.Clamp(newY, _worldTop, _worldBottom - _viewHeight);
+        // Clamp to world bounds (accounting for zoom)
+        newX = MathHelper.Clamp(newX, _worldLeft, MathF.Max(_worldLeft, _worldRight - evw));
+        newY = MathHelper.Clamp(newY, _worldTop, MathF.Max(_worldTop, _worldBottom - evh));
         
         Position = new Vector2(newX, newY);
     }
     
     public void SnapTo(Vector2 playerPos, int playerWidth, int playerHeight, bool unclamped = false)
     {
-        float cx = playerPos.X + playerWidth / 2f - _viewWidth / 2f;
-        float cy = playerPos.Y + playerHeight / 2f - _viewHeight / 2f;
+        float evw = EffectiveViewW;
+        float evh = EffectiveViewH;
+        float cx = playerPos.X + playerWidth / 2f - evw / 2f;
+        float cy = playerPos.Y + playerHeight / 2f - evh / 2f;
         if (!unclamped)
         {
-            cx = MathHelper.Clamp(cx, _worldLeft, _worldRight - _viewWidth);
-            cy = MathHelper.Clamp(cy, _worldTop, _worldBottom - _viewHeight);
+            cx = MathHelper.Clamp(cx, _worldLeft, MathF.Max(_worldLeft, _worldRight - evw));
+            cy = MathHelper.Clamp(cy, _worldTop, MathF.Max(_worldTop, _worldBottom - evh));
         }
         Position = new Vector2(cx, cy);
         _lastGroundY = playerPos.Y + playerHeight / 2f;
     }
     
-    public Matrix TransformMatrix => Matrix.CreateTranslation(-Position.X, -Position.Y, 0);
+    public Matrix TransformMatrix =>
+        Matrix.CreateTranslation(-Position.X, -Position.Y, 0) *
+        Matrix.CreateScale(Zoom, Zoom, 1f);
 }

@@ -41,6 +41,11 @@ public class Game1 : Game
     private float _prologueFadeAlpha;  // for fades between phases
     private bool _prologueSkipHeld;    // ESC hold-to-skip
     private float _prologueSkipTimer;  // 1.0s hold required
+    
+    // Wake-up cinematic sequence
+    private float _wakeUpTimer;
+    private int _wakeUpPhase;          // 0=blackout, 1=eyes opening, 2=look around, 3=control given
+    private bool _wakeUpComplete;
     private float _titleCardTimer;     // 3-second "GENESIS" display
     private float _titleCardFade;      // fade in/out alpha
     private float _tierSwitchFlash;    // flash timer on tier change
@@ -796,6 +801,10 @@ public class Game1 : Game
                             _rangedIndex = _saveData.RangedIndex;
                             if (_meleeIndex >= _meleeInventory.Length) _meleeIndex = _meleeInventory.Length > 0 ? 0 : -1;
                             if (_rangedIndex >= _rangedInventory.Length) _rangedIndex = _rangedInventory.Length > 0 ? 0 : -1;
+                            // Skip wake-up on continue
+                            _wakeUpComplete = true;
+                            _camera.Zoom = 1f;
+                            _camera.TargetZoom = 1f;
 
                             // Load movement tier
                             _player.CurrentTier = (Player.MoveTier)Math.Clamp(_saveData.MoveTier, 0, 2);
@@ -1016,6 +1025,50 @@ public class Game1 : Game
         // Weapon cycling (only during gameplay, not editor)
         if (!_menuOpen && !_dialogueOpen && _gameState == GameState.Playing)
         {
+            // === Wake-up cinematic sequence ===
+            if (!_wakeUpComplete)
+            {
+                _wakeUpTimer += dt;
+                switch (_wakeUpPhase)
+                {
+                    case 0: // Black screen, breathing sounds (0-2s)
+                        _fadeAlpha = Math.Max(0.7f, 1f - _wakeUpTimer * 0.15f);
+                        if (_wakeUpTimer >= 2f) { _wakeUpPhase = 1; _wakeUpTimer = 0; }
+                        break;
+                    case 1: // Eyes opening — fade lifts, camera still tight (0-3s)
+                        _fadeAlpha = Math.Max(0f, 0.7f - _wakeUpTimer * 0.25f);
+                        _camera.Zoom = 2.5f - _wakeUpTimer * 0.2f; // 2.5 → ~1.9
+                        _camera.TargetZoom = _camera.Zoom;
+                        if (_wakeUpTimer >= 3f) { _wakeUpPhase = 2; _wakeUpTimer = 0; }
+                        break;
+                    case 2: // Look around — camera pulls out more (0-4s)
+                        _camera.TargetZoom = 1.4f;
+                        _camera.ZoomLerpSpeed = 0.5f;
+                        if (_wakeUpTimer >= 1.5f && !_eveOrbActive)
+                        {
+                            // EVE boots up
+                            _eveOrbActive = true;
+                            EveAlert("Sys... systems rebooting. Adam? Can you hear me?", 4f);
+                        }
+                        if (_wakeUpTimer >= 4f) { _wakeUpPhase = 3; _wakeUpTimer = 0; }
+                        break;
+                    case 3: // Control given — zoom settles to 1x (0-3s)
+                        _camera.TargetZoom = 1f;
+                        _camera.ZoomLerpSpeed = 0.4f;
+                        if (_wakeUpTimer >= 1f)
+                        {
+                            _wakeUpComplete = true;
+                            EveAlert("Try to move. Carefully.", 3f);
+                        }
+                        break;
+                }
+                // Block player input during wake-up
+                _prevKb = kb;
+                _prevMouse = Mouse.GetState();
+                base.Update(gameTime);
+                return;
+            }
+
             // Pause toggle
             if (kb.IsKeyDown(Keys.B) && _prevKb.IsKeyUp(Keys.B))
             {
@@ -5656,6 +5709,14 @@ public class Game1 : Game
                     System.IO.File.Delete(f);
             _titleCardTimer = 0f;
             _fadeAlpha = 1f; // start gameplay from black, fade in
+            
+            // Cinematic zoom: start tight on Adam, slowly pull out
+            _camera.Zoom = 2.5f;
+            _camera.TargetZoom = 1f;
+            _camera.ZoomLerpSpeed = 0.3f; // slow cinematic pull-out (~8s to settle)
+            _camera.SnapTo(_player.Position, Player.Width, Player.Height);
+            _wakeUpTimer = 0f;
+            _wakeUpPhase = 0;
         }
     }
 

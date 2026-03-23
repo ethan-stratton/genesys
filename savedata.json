@@ -1,10 +1,12 @@
 {
   "currentLevel": "test-arena",
-  "spawnX": 405.7775,
+  "spawnX": 479.19376,
   "spawnY": 472,
   "unlockedAbilities": [],
-  "flags": {},
-  "playTime": 8.600043,
+  "flags": {
+    "eveOrbActive": true
+  },
+  "playTime": 52.682705,
   "meleeInventory": [],
   "rangedInventory": [],
   "meleeIndex": -1,
@@ -14,9 +16,9 @@
   "crtEnabled": false,
   "moveTier": 1,
   "upgrades": [],
-  "shelterLevel": "",
-  "shelterX": 0,
-  "shelterY": 0,
+  "shelterLevel": "test-arena",
+  "shelterX": 400,
+  "shelterY": 496,
   "deathCount": 0,
   "hp": 100
 }
