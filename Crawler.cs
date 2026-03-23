@@ -6,6 +6,55 @@ namespace Genesis;
 
 public enum CrawlerVariant { Forager, Skitter, Leaper, Bombardier }
 
+/// <summary>
+/// A procedural leg with 2-segment inverse kinematics.
+/// Solves joint angles via law of cosines for natural insect leg movement.
+/// </summary>
+public struct IKLeg
+{
+    public float UpperLen;     // thigh length
+    public float LowerLen;     // shin length
+    public Vector2 FootTarget; // where the foot WANTS to be (ground contact)
+    public Vector2 FootPos;    // where the foot currently IS (lerps toward target)
+    public Vector2 HipOffset;  // offset from body center (local space, facing right)
+    public bool IsMoving;      // currently stepping to new position
+    public float StepTimer;    // 0→1 during step animation
+    public Vector2 StepFrom;   // foot position at step start
+
+    public const float StepDuration = 0.08f; // seconds per step
+    public const float StepHeight = 4f;      // arc height during step
+    public const float StepThreshold = 6f;   // distance before foot re-steps
+
+    /// <summary>
+    /// Solve 2-segment IK: given hip position and foot target, returns knee position.
+    /// Uses law of cosines. Returns false if target is unreachable (stretches toward it).
+    /// </summary>
+    public static Vector2 SolveKnee(Vector2 hip, Vector2 foot, float upperLen, float lowerLen, float sideBias)
+    {
+        Vector2 toFoot = foot - hip;
+        float dist = toFoot.Length();
+        if (dist < 0.001f) return hip + new Vector2(0, upperLen);
+
+        float totalLen = upperLen + lowerLen;
+        // Clamp distance so IK doesn't break
+        if (dist > totalLen * 0.999f) dist = totalLen * 0.999f;
+        if (dist < MathF.Abs(upperLen - lowerLen) + 0.01f)
+            dist = MathF.Abs(upperLen - lowerLen) + 0.01f;
+
+        // Law of cosines for knee angle
+        float cosAngle = (upperLen * upperLen + dist * dist - lowerLen * lowerLen) / (2f * upperLen * dist);
+        cosAngle = MathHelper.Clamp(cosAngle, -1f, 1f);
+        float angle = MathF.Acos(cosAngle);
+
+        // Direction from hip to foot
+        float baseAngle = MathF.Atan2(toFoot.Y, toFoot.X);
+        // sideBias > 0 = knee bends outward (left legs bend left, right legs bend right)
+        float kneeAngle = baseAngle - angle * sideBias;
+
+        return hip + new Vector2(MathF.Cos(kneeAngle), MathF.Sin(kneeAngle)) * upperLen;
+    }
+}
+
 public class Crawler
 {
     public Vector2 Position;
@@ -94,6 +143,11 @@ public class Crawler
     // Bombardier spray event: Game1 reads this each frame and spawns particles
     public bool BombardierSprayed;          // true on the frame spray fires
     public Vector2 BombardierSprayDir;      // direction of spray (away from player, predicted)
+
+    // --- Procedural Legs ---
+    public IKLeg[] Legs;
+    private int _gaitGroup; // 0 or 1 — which group of legs is currently stepping
+    private const int LegCount = 6; // 3 per side
     public float DummyScaleX = 0f;
     public float DummyScaleY = 0f;
 
@@ -127,6 +181,7 @@ public class Crawler
         _bugStateTimer = (float)_rng.NextDouble() * 2f;
         _walkSpeedMult = 0.6f + (float)_rng.NextDouble() * 0.8f; // 0.6–1.4x
         _antennaeTimer = (float)_rng.NextDouble() * 10f;
+        InitLegs();
     }
 
     public Rectangle Rect => new((int)Position.X, (int)Position.Y, EffectiveWidth, EffectiveHeight);
@@ -478,6 +533,9 @@ public class Crawler
             }
         }
         
+        // Update procedural legs
+        UpdateLegs(dt);
+
         // === BOMBARDIER SPRAY LOGIC ===
         BombardierSprayed = false;
         if (Variant == CrawlerVariant.Bombardier && !Frozen && !IsLatched)
@@ -608,6 +666,128 @@ public class Crawler
         return 0;
     }
 
+    // ──────────── PROCEDURAL LEGS ────────────
+
+    private void InitLegs()
+    {
+        Legs = new IKLeg[LegCount];
+        // Variant-specific leg dimensions
+        float upper, lower;
+        switch (Variant)
+        {
+            case CrawlerVariant.Skitter: upper = 5f; lower = 5f; break;
+            case CrawlerVariant.Leaper: upper = 4f; lower = 6f; break;  // longer lower = grasshopper
+            case CrawlerVariant.Bombardier: upper = 3f; lower = 3f; break; // stubby
+            default: upper = 3.5f; lower = 3.5f; break; // Forager
+        }
+
+        float bodyW = EffectiveWidth;
+        float bodyH = EffectiveHeight;
+        // 3 legs per side, evenly spaced along body length
+        for (int i = 0; i < LegCount; i++)
+        {
+            bool rightSide = i < 3;
+            int legIndex = rightSide ? i : i - 3; // 0,1,2 per side
+            float xFrac = 0.2f + legIndex * 0.3f; // 0.2, 0.5, 0.8 along body
+
+            // Leaper: rear legs longer
+            float thisUpper = upper;
+            float thisLower = lower;
+            if (Variant == CrawlerVariant.Leaper && legIndex == 2)
+            {
+                thisUpper *= 1.4f;
+                thisLower *= 1.4f;
+            }
+
+            Legs[i].UpperLen = thisUpper;
+            Legs[i].LowerLen = thisLower;
+            Legs[i].HipOffset = new Vector2(
+                (xFrac - 0.5f) * bodyW,
+                bodyH * 0.3f  // hips near bottom of body
+            );
+
+            // Initial foot position: directly below hip, on the ground
+            float hipWorldX = Position.X + bodyW * xFrac;
+            float footY = Position.Y + bodyH + thisUpper + thisLower * 0.5f;
+            float footXSpread = rightSide ? 3f : -3f;
+            Legs[i].FootPos = new Vector2(hipWorldX + footXSpread, footY);
+            Legs[i].FootTarget = Legs[i].FootPos;
+        }
+    }
+
+    public void UpdateLegs(float dt)
+    {
+        if (!Alive || IsDummy || Legs == null) return;
+
+        float bodyW = EffectiveWidth;
+        float bodyH = EffectiveHeight;
+        Vector2 bodyCenter = new(Position.X + bodyW * 0.5f, Position.Y + bodyH * 0.5f);
+        float speed = MathF.Abs(Velocity.X);
+
+        for (int i = 0; i < LegCount; i++)
+        {
+            bool rightSide = i < 3;
+            int legIndex = rightSide ? i : i - 3;
+            float xFrac = 0.2f + legIndex * 0.3f;
+
+            // Compute hip world position
+            Vector2 hipLocal = Legs[i].HipOffset;
+            if (Dir < 0) hipLocal.X = -hipLocal.X; // mirror for facing direction
+            Vector2 hip = bodyCenter + hipLocal;
+
+            // Ideal foot target: below hip + spread outward + forward offset based on velocity
+            float spreadX = rightSide ? 3.5f : -3.5f;
+            float velOffset = Velocity.X * 0.04f; // lean into movement
+            float footTargetX = hip.X + spreadX + velOffset;
+            float footTargetY = Position.Y + bodyH + 1f; // ground level (just below body)
+
+            Legs[i].FootTarget = new Vector2(footTargetX, footTargetY);
+
+            // Check if this leg needs to step
+            float distToTarget = Vector2.Distance(Legs[i].FootPos, Legs[i].FootTarget);
+            // Tripod gait: legs 0,2,4 step together, 1,3,5 step together
+            int myGroup = (i % 2 == 0) ? 0 : 1;
+
+            if (!Legs[i].IsMoving && distToTarget > IKLeg.StepThreshold && myGroup == _gaitGroup)
+            {
+                Legs[i].IsMoving = true;
+                Legs[i].StepTimer = 0f;
+                Legs[i].StepFrom = Legs[i].FootPos;
+            }
+
+            // Animate step
+            if (Legs[i].IsMoving)
+            {
+                Legs[i].StepTimer += dt / IKLeg.StepDuration;
+                if (Legs[i].StepTimer >= 1f)
+                {
+                    Legs[i].StepTimer = 1f;
+                    Legs[i].IsMoving = false;
+                    Legs[i].FootPos = Legs[i].FootTarget;
+                }
+                else
+                {
+                    float t = Legs[i].StepTimer;
+                    // Smooth step with arc
+                    float smoothT = t * t * (3f - 2f * t); // smoothstep
+                    Legs[i].FootPos = Vector2.Lerp(Legs[i].StepFrom, Legs[i].FootTarget, smoothT);
+                    // Arc upward in middle of step
+                    Legs[i].FootPos.Y -= MathF.Sin(t * MathF.PI) * IKLeg.StepHeight;
+                }
+            }
+        }
+
+        // Alternate gait groups when any leg in current group finishes
+        bool anyMoving = false;
+        for (int i = 0; i < LegCount; i++)
+        {
+            int myGroup = (i % 2 == 0) ? 0 : 1;
+            if (myGroup == _gaitGroup && Legs[i].IsMoving) anyMoving = true;
+        }
+        if (!anyMoving && speed > 5f)
+            _gaitGroup = 1 - _gaitGroup;
+    }
+
     public void Draw(SpriteBatch sb, Texture2D pixel)
     {
         if (!Alive) return;
@@ -620,57 +800,115 @@ public class Crawler
             : SwarmActive ? (Variant == CrawlerVariant.Leaper ? new Color(200, 40, 20) : Variant == CrawlerVariant.Skitter ? new Color(140, 60, 40) : new Color(160, 50, 30))
             : Variant == CrawlerVariant.Leaper ? (Aggroed ? new Color(140, 80, 20) : new Color(100, 70, 30))
             : Variant == CrawlerVariant.Skitter ? new Color(60, 80, 50)
-            : Variant == CrawlerVariant.Bombardier ? (BombardierCharging ? new Color(255, 120, 30) : new Color(120, 60, 20)) // dark brown, orange when charging
+            : Variant == CrawlerVariant.Bombardier ? (BombardierCharging ? new Color(255, 120, 30) : new Color(120, 60, 20))
             : new Color(80, 50, 20);
         int scaledW = (int)(ew * VisualScale.X);
         int scaledH = (int)(eh * VisualScale.Y);
         int drawX = (int)Position.X + ew / 2 - scaledW / 2;
         int drawY = (int)Position.Y + eh - scaledH;
-        sb.Draw(pixel, new Rectangle(drawX, drawY, scaledW, scaledH), bodyColor);
-        
-        // Bombardier abdomen glow (rear half of body, orange-red)
-        if (Variant == CrawlerVariant.Bombardier && !IsDummy)
+
+        // --- PROCEDURAL LEGS ---
+        if (!IsDummy && Legs != null && Legs.Length == LegCount)
         {
-            int abdX = Dir == 1 ? drawX : drawX + scaledW / 2;
-            int abdW = scaledW / 2;
-            float glow = BombardierCharging ? 0.8f + 0.2f * MathF.Sin(BombardierChargeTimer * 20f) : 0.3f;
-            sb.Draw(pixel, new Rectangle(abdX, drawY + 1, abdW, scaledH - 2),
-                new Color(255, 80, 20) * glow);
+            Color legColor = new Color(
+                (int)(bodyColor.R * 0.7f),
+                (int)(bodyColor.G * 0.7f),
+                (int)(bodyColor.B * 0.7f));
+
+            Vector2 bodyCenter = new(Position.X + ew * 0.5f, Position.Y + eh * 0.5f);
+
+            for (int i = 0; i < LegCount; i++)
+            {
+                bool rightSide = i < 3;
+                Vector2 hipLocal = Legs[i].HipOffset;
+                if (Dir < 0) hipLocal.X = -hipLocal.X;
+                Vector2 hip = bodyCenter + hipLocal;
+                Vector2 foot = Legs[i].FootPos;
+
+                // Solve IK for knee position
+                float sideBias = rightSide ? 1f : -1f;
+                Vector2 knee = IKLeg.SolveKnee(hip, foot, Legs[i].UpperLen, Legs[i].LowerLen, sideBias);
+
+                // Draw upper leg (hip → knee)
+                DrawLine(sb, pixel, hip, knee, 2, legColor);
+                // Draw lower leg (knee → foot)
+                DrawLine(sb, pixel, knee, foot, 1, legColor);
+                // Foot dot
+                sb.Draw(pixel, new Rectangle((int)foot.X, (int)foot.Y, 2, 1), legColor);
+            }
+        }
+        else
+        {
+            // Fallback for dummies: simple stub legs
+            sb.Draw(pixel, new Rectangle((int)Position.X + 2, (int)Position.Y + eh, 2, 3), new Color(60, 30, 10));
+            sb.Draw(pixel, new Rectangle((int)Position.X + ew - 4, (int)Position.Y + eh, 2, 3), new Color(60, 30, 10));
         }
 
-        // Legs
-        sb.Draw(pixel, new Rectangle((int)Position.X + 2, (int)Position.Y + eh, 2, 3), new Color(60, 30, 10));
-        sb.Draw(pixel, new Rectangle((int)Position.X + ew - 4, (int)Position.Y + eh, 2, 3), new Color(60, 30, 10));
-
-        // Antennae (wiggle based on state)
+        // --- SEGMENTED BODY ---
+        // Head (front), thorax (middle), abdomen (rear)
         if (!IsDummy)
         {
+            int headW = scaledW / 3;
+            int thoraxW = scaledW / 3 + 2;
+            int abdomenW = scaledW - headW - thoraxW + 4;
+            int headX, thoraxX, abdomenX;
+            if (Dir > 0)
+            {
+                abdomenX = drawX - 2;
+                thoraxX = abdomenX + abdomenW - 2;
+                headX = thoraxX + thoraxW - 2;
+            }
+            else
+            {
+                headX = drawX - 2;
+                thoraxX = headX + headW - 2;
+                abdomenX = thoraxX + thoraxW - 2;
+            }
+            // Body bob based on movement
+            float bob = MathF.Abs(Velocity.X) > 10f ? MathF.Sin(_antennaeTimer * 12f) * 0.8f : 0f;
+            int headY = drawY + (int)(bob);
+            int thoraxY = drawY;
+            int abdomenY = drawY + (int)(-bob * 0.5f);
+
+            // Abdomen (largest segment)
+            Color abdColor = bodyColor;
+            if (Variant == CrawlerVariant.Bombardier)
+            {
+                float glow = BombardierCharging ? 0.8f + 0.2f * MathF.Sin(BombardierChargeTimer * 20f) : 0.3f;
+                abdColor = Color.Lerp(bodyColor, new Color(255, 80, 20), glow);
+            }
+            sb.Draw(pixel, new Rectangle(abdomenX, abdomenY + 1, abdomenW, scaledH - 1), abdColor);
+            // Thorax
+            sb.Draw(pixel, new Rectangle(thoraxX, thoraxY, thoraxW, scaledH), bodyColor);
+            // Head (slightly smaller vertically)
+            sb.Draw(pixel, new Rectangle(headX, headY + 1, headW, scaledH - 2), bodyColor);
+
+            // Eyes (tiny bright dots on head)
+            Color eyeColor = Aggroed || SwarmActive ? new Color(255, 60, 30) : new Color(200, 200, 180);
+            int eyeX = Dir > 0 ? headX + headW - 2 : headX + 1;
+            sb.Draw(pixel, new Rectangle(eyeX, headY + 2, 1, 1), eyeColor);
+
+            // Antennae (wiggle based on state)
             float wiggle = MathF.Sin(_antennaeTimer * 6f) * 2f;
-            int headX = Dir > 0 ? (int)Position.X + ew - 2 : (int)Position.X;
-            int antY = (int)Position.Y - 2;
-            int ant1X = headX + Dir * 3 + (int)(wiggle * 0.5f);
-            int ant2X = headX + Dir * 5 + (int)wiggle;
+            int antBaseX = Dir > 0 ? headX + headW : headX;
+            int antY = headY;
+            int ant1X = antBaseX + Dir * 3 + (int)(wiggle * 0.5f);
+            int ant2X = antBaseX + Dir * 5 + (int)wiggle;
             Color antColor = new Color(60, 40, 15);
             sb.Draw(pixel, new Rectangle(ant1X, antY, 1, 3), antColor);
             sb.Draw(pixel, new Rectangle(ant2X, antY - 1, 1, 3), antColor);
 
-            // Leaper variant: longer legs, slightly taller look
+            // Leaper stripe marking
             if (Variant == CrawlerVariant.Leaper)
-            {
-                // Extra middle legs
-                sb.Draw(pixel, new Rectangle((int)Position.X + ew / 2 - 1, (int)Position.Y + eh, 2, 4), new Color(70, 40, 15));
-                // Stripe marking
-                sb.Draw(pixel, new Rectangle(drawX + scaledW / 4, drawY + 1, scaledW / 2, 2), new Color(160, 100, 30) * 0.6f);
-            }
-            // Skitter: thin legs, lighter body spot (looks nervous/fast)
+                sb.Draw(pixel, new Rectangle(thoraxX + 1, thoraxY + 1, thoraxW - 2, 2), new Color(160, 100, 30) * 0.6f);
+            // Skitter light spot
             else if (Variant == CrawlerVariant.Skitter)
-            {
-                // Extra thin middle legs (speed look)
-                sb.Draw(pixel, new Rectangle((int)Position.X + ew / 3, (int)Position.Y + eh, 1, 4), new Color(50, 60, 35));
-                sb.Draw(pixel, new Rectangle((int)Position.X + ew * 2 / 3, (int)Position.Y + eh, 1, 4), new Color(50, 60, 35));
-                // Light spot on back
-                sb.Draw(pixel, new Rectangle(drawX + scaledW / 3, drawY + 2, scaledW / 3, 2), new Color(90, 110, 70) * 0.5f);
-            }
+                sb.Draw(pixel, new Rectangle(thoraxX + 2, thoraxY + 2, thoraxW - 4, 2), new Color(90, 110, 70) * 0.5f);
+        }
+        else
+        {
+            // Dummies: simple rectangle
+            sb.Draw(pixel, new Rectangle(drawX, drawY, scaledW, scaledH), bodyColor);
         }
 
         // Paused/edge-sniffing visual: slight head bob
@@ -680,5 +918,17 @@ public class Crawler
             int headDotX = Dir > 0 ? (int)Position.X + ew - 1 : (int)Position.X - 1;
             sb.Draw(pixel, new Rectangle(headDotX, (int)Position.Y + 2 + bobY, 2, 2), bodyColor * 1.2f);
         }
+    }
+
+    /// <summary>Draws a line between two points as a rotated rectangle.</summary>
+    private static void DrawLine(SpriteBatch sb, Texture2D pixel, Vector2 a, Vector2 b, int thickness, Color color)
+    {
+        Vector2 diff = b - a;
+        float length = diff.Length();
+        if (length < 0.5f) return;
+        float angle = MathF.Atan2(diff.Y, diff.X);
+        sb.Draw(pixel,
+            new Rectangle((int)a.X, (int)a.Y, (int)length, thickness),
+            null, color, angle, new Vector2(0, thickness * 0.5f), SpriteEffects.None, 0f);
     }
 }
