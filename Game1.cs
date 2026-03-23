@@ -327,7 +327,7 @@ public class Game1 : Game
     private readonly List<(string type, int index, object data)> _entityUndoStack = new();
 
     // Enemy/item editor placement
-    private static readonly string[] EnemyTypes = { "crawler", "wingbeater", "dummy" };
+    private static readonly string[] EnemyTypes = { "crawler", "leaper", "wingbeater", "dummy" };
     private int _editorEnemyCursor;
     private static readonly string[] ItemTypes = { "stick", "dagger", "sword", "axe", "club", "hammer", "greatsword", "greatclub", "whip", "sling", "bow", "gun", "heart" };
     private int _editorItemCursor;
@@ -536,9 +536,11 @@ public class Game1 : Game
                     _swarms.Add(new InsectSwarm(new Vector2(e.X, e.Y), e.Count > 0 ? e.Count : 10, _rng));
                     break;
                 case "crawler":
+                case "leaper":
                     float snapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Crawler.Width, Crawler.Height, tg, ts, plats, sFloors, walls, mainFloor);
-                    var c = new Crawler(new Vector2(e.X, snapY), bLeft, bRight, 0, 0);
+                    var c = new Crawler(new Vector2(e.X, snapY), bLeft, bRight, 0, 0, _rng);
                     c.Frozen = e.Frozen;
+                    if (e.Type == "leaper") c.Variant = CrawlerVariant.Leaper;
                     c.UpdateSurfaceEdges(tg, ts, plats, sFloors, bLeft, bRight);
                     _crawlers.Add(c);
                     break;
