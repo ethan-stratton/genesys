@@ -492,11 +492,11 @@ public class Player
     private const float GrappleMaxLength = 200f;    // ~6 tiles
     private const float GrappleReelSpeed = 150f;
     
-    private const float GrappleGravityBase = 900f;  // base gravity while swinging
-    private const float GrappleDampingRate = 0.8f;   // velocity damping per second
+    private const float GrappleGravityBase = 1100f;  // base gravity while swinging (high = heavy slingshot)
+    private const float GrappleDampingRate = 0.3f;   // very light damping (preserve momentum)
     private const float GrappleMinLength = 24f;
-    private const float GrappleReleaseBoost = 1.1f;
-    private const float GrappleInputForce = 400f;   // left/right pump strength
+    private const float GrappleReleaseBoost = 1.15f;
+    private const float GrappleInputForce = 500f;   // left/right pump strength
     
     private Vector2 _grappleHookDir;
     private Vector2 _grappleHookVel;         // hook velocity (includes gravity for downward shots)
@@ -640,6 +640,7 @@ public class Player
             GrappleRopeLength = MathF.Min(GrappleMaxLength, GrappleRopeLength + GrappleReelSpeed * dt);
         
         // Gravity (affected by player weight)
+        // Higher gravity = more momentum preservation on swing
         _grappleVel.Y += GrappleGravityBase * PlayerWeight * dt;
         
         // Player input: left/right pumping
@@ -648,7 +649,7 @@ public class Player
         if (kb.IsKeyDown(Keys.D) || kb.IsKeyDown(Keys.Right)) inputX += GrappleInputForce;
         _grappleVel.X += inputX * dt;
         
-        // Light damping (frame-rate independent)
+        // Very light damping — preserve momentum for slingshot feel
         float damp = MathF.Exp(-GrappleDampingRate * dt);
         _grappleVel *= damp;
         

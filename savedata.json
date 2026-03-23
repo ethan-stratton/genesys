@@ -6,12 +6,13 @@
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 73.43455,
+  "playTime": 294.40558,
   "meleeInventory": [
-    "Knife"
+    "Knife",
+    "Stick"
   ],
   "rangedInventory": [],
-  "meleeIndex": 0,
+  "meleeIndex": 1,
   "rangedIndex": -1,
   "collectedItems": [
     "knife-7",
@@ -22,11 +23,12 @@
     "knife-4",
     "knife-5",
     "knife-6",
-    "grapple-8"
+    "grapple-8",
+    "stick-1"
   ],
   "windowSizeIndex": 0,
   "crtEnabled": false,
-  "moveTier": 2,
+  "moveTier": 0,
   "upgrades": [],
   "shelterLevel": "",
   "shelterX": 0,

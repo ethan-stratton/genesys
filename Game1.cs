@@ -1454,8 +1454,42 @@ public class Game1 : Game
             if (!hit)
                 _player.AdvanceHook(dt);
         }
+        
+        // Terrain collision while swinging — prevent clipping into tiles
+        if (_player.IsGrappling && _level.TileGridInstance != null)
+        {
+            var grid = _level.TileGridInstance;
+            var pRect = _player.GetRect();
+            // Check all 4 corners + center bottom
+            var checkPoints = new[] {
+                new Point(pRect.Left + 2, pRect.Top + 2),
+                new Point(pRect.Right - 2, pRect.Top + 2),
+                new Point(pRect.Left + 2, pRect.Bottom - 2),
+                new Point(pRect.Right - 2, pRect.Bottom - 2),
+                new Point(pRect.Center.X, pRect.Bottom - 1),
+            };
+            foreach (var cp in checkPoints)
+            {
+                if (TileProperties.IsSolid(grid.GetTile(cp.X, cp.Y)))
+                {
+                    // Player clipped into solid tile — release grapple
+                    _player.ReleaseGrapple();
+                    break;
+                }
+            }
+            // Also check entity walls/floors/ceilings
+            if (_player.IsGrappling)
+            {
+                foreach (var r in _level.WallRects)
+                    if (r.Intersects(pRect)) { _player.ReleaseGrapple(); break; }
+            }
+            if (_player.IsGrappling)
+            {
+                foreach (var r in _level.CeilingRects)
+                    if (r.Intersects(pRect)) { _player.ReleaseGrapple(); break; }
+            }
         }
-
+        }
         // Track play time
         if (_saveData != null) _saveData.PlayTime += dt;
         // Update camera
@@ -5659,6 +5693,20 @@ public class Game1 : Game
                 _spriteBatch.Draw(_pixel, new Rectangle((int)colX1 - 4, (int)(startY + 30 + i * 24), 160, 22), Color.Yellow * 0.1f);
             _spriteBatch.DrawString(_font, SafeText($"{prefix}{_meleeInventory[i]}"), new Vector2(colX1, startY + 30 + i * 24), c);
         }
+
+        // Tools column (grapple, future items)
+        float colX2 = 200;
+        float toolsY = startY + 30 + MathF.Max(_rangedInventory.Length, _meleeInventory.Length) * 24 + 40;
+        _spriteBatch.DrawString(_font, SafeText("TOOLS"), new Vector2(colX2, toolsY), Color.Cyan);
+        float toolItemY = toolsY + 28;
+        if (_player.HasGrapple)
+        {
+            _spriteBatch.Draw(_pixel, new Rectangle((int)colX2 - 2, (int)toolItemY - 1, 8, 8), new Color(80, 90, 100));
+            _spriteBatch.DrawString(_font, SafeText("  Grapple Gun  [E] to fire"), new Vector2(colX2, toolItemY), Color.White);
+            toolItemY += 24;
+        }
+        if (toolItemY == toolsY + 28) // nothing in tools
+            _spriteBatch.DrawString(_font, SafeText("(none)"), new Vector2(colX2, toolItemY), Color.Gray * 0.5f);
     }
 
     private void UpdateMenu(KeyboardState kb)
