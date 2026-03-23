@@ -893,6 +893,7 @@ public class Game1 : Game
                             if (_rangedIndex >= _rangedInventory.Length) _rangedIndex = _rangedInventory.Length > 0 ? 0 : -1;
                             // Skip wake-up on continue
                             _wakeUpComplete = true;
+                            _player.IsLyingDown = false;
                             _camera.Zoom = 1f;
                             _camera.TargetZoom = 1f;
 
@@ -1170,6 +1171,13 @@ public class Game1 : Game
                                 EveAlert("Sys... systems rebooting. Adam? Can you hear me?", 4f);
                             };
                         }
+                        // Adam starts standing up at 4s (after some scanning)
+                        if (_wakeUpTimer >= 4f && _player.IsLyingDown && _player.StandUpProgress < 0.01f)
+                        {
+                            _player.BeginStandUp();
+                        }
+                        if (_player.IsLyingDown)
+                            _player.UpdateStandUp(dt);
                         if (_wakeUpTimer >= 8f) { _wakeUpPhase = 3; _wakeUpTimer = 0; }
                         break;
                     }
@@ -5872,6 +5880,9 @@ public class Game1 : Game
             _camera.SnapTo(_player.Position, Player.Width, Player.Height);
             _wakeUpTimer = 0f;
             _wakeUpPhase = 0;
+            // Adam starts lying down
+            _player.IsLyingDown = true;
+            _player.StandUpProgress = 0f;
         }
     }
 

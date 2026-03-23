@@ -441,6 +441,36 @@ public class Player
     public bool IsChargingJump => _chargingJump;
     public float ChargeJumpProgress => _chargeJumpTimer / ChargeJumpMaxTime;
 
+    // Wake-up / lying down state
+    public bool IsLyingDown;        // true = flat on ground, no input
+    public float StandUpProgress;   // 0 = lying flat, 1 = fully standing
+    private float _standUpTimer;
+    private const float StandUpDuration = 1.5f; // seconds to stand up
+    
+    /// <summary>Begin the stand-up animation from lying down.</summary>
+    public void BeginStandUp()
+    {
+        _standUpTimer = 0f;
+        StandUpProgress = 0f;
+    }
+    
+    /// <summary>Update stand-up animation. Returns true when complete.</summary>
+    public bool UpdateStandUp(float dt)
+    {
+        if (!IsLyingDown) return true;
+        _standUpTimer += dt;
+        // Ease-out curve for natural motion (slow at end)
+        float t = Math.Min(1f, _standUpTimer / StandUpDuration);
+        StandUpProgress = 1f - (1f - t) * (1f - t); // quadratic ease-out
+        if (t >= 1f)
+        {
+            IsLyingDown = false;
+            StandUpProgress = 1f;
+            return true;
+        }
+        return false;
+    }
+
     public int CurrentHeight => IsSliding ? SlideHeight : (IsCrouching ? CrouchHeight : Height);
 
     /// <summary>Check if there's headroom to expand to the given height at current position.</summary>
@@ -2195,6 +2225,48 @@ public class Player
 
     private void DrawFallback(SpriteBatch spriteBatch, Texture2D pixel)
     {
+        // Lying down / standing up animation
+        if (IsLyingDown)
+        {
+            float p = StandUpProgress; // 0 = flat, 1 = standing
+            // Interpolate from horizontal (lying) to vertical (standing)
+            int bodyW, bodyH;
+            if (p < 0.01f)
+            {
+                // Fully lying down — horizontal rectangle
+                bodyW = Height; // width = normal height (body length)
+                bodyH = Width / 2; // thin profile
+            }
+            else
+            {
+                // Transition: shrink width, grow height
+                bodyW = (int)MathHelper.Lerp(Height, Width, p);
+                bodyH = (int)MathHelper.Lerp(Width / 2f, Height, p);
+            }
+            // Bottom-anchored (feet stay on ground)
+            int bx = (int)Position.X + Width / 2 - bodyW / 2;
+            int by = (int)Position.Y + Height - bodyH;
+            
+            spriteBatch.Draw(pixel, new Rectangle(bx, by, bodyW, bodyH), Color.Gray);
+            
+            // Head — shifts from side to top as Adam stands
+            int headSize = 6;
+            float headLerpX = MathHelper.Lerp(bx + bodyW - headSize, bx + bodyW / 2 - headSize / 2, p);
+            float headLerpY = MathHelper.Lerp(by + bodyH / 2 - headSize / 2, by - headSize + 1, p);
+            spriteBatch.Draw(pixel, new Rectangle((int)headLerpX, (int)headLerpY, headSize, headSize), Color.LightGray);
+            
+            // Arm pushing off ground during mid-stand (0.2–0.6)
+            if (p > 0.15f && p < 0.7f)
+            {
+                float armT = (p - 0.15f) / 0.55f; // 0→1 within arm range
+                int armLen = (int)(8f * MathF.Sin(armT * MathF.PI)); // extends then retracts
+                int armX = bx + bodyW / 2 + (FacingDir == 1 ? 4 : -4 - armLen);
+                int armY = by + bodyH - 2;
+                spriteBatch.Draw(pixel, new Rectangle(armX, armY, armLen, 2), Color.LightGray * 0.8f);
+            }
+            return;
+        }
+
         // Afterimage trail (fallback: colored ghost rectangles)
         for (int i = 0; i < MaxAfterimages; i++)
         {
