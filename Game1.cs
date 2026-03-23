@@ -1427,18 +1427,13 @@ public class Game1 : Game
             bool hit = false;
             foreach (var sp in steps)
             {
-                int col = (int)(sp.X / 32);
-                int row = (int)(sp.Y / 32);
-                // Off-grid = open air, hook passes through
-                if (col >= 0 && col < grid.Width && row >= 0 && row < grid.Height)
+                // GetTile takes world coordinates, not tile indices
+                var tile = grid.GetTile((int)sp.X, (int)sp.Y);
+                if (tile != TileType.Empty && tile != TileType.Water && tile != TileType.Lava && tile != TileType.Acid)
                 {
-                    var tile = grid.GetTile(col, row);
-                    if (tile != TileType.Empty && tile != TileType.Water && tile != TileType.Lava && tile != TileType.Acid)
-                    {
-                        _player.AttachGrapple(sp);
-                        hit = true;
-                        break;
-                    }
+                    _player.AttachGrapple(sp);
+                    hit = true;
+                    break;
                 }
             }
             if (!hit)
