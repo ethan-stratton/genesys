@@ -477,21 +477,24 @@ public class Player
     public bool HasGrapple;                  // whether player has found the grapple module
     public bool IsGrappling { get; private set; }  // actively swinging
     public bool IsGrappleFiring { get; private set; } // hook in flight
-    public bool IsGrappleAnchored { get; private set; } // hook stuck in terrain, waiting to activate
     public Vector2 GrappleAnchor;            // world position of the hook point
     public Vector2 GrappleHookPos;           // current hook projectile position (during firing)
-    public float GrappleRopeLength;          // current rope length (distance to anchor)
+    public float GrappleRopeLength;          // current rope length
     
-    private float _grappleAngle;             // current angle from anchor (radians, 0=right)
-    private float _grappleAngularVel;        // angular velocity (rad/s)
-    private const float GrappleHookSpeed = 800f;   // hook projectile speed
-    private const float GrappleMaxLength = 250f;   // max rope length
-    private const float GrappleReelSpeed = 120f;   // how fast player reels in
+    // Player weight — affects grapple swing speed, fall speed with grapple, etc.
+    // Base = 1.0. Heavier equipment increases this. Lighter bio upgrades decrease it.
+    public float PlayerWeight = 1.0f;        // placeholder stat, modified by equipment later
     
-    private const float GrappleGravity = 800f;     // gravity constant for pendulum
-    private const float GrappleDampingRate = 2f;    // frame-rate independent damping (per second)
-    private const float GrappleMinLength = 32f;     // can't reel shorter than this
-    private const float GrappleReleaseBoost = 1.15f; // velocity multiplier on release
+    private Vector2 _grappleVel;             // player velocity while grappling (Cartesian, not angular)
+    private const float GrappleHookSpeed = 800f;
+    private const float GrappleMaxLength = 200f;    // ~6 tiles
+    private const float GrappleReelSpeed = 150f;
+    
+    private const float GrappleGravityBase = 900f;  // base gravity while swinging
+    private const float GrappleDampingRate = 0.8f;   // velocity damping per second
+    private const float GrappleMinLength = 24f;
+    private const float GrappleReleaseBoost = 1.1f;
+    private const float GrappleInputForce = 400f;   // left/right pump strength
     
     private Vector2 _grappleHookDir;
     private bool _prevEPressed;
@@ -499,7 +502,7 @@ public class Player
     /// <summary>Fire grapple toward target.</summary>
     public bool FireGrapple(Vector2 target)
     {
-        if (!HasGrapple || IsGrappling || IsGrappleFiring || IsGrappleAnchored) return false;
+        if (!HasGrapple || IsGrappling || IsGrappleFiring) return false;
         IsGrappleFiring = true;
         var center = Position + new Vector2(Width / 2f, Height / 2f);
         var dir = target - center;
@@ -511,51 +514,33 @@ public class Player
         return true;
     }
     
-    /// <summary>Hook hit terrain — anchor it and wait for player to activate.</summary>
-    public void AnchorGrapple(Vector2 anchor)
+    /// <summary>Hook hit terrain — immediately start swinging (ESA-style).</summary>
+    public void AttachGrapple(Vector2 anchor)
     {
         IsGrappleFiring = false;
-        IsGrappleAnchored = true;
-        GrappleAnchor = anchor;
-    }
-    
-    /// <summary>Player activates anchored grapple — start swinging.</summary>
-    public void ActivateGrapple()
-    {
-        if (!IsGrappleAnchored) return;
-        IsGrappleAnchored = false;
         IsGrappling = true;
+        GrappleAnchor = anchor;
         
         var center = Position + new Vector2(Width / 2f, Height / 2f);
-        var diff = center - GrappleAnchor;
-        GrappleRopeLength = diff.Length();
-        _grappleAngle = MathF.Atan2(diff.Y, diff.X);
+        GrappleRopeLength = Vector2.Distance(center, anchor);
         
-        // Convert current velocity into angular velocity for smooth transition
-        float tangentX = -MathF.Sin(_grappleAngle);
-        float tangentY = MathF.Cos(_grappleAngle);
-        _grappleAngularVel = (Velocity.X * tangentX + Velocity.Y * tangentY) / MathF.Max(GrappleMinLength, GrappleRopeLength);
+        // Carry current velocity into the swing
+        // Falling fast = big swing. Standing still = gentle dangle
+        _grappleVel = Velocity;
     }
     
-    /// <summary>Release grapple and convert angular momentum to linear velocity.</summary>
+    /// <summary>Release grapple and keep velocity with a small boost.</summary>
     public void ReleaseGrapple()
     {
-        if (!IsGrappling && !IsGrappleAnchored && !IsGrappleFiring) return;
+        if (!IsGrappling && !IsGrappleFiring) return;
         
         if (IsGrappling)
         {
-            // Convert angular velocity to linear velocity with boost
-            float tangentX = -MathF.Sin(_grappleAngle);
-            float tangentY = MathF.Cos(_grappleAngle);
-            float linearSpeed = _grappleAngularVel * GrappleRopeLength;
-            Velocity = new Vector2(
-                tangentX * linearSpeed * GrappleReleaseBoost,
-                tangentY * linearSpeed * GrappleReleaseBoost);
-            if (Velocity.Y < -500f) Velocity = new Vector2(Velocity.X, -500f);
+            Velocity = _grappleVel * GrappleReleaseBoost;
+            if (Velocity.Y < -600f) Velocity = new Vector2(Velocity.X, -600f);
         }
         
         IsGrappling = false;
-        IsGrappleAnchored = false;
         IsGrappleFiring = false;
     }
     
@@ -570,7 +555,7 @@ public class Player
     {
         if (!IsGrappleFiring) return Array.Empty<Vector2>();
         float dist = GrappleHookSpeed * dt;
-        int steps = Math.Max(1, (int)MathF.Ceiling(dist / 8f)); // check every 8px
+        int steps = Math.Max(1, (int)MathF.Ceiling(dist / 8f));
         var result = new Vector2[steps];
         for (int i = 0; i < steps; i++)
         {
@@ -588,12 +573,15 @@ public class Player
         var center = Position + new Vector2(Width / 2f, Height / 2f);
         if (Vector2.Distance(GrappleHookPos, center) > GrappleMaxLength)
         {
-            // Didn't hit anything — anchor where it landed (falls to ground handled by Game1)
-            AnchorGrapple(GrappleHookPos);
+            // Didn't hit anything — retract (fail)
+            CancelGrappleFire();
         }
     }
     
-    /// <summary>Update grapple pendulum physics. Call every frame.</summary>
+    /// <summary>
+    /// Cartesian pendulum physics. Simpler and more correct than angular.
+    /// Gravity + rope constraint (snap to circle + remove radial velocity).
+    /// </summary>
     public void UpdateGrapple(float dt, KeyboardState kb)
     {
         if (!IsGrappling) return;
@@ -606,43 +594,40 @@ public class Player
         if (reelOut)
             GrappleRopeLength = MathF.Min(GrappleMaxLength, GrappleRopeLength + GrappleReelSpeed * dt);
         
-        // Pendulum physics
-        // Angle: 0=right from anchor, PI/2=below anchor
-        // Angular acceleration from gravity: a = g/L * sin(angle) 
-        // (sin because angle 0 = horizontal, PI/2 = straight down = equilibrium)
-        float gravAccel = GrappleGravity / MathF.Max(GrappleMinLength, GrappleRopeLength) * MathF.Sin(_grappleAngle);
-        // Only apply gravity component that's tangential (makes pendulum swing toward bottom)
-        // When angle > 0 (right side), gravity pulls clockwise; when < 0, counterclockwise
-        // But we want it to always pull toward PI/2 (straight down)
-        // Correct formula: angular_accel = (g / L) * cos(angle) where angle is from vertical
-        // Our angle is from horizontal (0=right), so vertical is PI/2
-        // Torque = g/L * cos(angle - PI/2) = g/L * sin(angle)
-        // This IS correct — sin(angle) is positive when below horizontal, drives toward PI/2
-        _grappleAngularVel += gravAccel * dt;
+        // Gravity (affected by player weight)
+        _grappleVel.Y += GrappleGravityBase * PlayerWeight * dt;
         
-        // Player input: left/right pumps the swing
-        float inputForce = 0f;
-        if (kb.IsKeyDown(Keys.A) || kb.IsKeyDown(Keys.Left)) inputForce -= 4f;
-        if (kb.IsKeyDown(Keys.D) || kb.IsKeyDown(Keys.Right)) inputForce += 4f;
-        _grappleAngularVel += inputForce * dt;
+        // Player input: left/right pumping
+        float inputX = 0f;
+        if (kb.IsKeyDown(Keys.A) || kb.IsKeyDown(Keys.Left)) inputX -= GrappleInputForce;
+        if (kb.IsKeyDown(Keys.D) || kb.IsKeyDown(Keys.Right)) inputX += GrappleInputForce;
+        _grappleVel.X += inputX * dt;
         
-        // Frame-rate independent damping: vel *= e^(-dampRate * dt)
-        _grappleAngularVel *= MathF.Exp(-GrappleDampingRate * dt);
+        // Light damping (frame-rate independent)
+        float damp = MathF.Exp(-GrappleDampingRate * dt);
+        _grappleVel *= damp;
         
-        // Integrate angle
-        _grappleAngle += _grappleAngularVel * dt;
+        // Integrate position
+        var center = Position + new Vector2(Width / 2f, Height / 2f);
+        center += _grappleVel * dt;
         
-        // Update player position from pendulum
-        float px = GrappleAnchor.X + MathF.Cos(_grappleAngle) * GrappleRopeLength;
-        float py = GrappleAnchor.Y + MathF.Sin(_grappleAngle) * GrappleRopeLength;
-        Position = new Vector2(px - Width / 2f, py - Height / 2f);
+        // === ROPE CONSTRAINT ===
+        // If distance > rope length, snap to circle and remove outward radial velocity
+        var diff = center - GrappleAnchor;
+        float dist2 = diff.Length();
+        if (dist2 > GrappleRopeLength && dist2 > 0.001f)
+        {
+            var radial = diff / dist2;
+            center = GrappleAnchor + radial * GrappleRopeLength;
+            float radialVel = Vector2.Dot(_grappleVel, radial);
+            if (radialVel > 0)
+                _grappleVel -= radial * radialVel;
+        }
         
-        // Update velocity (for other systems and release)
-        float tangentX = -MathF.Sin(_grappleAngle);
-        float tangentY = MathF.Cos(_grappleAngle);
-        float linearSpeed = _grappleAngularVel * GrappleRopeLength;
-        Velocity = new Vector2(tangentX * linearSpeed, tangentY * linearSpeed);
+        Position = new Vector2(center.X - Width / 2f, center.Y - Height / 2f);
+        Velocity = _grappleVel;
     }
+
 
     /// <summary>Check if there's headroom to expand to the given height at current position.</summary>
     private bool HasHeadroom(int targetHeight, Rectangle[] ceilings, Rectangle[] solidFloors, TileGrid tileGrid)
@@ -1926,27 +1911,19 @@ public class Player
 
         // === Grapple input ===
         bool ePressed = kb.IsKeyDown(Keys.E);
-        if (HasGrapple && ePressed && !_prevEPressed)
+        if (HasGrapple && ePressed && !_prevEPressed && !IsGrappling && !IsGrappleFiring)
         {
-            if (IsGrappleAnchored)
-            {
-                // Activate: start swinging from anchored hook
-                ActivateGrapple();
-            }
-            else if (!IsGrappling && !IsGrappleFiring)
-            {
-                // Fire toward mouse cursor
-                var center = Position + new Vector2(Width / 2f, Height / 2f);
-                var target = center + AimDir * GrappleMaxLength;
-                FireGrapple(target);
-            }
+            // Fire toward mouse cursor
+            var center = Position + new Vector2(Width / 2f, Height / 2f);
+            var target = center + AimDir * GrappleMaxLength;
+            FireGrapple(target);
         }
-        // Release grapple on E release while swinging, or Space to release+jump
-        if (IsGrappling && (!ePressed && _prevEPressed))
+        // Release grapple on E release while swinging
+        if (IsGrappling && !ePressed && _prevEPressed)
             ReleaseGrapple();
-        // Cancel anchored hook on right-click or E again
-        if (IsGrappleAnchored && ePressed && !_prevEPressed)
-            ; // already handled above (activates)
+        // Also release on jump (Space) — gives a jump boost feel
+        if (IsGrappling && kb.IsKeyDown(Keys.Space) && !_prevKb.IsKeyDown(Keys.Space))
+            ReleaseGrapple();
         _prevEPressed = ePressed;
         
         // Update grapple pendulum physics (does nothing if not grappling)

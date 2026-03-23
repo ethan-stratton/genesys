@@ -1435,7 +1435,7 @@ public class Game1 : Game
                     var tile = grid.GetTile(col, row);
                     if (tile != TileType.Empty && tile != TileType.Water && tile != TileType.Lava && tile != TileType.Acid)
                     {
-                        _player.AnchorGrapple(sp);
+                        _player.AttachGrapple(sp);
                         hit = true;
                         break;
                     }
@@ -8288,24 +8288,22 @@ public class Game1 : Game
         _bullets.ForEach(b => b.Draw(_spriteBatch, _pixel));
 
         // === Grapple rope + hook rendering ===
-        if (_player.IsGrappling || _player.IsGrappleFiring || _player.IsGrappleAnchored)
+        if (_player.IsGrappling || _player.IsGrappleFiring)
         {
             var playerCenter = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
             var hookEnd = _player.IsGrappleFiring ? _player.GrappleHookPos : _player.GrappleAnchor;
             
-            // Draw rope (pixel-by-pixel line)
+            // Draw rope
             var ropeDiff = hookEnd - playerCenter;
             int steps = (int)MathF.Max(MathF.Abs(ropeDiff.X), MathF.Abs(ropeDiff.Y));
             if (steps > 0)
             {
-                // Rope color: gray when anchored/firing, lighter when swinging
                 var ropeColor = _player.IsGrappling ? new Color(140, 140, 150) : new Color(100, 100, 110);
                 for (int i = 0; i <= steps; i += 2)
                 {
                     float t = i / (float)steps;
                     int rx = (int)MathHelper.Lerp(playerCenter.X, hookEnd.X, t);
                     int ry = (int)MathHelper.Lerp(playerCenter.Y, hookEnd.Y, t);
-                    // Sag only when anchored (slack rope), taut when swinging
                     if (!_player.IsGrappling)
                     {
                         float sag = MathF.Sin(t * MathF.PI) * MathF.Min(12f, steps * 0.08f);
@@ -8315,19 +8313,10 @@ public class Game1 : Game
                 }
             }
             
-            // Draw hook
+            // Hook crosshair
             int hx = (int)hookEnd.X, hy = (int)hookEnd.Y;
-            var hookColor = _player.IsGrappleAnchored ? Color.Yellow : Color.White; // yellow = ready to activate
-            _spriteBatch.Draw(_pixel, new Rectangle(hx - 2, hy, 5, 1), hookColor);
-            _spriteBatch.Draw(_pixel, new Rectangle(hx, hy - 2, 1, 5), hookColor);
-            
-            // "[E] Swing" prompt when anchored
-            if (_player.IsGrappleAnchored)
-            {
-                string prompt = "[E] Swing";
-                var promptPos = new Vector2(hx - 20, hy - 16);
-                _spriteBatch.DrawString(_font, SafeText(prompt), promptPos, Color.Yellow * 0.8f);
-            }
+            _spriteBatch.Draw(_pixel, new Rectangle(hx - 2, hy, 5, 1), Color.White);
+            _spriteBatch.Draw(_pixel, new Rectangle(hx, hy - 2, 1, 5), Color.White);
             
             // Hand indicator
             int handX = (int)playerCenter.X + _player.FacingDir * (Player.Width / 2);

@@ -1,19 +1,27 @@
 {
   "currentLevel": "test-arena",
-  "spawnX": 417.7093,
+  "spawnX": 391.70923,
   "spawnY": 216,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 140.14323,
-  "meleeInventory": [],
+  "playTime": 265.91254,
+  "meleeInventory": [
+    "Knife"
+  ],
   "rangedInventory": [],
-  "meleeIndex": -1,
+  "meleeIndex": 0,
   "rangedIndex": -1,
   "collectedItems": [
     "grapple-1",
-    "grapple-2"
+    "grapple-2",
+    "knife-7",
+    "knife-3",
+    "knife-4",
+    "knife-5",
+    "knife-6",
+    "grapple-8"
   ],
   "windowSizeIndex": 0,
   "crtEnabled": false,
