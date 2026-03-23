@@ -1426,7 +1426,7 @@ public class Game1 : Game
             int col = (int)(hp.X / 32);
             int row = (int)(hp.Y / 32);
             var grid = _level.TileGridInstance;
-            if (col >= 0 && col < grid.Cols && row >= 0 && row < grid.Rows)
+            if (col >= 0 && col < grid.Width && row >= 0 && row < grid.Height)
             {
                 var tile = grid.GetTile(col, row);
                 if (tile != TileType.Empty && tile != TileType.Water && tile != TileType.Lava && tile != TileType.Acid)
