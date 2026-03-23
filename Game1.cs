@@ -66,6 +66,7 @@ public class Game1 : Game
     private static readonly float[] ProloguePhaseDurations = { 6f, 5f, 5f, 4f };
 
     private OverworldData _overworld;
+    private WorldGraph _worldGraph;
 
     // Sim mode
     private SimRegion _simRegion;
@@ -578,6 +579,9 @@ public class Game1 : Game
         else
             _overworld = new OverworldData();
         _currentNodeId = _overworld.StartNode;
+        
+        // World graph — interconnected room structure for creature sim, weather, pathing
+        _worldGraph = WorldGraph.Load();
 
         base.Initialize();
     }
