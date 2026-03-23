@@ -142,6 +142,17 @@ public class Game1 : Game
 
     private bool _isDead;
     private bool _isPaused;
+    private float _deathFadeTimer; // fade to black on death
+    private float _deathRespawnDelay = 2.5f;
+    private bool _respawning;
+
+    // Shelter system
+    private bool _nearShelter;
+    private ShelterData _currentShelter;
+    private float _shelterRestTimer; // hold W timer
+    private bool _isResting; // rest animation active
+    private float _restFadeAlpha;
+    private string _shelterPromptText;
 
     // Death log (Terraria-style)
     private List<string> _deathLog = new();
@@ -343,7 +354,7 @@ public class Game1 : Game
     private int _editorItemCursor;
 
     // Item placement palette (P key in editor)
-    private static readonly string[] ItemPaletteTypes = { "stick", "dagger", "sword", "axe", "club", "hammer", "greatsword", "greatclub", "whip", "sling", "bow", "gun", "heart" };
+    private static readonly string[] ItemPaletteTypes = { "stick", "dagger", "sword", "axe", "club", "hammer", "greatsword", "greatclub", "whip", "sling", "bow", "gun", "heart", "shelter" };
     private bool _itemPaletteOpen;
     private int _itemPaletteCursor;
     private bool _entityPaletteOpen;
@@ -896,9 +907,47 @@ public class Game1 : Game
 
         if (_isDead)
         {
-            if (kb.IsKeyDown(Keys.R) && _prevKb.IsKeyUp(Keys.R))
-                Restart();
+            _deathFadeTimer += dt;
+            if (_deathFadeTimer >= _deathRespawnDelay && !_respawning)
+            {
+                _respawning = true;
+                // Respawn at last shelter or level spawn
+                var save = _saveData ?? SaveData.Load();
+                if (save != null)
+                {
+                    save.DeathCount++;
+                    save.Save();
+                    if (!string.IsNullOrEmpty(save.ShelterLevel))
+                    {
+                        // Respawn at shelter
+                        _player.Position = new Microsoft.Xna.Framework.Vector2(save.ShelterX, save.ShelterY);
+                        _player.Hp = _player.MaxHp;
+                    }
+                    else
+                    {
+                        _player.Position = new Microsoft.Xna.Framework.Vector2(save.SpawnX, save.SpawnY);
+                        _player.Hp = _player.MaxHp;
+                    }
+                }
+                else
+                {
+                    _player.Hp = _player.MaxHp;
+                }
+                _isDead = false;
+                _deathFadeTimer = 0;
+                _respawning = false;
+                _spawnInvincibility = 2f;
+                // Shift weather on death (consequence)
+                _weatherTimer = 0f; // force weather change
+                // TODO: shuffle enemy patrol patterns
+                if (_eveOrbActive && save?.DeathCount == 1)
+                    EveAlert("Your vitals flatlined for... 11 seconds. The local microbiome appears to have... intervened.", 5f);
+                else if (_eveOrbActive)
+                    EveAlert("Biosignatures stabilizing. Try to be more careful.", 3f);
+            }
             _prevKb = kb;
+            _prevMouse = Mouse.GetState();
+            base.Update(gameTime);
             return;
         }
 
@@ -1988,6 +2037,61 @@ public class Game1 : Game
         }
 
         // Switch interaction (W key near switch)
+        // Shelter proximity check
+        _nearShelter = false;
+        _currentShelter = null;
+        _shelterPromptText = null;
+        if (_level.Shelters != null)
+        {
+            var pCenter = _player.Position + new Microsoft.Xna.Framework.Vector2(Player.Width / 2f, Player.Height / 2f);
+            foreach (var sh in _level.Shelters)
+            {
+                float dx = MathF.Abs(pCenter.X - sh.X);
+                float dy = MathF.Abs(pCenter.Y - sh.Y);
+                if (dx < 40 && dy < 40)
+                {
+                    _nearShelter = true;
+                    _currentShelter = sh;
+                    _shelterPromptText = $"[W] Rest at {sh.Name}";
+                    break;
+                }
+            }
+        }
+
+        // Shelter rest (hold W near shelter)
+        if (_nearShelter && _currentShelter != null && kb.IsKeyDown(Keys.W) && !_dialogueOpen)
+        {
+            _shelterRestTimer += dt;
+            if (_shelterRestTimer >= 0.8f && !_isResting) // hold for 0.8s
+            {
+                _isResting = true;
+                // Save at shelter
+                var save = _saveData ?? SaveData.Load() ?? new SaveData();
+                save.ShelterLevel = save.CurrentLevel;
+                save.ShelterX = _currentShelter.X;
+                save.ShelterY = _currentShelter.Y - Player.Height; // spawn above shelter point
+                save.SpawnX = _player.Position.X;
+                save.SpawnY = _player.Position.Y;
+                save.Hp = _player.Hp;
+                save.Save();
+                _saveData = save;
+
+                // Heal + feedback
+                _player.Hp = _player.MaxHp;
+                _shakeTimer = 0.1f; _shakeIntensity = 1f;
+                EveAlert("Shelter secured. Biosigns stabilizing.", 3f);
+
+                // Fade effect
+                _restFadeAlpha = 1f;
+            }
+        }
+        else
+        {
+            _shelterRestTimer = 0;
+            _isResting = false;
+        }
+        if (_restFadeAlpha > 0) _restFadeAlpha -= dt * 0.8f;
+
         if (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W) && !_dialogueOpen)
         {
             var pRect = new Rectangle((int)_player.Position.X - 10, (int)_player.Position.Y, Player.Width + 20, Player.Height);
@@ -2862,10 +2966,21 @@ public class Game1 : Game
                 float cx = _editorGridSnap ? _eox + MathF.Floor((_editorCursor.X - _eox) / 32) * 32 : _editorCursor.X;
                 float cy = _editorGridSnap ? _eoy + MathF.Floor((_editorCursor.Y - _eoy) / 32) * 32 : _editorCursor.Y;
                 string itype = ItemPaletteTypes[_itemPaletteCursor];
-                var itemList = new List<ItemData>(_level.Items);
-                itemList.Add(new ItemData { Id = $"{itype}-{itemList.Count}", Type = itype, X = cx, Y = cy });
-                _level.Items = itemList.ToArray();
-                SetEditorStatus($"Placed item: {itype} at ({(int)cx}, {(int)cy})");
+                if (itype == "shelter")
+                {
+                    // Place shelter
+                    var shelterList = new List<ShelterData>(_level.Shelters ?? Array.Empty<ShelterData>());
+                    shelterList.Add(new ShelterData { Id = $"shelter-{shelterList.Count}", X = cx, Y = cy, Name = "Leaf Shelter" });
+                    _level.Shelters = shelterList.ToArray();
+                    SetEditorStatus($"Placed shelter at ({(int)cx}, {(int)cy})");
+                }
+                else
+                {
+                    var itemList = new List<ItemData>(_level.Items);
+                    itemList.Add(new ItemData { Id = $"{itype}-{itemList.Count}", Type = itype, X = cx, Y = cy });
+                    _level.Items = itemList.ToArray();
+                    SetEditorStatus($"Placed item: {itype} at ({(int)cx}, {(int)cy})");
+                }
                 _itemPaletteOpen = false;
                 SaveLevel();
             }
@@ -3795,6 +3910,21 @@ public class Game1 : Game
                 return true;
             }
         }
+        // Check shelters
+        if (_level.Shelters != null)
+        {
+            for (int i = _level.Shelters.Length - 1; i >= 0; i--)
+            {
+                var sh = _level.Shelters[i];
+                if (new Rectangle((int)sh.X - 16, (int)sh.Y - 24, 32, 32).Contains(p))
+                {
+                    var list = new List<ShelterData>(_level.Shelters);
+                    list.RemoveAt(i);
+                    _level.Shelters = list.ToArray();
+                    return true;
+                }
+            }
+        }
         return false;
     }
 
@@ -4589,6 +4719,18 @@ public class Game1 : Game
                 Color npcColor = ParseNpcColor(npc.Color);
                 _spriteBatch.Draw(_pixel, new Rectangle(npc.X, npc.Y, npc.W, npc.H), npcColor * 0.7f);
                 _spriteBatch.DrawString(_font, SafeText(npc.Name), new Vector2(npc.X, npc.Y - 16), npcColor * 0.8f);
+            }
+        }
+
+        // Draw shelters in editor
+        if (_level.Shelters != null)
+        {
+            foreach (var sh in _level.Shelters)
+            {
+                int sx = (int)sh.X - 16, sy = (int)sh.Y - 24;
+                _spriteBatch.Draw(_pixel, new Rectangle(sx, sy, 32, 32), new Color(50, 90, 35) * 0.6f);
+                _spriteBatch.Draw(_pixel, new Rectangle(sx + 12, sy + 12, 8, 16), new Color(90, 60, 30) * 0.8f);
+                DrawOutlinedString(_fontSmall, SafeText(sh.Name), new Vector2(sx - 4, sy - 14), Color.Green * 0.9f);
             }
         }
 
@@ -7440,6 +7582,46 @@ public class Game1 : Game
             }
         }
 
+        // Draw shelters
+        if (_level.Shelters != null)
+        {
+            foreach (var sh in _level.Shelters)
+            {
+                int sx = (int)sh.X - 16, sy = (int)sh.Y - 24;
+                // Leaf shelter: triangular roof + trunk
+                var leafGreen = new Color(50, 90, 35);
+                var leafDark = new Color(30, 60, 20);
+                var trunk = new Color(90, 60, 30);
+                // Trunk
+                _spriteBatch.Draw(_pixel, new Rectangle(sx + 14, sy + 12, 4, 16), trunk);
+                // Leaf canopy (layered triangles)
+                for (int row = 0; row < 12; row++)
+                {
+                    int w = 32 - row * 2;
+                    int ox = row;
+                    var c = (row % 3 == 0) ? leafDark : leafGreen;
+                    _spriteBatch.Draw(_pixel, new Rectangle(sx + ox, sy + row, w, 1), c);
+                }
+                // Ground leaves
+                _spriteBatch.Draw(_pixel, new Rectangle(sx + 2, sy + 28, 28, 2), leafDark * 0.5f);
+
+                // Prompt
+                if (_nearShelter && _currentShelter == sh)
+                {
+                    float holdPct = MathHelper.Clamp(_shelterRestTimer / 0.8f, 0, 1);
+                    string prompt = _isResting ? "Resting..." : _shelterPromptText ?? "[W] Rest";
+                    var promptPos = new Vector2(sx - 8, sy - 16);
+                    DrawOutlinedString(_fontSmall, SafeText(prompt), promptPos, Color.White * 0.9f);
+                    // Hold progress bar
+                    if (holdPct > 0 && !_isResting)
+                    {
+                        _spriteBatch.Draw(_pixel, new Rectangle(sx, sy - 4, 32, 3), Color.Black * 0.5f);
+                        _spriteBatch.Draw(_pixel, new Rectangle(sx, sy - 4, (int)(32 * holdPct), 3), Color.Green * 0.8f);
+                    }
+                }
+            }
+        }
+
         // Draw item pickups (gameplay)
         for (int i = 0; i < _itemPickups.Count; i++)
         {
@@ -7905,6 +8087,23 @@ public class Game1 : Game
         {
             _spriteBatch.Begin();
             _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), Color.Black * _transitionAlpha);
+            _spriteBatch.End();
+        }
+
+        // Death fade to black
+        if (_isDead)
+        {
+            float fade = MathHelper.Clamp(_deathFadeTimer / 1.5f, 0, 1); // 1.5s fade
+            _spriteBatch.Begin();
+            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), Color.Black * fade);
+            _spriteBatch.End();
+        }
+
+        // Rest warm fade
+        if (_restFadeAlpha > 0)
+        {
+            _spriteBatch.Begin();
+            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), new Color(40, 30, 15) * _restFadeAlpha);
             _spriteBatch.End();
         }
 

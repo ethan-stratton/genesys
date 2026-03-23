@@ -28,6 +28,7 @@ public class LevelData
     [JsonPropertyName("switches")] public SwitchData[] Switches { get; set; } = Array.Empty<SwitchData>();
     [JsonPropertyName("labels")] public LabelData[] Labels { get; set; } = Array.Empty<LabelData>();
     [JsonPropertyName("retractableSpikes")] public RetractableSpikeData[] RetractableSpikes { get; set; } = Array.Empty<RetractableSpikeData>();
+    [JsonPropertyName("shelters")] public ShelterData[] Shelters { get; set; } = Array.Empty<ShelterData>();
     [JsonPropertyName("tileGrid")] public TileGridData TileGrid { get; set; }
 
     [JsonIgnore] public TileGrid TileGridInstance { get; set; }
@@ -379,4 +380,12 @@ public class RetractableSpikeData
     [JsonPropertyName("upTime")] public float UpTime { get; set; } = 1.5f;   // seconds extended
     [JsonPropertyName("downTime")] public float DownTime { get; set; } = 1.5f; // seconds retracted
     [JsonPropertyName("phase")] public float Phase { get; set; } = 0f;         // offset in cycle (0..1)
+}
+
+public class ShelterData
+{
+    [JsonPropertyName("id")] public string Id { get; set; } = "";
+    [JsonPropertyName("x")] public float X { get; set; }
+    [JsonPropertyName("y")] public float Y { get; set; }
+    [JsonPropertyName("name")] public string Name { get; set; } = "Shelter"; // display name
 }

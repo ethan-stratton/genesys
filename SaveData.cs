@@ -25,6 +25,11 @@ public class SaveData
     [JsonPropertyName("crtEnabled")] public bool CrtEnabled { get; set; } = false;
     [JsonPropertyName("moveTier")] public int MoveTier { get; set; } = 0; // 0=Tech, 1=Bio, 2=Cipher
     [JsonPropertyName("upgrades")] public List<string> Upgrades { get; set; } = new(); // future: equipped upgrade IDs
+    [JsonPropertyName("shelterLevel")] public string ShelterLevel { get; set; } = ""; // last rested level
+    [JsonPropertyName("shelterX")] public float ShelterX { get; set; }
+    [JsonPropertyName("shelterY")] public float ShelterY { get; set; }
+    [JsonPropertyName("deathCount")] public int DeathCount { get; set; } = 0;
+    [JsonPropertyName("hp")] public int Hp { get; set; } = 100;
 
     public void Save()
     {
