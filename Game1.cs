@@ -326,9 +326,19 @@ public class Game1 : Game
     // Entity delete undo stack (stores JSON snapshots of level arrays before deletion)
     private readonly List<(string type, int index, object data)> _entityUndoStack = new();
 
-    // Enemy/item editor placement
-    private static readonly string[] EnemyTypes = { "forager", "skitter", "leaper", "wingbeater", "dummy" };
-    private int _editorEnemyCursor;
+    // Enemy/item editor placement — accordion structure
+    private static readonly (string category, string[] variants)[] EnemyCategories = {
+        ("Crawler", new[] { "forager", "skitter", "leaper" }),
+        ("Wingbeater", new[] { "wingbeater" }),
+        ("Bird", new[] { "bird" }),
+        ("Dummy", new[] { "dummy", "crit-dummy" }),
+        ("Swarm", new[] { "swarm" }),
+    };
+    private int _enemyCategoryCursor;
+    private int _enemyVariantCursor;
+    private bool _enemyVariantExpanded; // Right arrow expands variants
+    private string SelectedEnemyType => EnemyCategories[_enemyCategoryCursor].variants[_enemyVariantCursor];
+    private int _editorEnemyCursor; // legacy, unused now
     private static readonly string[] ItemTypes = { "stick", "dagger", "sword", "axe", "club", "hammer", "greatsword", "greatclub", "whip", "sling", "bow", "gun", "heart" };
     private int _editorItemCursor;
 
@@ -445,6 +455,16 @@ public class Game1 : Game
         }
 
         // Enemies are spawned in SpawnEnemiesFromLevel(), called by Restart()
+    }
+
+    private void RespawnItemsFromLevel()
+    {
+        _itemPickups.Clear();
+        foreach (var item in _level.Items)
+        {
+            bool alreadyCollected = _saveData?.CollectedItems?.Contains(item.Id) == true;
+            _itemPickups.Add(new ItemPickup { Id = item.Id, X = item.X, Y = item.Y, W = item.W, H = item.H, ItemType = item.Type, Collected = alreadyCollected });
+        }
     }
 
     private int ViewW => _graphics.PreferredBackBufferWidth;
@@ -2916,87 +2936,71 @@ public class Game1 : Game
         if (kb.IsKeyDown(Keys.E) && _prevKb.IsKeyUp(Keys.E) && !_editorMenuOpen)
         {
             _entityPaletteOpen = !_entityPaletteOpen;
-            _entityPaletteCursor = 0;
+            _enemyCategoryCursor = 0;
+            _enemyVariantCursor = 0;
+            _enemyVariantExpanded = false;
         }
 
-        // Entity palette input
+        // Entity palette input — accordion style
         if (_entityPaletteOpen)
         {
-            var entityTypes = Enum.GetValues<EntityType>();
-            if (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W))
-                _entityPaletteCursor = (_entityPaletteCursor - 1 + entityTypes.Length) % entityTypes.Length;
-            if (kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S))
-                _entityPaletteCursor = (_entityPaletteCursor + 1) % entityTypes.Length;
+            if (_enemyVariantExpanded)
+            {
+                // Navigating variants within a category
+                var variants = EnemyCategories[_enemyCategoryCursor].variants;
+                if (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W))
+                    _enemyVariantCursor = (_enemyVariantCursor - 1 + variants.Length) % variants.Length;
+                if (kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S))
+                    _enemyVariantCursor = (_enemyVariantCursor + 1) % variants.Length;
+                if (kb.IsKeyDown(Keys.Left) && _prevKb.IsKeyUp(Keys.Left))
+                    _enemyVariantExpanded = false; // collapse back to categories
+            }
+            else
+            {
+                // Navigating categories
+                if (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W))
+                    _enemyCategoryCursor = (_enemyCategoryCursor - 1 + EnemyCategories.Length) % EnemyCategories.Length;
+                if (kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S))
+                    _enemyCategoryCursor = (_enemyCategoryCursor + 1) % EnemyCategories.Length;
+                if (kb.IsKeyDown(Keys.Right) && _prevKb.IsKeyUp(Keys.Right))
+                {
+                    if (EnemyCategories[_enemyCategoryCursor].variants.Length > 1)
+                    {
+                        _enemyVariantExpanded = true;
+                        _enemyVariantCursor = 0;
+                    }
+                }
+            }
 
             bool place = (kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter)) ||
-                         (kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space));
+                         (kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space)) ||
+                         (mouse.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released);
             if (place)
             {
-                var selectedType = entityTypes[_entityPaletteCursor];
+                string etype = SelectedEnemyType;
                 int _eox = _level.TileGridInstance?.OriginX ?? 0;
                 int _eoy = _level.TileGridInstance?.OriginY ?? 0;
-                float cx = _editorGridSnap ? _eox + MathF.Floor((_editorCursor.X - _eox) / 32) * 32 : _editorCursor.X;
-                float cy = _editorGridSnap ? _eoy + MathF.Floor((_editorCursor.Y - _eoy) / 32) * 32 : _editorCursor.Y;
+                var worldMouse2 = Vector2.Transform(new Vector2(Mouse.GetState().X, Mouse.GetState().Y), Matrix.Invert(_camera.TransformMatrix));
+                float cx = _editorGridSnap ? _eox + MathF.Floor((worldMouse2.X - _eox) / 32) * 32 : worldMouse2.X;
+                float cy = _editorGridSnap ? _eoy + MathF.Floor((worldMouse2.Y - _eoy) / 32) * 32 : worldMouse2.Y;
 
-                switch (selectedType)
+                if (etype == "tree")
                 {
-                    case EntityType.Swarm:
-                        var enemyList = new List<EnemySpawnData>(_level.Enemies);
-                        // Swarms don't snap — they float freely
-                        enemyList.Add(new EnemySpawnData { Id = $"swarm-{enemyList.Count}", Type = "swarm", X = _editorCursor.X, Y = _editorCursor.Y, Count = 10 });
-                        _level.Enemies = enemyList.ToArray();
-                        SetEditorStatus($"Placed swarm at ({(int)cx}, {(int)cy})");
-                        break;
-                    case EntityType.Crawler:
-                        var cList = new List<EnemySpawnData>(_level.Enemies);
-                        cList.Add(new EnemySpawnData { Id = $"crawler-{cList.Count}", Type = "crawler", X = cx, Y = cy });
-                        _level.Enemies = cList.ToArray();
-                        SetEditorStatus($"Placed crawler at ({(int)cx}, {(int)cy})");
-                        break;
-                    case EntityType.Thornback:
-                        var tList = new List<EnemySpawnData>(_level.Enemies);
-                        tList.Add(new EnemySpawnData { Id = $"thornback-{tList.Count}", Type = "thornback", X = cx, Y = cy });
-                        _level.Enemies = tList.ToArray();
-                        SetEditorStatus($"Placed thornback at ({(int)cx}, {(int)cy})");
-                        break;
-                    case EntityType.Hopper:
-                        var hList = new List<EnemySpawnData>(_level.Enemies);
-                        hList.Add(new EnemySpawnData { Id = $"hopper-{hList.Count}", Type = "hopper", X = cx, Y = cy });
-                        _level.Enemies = hList.ToArray();
-                        SetEditorStatus($"Placed hopper at ({(int)cx}, {(int)cy})");
-                        break;
-                    case EntityType.Tree:
-                        var oList = new List<EnvObjectData>(_level.Objects);
-                        float treeSnapY = SnapToSurface(cx, cy, 40, 80);
-                        oList.Add(new EnvObjectData { Id = $"tree-{oList.Count}", Type = "tree", X = cx, Y = treeSnapY, W = 40, H = 80 });
-                        _level.Objects = oList.ToArray();
-                        SetEditorStatus($"Placed tree at ({(int)cx}, {(int)treeSnapY})");
-                        break;
-                    case EntityType.Bird:
-                        var birdList = new List<EnemySpawnData>(_level.Enemies);
-                        birdList.Add(new EnemySpawnData { Id = $"bird-{birdList.Count}", Type = "bird", X = cx, Y = cy });
-                        _level.Enemies = birdList.ToArray();
-                        SetEditorStatus($"Placed bird at ({(int)cx}, {(int)cy})");
-                        break;
-                    case EntityType.Dummy:
-                        var dummyList = new List<EnemySpawnData>(_level.Enemies);
-                        dummyList.Add(new EnemySpawnData { Id = $"dummy-{dummyList.Count}", Type = "dummy", X = cx, Y = cy });
-                        _level.Enemies = dummyList.ToArray();
-                        SetEditorStatus($"Placed dummy at ({(int)cx}, {(int)cy})");
-                        break;
-                    case EntityType.CritDummy:
-                        var cdList = new List<EnemySpawnData>(_level.Enemies);
-                        cdList.Add(new EnemySpawnData { Id = $"crit-dummy-{cdList.Count}", Type = "crit-dummy", X = cx, Y = cy });
-                        _level.Enemies = cdList.ToArray();
-                        SetEditorStatus($"Placed crit-dummy at ({(int)cx}, {(int)cy})");
-                        break;
-                    case EntityType.Wingbeater:
-                        var wbList = new List<EnemySpawnData>(_level.Enemies);
-                        wbList.Add(new EnemySpawnData { Id = $"wingbeater-{wbList.Count}", Type = "wingbeater", X = cx, Y = cy });
-                        _level.Enemies = wbList.ToArray();
-                        SetEditorStatus($"Placed wingbeater at ({(int)cx}, {(int)cy})");
-                        break;
+                    var oList = new List<EnvObjectData>(_level.Objects);
+                    float treeSnapY = SnapToSurface(cx, cy, 40, 80);
+                    oList.Add(new EnvObjectData { Id = $"tree-{oList.Count}", Type = "tree", X = cx, Y = treeSnapY, W = 40, H = 80 });
+                    _level.Objects = oList.ToArray();
+                    SetEditorStatus($"Placed tree");
                 }
+                else
+                {
+                    var eList = new List<EnemySpawnData>(_level.Enemies);
+                    eList.Add(new EnemySpawnData { Id = $"{etype}-{eList.Count}", Type = etype, X = cx, Y = cy, Count = etype == "swarm" ? 10 : 0 });
+                    _level.Enemies = eList.ToArray();
+                    SetEditorStatus($"Placed {etype}");
+                }
+                SaveLevel();
+                SpawnEnemiesFromLevel();
             }
 
             if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape))
@@ -3209,10 +3213,27 @@ public class Game1 : Game
         // Enemy/Item type cycling with [ and ]
         if (_editorTool == EditorTool.Enemy)
         {
+            // [ and ] cycle through all variants across all categories
             if (kb.IsKeyDown(Keys.OemOpenBrackets) && _prevKb.IsKeyUp(Keys.OemOpenBrackets))
-            { _editorEnemyCursor = (_editorEnemyCursor - 1 + EnemyTypes.Length) % EnemyTypes.Length; SetEditorStatus($"Enemy: {EnemyTypes[_editorEnemyCursor]}"); }
+            {
+                _enemyVariantCursor--;
+                if (_enemyVariantCursor < 0)
+                {
+                    _enemyCategoryCursor = (_enemyCategoryCursor - 1 + EnemyCategories.Length) % EnemyCategories.Length;
+                    _enemyVariantCursor = EnemyCategories[_enemyCategoryCursor].variants.Length - 1;
+                }
+                SetEditorStatus($"Enemy: {SelectedEnemyType}");
+            }
             if (kb.IsKeyDown(Keys.OemCloseBrackets) && _prevKb.IsKeyUp(Keys.OemCloseBrackets))
-            { _editorEnemyCursor = (_editorEnemyCursor + 1) % EnemyTypes.Length; SetEditorStatus($"Enemy: {EnemyTypes[_editorEnemyCursor]}"); }
+            {
+                _enemyVariantCursor++;
+                if (_enemyVariantCursor >= EnemyCategories[_enemyCategoryCursor].variants.Length)
+                {
+                    _enemyCategoryCursor = (_enemyCategoryCursor + 1) % EnemyCategories.Length;
+                    _enemyVariantCursor = 0;
+                }
+                SetEditorStatus($"Enemy: {SelectedEnemyType}");
+            }
         }
         if (_editorTool == EditorTool.Item)
         {
@@ -3236,6 +3257,8 @@ public class Game1 : Game
                 {
                     SetEditorStatus("Deleted");
                     SaveLevel();
+                    SpawnEnemiesFromLevel();
+                    RespawnItemsFromLevel();
                 }
                 else
                     SetEditorStatus("Nothing to delete here");
@@ -3252,13 +3275,14 @@ public class Game1 : Game
             }
             else if (_editorTool == EditorTool.Enemy)
             {
-                string etype = EnemyTypes[_editorEnemyCursor];
+                string etype = SelectedEnemyType;
                 int nextId = _level.Enemies.Length;
                 var eList = new List<EnemySpawnData>(_level.Enemies);
                 eList.Add(new EnemySpawnData { Id = $"{etype}-{nextId}", Type = etype, X = snapped.X, Y = snapped.Y });
                 _level.Enemies = eList.ToArray();
-                SetEditorStatus($"Enemy: {etype} placed ([/] to cycle type)");
+                SetEditorStatus($"Enemy: {etype} placed ([/] to cycle)");
                 SaveLevel();
+                SpawnEnemiesFromLevel();
             }
             else if (_editorTool == EditorTool.Item)
             {
@@ -3269,6 +3293,7 @@ public class Game1 : Game
                 _level.Items = iList.ToArray();
                 SetEditorStatus($"Item: {itype} placed ([/] to cycle type)");
                 SaveLevel();
+                RespawnItemsFromLevel();
             }
             else
             {
@@ -3506,6 +3531,9 @@ public class Game1 : Game
         if ((mouse.LeftButton == ButtonState.Released || !kb.IsKeyDown(Keys.T)) && _editorMovingEntity != null)
         {
             _level.Build();
+            SaveLevel();
+            SpawnEnemiesFromLevel();
+            RespawnItemsFromLevel();
             SetEditorStatus("Placed");
             _editorMovingEntity = null;
         }
@@ -4684,7 +4712,7 @@ public class Game1 : Game
         string controlsHint = _editorTool switch
         {
             EditorTool.TilePaint => "[=]Play [Q]Tools [Click]Paint [Ctrl+Drag]Fill [RClick]Erase [[ ]]Tile [Ctrl+Z]Undo",
-            EditorTool.Enemy => $"[=]Play [Q]Tools [Click]Place [[ ]]Type: {EnemyTypes[_editorEnemyCursor]}",
+            EditorTool.Enemy => $"[=]Play [Q]Tools [Click]Place [[ ]]Type: {SelectedEnemyType}",
             EditorTool.Item => $"[=]Play [Q]Tools [Click]Place [[ ]]Type: {ItemTypes[_editorItemCursor]}",
             _ => "[=]Play [Esc]Menu [Q]Tile [E]Enemy [P]Item [Drag]Place [RClick]Del [Tab]Target",
         };
@@ -4758,33 +4786,65 @@ public class Game1 : Game
         // Entity palette overlay
         if (_entityPaletteOpen)
         {
-            var entityTypes = Enum.GetValues<EntityType>();
-            float epalW = 180, epalH = entityTypes.Length * 28 + 20;
+            // Count visible rows
+            int rowCount = 0;
+            for (int i = 0; i < EnemyCategories.Length; i++)
+            {
+                rowCount++; // category row
+                if (_enemyVariantExpanded && i == _enemyCategoryCursor && EnemyCategories[i].variants.Length > 1)
+                    rowCount += EnemyCategories[i].variants.Length;
+            }
+
+            float epalW = 220, lineH = 26;
+            float epalH = rowCount * lineH + 30;
             float epalX = ViewW / 2f - epalW / 2f, epalY = ViewH / 2f - epalH / 2f;
             _spriteBatch.Draw(_pixel, new Rectangle((int)epalX, (int)epalY, (int)epalW, (int)epalH), Color.Black * 0.85f);
-            _spriteBatch.DrawString(_font, SafeText("ENTITIES [E]"), new Vector2(epalX + 30, epalY + 4), Color.White);
+            _spriteBatch.DrawString(_fontSmall, SafeText("ENEMIES [E]  W/S=nav  Right=expand"), new Vector2(epalX + 8, epalY + 4), Color.White);
 
-            for (int i = 0; i < entityTypes.Length; i++)
+            float drawY = epalY + 24;
+            for (int i = 0; i < EnemyCategories.Length; i++)
             {
-                float itemY = epalY + 24 + i * 28;
-                bool selected = i == _entityPaletteCursor;
-                if (selected)
-                    _spriteBatch.Draw(_pixel, new Rectangle((int)epalX + 4, (int)itemY, (int)epalW - 8, 26), Color.Yellow * 0.15f);
+                var (cat, variants) = EnemyCategories[i];
+                bool isCatSelected = i == _enemyCategoryCursor && !_enemyVariantExpanded;
+                bool isCatActive = i == _enemyCategoryCursor;
+                string arrow = (variants.Length > 1) ? (isCatActive && _enemyVariantExpanded ? "▼ " : "▶ ") : "  ";
+                string catLabel = $"{arrow}{cat}";
 
-                string label = entityTypes[i].ToString();
-                Color iconColor = entityTypes[i] switch
+                if (isCatSelected)
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)epalX + 4, (int)drawY, (int)epalW - 8, (int)lineH), Color.Yellow * 0.15f);
+
+                Color catColor = isCatSelected ? Color.Yellow : isCatActive ? Color.White : Color.Gray;
+                _spriteBatch.DrawString(_fontSmall, SafeText(catLabel), new Vector2(epalX + 10, drawY + 4), catColor);
+
+                // Show default variant name on right if not expanded
+                if (!(_enemyVariantExpanded && isCatActive) && variants.Length > 0)
                 {
-                    EntityType.Swarm => Color.OrangeRed,
-                    EntityType.Crawler => new Color(120, 60, 20),
-                    EntityType.Thornback => new Color(60, 100, 30),
-                    EntityType.Tree => Color.ForestGreen,
-                    EntityType.Dummy => new Color(140, 100, 160),
-                    EntityType.CritDummy => new Color(200, 60, 200),
-                    _ => Color.White
-                };
-                _spriteBatch.Draw(_pixel, new Rectangle((int)epalX + 10, (int)itemY + 8, 10, 10), iconColor);
-                _spriteBatch.DrawString(_font, SafeText(label), new Vector2(epalX + 26, itemY + 4), selected ? Color.Yellow : Color.Gray);
+                    string defaultV = isCatActive ? variants[_enemyVariantCursor < variants.Length ? _enemyVariantCursor : 0] : variants[0];
+                    _spriteBatch.DrawString(_fontSmall, SafeText(defaultV), new Vector2(epalX + epalW - 80, drawY + 4), Color.Gray * 0.5f);
+                }
+
+                drawY += lineH;
+
+                // Expanded variants
+                if (_enemyVariantExpanded && isCatActive && variants.Length > 1)
+                {
+                    for (int v = 0; v < variants.Length; v++)
+                    {
+                        bool vSelected = v == _enemyVariantCursor;
+                        if (vSelected)
+                            _spriteBatch.Draw(_pixel, new Rectangle((int)epalX + 20, (int)drawY, (int)epalW - 24, (int)lineH), Color.Cyan * 0.12f);
+
+                        _spriteBatch.DrawString(_fontSmall, SafeText($"   {variants[v]}"),
+                            new Vector2(epalX + 26, drawY + 4),
+                            vSelected ? Color.Cyan : Color.Gray * 0.7f);
+                        drawY += lineH;
+                    }
+                }
             }
+
+            // Hint at bottom
+            _spriteBatch.DrawString(_fontSmall, SafeText("Enter/Click=place  Esc=close  Left=collapse"),
+                new Vector2(epalX + 8, drawY + 4), Color.Gray * 0.4f);
         }
 
         // Item placement palette (P key)

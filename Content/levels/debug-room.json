@@ -362,7 +362,16 @@
     }
   ],
   "npcs": [],
-  "items": [],
+  "items": [
+    {
+      "id": "hammer-0",
+      "type": "hammer",
+      "x": 2016,
+      "y": 592,
+      "w": 20,
+      "h": 20
+    }
+  ],
   "objects": [],
   "enemies": [
     {
@@ -372,7 +381,10 @@
       "y": 668,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "zoo-hopper",
@@ -381,7 +393,10 @@
       "y": 668,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "zoo-thornback",
@@ -390,7 +405,10 @@
       "y": 668,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "zoo-swarm",
@@ -399,7 +417,10 @@
       "y": 668,
       "count": 8,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "zoo-bird",
@@ -408,7 +429,10 @@
       "y": 668,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "gym-dummy-1",
@@ -417,7 +441,10 @@
       "y": 540,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "gym-dummy-2",
@@ -426,7 +453,10 @@
       "y": 540,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "gym-dummy-3",
@@ -435,7 +465,10 @@
       "y": 540,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "crit-dummy-p1",
@@ -444,7 +477,10 @@
       "y": 620,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "crit-dummy-p2",
@@ -453,7 +489,10 @@
       "y": 620,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "dummy-p1",
@@ -462,7 +501,10 @@
       "y": 620,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "dummy-p2",
@@ -471,7 +513,10 @@
       "y": 620,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "dummy-w1",
@@ -480,7 +525,10 @@
       "y": 620,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "dummy-w2",
@@ -489,7 +537,10 @@
       "y": 620,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "dummy-w3",
@@ -498,7 +549,10 @@
       "y": 620,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "dummy-w4",
@@ -507,7 +561,10 @@
       "y": 620,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "dummy-w5",
@@ -516,7 +573,10 @@
       "y": 620,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "dummy-w6",
@@ -525,7 +585,10 @@
       "y": 620,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "ranged-near",
@@ -534,7 +597,10 @@
       "y": 134,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "ranged-mid",
@@ -543,7 +609,10 @@
       "y": 134,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "ranged-far",
@@ -552,7 +621,10 @@
       "y": 134,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "size-small",
@@ -561,7 +633,10 @@
       "y": 134,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "size-medium",
@@ -570,7 +645,10 @@
       "y": 124,
       "count": 1,
       "scale": 2,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "size-large",
@@ -579,7 +657,10 @@
       "y": 109,
       "count": 1,
       "scale": 3.5,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "scan-crawler",
@@ -588,7 +669,10 @@
       "y": 620,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "scan-hopper",
@@ -597,7 +681,10 @@
       "y": 620,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "scan-bird",
@@ -606,7 +693,10 @@
       "y": 580,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "scan-eco-crawler",
@@ -615,7 +705,10 @@
       "y": 620,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "scan-eco-bird",
@@ -624,7 +717,10 @@
       "y": 560,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "eco-crawler-1",
@@ -633,7 +729,10 @@
       "y": 620,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "eco-crawler-2",
@@ -642,7 +741,10 @@
       "y": 620,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "eco-crawler-3",
@@ -651,7 +753,10 @@
       "y": 620,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "eco-crawler-4",
@@ -660,7 +765,10 @@
       "y": 620,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "eco-crawler-5",
@@ -669,7 +777,10 @@
       "y": 620,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "eco-crawler-6",
@@ -678,7 +789,10 @@
       "y": 620,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "eco-bird-1",
@@ -687,7 +801,10 @@
       "y": 560,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "swarm-crawler-1",
@@ -696,7 +813,10 @@
       "y": 620,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "swarm-crawler-2",
@@ -705,7 +825,10 @@
       "y": 620,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "swarm-crawler-3",
@@ -714,7 +837,10 @@
       "y": 620,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "swarm-crawler-4",
@@ -723,7 +849,10 @@
       "y": 620,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "swarm-crawler-5",
@@ -732,7 +861,10 @@
       "y": 620,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "swarm-crawler-6",
@@ -741,7 +873,10 @@
       "y": 620,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "swarm-crawler-7",
@@ -750,7 +885,10 @@
       "y": 620,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "swarm-crawler-8",
@@ -759,7 +897,22 @@
       "y": 620,
       "count": 1,
       "scale": 1,
-      "frozen": false
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
+    },
+    {
+      "id": "crawler-44",
+      "type": "crawler",
+      "x": 1655.1776,
+      "y": 749,
+      "count": 1,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     }
   ],
   "switches": [],
@@ -1206,6 +1359,7 @@
       "size": "normal"
     }
   ],
+  "retractableSpikes": [],
   "tileGrid": {
     "width": 351,
     "height": 38,
@@ -12848,28 +13002,28 @@
       2,
       2,
       2,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
+      21,
+      21,
+      21,
+      2,
+      21,
+      21,
+      2,
+      21,
+      21,
+      2,
+      21,
+      21,
+      2,
+      21,
+      21,
+      2,
+      21,
+      21,
+      2,
+      21,
+      21,
+      2,
       0,
       0,
       0,
@@ -13202,25 +13356,25 @@
       0,
       0,
       0,
+      2,
       0,
       0,
+      2,
       0,
       0,
+      2,
       0,
       0,
+      2,
       0,
       0,
+      2,
       0,
       0,
+      2,
       0,
       0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
+      2,
       0,
       0,
       0,
@@ -13553,25 +13707,25 @@
       0,
       0,
       0,
+      2,
       0,
       0,
+      2,
       0,
       0,
+      2,
       0,
       0,
+      2,
       0,
       0,
+      2,
       0,
       0,
+      2,
       0,
       0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
+      2,
       0,
       0,
       0,
@@ -13904,25 +14058,25 @@
       0,
       0,
       0,
+      2,
       0,
       0,
+      2,
       0,
       0,
+      2,
       0,
       0,
+      2,
       0,
       0,
+      2,
       0,
       0,
+      2,
       0,
       0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
+      2,
       0,
       0,
       0,
