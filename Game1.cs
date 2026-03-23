@@ -938,7 +938,10 @@ public class Game1 : Game
                 _respawning = false;
                 _spawnInvincibility = 2f;
                 // Shift weather on death (consequence)
-                _weatherTimer = 0f; // force weather change
+                // Force weather shift on death (consequence)
+                _weatherRain = !_weatherRain;
+                if (!_weatherRain) _weatherStorm = false;
+                _weatherWind = _rng.NextDouble() > 0.5;
                 // TODO: shuffle enemy patrol patterns
                 if (_eveOrbActive && save?.DeathCount == 1)
                     EveAlert("Your vitals flatlined for... 11 seconds. The local microbiome appears to have... intervened.", 5f);

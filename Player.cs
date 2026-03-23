@@ -2025,7 +2025,7 @@ public class Player
     // Sprite sheet layout: 48x48 per frame, multi-row
     // Row 0: idle(4) 1: walk(7) 2: run(8) 3: jump(4) 4: crouch(2) 
     // 5: whip/attack(6) 6: backflip(6) 7: damaged(3) 8: superjump(6) 9: dash(3)
-    private const int SpriteW = 48, SpriteH = 48;
+    public const int SpriteW = 48, SpriteH = 48;
     private const int RowIdle = 0, RowCrouch = 1, RowJump = 2, RowWalk = 3, RowRun = 4;
     private const int RowWhip = 5, RowBackflip = 6, RowDamaged = 7, RowSuperjump = 8, RowDash = 9;
     private static readonly int[] RowFrameCounts = { 4, 3, 8, 8, 8, 10, 10, 3, 6, 3 };
