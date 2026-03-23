@@ -1122,21 +1122,31 @@ public class Game1 : Game
                 _wakeUpTimer += dt;
                 switch (_wakeUpPhase)
                 {
-                    case 0: // Black screen, breathing sounds (0-2s)
+                    case 0: // Black screen (0-2s) — zoom stays at 2.5
                         _fadeAlpha = Math.Max(0.7f, 1f - _wakeUpTimer * 0.15f);
+                        _camera.Zoom = 2.5f;
+                        _camera.TargetZoom = 2.5f;
                         _camera.SnapTo(_player.Position, Player.Width, Player.Height);
                         if (_wakeUpTimer >= 2f) { _wakeUpPhase = 1; _wakeUpTimer = 0; }
                         break;
-                    case 1: // Eyes opening — fade lifts, camera still tight (0-3s)
+                    case 1: // Eyes opening (0-3s) — zoom 2.5 → 1.9
+                    {
+                        float t1 = _wakeUpTimer / 3f; // 0→1
+                        float z1 = MathHelper.Lerp(2.5f, 1.9f, t1 * t1); // ease-in
                         _fadeAlpha = Math.Max(0f, 0.7f - _wakeUpTimer * 0.25f);
-                        _camera.TargetZoom = 2.5f - _wakeUpTimer * 0.2f; // 2.5 → ~1.9
-                        _camera.ZoomLerpSpeed = 8f; // fast tracking so it doesn't fight
+                        _camera.Zoom = z1;
+                        _camera.TargetZoom = z1;
                         _camera.SnapTo(_player.Position, Player.Width, Player.Height);
                         if (_wakeUpTimer >= 3f) { _wakeUpPhase = 2; _wakeUpTimer = 0; }
                         break;
-                    case 2: // Look around — camera pulls out more (0-4s)
-                        _camera.TargetZoom = 1.4f;
-                        _camera.ZoomLerpSpeed = 0.6f;
+                    }
+                    case 2: // EVE arrives + scans (0-4s) — zoom 1.9 → 1.2
+                    {
+                        float t2 = _wakeUpTimer / 4f;
+                        float z2 = MathHelper.Lerp(1.9f, 1.2f, t2);
+                        _camera.Zoom = z2;
+                        _camera.TargetZoom = z2;
+                        _camera.SnapTo(_player.Position, Player.Width, Player.Height);
                         if (_wakeUpTimer >= 1.5f && !_eveOrbActive)
                         {
                             // EVE boots up — spawn off-screen right, fly to Adam
@@ -1154,12 +1164,17 @@ public class Game1 : Game
                         }
                         if (_wakeUpTimer >= 4f) { _wakeUpPhase = 3; _wakeUpTimer = 0; }
                         break;
-                    case 3: // Control given — zoom settles to 1x (0-3s)
-                        _camera.TargetZoom = 1f;
-                        _camera.ZoomLerpSpeed = 0.4f;
+                    case 3: // Control given (0-2s) — zoom 1.2 → 1.0
+                    {
+                        float t3 = Math.Min(1f, _wakeUpTimer / 2f);
+                        float z3 = MathHelper.Lerp(1.2f, 1f, t3);
+                        _camera.Zoom = z3;
+                        _camera.TargetZoom = z3;
                         if (_wakeUpTimer >= 1f && !_wakeUpComplete)
                         {
                             _wakeUpComplete = true;
+                            _camera.Zoom = 1f;
+                            _camera.TargetZoom = 1f;
                             // Transition EVE from scan to orbit smoothly
                             var pc3 = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
                             EveFlyTo(EveOrbitPos(pc3, _totalTime), 80f, () => {
@@ -1168,6 +1183,7 @@ public class Game1 : Game
                             EveAlert("Try to move. Carefully.", 3f);
                         }
                         break;
+                    }
                 }
                 // Update EVE sparks during wake-up
                 if (_eveOrbActive)
@@ -5841,10 +5857,10 @@ public class Game1 : Game
             _titleCardTimer = 0f;
             _fadeAlpha = 1f; // start gameplay from black, fade in
             
-            // Cinematic zoom: start tight on Adam, slowly pull out
+            // Cinematic zoom: driven directly per-frame in wake-up phases
             _camera.Zoom = 2.5f;
-            _camera.TargetZoom = 1f;
-            _camera.ZoomLerpSpeed = 0.3f; // slow cinematic pull-out (~8s to settle)
+            _camera.TargetZoom = 2.5f;
+            _camera.ZoomLerpSpeed = 0.5f;
             _camera.SnapTo(_player.Position, Player.Width, Player.Height);
             _wakeUpTimer = 0f;
             _wakeUpPhase = 0;
@@ -8104,7 +8120,8 @@ public class Game1 : Game
         // Draw bullets
         _bullets.ForEach(b => b.Draw(_spriteBatch, _pixel));
 
-        // Draw crosshair reticle at mouse position (world space)
+        // Draw crosshair reticle at mouse position (world space) — hidden during wake-up
+        if (_wakeUpComplete)
         {
             var ms = Mouse.GetState();
             var mScreen = new Vector2(ms.X, ms.Y);
