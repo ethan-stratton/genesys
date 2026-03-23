@@ -2970,9 +2970,9 @@ public class Game1 : Game
                 string itype = ItemPaletteTypes[_itemPaletteCursor];
                 if (itype == "shelter")
                 {
-                    // Snap shelter to ground surface
-                    float groundY = SnapToSurface(cx + 16, cy, 32, 32);
-                    if (groundY < 0) groundY = cy; // fallback if no ground found
+                    // Snap shelter to ground surface (use height=0 so Y = actual ground level)
+                    float groundY = SnapToSurface(cx + 16, cy, 4, 0);
+                    if (groundY > 9000) groundY = cy; // fallback
                     var shelterList = new List<ShelterData>(_level.Shelters ?? Array.Empty<ShelterData>());
                     shelterList.Add(new ShelterData { Id = $"shelter-{shelterList.Count}", X = cx + 16, Y = groundY, Name = "Leaf Shelter" });
                     _level.Shelters = shelterList.ToArray();
