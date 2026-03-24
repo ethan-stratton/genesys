@@ -587,11 +587,61 @@ public class Player
     private Vector2 _grappleHookDir;
     private Vector2 _grappleHookVel;         // hook velocity (includes gravity for downward shots)
     private bool _prevEPressed;
+    // Cipher Teleport (replaces grapple in Cipher tier)
+    public bool IsCipherTeleporting { get; private set; }
+    public Vector2 CipherTeleportStart { get; private set; }
+    public Vector2 CipherTeleportEnd { get; private set; }
+    private float _cipherTeleportTimer;
+    private const float CipherTeleportDuration = 0.08f; // near-instant
+    private const float CipherTeleportMaxRange = 350f;   // ~11 tiles
+    private const float CipherTeleportCooldown = 0.5f;
+    private float _cipherTeleportCooldownTimer;
+    private const float CipherTeleportDamage = 4f; // damage to enemies along path
     
     /// <summary>Fire grapple toward target.</summary>
     public bool FireGrapple(Vector2 target)
     {
-        if (!HasGrapple || IsGrappling || IsGrappleFiring || IsGrappleRetracting) return false;
+        if (!HasGrapple) return false;
+        
+        // Cipher: teleport instead of grapple
+        if (CurrentTier == MoveTier.Cipher)
+        {
+            if (_cipherTeleportCooldownTimer > 0 || IsCipherTeleporting) return false;
+            var center = Position + new Vector2(Width / 2f, Height / 2f);
+            var dir = target - center;
+            float dist = dir.Length();
+            if (dist < 1f) return false;
+            dir /= dist;
+            dist = Math.Min(dist, CipherTeleportMaxRange);
+            
+            CipherTeleportStart = center;
+            CipherTeleportEnd = center + dir * dist;
+            _cipherTeleportTimer = 0f;
+            _cipherTeleportCooldownTimer = CipherTeleportCooldown;
+            IsCipherTeleporting = true;
+            
+            // Spawn afterimages along the path
+            int steps = Math.Max(4, (int)(dist / 40f));
+            for (int i = 0; i < steps && i < MaxAfterimages; i++)
+            {
+                float t = (float)i / steps;
+                var pos = Vector2.Lerp(CipherTeleportStart, CipherTeleportEnd, t);
+                _afterimages[(_afterimageIndex + i) % MaxAfterimages] = new Afterimage
+                {
+                    Position = new Vector2(pos.X - Width / 2f, pos.Y - Height / 2f),
+                    SpriteRow = 0, SpriteFrame = 0,
+                    FacingDir = FacingDir,
+                    DrawHeight = Height,
+                    Alpha = 0.7f - t * 0.4f,
+                    TimeLeft = AfterimageLifetime * (1f - t * 0.5f),
+                    TierColor = new Color(180, 80, 200) // crimson purple
+                };
+            }
+            _afterimageIndex = (_afterimageIndex + steps) % MaxAfterimages;
+            return true;
+        }
+        
+        if (IsGrappling || IsGrappleFiring || IsGrappleRetracting) return false;
         IsGrappleFiring = true;
         var center = Position + new Vector2(Width / 2f, Height / 2f);
         var dir = target - center;
@@ -2176,12 +2226,39 @@ public class Player
             ReleaseGrapple();
         _prevEPressed = ePressed;
         
+        // Cipher teleport cooldown
+        if (_cipherTeleportCooldownTimer > 0) _cipherTeleportCooldownTimer -= dt;
+        
+        // Cipher teleport update — lerp to target, damage along path handled by Game1
+        if (IsCipherTeleporting)
+        {
+            _cipherTeleportTimer += dt;
+            float t = Math.Min(_cipherTeleportTimer / CipherTeleportDuration, 1f);
+            // Ease-out for snappy arrival
+            float eased = 1f - (1f - t) * (1f - t);
+            var pos = Vector2.Lerp(CipherTeleportStart, CipherTeleportEnd, eased);
+            Position = new Vector2(pos.X - Width / 2f, pos.Y - Height / 2f);
+            Velocity = Vector2.Zero;
+            
+            if (t >= 1f)
+            {
+                IsCipherTeleporting = false;
+                // Small residual velocity in aim direction
+                var dir = CipherTeleportEnd - CipherTeleportStart;
+                if (dir.LengthSquared() > 1f)
+                {
+                    dir = Vector2.Normalize(dir);
+                    Velocity = dir * 80f;
+                }
+            }
+        }
+        
         // Update grapple pendulum physics (does nothing if not grappling)
         UpdateGrapple(dt, kb);
         UpdateGrappleRetract(dt);
         
-        // If grappling, pendulum handles position — skip normal movement
-        if (IsGrappling)
+        // If grappling or cipher teleporting, skip normal movement
+        if (IsGrappling || IsCipherTeleporting)
         {
             _prevKb = kb;
             return;

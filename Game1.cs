@@ -1858,6 +1858,36 @@ public class Game1 : Game
             }
         }
         
+        // Cipher teleport — damage enemies along path + terrain collision
+        if (_player.IsCipherTeleporting)
+        {
+            // Check creatures along teleport line for damage
+            foreach (var creature in _creatures)
+            {
+                if (creature.Hp <= 0) continue;
+                var cr = creature.Rect;
+                // Line-rect intersection approximation: check if creature bbox intersects the teleport corridor
+                var start = _player.CipherTeleportStart;  
+                var end = _player.CipherTeleportEnd;
+                // Simple: check if creature center is within ~20px of the line
+                var cc = new Vector2(cr.X + cr.Width / 2f, cr.Y + cr.Height / 2f);
+                var lineDir = end - start;
+                float lineLen = lineDir.Length();
+                if (lineLen < 1f) continue;
+                lineDir /= lineLen;
+                float proj = Vector2.Dot(cc - start, lineDir);
+                if (proj < 0 || proj > lineLen) continue;
+                var closest = start + lineDir * proj;
+                float dist = Vector2.Distance(cc, closest);
+                if (dist < 24f) // 24px corridor width
+                {
+                    creature.Hp -= 4;
+                    creature.HitFlash = 0.15f;
+                    if (creature.Hp <= 0) creature.Hp = 0;
+                }
+            }
+        }
+        
         // Grapple hook collision — raycast along hook path
         if (_player.IsGrappleFiring)
         {
@@ -9089,6 +9119,37 @@ public class Game1 : Game
         // Draw bullets
         _bullets.ForEach(b => b.Draw(_spriteBatch, _pixel));
 
+        // === Cipher teleport visual — purple trail line ===
+        if (_player.IsCipherTeleporting)
+        {
+            var tStart = _player.CipherTeleportStart;
+            var tEnd = _player.CipherTeleportEnd;
+            float tProgress = 1f; // trail visible whole duration
+            // Draw a flickering purple line with varying thickness
+            var diff = tEnd - tStart;
+            float dist = diff.Length();
+            if (dist > 1f)
+            {
+                var dir = diff / dist;
+                var perp = new Vector2(-dir.Y, dir.X);
+                int segments = Math.Max(4, (int)(dist / 12f));
+                for (int i = 0; i < segments; i++)
+                {
+                    float t0 = (float)i / segments;
+                    float t1 = (float)(i + 1) / segments;
+                    var p0 = Vector2.Lerp(tStart, tEnd, t0);
+                    var p1 = Vector2.Lerp(tStart, tEnd, t1);
+                    // Wobble perpendicular for distortion effect
+                    float wobble = (float)Math.Sin(t0 * 20f + _totalTime * 30f) * 3f;
+                    p0 += perp * wobble;
+                    p1 += perp * -wobble;
+                    float alpha = 0.6f * (1f - t0 * 0.5f);
+                    var col = new Color(180, 80, 200) * alpha;
+                    DrawLine((int)p0.X, (int)p0.Y, (int)p1.X, (int)p1.Y, col);
+                }
+            }
+        }
+        
         // === Grapple rope + hook rendering ===
         if (_player.IsGrappling || _player.IsGrappleFiring || _player.IsGrappleRetracting || _player.IsGrapplePulling)
         {
