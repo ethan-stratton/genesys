@@ -92,6 +92,18 @@ public abstract class Creature
     }
 
     /// <summary>
+    /// Take damage with knockback. Default delegates to TakeDamage + applies velocity.
+    /// Subclasses may override for custom behavior.
+    /// </summary>
+    public virtual bool TakeHit(int damage, float knockbackX = 0, float knockbackY = 0)
+    {
+        bool killed = TakeDamage(damage);
+        if (knockbackX != 0 || knockbackY != 0)
+            Velocity = new Vector2(knockbackX, knockbackY);
+        return killed;
+    }
+
+    /// <summary>
     /// Tick needs over time. Call from Update.
     /// </summary>
     public void TickNeeds(float dt)
