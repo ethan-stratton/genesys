@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>GENESYS — World Map Editor</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #1a1a2e; color: #eee; font-family: 'Consolas', 'Monaco', monospace; overflow: hidden; }
+  
+  #toolbar {
+    position: fixed; top: 0; left: 0; right: 0; height: 48px; z-index: 100;
+    background: #16213e; border-bottom: 2px solid #0f3460;
+    display: flex; align-items: center; padding: 0 16px; gap: 16px;
+  }
+  #toolbar h1 { font-size: 16px; color: #e94560; letter-spacing: 2px; }
+  #toolbar button {
+    background: #0f3460; color: #eee; border: 1px solid #533483;
+    padding: 6px 14px; cursor: pointer; font-family: inherit; font-size: 12px;
+    border-radius: 3px;
+  }
+  #toolbar button:hover { background: #533483; }
+  #toolbar .status { margin-left: auto; font-size: 12px; color: #666; }
+  
+  #canvas-wrap { position: fixed; top: 48px; left: 0; right: 300px; bottom: 0; }
+  canvas { width: 100%; height: 100%; display: block; }
+  
+  #sidebar {
+    position: fixed; top: 48px; right: 0; bottom: 0; width: 300px;
+    background: #16213e; border-left: 2px solid #0f3460;
+    overflow-y: auto; padding: 12px;
+  }
+  #sidebar h2 { font-size: 14px; color: #e94560; margin: 12px 0 8px; }
+  #sidebar h2:first-child { margin-top: 0; }
+  
+  .room-info { font-size: 12px; line-height: 1.6; }
+  .room-info label { color: #888; display: inline-block; width: 70px; }
+  .room-info .val { color: #ccc; }
+  
+  .neighbor-row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+  .neighbor-row label { width: 50px; font-size: 12px; color: #888; }
+  .neighbor-row select {
+    flex: 1; background: #1a1a2e; color: #eee; border: 1px solid #533483;
+    padding: 4px; font-family: inherit; font-size: 12px;
+  }
+  
+  .tile-preview {
+    font-size: 6px; line-height: 6px; letter-spacing: 0px;
+    background: #111; padding: 4px; margin: 8px 0; overflow: hidden;
+    white-space: pre; font-family: monospace; border: 1px solid #333;
+  }
+  
+  .legend { font-size: 11px; color: #666; margin-top: 8px; }
+  .legend b { color: #999; }
+  
+  #help {
+    position: fixed; bottom: 12px; left: 12px; font-size: 11px; color: #444; z-index: 50;
+  }
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <h1>GENESYS MAP</h1>
+  <button onclick="resetView()">Reset View</button>
+  <button onclick="autoLayout()">Auto Layout</button>
+  <button onclick="saveAll()">💾 Save All</button>
+  <span class="status" id="status">Loading...</span>
+</div>
+
+<div id="canvas-wrap">
+  <canvas id="c"></canvas>
+</div>
+
+<div id="sidebar" id="panel">
+  <h2>Select a room</h2>
+  <div id="room-detail" class="room-info">Click a room on the map to inspect and edit.</div>
+</div>
+
+<div id="help">Scroll: zoom · Drag: pan · Click: select room · Drag room: reposition</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+let levels = {};
+let levelIds = [];
+let roomPositions = {}; // visual positions on canvas (not game coords)
+
+let cam = { x: 0, y: 0, zoom: 1 };
+let selected = null;
+let dragging = null;
+let panning = false;
+let panStart = { x: 0, y: 0 };
+let camStart = { x: 0, y: 0 };
+let dirty = false;
+
+const ROOM_COLORS = {
+  'test-arena': '#4ade80',
+  'crashsite': '#f87171',
+  'the-descent': '#60a5fa',
+  'the-gauntlet': '#fbbf24',
+  'the-summit': '#c084fc',
+  'debug-room': '#666',
+  'debug-room-2': '#555',
+  'training-hall': '#555',
+  'def': '#444',
+};
+
+function getColor(id) {
+  return ROOM_COLORS[id] || '#888';
+}
+
+async function loadLevels() {
+  const res = await fetch('/api/levels');
+  levels = await res.json();
+  levelIds = Object.keys(levels);
+  
+  // Initial layout: use bounds to estimate relative positions
+  autoLayout();
+  setStatus(`Loaded ${levelIds.length} rooms`);
+  draw();
+}
+
+function autoLayout() {
+  // Position rooms based on neighbor relationships using a simple force-directed approach
+  // Start with the garden at center
+  const spacing = 220;
+  const placed = new Set();
+  const positions = {};
+  
+  // BFS from test-arena
+  const start = levelIds.includes('test-arena') ? 'test-arena' : levelIds[0];
+  positions[start] = { x: 400, y: 300 };
+  placed.add(start);
+  
+  const queue = [start];
+  const dirOffsets = {
+    right: { x: spacing, y: 0 },
+    left: { x: -spacing, y: 0 },
+    down: { x: 0, y: spacing },
+    up: { x: 0, y: -spacing },
+  };
+  
+  while (queue.length > 0) {
+    const id = queue.shift();
+    const level = levels[id];
+    if (!level) continue;
+    const pos = positions[id];
+    
+    for (const [dir, offset] of Object.entries(dirOffsets)) {
+      const neighborId = level.neighbors[dir];
+      if (neighborId && !placed.has(neighborId)) {
+        positions[neighborId] = { x: pos.x + offset.x, y: pos.y + offset.y };
+        placed.add(neighborId);
+        queue.push(neighborId);
+      }
+    }
+  }
+  
+  // Place any unconnected rooms
+  let ox = 0;
+  for (const id of levelIds) {
+    if (!placed.has(id)) {
+      positions[id] = { x: -200 + ox, y: 500 };
+      ox += 150;
+    }
+  }
+  
+  roomPositions = positions;
+  draw();
+}
+
+function resize() {
+  const wrap = document.getElementById('canvas-wrap');
+  canvas.width = wrap.clientWidth * devicePixelRatio;
+  canvas.height = wrap.clientHeight * devicePixelRatio;
+  canvas.style.width = wrap.clientWidth + 'px';
+  canvas.style.height = wrap.clientHeight + 'px';
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  draw();
+}
+
+function worldToScreen(wx, wy) {
+  return { x: (wx - cam.x) * cam.zoom + canvas.width / devicePixelRatio / 2,
+           y: (wy - cam.y) * cam.zoom + canvas.height / devicePixelRatio / 2 };
+}
+
+function screenToWorld(sx, sy) {
+  return { x: (sx - canvas.width / devicePixelRatio / 2) / cam.zoom + cam.x,
+           y: (sy - canvas.height / devicePixelRatio / 2) / cam.zoom + cam.y };
+}
+
+function draw() {
+  const w = canvas.width / devicePixelRatio;
+  const h = canvas.height / devicePixelRatio;
+  ctx.clearRect(0, 0, w, h);
+  
+  // Grid
+  ctx.strokeStyle = '#222';
+  ctx.lineWidth = 0.5;
+  const gridSize = 50;
+  const tl = screenToWorld(0, 0);
+  const br = screenToWorld(w, h);
+  for (let x = Math.floor(tl.x / gridSize) * gridSize; x < br.x; x += gridSize) {
+    const s = worldToScreen(x, 0);
+    ctx.beginPath(); ctx.moveTo(s.x, 0); ctx.lineTo(s.x, h); ctx.stroke();
+  }
+  for (let y = Math.floor(tl.y / gridSize) * gridSize; y < br.y; y += gridSize) {
+    const s = worldToScreen(0, y);
+    ctx.beginPath(); ctx.moveTo(0, s.y); ctx.lineTo(w, s.y); ctx.stroke();
+  }
+  
+  // Draw connections first (lines behind rooms)
+  for (const id of levelIds) {
+    const level = levels[id];
+    const pos = roomPositions[id];
+    if (!pos || !level) continue;
+    
+    const neighbors = level.neighbors || {};
+    for (const [dir, nid] of Object.entries(neighbors)) {
+      if (!nid || !roomPositions[nid]) continue;
+      const npos = roomPositions[nid];
+      const from = worldToScreen(pos.x, pos.y);
+      const to = worldToScreen(npos.x, npos.y);
+      
+      // Check if bidirectional
+      const otherLevel = levels[nid];
+      const reverseDir = { left: 'right', right: 'left', up: 'down', down: 'up' }[dir];
+      const bidir = otherLevel?.neighbors?.[reverseDir] === id;
+      
+      ctx.strokeStyle = bidir ? 'rgba(83, 52, 131, 0.6)' : 'rgba(233, 69, 96, 0.4)';
+      ctx.lineWidth = bidir ? 2 : 1;
+      ctx.setLineDash(bidir ? [] : [4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      
+      // Arrow for direction
+      const mx = (from.x + to.x) / 2, my = (from.y + to.y) / 2;
+      const angle = Math.atan2(to.y - from.y, to.x - from.x);
+      ctx.fillStyle = ctx.strokeStyle;
+      ctx.beginPath();
+      ctx.moveTo(mx + Math.cos(angle) * 8, my + Math.sin(angle) * 8);
+      ctx.lineTo(mx + Math.cos(angle + 2.5) * 6, my + Math.sin(angle + 2.5) * 6);
+      ctx.lineTo(mx + Math.cos(angle - 2.5) * 6, my + Math.sin(angle - 2.5) * 6);
+      ctx.fill();
+    }
+  }
+  
+  // Draw rooms
+  for (const id of levelIds) {
+    const level = levels[id];
+    const pos = roomPositions[id];
+    if (!pos) continue;
+    
+    const s = worldToScreen(pos.x, pos.y);
+    const rw = Math.max(60, (level.grid.width || 10) * 0.8) * cam.zoom;
+    const rh = Math.max(30, (level.grid.height || 10) * 0.8) * cam.zoom;
+    
+    // Room rect
+    const color = getColor(id);
+    ctx.fillStyle = selected === id ? color : color + '40';
+    ctx.strokeStyle = selected === id ? '#fff' : color;
+    ctx.lineWidth = selected === id ? 2 : 1;
+    ctx.fillRect(s.x - rw/2, s.y - rh/2, rw, rh);
+    ctx.strokeRect(s.x - rw/2, s.y - rh/2, rw, rh);
+    
+    // Neighbor indicators (small arrows on edges)
+    const n = level.neighbors || {};
+    const arrowSize = 6;
+    ctx.fillStyle = '#e94560';
+    if (n.left) { // left arrow
+      ctx.beginPath();
+      ctx.moveTo(s.x - rw/2, s.y);
+      ctx.lineTo(s.x - rw/2 - arrowSize, s.y - arrowSize);
+      ctx.lineTo(s.x - rw/2 - arrowSize, s.y + arrowSize);
+      ctx.fill();
+    }
+    if (n.right) {
+      ctx.beginPath();
+      ctx.moveTo(s.x + rw/2, s.y);
+      ctx.lineTo(s.x + rw/2 + arrowSize, s.y - arrowSize);
+      ctx.lineTo(s.x + rw/2 + arrowSize, s.y + arrowSize);
+      ctx.fill();
+    }
+    if (n.up) {
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y - rh/2);
+      ctx.lineTo(s.x - arrowSize, s.y - rh/2 - arrowSize);
+      ctx.lineTo(s.x + arrowSize, s.y - rh/2 - arrowSize);
+      ctx.fill();
+    }
+    if (n.down) {
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y + rh/2);
+      ctx.lineTo(s.x - arrowSize, s.y + rh/2 + arrowSize);
+      ctx.lineTo(s.x + arrowSize, s.y + rh/2 + arrowSize);
+      ctx.fill();
+    }
+    
+    // Label
+    ctx.fillStyle = selected === id ? '#fff' : '#ccc';
+    ctx.font = `${Math.max(9, 11 * cam.zoom)}px Consolas, monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(level.name || id, s.x, s.y - 2);
+    ctx.font = `${Math.max(7, 9 * cam.zoom)}px Consolas, monospace`;
+    ctx.fillStyle = '#888';
+    ctx.fillText(`${level.grid.width}×${level.grid.height}`, s.x, s.y + 12);
+  }
+}
+
+function hitTest(sx, sy) {
+  for (const id of levelIds) {
+    const pos = roomPositions[id];
+    if (!pos) continue;
+    const level = levels[id];
+    const s = worldToScreen(pos.x, pos.y);
+    const rw = Math.max(60, (level.grid.width || 10) * 0.8) * cam.zoom;
+    const rh = Math.max(30, (level.grid.height || 10) * 0.8) * cam.zoom;
+    if (sx >= s.x - rw/2 && sx <= s.x + rw/2 && sy >= s.y - rh/2 && sy <= s.y + rh/2) {
+      return id;
+    }
+  }
+  return null;
+}
+
+function selectRoom(id) {
+  selected = id;
+  const panel = document.getElementById('room-detail');
+  if (!id || !levels[id]) {
+    panel.innerHTML = 'Click a room on the map to inspect and edit.';
+    draw();
+    return;
+  }
+  
+  const level = levels[id];
+  const n = level.neighbors || {};
+  const options = levelIds.filter(lid => lid !== id).map(lid => 
+    `<option value="${lid}">${levels[lid]?.name || lid}</option>`
+  ).join('');
+  const emptyOpt = '<option value="">(none)</option>';
+  
+  function sel(dir) {
+    const val = n[dir] || '';
+    return `<select onchange="setNeighbor('${id}','${dir}',this.value)">
+      ${emptyOpt}${options.replace(`value="${val}"`, `value="${val}" selected`)}
+    </select>`;
+  }
+  
+  panel.innerHTML = `
+    <h2>${level.name} <span style="color:#666;font-size:11px">(${id})</span></h2>
+    <div class="room-info">
+      <div><label>Size:</label><span class="val">${level.grid.width}×${level.grid.height} tiles (${level.grid.width * level.grid.tileSize}×${level.grid.height * level.grid.tileSize}px)</span></div>
+      <div><label>Spawn:</label><span class="val">(${level.playerSpawn.x}, ${level.playerSpawn.y})</span></div>
+      <div><label>Enemies:</label><span class="val">${level.enemies}</span></div>
+      <div><label>Items:</label><span class="val">${level.items}</span></div>
+      <div><label>Platforms:</label><span class="val">${level.platforms}</span></div>
+      <div><label>Ropes:</label><span class="val">${level.ropes}</span></div>
+      <div><label>Old Exits:</label><span class="val">${level.exits.length}</span></div>
+    </div>
+    
+    <h2>Neighbors (edge transitions)</h2>
+    <div class="neighbor-row"><label>↑ Up:</label>${sel('up')}</div>
+    <div class="neighbor-row"><label>← Left:</label>${sel('left')}</div>
+    <div class="neighbor-row"><label>→ Right:</label>${sel('right')}</div>
+    <div class="neighbor-row"><label>↓ Down:</label>${sel('down')}</div>
+    
+    <h2>Tile Preview</h2>
+    <div class="tile-preview">${level.grid.rows.join('\n')}</div>
+    
+    <div class="legend">
+      <b>#</b> solid  <b>:</b> background  <b>+</b> special  <b>.</b> empty
+    </div>
+    
+    <h2>Old Exit Zones</h2>
+    ${level.exits.map(e => `<div style="font-size:11px;color:#888">→ ${e.targetLevel} (${e.id || '?'})</div>`).join('')}
+  `;
+  
+  draw();
+}
+
+window.setNeighbor = function(roomId, dir, value) {
+  if (!levels[roomId]) return;
+  if (!levels[roomId].neighbors) levels[roomId].neighbors = {};
+  levels[roomId].neighbors[dir] = value;
+  dirty = true;
+  setStatus('Unsaved changes');
+  draw();
+};
+
+async function saveAll() {
+  const neighbors = {};
+  for (const id of levelIds) {
+    neighbors[id] = levels[id].neighbors || {};
+  }
+  const res = await fetch('/api/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(neighbors),
+  });
+  const data = await res.json();
+  if (data.ok) {
+    dirty = false;
+    setStatus('Saved ✓');
+  } else {
+    setStatus('Save failed: ' + data.error);
+  }
+}
+
+function resetView() {
+  cam = { x: 400, y: 300, zoom: 1 };
+  draw();
+}
+
+function setStatus(msg) {
+  document.getElementById('status').textContent = msg;
+}
+
+// Mouse handling
+let mouseDown = false;
+let mouseButton = 0;
+
+canvas.addEventListener('mousedown', e => {
+  const rect = canvas.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+  mouseDown = true;
+  mouseButton = e.button;
+  
+  if (e.button === 0) {
+    const hit = hitTest(sx, sy);
+    if (hit) {
+      dragging = hit;
+      selectRoom(hit);
+    } else {
+      selectRoom(null);
+      panning = true;
+      panStart = { x: e.clientX, y: e.clientY };
+      camStart = { x: cam.x, y: cam.y };
+    }
+  } else if (e.button === 1 || e.button === 2) {
+    panning = true;
+    panStart = { x: e.clientX, y: e.clientY };
+    camStart = { x: cam.x, y: cam.y };
+  }
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (dragging) {
+    const rect = canvas.getBoundingClientRect();
+    const w = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+    roomPositions[dragging] = { x: w.x, y: w.y };
+    draw();
+  } else if (panning) {
+    cam.x = camStart.x - (e.clientX - panStart.x) / cam.zoom;
+    cam.y = camStart.y - (e.clientY - panStart.y) / cam.zoom;
+    draw();
+  }
+});
+
+canvas.addEventListener('mouseup', () => {
+  mouseDown = false;
+  dragging = null;
+  panning = false;
+});
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY > 0 ? 0.9 : 1.1;
+  cam.zoom = Math.max(0.2, Math.min(5, cam.zoom * factor));
+  draw();
+}, { passive: false });
+
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+window.addEventListener('resize', resize);
+resize();
+loadLevels();
+</script>
+</body>
+</html>
