@@ -3,8 +3,10 @@
   "spawnX": 416,
   "spawnY": 224,
   "unlockedAbilities": [],
-  "flags": {},
-  "playTime": 8.466712,
+  "flags": {
+    "eveOrbActive": true
+  },
+  "playTime": 14.983279,
   "meleeInventory": [],
   "rangedInventory": [],
   "meleeIndex": -1,

@@ -1075,7 +1075,11 @@ public class Game1 : Game
                         _wakeUpComplete = false;
                         _wakeUpPhase = 0;
                         _wakeUpTimer = 0f;
-                        _fadeAlpha = 1f;
+                        _fadingOut = false;
+                        _fadeAlpha = 0f;
+                        _fadeTargetState = null;
+                        _fadeCallback = null;
+                        _fadeSpeed = 1.5f;
                         _eveMode = EveMovementMode.Orbit;
                         _eveMessageTimer = 0f;
                         _eveMessage = "";
