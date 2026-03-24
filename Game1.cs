@@ -266,6 +266,15 @@ public class Game1 : Game
     private bool _eveDialogueExhausted; // used later for quest tracking
     #pragma warning restore CS0414
     private string _eveMessage = "";
+
+    // --- EVE Map Projection ---
+    private bool _hasMapModule;          // player found the cartographic module
+    private bool _eveProjectingMap;      // EVE is on ground projecting mini-map
+    private Vector2 _eveMapGroundPos;    // where EVE landed to project
+    private float _eveMapTimer;          // animation timer
+    private bool _fullscreenMapOpen;     // W pressed near projection → fullscreen hex map
+    private Vector2 _fullscreenMapScroll;// scroll offset in fullscreen map
+    private string _currentRoomId = "";  // which WorldGraph room the player is in
     private float _eveMessageTimer;
     private void EveAlert(string msg, float duration = 3f)
     {
@@ -278,7 +287,7 @@ public class Game1 : Game
     private Vector2 _eveVel;           // velocity
     private bool _evePosInitialized;
     private SecondOrderDynamics2D _eveSpring; // smooth orbit/scan target
-    private enum EveMovementMode { Orbit, FlyTo, Scan }
+    private enum EveMovementMode { Orbit, FlyTo, Scan, MapProject }
     private EveMovementMode _eveMode = EveMovementMode.Orbit;
     private Vector2 _eveFlyTarget;     // target for FlyTo
     private float _eveFlySpeed = 120f;
@@ -373,6 +382,12 @@ public class Game1 : Game
             }
             default:
                 return;
+            case EveMovementMode.MapProject:
+                // EVE holds position on ground, gentle bob
+                _evePos = _eveMapGroundPos + new Vector2(0, MathF.Sin((float)_totalTime * 2f) * 1.5f);
+                _eveVel = Vector2.Zero;
+                _eveMapTimer += dt;
+                return; // skip normal steering
         }
         
         // Steering: accelerate toward target — faster when far, ease near
@@ -613,6 +628,22 @@ public class Game1 : Game
         }
 
         // Enemies are spawned in SpawnEnemiesFromLevel(), called by Restart()
+
+        // Track current room in WorldGraph
+        string levelName = System.IO.Path.GetFileNameWithoutExtension(path);
+        var matchRoom = _worldGraph?.Rooms.FirstOrDefault(r => r.LevelFile == levelName);
+        if (matchRoom != null)
+        {
+            _currentRoomId = matchRoom.Id;
+            matchRoom.Visited = true;
+            matchRoom.Discovered = true;
+            // Discover adjacent rooms
+            foreach (var exit in matchRoom.Exits)
+            {
+                var adj = _worldGraph.GetRoom(exit.TargetRoomId);
+                if (adj != null) adj.Discovered = true;
+            }
+        }
     }
 
     private void RespawnItemsFromLevel()
@@ -953,6 +984,7 @@ public class Game1 : Game
                             _wakeUpComplete = true;
                             _player.IsLyingDown = false;
                             _player.HasGrapple = _saveData?.CollectedItems?.Any(id => id.StartsWith("grapple")) == true;
+                            _hasMapModule = _saveData?.CollectedItems?.Any(id => id.StartsWith("map-module")) == true;
                             _camera.Zoom = 1f;
                             _camera.TargetZoom = 1f;
 
@@ -1028,19 +1060,54 @@ public class Game1 : Game
             _prevKb = kb; // consume the Escape press so UpdateMenu doesn't immediately close
         }
 
-        // M key — open overworld map
-        if (kb.IsKeyDown(Keys.M) && _prevKb.IsKeyUp(Keys.M) && !_menuOpen && !_dialogueOpen)
+        // M key — EVE map projection toggle
+        if (kb.IsKeyDown(Keys.M) && _prevKb.IsKeyUp(Keys.M) && !_menuOpen && !_dialogueOpen && _eveOrbActive)
         {
-            if (_overworld != null)
+            if (_fullscreenMapOpen)
             {
-                _overworldCursor = Array.IndexOf(_overworld.Nodes, _overworld.FindNode(
-                    System.IO.Path.GetFileNameWithoutExtension(_editorSaveFile)));
-                if (_overworldCursor < 0) _overworldCursor = 0;
-                _currentNodeId = _overworld.Nodes[_overworldCursor].Id;
-                _gameState = GameState.Overworld;
-                _prevKb = kb;
-                return;
+                // Close fullscreen map → return to projection
+                _fullscreenMapOpen = false;
             }
+            else if (_eveProjectingMap)
+            {
+                // Cancel projection → EVE returns to orbit
+                _eveProjectingMap = false;
+                _eveMode = EveMovementMode.Orbit;
+            }
+            else if (_hasMapModule)
+            {
+                // Start projection: EVE flies to ground near player
+                _eveProjectingMap = true;
+                _eveMapTimer = 0f;
+                _fullscreenMapOpen = false;
+                float groundY = SnapToSurface(_player.Position.X + Player.Width / 2f, _player.Position.Y, 4, 0);
+                _eveMapGroundPos = new Vector2(_player.Position.X + Player.Width / 2f + _player.FacingDir * 40f, groundY - 8f);
+                EveFlyTo(_eveMapGroundPos, 200f, () => { _eveMode = EveMovementMode.MapProject; });
+            }
+            else
+            {
+                EveAlert("No cartographic module installed.", 2f);
+            }
+        }
+
+        // W key near map projection → fullscreen
+        if (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W) && _eveProjectingMap && _eveMode == EveMovementMode.MapProject && !_fullscreenMapOpen)
+        {
+            var dist = Vector2.Distance(new Vector2(_player.Position.X + Player.Width / 2f, _player.Position.Y), _eveMapGroundPos);
+            if (dist < 80f)
+                _fullscreenMapOpen = true;
+        }
+
+        // Fullscreen map blocks gameplay input, handles scroll
+        if (_fullscreenMapOpen)
+        {
+            float scrollSpeed = 3f;
+            if (kb.IsKeyDown(Keys.W)) _fullscreenMapScroll.Y += scrollSpeed;
+            if (kb.IsKeyDown(Keys.S)) _fullscreenMapScroll.Y -= scrollSpeed;
+            if (kb.IsKeyDown(Keys.A)) _fullscreenMapScroll.X += scrollSpeed;
+            if (kb.IsKeyDown(Keys.D)) _fullscreenMapScroll.X -= scrollSpeed;
+            _prevKb = kb;
+            return;
         }
 
         if (_menuOpen)
@@ -1122,6 +1189,18 @@ public class Game1 : Game
         {
             var pc = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
             UpdateEvePosition(dt, pc);
+            
+            // Auto-cancel map projection if player walks too far
+            if (_eveProjectingMap && _eveMode == EveMovementMode.MapProject)
+            {
+                float distToProj = Vector2.Distance(pc, _eveMapGroundPos);
+                if (distToProj > 200f)
+                {
+                    _eveProjectingMap = false;
+                    _fullscreenMapOpen = false;
+                    _eveMode = EveMovementMode.Orbit;
+                }
+            }
         }
 
         // Update retractable spike timer
@@ -2698,6 +2777,7 @@ public class Game1 : Game
                     {
                         case "knife": EquipMelee(WeaponType.Knife); break;
                         case "grapple": _player.HasGrapple = true; EveAlert("Partially functional. Battery drain, but better than nothing.", 4f); break;
+                        case "map-module": _hasMapModule = true; EveAlert("Cartographic module. Damaged, but I can compensate.", 4f); break;
                         case "stick": EquipMelee(WeaponType.Stick); break;
                         case "whip": EquipMelee(WeaponType.Whip); break;
                         case "dagger": EquipMelee(WeaponType.Dagger); break;
@@ -3053,6 +3133,7 @@ public class Game1 : Game
                         if (_saveData != null)
                         {
                             _player.HasGrapple = _saveData.CollectedItems?.Any(id => id.StartsWith("grapple")) == true;
+                            _hasMapModule = _saveData.CollectedItems?.Any(id => id.StartsWith("map-module")) == true;
                             _player.CurrentTier = (Player.MoveTier)Math.Clamp(_saveData.MoveTier, 0, 2);
                             _player.ApplyTierConstants();
                             _wakeUpComplete = true;
@@ -5233,6 +5314,7 @@ public class Game1 : Game
                     "hammer" => new Color(160, 160, 170),
                     "bow" => new Color(160, 120, 60),
                     "gun" => Color.SlateGray,
+                    "map-module" => Color.Cyan,
                     _ => Color.White
                 };
                 _spriteBatch.Draw(_pixel, item.Rect, itemColor);
@@ -8221,6 +8303,7 @@ public class Game1 : Game
                     "bow" => new Color(160, 120, 60),
                     "gun" => Color.SlateGray,
                     "heart" => Color.Red,
+                    "map-module" => Color.Cyan,
                     _ => Color.White
                 };
                 // Draw with glow so it's visible
@@ -8530,6 +8613,67 @@ public class Game1 : Game
                 _spriteBatch.Draw(_pixel, new Rectangle((int)bubbleX - 4, (int)bubbleY - 2, (int)msgSize.X + 8, (int)msgSize.Y + 4), Color.Black * (0.7f * alpha));
                 DrawOutlinedString(_fontSmall, _eveMessage, new Vector2(bubbleX, bubbleY), Color.Cyan * alpha);
             }
+
+            // --- EVE Mini-Map Projection ---
+            if (_eveProjectingMap && _eveMode == EveMovementMode.MapProject && _eveMapTimer > 0.3f)
+            {
+                float projAlpha = MathHelper.Clamp((_eveMapTimer - 0.3f) / 0.5f, 0f, 1f); // fade in over 0.5s
+                float projX = _eveMapGroundPos.X;
+                float projY = _eveMapGroundPos.Y - 20f; // project above EVE
+                
+                // Holographic beam from EVE to projection
+                for (int beam = 0; beam < 3; beam++)
+                {
+                    float bx = projX - 1 + beam;
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)bx, (int)(_eveMapGroundPos.Y - 8), 1, (int)(-(projY - _eveMapGroundPos.Y + 8))),
+                        Color.Cyan * (0.15f * projAlpha));
+                }
+                
+                // Mini hex map (small, world-space)
+                float hexSize = 6f;
+                float mapCenterX = projX;
+                float mapCenterY = projY - 24f;
+                
+                // Draw connections first (lines between hexes)
+                foreach (var room in _worldGraph.Rooms)
+                {
+                    if (!room.Visited) continue;
+                    foreach (var exit in room.Exits)
+                    {
+                        var neighbor = _worldGraph.GetRoom(exit.TargetRoomId);
+                        if (neighbor == null || !neighbor.Visited) continue;
+                        float x1 = mapCenterX + room.MapX * hexSize * 1.5f;
+                        float y1 = mapCenterY + room.MapY * hexSize * 1.3f;
+                        float x2 = mapCenterX + neighbor.MapX * hexSize * 1.5f;
+                        float y2 = mapCenterY + neighbor.MapY * hexSize * 1.3f;
+                        DrawLine(_spriteBatch, _pixel, new Vector2(x1, y1), new Vector2(x2, y2), Color.Cyan * (0.3f * projAlpha), 1);
+                    }
+                }
+                
+                // Draw room hexes
+                foreach (var room in _worldGraph.Rooms)
+                {
+                    if (!room.Visited && !room.Discovered) continue;
+                    float rx = mapCenterX + room.MapX * hexSize * 1.5f;
+                    float ry = mapCenterY + room.MapY * hexSize * 1.3f;
+                    int sz = room.Visited ? 3 : 2;
+                    Color roomColor = room.Visited ? Color.Cyan : Color.Cyan * 0.3f;
+                    if (room.Id == _currentRoomId)
+                    {
+                        // Blinking red dot for current room
+                        float blink = 0.5f + 0.5f * MathF.Sin(_totalTime * 6f);
+                        _spriteBatch.Draw(_pixel, new Rectangle((int)(rx - sz), (int)(ry - sz), sz * 2, sz * 2), Color.Red * (blink * projAlpha));
+                    }
+                    else
+                    {
+                        _spriteBatch.Draw(_pixel, new Rectangle((int)(rx - sz), (int)(ry - sz), sz * 2, sz * 2), roomColor * projAlpha);
+                    }
+                }
+                
+                // Scanline effect
+                float scanY = mapCenterY - 30f + ((_eveMapTimer * 12f) % 60f);
+                _spriteBatch.Draw(_pixel, new Rectangle((int)(mapCenterX - 30f), (int)scanY, 60, 1), Color.Cyan * (0.1f * projAlpha));
+            }
         }
 
         // Draw bullets
@@ -8808,6 +8952,122 @@ public class Game1 : Game
         {
             _spriteBatch.Begin();
             _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), new Color(40, 30, 15) * _restFadeAlpha);
+            _spriteBatch.End();
+        }
+
+        // --- Fullscreen Hex Map ---
+        if (_fullscreenMapOpen && _eveProjectingMap)
+        {
+            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
+
+            // Dark translucent background
+            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), new Color(0, 10, 20) * 0.92f);
+
+            // Title
+            string mapTitle = "EVE CARTOGRAPHIC PROJECTION";
+            var titleSize = _font.MeasureString(mapTitle);
+            _spriteBatch.DrawString(_font, mapTitle, new Vector2(ViewW / 2f - titleSize.X / 2f, 20), Color.Cyan * 0.8f);
+
+            // Hint text
+            string hint = "[M] Close    [WASD] Scroll";
+            var hintSize = _fontSmall.MeasureString(SafeText(hint));
+            _spriteBatch.DrawString(_fontSmall, SafeText(hint), new Vector2(ViewW / 2f - hintSize.X / 2f, ViewH - 24), Color.Gray * 0.6f);
+
+            float hexR = 20f; // hex radius in screen pixels
+            float hexW = hexR * 1.5f;  // horizontal spacing
+            float hexH = hexR * 1.3f;  // vertical spacing
+            float cx = ViewW / 2f + _fullscreenMapScroll.X;
+            float cy = ViewH / 2f + _fullscreenMapScroll.Y;
+
+            // Draw connections (lines)
+            foreach (var room in _worldGraph.Rooms)
+            {
+                if (!room.Visited) continue;
+                float x1 = cx + room.MapX * hexW;
+                float y1 = cy + room.MapY * hexH;
+                foreach (var exit in room.Exits)
+                {
+                    var neighbor = _worldGraph.GetRoom(exit.TargetRoomId);
+                    if (neighbor == null || !neighbor.Visited) continue;
+                    float x2 = cx + neighbor.MapX * hexW;
+                    float y2 = cy + neighbor.MapY * hexH;
+                    DrawLine(_spriteBatch, _pixel, new Vector2(x1, y1), new Vector2(x2, y2), Color.Cyan * 0.25f, 1);
+                }
+            }
+
+            // Get area colors
+            Color AreaColor(string areaId) => areaId switch
+            {
+                "wreckage" => new Color(100, 130, 160),
+                "forest" => new Color(60, 140, 60),
+                "native-ruins" => new Color(160, 130, 80),
+                "bone-reef" => new Color(130, 80, 130),
+                "deep-ruins" => new Color(60, 90, 140),
+                "transformed-lands" => new Color(100, 60, 140),
+                "dragons-sanctum" => new Color(160, 40, 40),
+                _ => Color.Cyan
+            };
+
+            // Draw rooms
+            foreach (var room in _worldGraph.Rooms)
+            {
+                if (!room.Visited && !room.Discovered) continue;
+                float rx = cx + room.MapX * hexW;
+                float ry = cy + room.MapY * hexH;
+
+                Color col = AreaColor(room.AreaId);
+                float alpha = room.Visited ? 0.8f : 0.25f;
+
+                // Hex shape (approximated as filled octagon-ish)
+                int hr = (int)(hexR * 0.6f);
+                _spriteBatch.Draw(_pixel, new Rectangle((int)(rx - hr), (int)(ry - hr), hr * 2, hr * 2), col * alpha);
+                // Slightly larger outline
+                int or2 = hr + 1;
+                _spriteBatch.Draw(_pixel, new Rectangle((int)(rx - or2), (int)(ry - or2), or2 * 2, 1), col * (alpha * 0.5f));
+                _spriteBatch.Draw(_pixel, new Rectangle((int)(rx - or2), (int)(ry + or2 - 1), or2 * 2, 1), col * (alpha * 0.5f));
+                _spriteBatch.Draw(_pixel, new Rectangle((int)(rx - or2), (int)(ry - or2), 1, or2 * 2), col * (alpha * 0.5f));
+                _spriteBatch.Draw(_pixel, new Rectangle((int)(rx + or2 - 1), (int)(ry - or2), 1, or2 * 2), col * (alpha * 0.5f));
+
+                // Current room: blinking red dot
+                if (room.Id == _currentRoomId)
+                {
+                    float blink = 0.5f + 0.5f * MathF.Sin(_totalTime * 6f);
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)(rx - 3), (int)(ry - 3), 6, 6), Color.Red * blink);
+                }
+
+                // Ship icon on wreckage hub
+                if (room.Id == "ship-interior")
+                {
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)(rx - 2), (int)(ry - hr - 6), 4, 4), Color.White * 0.6f);
+                }
+
+                // Room name label
+                if (room.Visited)
+                {
+                    string rname = room.Name;
+                    var nameSize = _fontSmall.MeasureString(SafeText(rname));
+                    _spriteBatch.DrawString(_fontSmall, SafeText(rname),
+                        new Vector2(rx - nameSize.X / 2f, ry + hr + 2), col * (alpha * 0.9f));
+                }
+            }
+
+            // Area name labels (larger, positioned near area center)
+            foreach (var area in _worldGraph.Areas)
+            {
+                var areaRooms = _worldGraph.GetAreaRooms(area.Id);
+                if (areaRooms.Count == 0 || !areaRooms.Any(r => r.Visited)) continue;
+                float avgX = areaRooms.Average(r => cx + r.MapX * hexW);
+                float avgY = areaRooms.Min(r => cy + r.MapY * hexH) - hexR * 1.2f;
+                var areaNameSize = _font.MeasureString(area.Name);
+                _spriteBatch.DrawString(_font, area.Name,
+                    new Vector2(avgX - areaNameSize.X / 2f, avgY), AreaColor(area.Id) * 0.6f);
+            }
+
+            // Holographic scanline effect
+            float scanLineY = ((_totalTime * 40f) % ViewH);
+            _spriteBatch.Draw(_pixel, new Rectangle(0, (int)scanLineY, ViewW, 1), Color.Cyan * 0.06f);
+            _spriteBatch.Draw(_pixel, new Rectangle(0, (int)scanLineY + 2, ViewW, 1), Color.Cyan * 0.03f);
+
             _spriteBatch.End();
         }
 
