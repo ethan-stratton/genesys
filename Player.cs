@@ -259,7 +259,7 @@ public class Player
 
     // Dash (double-tap A or D)
     public bool IsDashing { get; private set; }
-    private const float DashSpeed = 420f;
+    private const float DashSpeed = 330f;
     private float _lastATapTime;
     private float _lastDTapTime;
     private bool _aWasUp;
@@ -284,7 +284,7 @@ public class Player
     public bool IsSprinting { get; private set; }
     private float _sprintBuildup; // 0→1 over time
     private const float SprintBuildTime = 0.8f; // seconds to reach full sprint
-    private const float SprintMaxSpeedMult = 1.8f; // 80% faster at full sprint
+    private const float SprintMaxSpeedMult = 1.4f; // 40% faster than base walk at full sprint
     private const float SprintMinTime = 0.3f; // must hold direction this long before sprint kicks in
     private int _sprintDir;
 
