@@ -47,7 +47,7 @@ public class Thornback : Creature
         return 0;
     }
 
-    public bool TakeHit(int damage, float knockbackX = 0, float knockbackY = 0)
+    public override bool TakeHit(int damage, float knockbackX = 0, float knockbackY = 0)
     {
         if (!Alive || MeleeHitCooldown > 0) return false;
         Hp -= damage;

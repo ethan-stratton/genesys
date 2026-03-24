@@ -184,7 +184,7 @@ public class Wingbeater : Creature
         return 0;
     }
 
-    public bool TakeHit(int damage, float kbX = 0, float kbY = 0)
+    public override bool TakeHit(int damage, float kbX = 0, float kbY = 0)
     {
         if (!Alive || MeleeHitCooldown > 0) return false;
         Hp -= damage;

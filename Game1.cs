@@ -8646,7 +8646,7 @@ public class Game1 : Game
                         float y1 = mapCenterY + room.MapY * hexSize * 1.3f;
                         float x2 = mapCenterX + neighbor.MapX * hexSize * 1.5f;
                         float y2 = mapCenterY + neighbor.MapY * hexSize * 1.3f;
-                        DrawLine(_spriteBatch, _pixel, new Vector2(x1, y1), new Vector2(x2, y2), Color.Cyan * (0.3f * projAlpha), 1);
+                        DrawLine((int)x1, (int)y1, (int)x2, (int)y2, Color.Cyan * (0.3f * projAlpha));
                     }
                 }
                 
@@ -8991,7 +8991,7 @@ public class Game1 : Game
                     if (neighbor == null || !neighbor.Visited) continue;
                     float x2 = cx + neighbor.MapX * hexW;
                     float y2 = cy + neighbor.MapY * hexH;
-                    DrawLine(_spriteBatch, _pixel, new Vector2(x1, y1), new Vector2(x2, y2), Color.Cyan * 0.25f, 1);
+                    DrawLine((int)x1, (int)y1, (int)x2, (int)y2, Color.Cyan * 0.25f);
                 }
             }
 

@@ -243,7 +243,7 @@ public class Bird : Creature
             Position.Y = GroundY;
     }
 
-    public bool TakeHit(int damage, float knockbackX = 0, float knockbackY = 0)
+    public override bool TakeHit(int damage, float knockbackX = 0, float knockbackY = 0)
     {
         if (!Alive) return false;
         KnockbackVel = new Vector2(knockbackX * 0.5f, knockbackY);
