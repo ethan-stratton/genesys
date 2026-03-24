@@ -257,16 +257,18 @@ public class Player
     public const int UppercutHitboxW = 20;
     public const int UppercutHitboxH = 30;
 
-    // Dash (double-tap A or D) — universal burst, tier-flavored
+    // Dash (double-tap A or D) — instant velocity burst, tier-flavored
     public bool IsDashing { get; private set; }
     private float _dashTimer;
-    private const float TechDashSpeed = 350f;
-    private const float TechDashDuration = 0.15f; // short jet burst
-    private const float BioDashSpeed = 300f;
-    private const float BioDashDuration = 0.12f; // quick leap
-    private const float CipherDashSpeed = 400f;
-    private const float CipherDashDuration = 0.18f; // longest, can aim
-    private const float DashCooldown = 0.4f;
+    // Burst impulse (applied once on dash start)
+    private const float TechBurstImpulse = 450f;   // jet thruster — BIG kick
+    private const float BioBurstImpulse = 380f;     // athletic leap
+    private const float CipherBurstImpulse = 500f;  // teleport-fast
+    // Duration (how long dash state lasts — preserves velocity, reduces gravity)
+    private const float TechDashDuration = 0.12f;
+    private const float BioDashDuration = 0.10f;
+    private const float CipherDashDuration = 0.15f;
+    private const float DashCooldown = 0.35f;
     private float _dashCooldownTimer;
     private float _lastATapTime;
     private float _lastDTapTime;
@@ -488,7 +490,6 @@ public class Player
     // Debug getters for tier display
     public float GetTierSpeed() => _speed;
     public float GetTierAccel() => _runAccel;
-    public float GetDashSpeed() => CurrentTier switch { MoveTier.Tech => TechDashSpeed, MoveTier.Bio => BioDashSpeed, _ => CipherDashSpeed };
     public float GetTierAirMult() => _airMult;
     public float GetTierJump() => _jumpForce;
     public bool IsChargingJump => _chargingJump;
@@ -1173,7 +1174,7 @@ public class Player
 
         // (raw input moved up, was here)
 
-        // --- Dash detection (double-tap A or D) — burst dash, tier-flavored ---
+        // --- Dash detection (double-tap A or D) — instant velocity burst ---
         _dashCooldownTimer = Math.Max(0, _dashCooldownTimer - dt);
         if (!EnableDash) IsDashing = false;
         else
@@ -1185,18 +1186,30 @@ public class Player
         if (aDown && _aWasUp)
         {
             _aWasUp = false;
-            bool canDash = _dashCooldownTimer <= 0 && (CurrentTier == MoveTier.Cipher || _wasGrounded);
-            if (now_dash - _lastATapTime < DashDoubleTapWindow && canDash)
-            { IsDashing = true; _dashDir = -1; _dashTimer = 0; _dashCooldownTimer = DashCooldown; SetSquash(1.25f, 0.8f); }
+            // Tech: air+ground. Bio: ground only. Cipher: air+ground.
+            bool canDash = _dashCooldownTimer <= 0 && (CurrentTier != MoveTier.Bio || _wasGrounded);
+            if (now_dash - _lastATapTime < DashDoubleTapWindow && canDash && !IsDashing)
+            {
+                IsDashing = true; _dashDir = -1; _dashTimer = 0; _dashCooldownTimer = DashCooldown;
+                SetSquash(1.25f, 0.8f);
+                // BURST: inject velocity directly
+                float impulse = CurrentTier switch { MoveTier.Tech => TechBurstImpulse, MoveTier.Bio => BioBurstImpulse, _ => CipherBurstImpulse };
+                Velocity = new Vector2(-impulse, IsGrounded ? Velocity.Y : Velocity.Y * 0.3f);
+            }
             _lastATapTime = now_dash;
         }
         if (!dDown) _dWasUp = true;
         if (dDown && _dWasUp)
         {
             _dWasUp = false;
-            bool canDash = _dashCooldownTimer <= 0 && (CurrentTier == MoveTier.Cipher || _wasGrounded);
-            if (now_dash - _lastDTapTime < DashDoubleTapWindow && canDash)
-            { IsDashing = true; _dashDir = 1; _dashTimer = 0; _dashCooldownTimer = DashCooldown; SetSquash(1.25f, 0.8f); }
+            bool canDash = _dashCooldownTimer <= 0 && (CurrentTier != MoveTier.Bio || _wasGrounded);
+            if (now_dash - _lastDTapTime < DashDoubleTapWindow && canDash && !IsDashing)
+            {
+                IsDashing = true; _dashDir = 1; _dashTimer = 0; _dashCooldownTimer = DashCooldown;
+                SetSquash(1.25f, 0.8f);
+                float impulse = CurrentTier switch { MoveTier.Tech => TechBurstImpulse, MoveTier.Bio => BioBurstImpulse, _ => CipherBurstImpulse };
+                Velocity = new Vector2(impulse, IsGrounded ? Velocity.Y : Velocity.Y * 0.3f);
+            }
             _lastDTapTime = now_dash;
         }
         if (IsDashing)
@@ -1750,7 +1763,9 @@ public class Player
                 // Chain into dash automatically
                 IsDashing = true;
                 _dashDir = _bladeDashDir;
-                vel.X = _bladeDashDir * GetDashSpeed();
+                _dashTimer = 0;
+                float chainImpulse = CurrentTier switch { MoveTier.Tech => TechBurstImpulse, MoveTier.Bio => BioBurstImpulse, _ => CipherBurstImpulse };
+                vel.X = _bladeDashDir * chainImpulse;
             }
         }
         else if (IsSliding)
@@ -1828,9 +1843,17 @@ public class Player
             // Don't override vel.X — let knockback velocity play out
             vel.Y += _gravity * (vel.Y > 0 ? _fallGravMultiplier : 1f) * dt;
         }
+        else if (IsDashing)
+        {
+            // During burst: DON'T apply normal movement — velocity was injected on start.
+            // Slight drag so it decays naturally (feels like a burst, not teleport)
+            vel.X *= 0.96f;
+            // Reduced gravity during dash (hang time for air dashes)
+            vel.Y += _gravity * 0.3f * dt;
+        }
         else
         {
-            float moveSpeed = (IsDashing && inputX == _dashDir) ? GetDashSpeed() : _speed;
+            float moveSpeed = _speed;
             if (SpeedBoostTimer > 0) moveSpeed *= SpeedBoostMultiplier;
 
             // Tech Sprint: dash transitions into sprint (hold direction after dash ends)
@@ -1838,7 +1861,7 @@ public class Player
             {
                 moveSpeed *= SprintMaxSpeedMult;
             }
-            else if (!IsDashing)
+            else
             {
                 IsSprinting = false;
             }
@@ -1948,6 +1971,14 @@ public class Player
             {
                 vel.Y += _gravity * 1.5f * dt; // extra gravity burst
                 termVel = _maxFall * 1.4f;     // higher terminal velocity
+            }
+            // Bio glide: hold W in air to slow fall (flying squirrel)
+            if (CurrentTier == MoveTier.Bio && !IsGrounded && inputY < 0 && vel.Y > 0)
+            {
+                vel.Y *= 0.85f; // strong drag on descent
+                termVel = _maxFall * 0.35f; // cap fall speed at 35% of normal
+                // Slight horizontal boost while gliding
+                if (inputX != 0) vel.X = ApproachF(vel.X, inputX * _speed * 1.2f, _airAccel * 1.5f * dt);
             }
             // Tech ground pound: press S in air — heavy stomp with afterimage
             if (CurrentTier == MoveTier.Tech && !IsGrounded && inputY > 0 && !IsGroundPounding)

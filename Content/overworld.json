@@ -23,7 +23,7 @@
       "y": 250,
       "level": "the-descent",
       "discovered": true,
-      "cleared": false,
+      "cleared": true,
       "connections": [
         "test-arena",
         "the-gauntlet"
@@ -37,13 +37,13 @@
       "x": 500,
       "y": 350,
       "level": "the-gauntlet",
-      "discovered": false,
+      "discovered": true,
       "cleared": false,
       "connections": [
         "the-descent",
         "the-summit"
       ],
-      "ShownName": "???"
+      "ShownName": "The Gauntlet"
     },
     {
       "id": "the-summit",
