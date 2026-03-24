@@ -1732,8 +1732,7 @@ public class Game1 : Game
                     Life = 0.4f + (float)_rng.NextDouble() * 0.3f,
                     MaxLife = 0.7f,
                     Color = new Color(180, 160, 130),
-                    Size = 2f + (float)_rng.NextDouble() * 2f,
-                    Gravity = 200f
+                    Size = 2 + _rng.Next(2)
                 });
             }
             // Damage enemies in stomp radius
