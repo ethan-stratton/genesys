@@ -72,7 +72,7 @@ public class Camera
         
         // --- Forward bias (spring-driven for organic turn feel) ---
         float targetBias = facingDir * ForwardBias;
-        if (!_biasInitialized) { _biasSpring = new SecondOrderDynamics(1.5f, 0.6f, -0.5f, targetBias); _biasInitialized = true; }
+        if (!_biasInitialized) { _biasSpring = new SecondOrderDynamics(0.8f, 1.0f, 0f, targetBias); _biasInitialized = true; }
         float currentBias = _biasSpring.Update(dt, targetBias);
         
         // Camera center = where the camera is currently looking

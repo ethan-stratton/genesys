@@ -3041,6 +3041,9 @@ public class Game1 : Game
                     string _sourceLevel = System.IO.Path.GetFileNameWithoutExtension(_editorSaveFile);
                     if (System.IO.File.Exists(nextPath))
                     {
+                        // Save current player state BEFORE Restart() destroys the player
+                        if (_saveData != null) { SyncInventoryToSave(); _saveData.Save(); }
+                        
                         LoadLevel(nextPath);
                         _editorSaveFile = nextPath;
                         _camera = MakeCamera();
