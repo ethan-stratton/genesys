@@ -308,9 +308,9 @@ public class Player
     private const float KnockbackDuration = 0.25f;
     private float _knockbackTimer;
     private float _regenDelay; // time since last damage
-    private const float RegenStartDelay = 2.0f; // 2s before regen kicks in
+    private const float RegenStartDelay = 8.0f; // 8s before regen kicks in
     private float _regenAccum; // fractional HP accumulator
-    private const float RegenRate = 5f; // HP per second (slow)
+    private const float RegenRate = 0.25f; // HP per second (very slow — 4s per 1 HP)
     
     // Effect tile state
     public float SpeedBoostTimer { get; set; }
