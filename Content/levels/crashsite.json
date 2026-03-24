@@ -43,7 +43,7 @@
       "h": 48,
       "targetLevel": "test-arena",
       "id": "exit-top",
-      "targetExitId": "exit-from-crashsite"
+      "targetExitId": "exit-to-crashsite"
     },
     {
       "x": 256,

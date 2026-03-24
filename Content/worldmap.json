@@ -8731,9 +8731,9 @@
     false,
     false,
     false,
-    true,
-    true,
-    true,
+    false,
+    false,
+    false,
     false,
     false,
     false,
@@ -12020,7 +12020,7 @@
           "id": "descent",
           "name": "The Descent",
           "level": "the-descent",
-          "cleared": true,
+          "cleared": false,
           "discovered": true,
           "order": 1
         },
@@ -12029,7 +12029,7 @@
           "name": "The Gauntlet",
           "level": "the-gauntlet",
           "cleared": false,
-          "discovered": true,
+          "discovered": false,
           "order": 2
         },
         {
@@ -12045,7 +12045,7 @@
     }
   ],
   "playerX": 30,
-  "playerY": 46,
+  "playerY": 47,
   "points": [
     {
       "x": 30,
