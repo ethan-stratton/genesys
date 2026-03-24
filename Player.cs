@@ -546,15 +546,15 @@ public class Player
     
     private Vector2 _grappleVel;             // player velocity while grappling (Cartesian, not angular)
     private bool _grappleJustReleased;       // flag: grapple released this frame, use its velocity
-    private const float GrappleHookSpeed = 800f;
+    private const float GrappleHookSpeed = 1000f;
     private const float GrappleMaxLength = 200f;    // ~6 tiles
-    private const float GrappleReelSpeed = 150f;
+    private const float GrappleReelSpeed = 200f;
     
-    private const float GrappleGravityBase = 1100f;  // base gravity while swinging (high = heavy slingshot)
-    private const float GrappleDampingRate = 0.3f;   // very light damping (preserve momentum)
+    private const float GrappleGravityBase = 1300f;  // high gravity = heavy slingshot feel
+    private const float GrappleDampingRate = 0.15f;   // minimal damping — preserve ALL momentum
     private const float GrappleMinLength = 24f;
-    private const float GrappleReleaseBoost = 1.15f;
-    private const float GrappleInputForce = 500f;   // left/right pump strength
+    private const float GrappleReleaseBoost = 1.3f;
+    private const float GrappleInputForce = 650f;   // left/right pump strength
     
     private Vector2 _grappleHookDir;
     private Vector2 _grappleHookVel;         // hook velocity (includes gravity for downward shots)
@@ -1188,8 +1188,23 @@ public class Player
         // Stop dashing when you release the dash direction key or press opposite
         if (IsDashing)
         {
-            if ((_dashDir == -1 && !aDown) || (_dashDir == 1 && !dDown) || inputX == -_dashDir)
+            if (inputX == -_dashDir)
+            {
                 IsDashing = false;
+                IsSprinting = false;
+            }
+            else if ((_dashDir == -1 && !aDown) || (_dashDir == 1 && !dDown))
+            {
+                // Released dash key — stop dash, but if still holding direction, enter sprint
+                IsDashing = false;
+                IsSprinting = false;
+            }
+            else if (CurrentTier == MoveTier.Tech && IsGrounded)
+            {
+                // Dash naturally continues — transition to sprint state
+                IsSprinting = true;
+                _sprintDir = _dashDir;
+            }
         }
         }
 
@@ -1810,33 +1825,14 @@ public class Player
             float moveSpeed = (IsDashing && inputX == _dashDir) ? DashSpeed : _speed;
             if (SpeedBoostTimer > 0) moveSpeed *= SpeedBoostMultiplier;
 
-            // Tech Sprint: hold direction to build up speed (Wario dash)
-            if (CurrentTier == MoveTier.Tech && IsGrounded && inputX != 0 && !IsCrouching && !IsSliding)
+            // Tech Sprint: dash transitions into sprint (hold direction after dash ends)
+            if (CurrentTier == MoveTier.Tech && IsSprinting && IsGrounded && inputX == _sprintDir)
             {
-                if (inputX == _sprintDir)
-                {
-                    _sprintBuildup = Math.Min(1f, _sprintBuildup + dt / SprintBuildTime);
-                }
-                else
-                {
-                    _sprintBuildup = 0f;
-                    _sprintDir = inputX;
-                }
-                if (_sprintBuildup > SprintMinTime / SprintBuildTime)
-                {
-                    IsSprinting = true;
-                    float sprintFactor = (_sprintBuildup - SprintMinTime / SprintBuildTime) / (1f - SprintMinTime / SprintBuildTime);
-                    moveSpeed *= 1f + (SprintMaxSpeedMult - 1f) * sprintFactor;
-                }
-                else
-                {
-                    IsSprinting = false;
-                }
+                moveSpeed *= SprintMaxSpeedMult;
             }
-            else
+            else if (!IsDashing)
             {
                 IsSprinting = false;
-                if (inputX == 0) { _sprintBuildup = 0f; _sprintDir = 0; }
             }
 
             // Acceleration-based movement (Celeste-style)
@@ -1869,26 +1865,13 @@ public class Player
             // Tech charged jump: hold to charge on ground, release to launch
             if (CurrentTier == MoveTier.Tech && (IsGrounded || _coyoteTimer > 0))
             {
-                if (spacePressed && inputY <= 0)
+                // Tech: normal jump (no charge)
+                if (spacePressed && inputY <= 0 && !_jumpHeld)
                 {
-                    if (!_chargingJump)
-                    {
-                        _chargingJump = true;
-                        _chargeJumpTimer = 0f;
-                    }
-                    _chargeJumpTimer = Math.Min(_chargeJumpTimer + dt, ChargeJumpMaxTime);
-                    // Slow down while charging
-                    vel.X *= 0.9f;
-                }
-                else if (_chargingJump && !spacePressed)
-                {
-                    // Release — jump with charged force
-                    float t = _chargeJumpTimer / ChargeJumpMaxTime;
-                    vel.Y = MathHelper.Lerp(ChargeJumpMinForce, ChargeJumpMaxForce, t);
+                    vel.Y = _jumpForce;
                     _jumpsLeft--;
                     _chargingJump = false;
-                    _chargeJumpTimer = 0f;
-                    SetSquash(0.6f + 0.1f * (1f - t), 1.2f + 0.2f * t);
+                    SetSquash(0.7f, 1.3f);
                     IsGrounded = false;
                     _wasGrounded = false;
                     _coyoteTimer = 0;
