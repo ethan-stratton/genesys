@@ -1,0 +1,379 @@
+{
+  "areas": [
+    {
+      "id": "wreckage",
+      "name": "The Wreckage",
+      "stageOfFall": "Shock",
+      "baseConductivity": 0.4,
+      "baseViscosity": 0.2,
+      "baseParticulate": 0.3,
+      "baseResonance": 0.1,
+      "creatureDensity": 0.5,
+      "dominantSpecies": ["crawler-forager", "drone"],
+      "ambientColor": "#556677",
+      "musicTrack": ""
+    },
+    {
+      "id": "forest",
+      "name": "The Living Forest",
+      "stageOfFall": "Wonder",
+      "baseConductivity": 0.2,
+      "baseViscosity": 0.3,
+      "baseParticulate": 0.6,
+      "baseResonance": 0.2,
+      "creatureDensity": 1.5,
+      "dominantSpecies": ["crawler-forager", "crawler-skitter", "bird"],
+      "ambientColor": "#334422",
+      "musicTrack": ""
+    },
+    {
+      "id": "native-ruins",
+      "name": "Native Ruins",
+      "stageOfFall": "Humility",
+      "baseConductivity": 0.3,
+      "baseViscosity": 0.2,
+      "baseParticulate": 0.2,
+      "baseResonance": 0.4,
+      "creatureDensity": 0.3,
+      "dominantSpecies": ["crawler-bombardier"],
+      "ambientColor": "#665544",
+      "musicTrack": ""
+    },
+    {
+      "id": "bone-reef",
+      "name": "The Bone Reef",
+      "stageOfFall": "Struggle",
+      "baseConductivity": 0.5,
+      "baseViscosity": 0.5,
+      "baseParticulate": 0.3,
+      "baseResonance": 0.3,
+      "creatureDensity": 1.2,
+      "dominantSpecies": ["crawler-leaper", "wingbeater"],
+      "ambientColor": "#554455",
+      "musicTrack": ""
+    },
+    {
+      "id": "deep-ruins",
+      "name": "The Deep Ruins",
+      "stageOfFall": "Truth",
+      "baseConductivity": 0.6,
+      "baseViscosity": 0.4,
+      "baseParticulate": 0.1,
+      "baseResonance": 0.6,
+      "creatureDensity": 0.8,
+      "dominantSpecies": ["crawler-leaper", "thornback"],
+      "ambientColor": "#223344",
+      "musicTrack": ""
+    },
+    {
+      "id": "transformed-lands",
+      "name": "The Transformed Lands",
+      "stageOfFall": "Acceptance",
+      "baseConductivity": 0.7,
+      "baseViscosity": 0.6,
+      "baseParticulate": 0.7,
+      "baseResonance": 0.8,
+      "creatureDensity": 0.6,
+      "dominantSpecies": [],
+      "ambientColor": "#443366",
+      "musicTrack": ""
+    },
+    {
+      "id": "dragons-sanctum",
+      "name": "Dragon's Sanctum",
+      "stageOfFall": "Transcendence",
+      "baseConductivity": 0.9,
+      "baseViscosity": 0.8,
+      "baseParticulate": 0.5,
+      "baseResonance": 1.0,
+      "creatureDensity": 0.0,
+      "dominantSpecies": [],
+      "ambientColor": "#221133",
+      "musicTrack": ""
+    }
+  ],
+  "rooms": [
+    {
+      "id": "ship-interior",
+      "name": "Ship Interior",
+      "levelFile": "ship-interior",
+      "areaId": "wreckage",
+      "mapX": 0, "mapY": 0,
+      "exits": [
+        { "exitId": "ship-to-perimeter", "targetRoomId": "crash-perimeter", "targetExitId": "perimeter-to-ship" }
+      ]
+    },
+    {
+      "id": "crash-perimeter",
+      "name": "Crash Perimeter",
+      "levelFile": "crash-perimeter",
+      "areaId": "wreckage",
+      "mapX": 1, "mapY": 0,
+      "exits": [
+        { "exitId": "perimeter-to-ship", "targetRoomId": "ship-interior", "targetExitId": "ship-to-perimeter" },
+        { "exitId": "perimeter-to-debris", "targetRoomId": "debris-field", "targetExitId": "debris-to-perimeter" },
+        { "exitId": "perimeter-to-forest", "targetRoomId": "forest-edge", "targetExitId": "forest-to-perimeter" },
+        { "exitId": "perimeter-to-reef", "targetRoomId": "tidal-flats", "targetExitId": "reef-to-perimeter" }
+      ]
+    },
+    {
+      "id": "debris-field",
+      "name": "Debris Field",
+      "levelFile": "debris-field",
+      "areaId": "wreckage",
+      "mapX": 2, "mapY": 0,
+      "exits": [
+        { "exitId": "debris-to-perimeter", "targetRoomId": "crash-perimeter", "targetExitId": "perimeter-to-debris" },
+        { "exitId": "debris-to-hull", "targetRoomId": "upper-hull", "targetExitId": "hull-to-debris" }
+      ]
+    },
+    {
+      "id": "upper-hull",
+      "name": "Upper Hull",
+      "levelFile": "upper-hull",
+      "areaId": "wreckage",
+      "mapX": 2, "mapY": -1,
+      "exits": [
+        { "exitId": "hull-to-debris", "targetRoomId": "debris-field", "targetExitId": "debris-to-hull" },
+        { "exitId": "hull-to-ruins", "targetRoomId": "ruin-entrance", "targetExitId": "ruins-to-hull" }
+      ]
+    },
+    {
+      "id": "forest-edge",
+      "name": "Forest Edge",
+      "levelFile": "forest-edge",
+      "areaId": "forest",
+      "mapX": -1, "mapY": 0,
+      "exits": [
+        { "exitId": "forest-to-perimeter", "targetRoomId": "crash-perimeter", "targetExitId": "perimeter-to-forest" },
+        { "exitId": "edge-to-canopy", "targetRoomId": "canopy", "targetExitId": "canopy-to-edge" },
+        { "exitId": "edge-to-roots", "targetRoomId": "root-caves", "targetExitId": "roots-to-edge" }
+      ]
+    },
+    {
+      "id": "canopy",
+      "name": "The Canopy",
+      "levelFile": "canopy",
+      "areaId": "forest",
+      "mapX": -1, "mapY": -1,
+      "exits": [
+        { "exitId": "canopy-to-edge", "targetRoomId": "forest-edge", "targetExitId": "edge-to-canopy" },
+        { "exitId": "canopy-to-grove", "targetRoomId": "ancient-grove", "targetExitId": "grove-to-canopy" },
+        { "exitId": "canopy-to-ruins", "targetRoomId": "ruin-entrance", "targetExitId": "ruins-to-canopy" }
+      ]
+    },
+    {
+      "id": "root-caves",
+      "name": "Root Caves",
+      "levelFile": "root-caves",
+      "areaId": "forest",
+      "mapX": -1, "mapY": 1,
+      "exits": [
+        { "exitId": "roots-to-edge", "targetRoomId": "forest-edge", "targetExitId": "edge-to-roots" },
+        { "exitId": "roots-to-fungal", "targetRoomId": "fungal-depths", "targetExitId": "fungal-to-roots" },
+        { "exitId": "roots-shortcut-wreckage", "targetRoomId": "crash-perimeter", "targetExitId": "perimeter-shortcut-roots" }
+      ]
+    },
+    {
+      "id": "fungal-depths",
+      "name": "Fungal Depths",
+      "levelFile": "fungal-depths",
+      "areaId": "forest",
+      "mapX": -2, "mapY": 1,
+      "exits": [
+        { "exitId": "fungal-to-roots", "targetRoomId": "root-caves", "targetExitId": "roots-to-fungal" },
+        { "exitId": "fungal-to-transformed", "targetRoomId": "threshold", "targetExitId": "threshold-to-fungal" }
+      ]
+    },
+    {
+      "id": "ancient-grove",
+      "name": "Ancient Grove",
+      "levelFile": "ancient-grove",
+      "areaId": "forest",
+      "mapX": -2, "mapY": 0,
+      "exits": [
+        { "exitId": "grove-to-canopy", "targetRoomId": "canopy", "targetExitId": "canopy-to-grove" }
+      ]
+    },
+    {
+      "id": "ruin-entrance",
+      "name": "Ruin Entrance",
+      "levelFile": "ruin-entrance",
+      "areaId": "native-ruins",
+      "mapX": 0, "mapY": -2,
+      "exits": [
+        { "exitId": "ruins-to-hull", "targetRoomId": "upper-hull", "targetExitId": "hull-to-ruins" },
+        { "exitId": "ruins-to-canopy", "targetRoomId": "canopy", "targetExitId": "canopy-to-ruins" },
+        { "exitId": "ruins-to-sanctum", "targetRoomId": "inner-sanctum", "targetExitId": "sanctum-to-entrance" },
+        { "exitId": "ruins-to-coral", "targetRoomId": "coral-maze", "targetExitId": "coral-to-ruins" }
+      ]
+    },
+    {
+      "id": "inner-sanctum",
+      "name": "Inner Sanctum",
+      "levelFile": "inner-sanctum",
+      "areaId": "native-ruins",
+      "mapX": 0, "mapY": -3,
+      "exits": [
+        { "exitId": "sanctum-to-entrance", "targetRoomId": "ruin-entrance", "targetExitId": "ruins-to-sanctum" },
+        { "exitId": "sanctum-to-observatory", "targetRoomId": "observatory", "targetExitId": "observatory-to-sanctum" }
+      ]
+    },
+    {
+      "id": "observatory",
+      "name": "The Observatory",
+      "levelFile": "observatory",
+      "areaId": "native-ruins",
+      "mapX": 1, "mapY": -3,
+      "exits": [
+        { "exitId": "observatory-to-sanctum", "targetRoomId": "inner-sanctum", "targetExitId": "sanctum-to-observatory" }
+      ]
+    },
+    {
+      "id": "tidal-flats",
+      "name": "Tidal Flats",
+      "levelFile": "tidal-flats",
+      "areaId": "bone-reef",
+      "mapX": 1, "mapY": 1,
+      "exits": [
+        { "exitId": "reef-to-perimeter", "targetRoomId": "crash-perimeter", "targetExitId": "perimeter-to-reef" },
+        { "exitId": "tidal-to-coral", "targetRoomId": "coral-maze", "targetExitId": "coral-to-tidal" },
+        { "exitId": "tidal-to-predator", "targetRoomId": "predator-den", "targetExitId": "predator-to-tidal" }
+      ]
+    },
+    {
+      "id": "coral-maze",
+      "name": "Coral Maze",
+      "levelFile": "coral-maze",
+      "areaId": "bone-reef",
+      "mapX": 1, "mapY": -1,
+      "exits": [
+        { "exitId": "coral-to-tidal", "targetRoomId": "tidal-flats", "targetExitId": "tidal-to-coral" },
+        { "exitId": "coral-to-ruins", "targetRoomId": "ruin-entrance", "targetExitId": "ruins-to-coral" },
+        { "exitId": "coral-to-summit", "targetRoomId": "reef-summit", "targetExitId": "summit-to-coral" }
+      ]
+    },
+    {
+      "id": "predator-den",
+      "name": "Predator Den",
+      "levelFile": "predator-den",
+      "areaId": "bone-reef",
+      "mapX": 2, "mapY": 1,
+      "exits": [
+        { "exitId": "predator-to-tidal", "targetRoomId": "tidal-flats", "targetExitId": "tidal-to-predator" },
+        { "exitId": "predator-to-descent", "targetRoomId": "descent", "targetExitId": "descent-to-predator" }
+      ]
+    },
+    {
+      "id": "reef-summit",
+      "name": "Reef Summit",
+      "levelFile": "reef-summit",
+      "areaId": "bone-reef",
+      "mapX": 2, "mapY": -1,
+      "exits": [
+        { "exitId": "summit-to-coral", "targetRoomId": "coral-maze", "targetExitId": "coral-to-summit" },
+        { "exitId": "summit-shortcut-wreckage", "targetRoomId": "upper-hull", "targetExitId": "hull-shortcut-summit" }
+      ]
+    },
+    {
+      "id": "descent",
+      "name": "The Descent",
+      "levelFile": "descent",
+      "areaId": "deep-ruins",
+      "mapX": 1, "mapY": 2,
+      "exits": [
+        { "exitId": "descent-to-predator", "targetRoomId": "predator-den", "targetExitId": "predator-to-descent" },
+        { "exitId": "descent-to-flooded", "targetRoomId": "flooded-chambers", "targetExitId": "flooded-to-descent" },
+        { "exitId": "descent-shortcut-wreckage", "targetRoomId": "crash-perimeter", "targetExitId": "perimeter-shortcut-descent" }
+      ]
+    },
+    {
+      "id": "flooded-chambers",
+      "name": "Flooded Chambers",
+      "levelFile": "flooded-chambers",
+      "areaId": "deep-ruins",
+      "mapX": 1, "mapY": 3,
+      "exits": [
+        { "exitId": "flooded-to-descent", "targetRoomId": "descent", "targetExitId": "descent-to-flooded" },
+        { "exitId": "flooded-to-machine", "targetRoomId": "machine-room", "targetExitId": "machine-to-flooded" }
+      ]
+    },
+    {
+      "id": "machine-room",
+      "name": "Machine Room",
+      "levelFile": "machine-room",
+      "areaId": "deep-ruins",
+      "mapX": 0, "mapY": 3,
+      "exits": [
+        { "exitId": "machine-to-flooded", "targetRoomId": "flooded-chambers", "targetExitId": "flooded-to-machine" },
+        { "exitId": "machine-to-memory", "targetRoomId": "dragons-memory", "targetExitId": "memory-to-machine" }
+      ]
+    },
+    {
+      "id": "dragons-memory",
+      "name": "Dragon's Memory",
+      "levelFile": "dragons-memory",
+      "areaId": "deep-ruins",
+      "mapX": 0, "mapY": 4,
+      "exits": [
+        { "exitId": "memory-to-machine", "targetRoomId": "machine-room", "targetExitId": "machine-to-memory" },
+        { "exitId": "memory-to-approach", "targetRoomId": "approach", "targetExitId": "approach-to-memory" }
+      ]
+    },
+    {
+      "id": "threshold",
+      "name": "The Threshold",
+      "levelFile": "threshold",
+      "areaId": "transformed-lands",
+      "mapX": -1, "mapY": 2,
+      "exits": [
+        { "exitId": "threshold-to-fungal", "targetRoomId": "fungal-depths", "targetExitId": "fungal-to-transformed" },
+        { "exitId": "threshold-to-garden", "targetRoomId": "resonance-garden", "targetExitId": "garden-to-threshold" }
+      ]
+    },
+    {
+      "id": "resonance-garden",
+      "name": "Resonance Garden",
+      "levelFile": "resonance-garden",
+      "areaId": "transformed-lands",
+      "mapX": -1, "mapY": 3,
+      "exits": [
+        { "exitId": "garden-to-threshold", "targetRoomId": "threshold", "targetExitId": "threshold-to-garden" },
+        { "exitId": "garden-to-eves-trial", "targetRoomId": "eves-trial", "targetExitId": "trial-to-garden" }
+      ]
+    },
+    {
+      "id": "eves-trial",
+      "name": "Eve's Trial",
+      "levelFile": "eves-trial",
+      "areaId": "transformed-lands",
+      "mapX": -1, "mapY": 4,
+      "exits": [
+        { "exitId": "trial-to-garden", "targetRoomId": "resonance-garden", "targetExitId": "garden-to-eves-trial" },
+        { "exitId": "trial-to-approach", "targetRoomId": "approach", "targetExitId": "approach-to-trial" }
+      ]
+    },
+    {
+      "id": "approach",
+      "name": "The Approach",
+      "levelFile": "approach",
+      "areaId": "dragons-sanctum",
+      "mapX": 0, "mapY": 5,
+      "exits": [
+        { "exitId": "approach-to-memory", "targetRoomId": "dragons-memory", "targetExitId": "memory-to-approach" },
+        { "exitId": "approach-to-trial", "targetRoomId": "eves-trial", "targetExitId": "trial-to-approach" },
+        { "exitId": "approach-to-sanctum", "targetRoomId": "the-sanctum", "targetExitId": "sanctum-to-approach" }
+      ]
+    },
+    {
+      "id": "the-sanctum",
+      "name": "The Sanctum",
+      "levelFile": "the-sanctum",
+      "areaId": "dragons-sanctum",
+      "mapX": 0, "mapY": 6,
+      "exits": [
+        { "exitId": "sanctum-to-approach", "targetRoomId": "approach", "targetExitId": "approach-to-sanctum" }
+      ]
+    }
+  ]
+}
