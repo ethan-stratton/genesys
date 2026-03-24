@@ -270,7 +270,8 @@ public class Game1 : Game
     // --- EVE Dialogue Log ---
     private struct EveLogEntry { public string Text; public float Timestamp; }
     private List<EveLogEntry> _eveDialogueLog = new();
-    private bool _eveLogVisible; // toggled in settings
+    private bool _eveLogVisible; // toggled with L key
+    private int _eveLogScroll; // scroll offset (0 = bottom/newest)
 
     // --- EVE Map Projection ---
     private bool _hasMapModule;          // player found the cartographic module
@@ -289,6 +290,15 @@ public class Game1 : Game
         _eveDialogueLog.Add(new EveLogEntry { Text = msg, Timestamp = _totalTime });
         if (_eveDialogueLog.Count > 200) _eveDialogueLog.RemoveAt(0);
     }
+    /// <summary>Say a line only once per session. Returns false if already said.</summary>
+    private bool EveAlertOnce(string msg, float duration = 3f, bool ignoresSilence = false)
+    {
+        if (_eveSaidLines.Contains(msg)) return false;
+        _eveSaidLines.Add(msg);
+        EveAlert(msg, duration, ignoresSilence);
+        return true;
+    }
+    private HashSet<string> _eveSaidLines = new();
 
     // EVE world position + movement system
     private Vector2 _evePos;           // actual world position
@@ -1182,8 +1192,18 @@ public class Game1 : Game
 
         // L key — toggle EVE dialogue log
         if (kb.IsKeyDown(Keys.L) && _prevKb.IsKeyUp(Keys.L) && !_menuOpen)
+        {
             _eveLogVisible = !_eveLogVisible;
-
+            _eveLogScroll = 0; // reset scroll on toggle
+        }
+        // Scroll EVE log with W/S (or Up/Down) when open
+        if (_eveLogVisible && _eveDialogueLog.Count > 0)
+        {
+            if ((kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W)) || (kb.IsKeyDown(Keys.Up) && _prevKb.IsKeyUp(Keys.Up)))
+                _eveLogScroll = Math.Min(_eveLogScroll + 1, Math.Max(0, _eveDialogueLog.Count - 12));
+            if ((kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S)) || (kb.IsKeyDown(Keys.Down) && _prevKb.IsKeyUp(Keys.Down)))
+                _eveLogScroll = Math.Max(0, _eveLogScroll - 1);
+        }
         // M key — EVE map projection toggle
         if (kb.IsKeyDown(Keys.M) && _prevKb.IsKeyUp(Keys.M) && !_menuOpen && !_dialogueOpen && _eveOrbActive)
         {
@@ -1476,7 +1496,7 @@ public class Game1 : Game
                             _eveFlySpeed = 80f; // steady approach
                             _eveFlyCallback = () => {
                                 _eveMode = EveMovementMode.Scan;
-                                EveAlert("Sys... systems rebooting. Adam? Can you hear me?", 4f);
+                                EveAlertOnce("Sys... systems rebooting. Adam? Can you hear me?", 4f);
                             };
                         }
                         // Adam starts standing up at 4s (after some scanning)
@@ -1491,7 +1511,7 @@ public class Game1 : Game
                             _wakeUpPhase = 3; _wakeUpTimer = 0;
                             // EVE patches Adam's suit servos
                             _player.CureInjury();
-                            EveAlert("Micro-fractures in the suit servos. Compensating.");
+                            EveAlertOnce("Micro-fractures in the suit servos. Compensating.");
                         }
                         break;
                     }
@@ -1510,7 +1530,7 @@ public class Game1 : Game
                             EveFlyTo(EveOrbitPos(pc3, _totalTime), 80f, () => {
                                 _eveMode = EveMovementMode.Orbit;
                             });
-                            EveAlert("Try to move. Carefully.", 3f);
+                            EveAlertOnce("Try to move. Carefully.", 3f);
                             // Save EVE state so Continue remembers her
                             _saveData.Flags["eveOrbActive"] = true;
                             _scanL2Available = true; // EVE's scanner is online
@@ -1519,11 +1539,11 @@ public class Game1 : Game
                         // Delayed crash survival hint (5s after control given)
                         if (_wakeUpTimer >= 5f && _wakeUpTimer < 5f + dt * 2f)
                         {
-                            EveAlert("Adam... I've lost all telemetry from the descent. Flight recorder is gone.", 5f);
+                            EveAlertOnce("Adam... I've lost all telemetry from the descent. Flight recorder is gone.", 5f);
                         }
                         if (_wakeUpTimer >= 11f && _wakeUpTimer < 11f + dt * 2f)
                         {
-                            EveAlert("Based on impact analysis... survival probability was 0.003%. Something doesn't add up.", 6f);
+                            EveAlertOnce("Based on impact analysis... survival probability was 0.003%. Something doesn't add up.", 6f);
                         }
                         break;
                     }
@@ -2930,7 +2950,7 @@ public class Game1 : Game
                 // Heal + feedback
                 _player.Hp = _player.MaxHp;
                 _shakeTimer = 0.1f; _shakeIntensity = 1f;
-                EveAlert("Shelter secured. Biosigns stabilizing.", 3f);
+                EveAlertOnce("Shelter secured. Biosigns stabilizing.", 3f);
 
                 // Fade effect
                 _restFadeAlpha = 1f;
@@ -9102,8 +9122,10 @@ public class Game1 : Game
             DrawHollowRect(hpBarX, siBarY, hpBarW, hpBarH, Color.White * 0.3f);
             DrawOutlinedString(_font, $"SUIT {(int)_suitIntegrity}%", new Vector2(hpBarX + hpBarW + 8, siBarY - 2), siColor * 0.9f);
 
-            // EVE Status indicator (below suit)
+            // EVE Status indicator (below suit) — only when EVE is active
             int eveY = siBarY + hpBarH + 8;
+            if (_eveOrbActive)
+            {
             Color eveStatusColor;
             string eveStatusText;
             switch (_eveStatus)
@@ -9128,6 +9150,7 @@ public class Game1 : Game
             // EVE dot + label
             _spriteBatch.Draw(_pixel, new Rectangle(hpBarX, eveY + 2, 8, 8), eveStatusColor);
             DrawOutlinedString(_font, $"EVE: {eveStatusText}", new Vector2(hpBarX + 14, eveY), eveStatusColor * 0.9f);
+            } // end _eveOrbActive
 
             // Weapon HUD
             {
@@ -9159,10 +9182,11 @@ public class Game1 : Game
             // Background
             int bgH = Math.Min(_eveDialogueLog.Count, maxLines) * lineH + 12;
             _spriteBatch.Draw(_pixel, new Rectangle(logX - 6, logY - 4, 316, bgH), Color.Black * 0.5f);
-            DrawOutlinedString(_fontSmall, "EVE LOG [L]", new Vector2(logX, logY - 2), Color.Cyan * 0.7f);
+            DrawOutlinedString(_fontSmall, "EVE LOG [L]  W/S scroll", new Vector2(logX, logY - 2), Color.Cyan * 0.7f);
             logY += 14;
-            int start = Math.Max(0, _eveDialogueLog.Count - maxLines);
-            for (int i = start; i < _eveDialogueLog.Count; i++)
+            int end = Math.Max(0, _eveDialogueLog.Count - _eveLogScroll);
+            int start = Math.Max(0, end - maxLines);
+            for (int i = start; i < end; i++)
             {
                 var entry = _eveDialogueLog[i];
                 float age = _totalTime - entry.Timestamp;

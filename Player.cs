@@ -24,9 +24,9 @@ public class Player
     private static readonly float[] TierSpeed =          { 200f,  250f,  320f  };
     private static readonly float[] TierGravity =        { 900f,  750f,  950f  };
     private static readonly float[] TierJumpForce =      { -370f, -500f, -400f };  // Bio: big single jump
-    private static readonly float[] TierRunAccel =       { 2000f, 1000f, 1600f };  // Tech: snap (high accel, low speed)
-    private static readonly float[] TierRunDecel =       { 2000f, 1000f, 2500f };  // Cipher: stops on a dime
-    private static readonly float[] TierAirAccel =       { 250f,  800f,  500f  };  // Tech: very low air control
+    private static readonly float[] TierRunAccel =       { 2000f, 1000f, 3000f };  // Cipher: instant response (Wesker)
+    private static readonly float[] TierRunDecel =       { 2000f, 1000f, 3500f };  // Cipher: stops on a dime
+    private static readonly float[] TierAirAccel =       { 250f,  800f,  1200f };  // Cipher: full air control
     private static readonly float[] TierAirDecel =       { 200f,  350f,  300f  };  // Tech: can barely redirect in air
     private static readonly float[] TierAirMult =        { 0.35f, 0.9f,  0.7f  };  // Tech: committed to your jump arc
     private static readonly float[] TierMaxFall =        { 380f,  350f,  450f  };  // Bio: slower terminal velocity
@@ -1127,10 +1127,12 @@ public class Player
                     if (!_wallDisengaged)
                     {
                         IsOnWall = true;
-                        IsDashing = false; // cancel dash on wall grab
-                        IsVaultKicking = false; // cancel vault kick on wall grab
-                        IsBladeDashing = false; // cancel blade dash on wall grab
-                        IsCrouching = false; // clear crouch from slide/vault kick
+                        IsDashing = false;
+                        IsVaultKicking = false;
+                        IsBladeDashing = false;
+                        IsCartwheeling = false;
+                        IsFlipping = false;
+                        IsCrouching = false;
                         _visualScale = Vector2.One; // reset squash/stretch
                         _squashHoldTimer = 0;
                         _currentWall = w;
