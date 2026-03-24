@@ -8614,65 +8614,110 @@ public class Game1 : Game
                 DrawOutlinedString(_fontSmall, _eveMessage, new Vector2(bubbleX, bubbleY), Color.Cyan * alpha);
             }
 
-            // --- EVE Mini-Map Projection ---
+            // --- EVE Mini-Map Projection (7 area hexagons) ---
             if (_eveProjectingMap && _eveMode == EveMovementMode.MapProject && _eveMapTimer > 0.3f)
             {
-                float projAlpha = MathHelper.Clamp((_eveMapTimer - 0.3f) / 0.5f, 0f, 1f); // fade in over 0.5s
+                float projAlpha = MathHelper.Clamp((_eveMapTimer - 0.3f) / 0.5f, 0f, 1f);
                 float projX = _eveMapGroundPos.X;
-                float projY = _eveMapGroundPos.Y - 20f; // project above EVE
+                float projBaseY = _eveMapGroundPos.Y - 12f;
                 
-                // Holographic beam from EVE to projection
-                for (int beam = 0; beam < 3; beam++)
+                // Holographic beam (wider, more visible)
+                for (int beam = -1; beam <= 1; beam++)
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)(projX + beam), (int)(projBaseY - 80), 1, 68), Color.Cyan * (0.2f * projAlpha));
+                
+                // 7 area hexagons in honeycomb pattern
+                float hexR = 12f;
+                float hexSpacing = hexR * 2.2f;
+                float mapCX = projX;
+                float mapCY = projBaseY - 110f;
+                
+                var areaHexes = new (string id, float hx, float hy)[]
                 {
-                    float bx = projX - 1 + beam;
-                    _spriteBatch.Draw(_pixel, new Rectangle((int)bx, (int)(_eveMapGroundPos.Y - 8), 1, (int)(-(projY - _eveMapGroundPos.Y + 8))),
-                        Color.Cyan * (0.15f * projAlpha));
-                }
-                
-                // Mini hex map (small, world-space)
-                float hexSize = 6f;
-                float mapCenterX = projX;
-                float mapCenterY = projY - 24f;
-                
-                // Draw connections first (lines between hexes)
-                foreach (var room in _worldGraph.Rooms)
+                    ("wreckage",          0,     0),
+                    ("forest",           -1f,    0),
+                    ("bone-reef",         1f,    0),
+                    ("native-ruins",     -0.5f, -0.866f),
+                    ("deep-ruins",        0.5f,  0.866f),
+                    ("transformed-lands", -0.5f,  0.866f),
+                    ("dragons-sanctum",   0,     1.732f),
+                };
+
+                Color MiniAreaCol(string a) => a switch
                 {
-                    if (!room.Visited) continue;
-                    foreach (var exit in room.Exits)
+                    "wreckage" => new Color(100, 150, 180),
+                    "forest" => new Color(60, 160, 60),
+                    "native-ruins" => new Color(180, 150, 80),
+                    "bone-reef" => new Color(150, 80, 150),
+                    "deep-ruins" => new Color(60, 100, 160),
+                    "transformed-lands" => new Color(120, 60, 160),
+                    "dragons-sanctum" => new Color(180, 40, 40),
+                    _ => Color.Cyan
+                };
+                
+                // Connections between adjacent hexes
+                for (int i = 0; i < areaHexes.Length; i++)
+                for (int j = i + 1; j < areaHexes.Length; j++)
+                {
+                    float ddx = areaHexes[j].hx - areaHexes[i].hx;
+                    float ddy = areaHexes[j].hy - areaHexes[i].hy;
+                    if (ddx * ddx + ddy * ddy < 1.3f)
                     {
-                        var neighbor = _worldGraph.GetRoom(exit.TargetRoomId);
-                        if (neighbor == null || !neighbor.Visited) continue;
-                        float x1 = mapCenterX + room.MapX * hexSize * 1.5f;
-                        float y1 = mapCenterY + room.MapY * hexSize * 1.3f;
-                        float x2 = mapCenterX + neighbor.MapX * hexSize * 1.5f;
-                        float y2 = mapCenterY + neighbor.MapY * hexSize * 1.3f;
-                        DrawLine((int)x1, (int)y1, (int)x2, (int)y2, Color.Cyan * (0.3f * projAlpha));
+                        float lx1 = mapCX + areaHexes[i].hx * hexSpacing;
+                        float ly1 = mapCY + areaHexes[i].hy * hexSpacing;
+                        float lx2 = mapCX + areaHexes[j].hx * hexSpacing;
+                        float ly2 = mapCY + areaHexes[j].hy * hexSpacing;
+                        DrawLine((int)lx1, (int)ly1, (int)lx2, (int)ly2, Color.Cyan * (0.15f * projAlpha));
                     }
                 }
                 
-                // Draw room hexes
-                foreach (var room in _worldGraph.Rooms)
+                // Draw each area hex
+                var curRoom = _worldGraph?.GetRoom(_currentRoomId);
+                foreach (var (areaId, hx, hy) in areaHexes)
                 {
-                    if (!room.Visited && !room.Discovered) continue;
-                    float rx = mapCenterX + room.MapX * hexSize * 1.5f;
-                    float ry = mapCenterY + room.MapY * hexSize * 1.3f;
-                    int sz = room.Visited ? 3 : 2;
-                    Color roomColor = room.Visited ? Color.Cyan : Color.Cyan * 0.3f;
-                    if (room.Id == _currentRoomId)
+                    float ax = mapCX + hx * hexSpacing;
+                    float ay = mapCY + hy * hexSpacing;
+                    Color col = MiniAreaCol(areaId);
+                    bool isCurrent = curRoom != null && curRoom.AreaId == areaId;
+                    bool anyVisited = _worldGraph?.GetAreaRooms(areaId).Any(r => r.Visited) == true;
+                    float alpha = anyVisited ? 0.7f : 0.15f;
+                    
+                    // Hex fill (cross shape approximation)
+                    int hr = (int)hexR;
+                    int hr2 = (int)(hexR * 0.7f);
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)(ax - hr2), (int)(ay - hr), hr2 * 2, hr * 2), col * (alpha * projAlpha * 0.5f));
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)(ax - hr), (int)(ay - hr2), hr * 2, hr2 * 2), col * (alpha * projAlpha * 0.5f));
+                    // Hex border edges
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)(ax - hr), (int)(ay - hr2), hr * 2, 1), col * (alpha * projAlpha));
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)(ax - hr), (int)(ay + hr2), hr * 2, 1), col * (alpha * projAlpha));
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)(ax - hr2), (int)(ay - hr), hr2 * 2, 1), col * (alpha * projAlpha));
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)(ax - hr2), (int)(ay + hr), hr2 * 2, 1), col * (alpha * projAlpha));
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)(ax - hr), (int)(ay - hr2), 1, hr2 * 2), col * (alpha * projAlpha));
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)(ax + hr), (int)(ay - hr2), 1, hr2 * 2), col * (alpha * projAlpha));
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)(ax - hr2), (int)(ay - hr), 1, hr - hr2), col * (alpha * projAlpha));
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)(ax + hr2), (int)(ay - hr), 1, hr - hr2), col * (alpha * projAlpha));
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)(ax - hr2), (int)(ay + hr2 + 1), 1, hr - hr2 - 1), col * (alpha * projAlpha));
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)(ax + hr2), (int)(ay + hr2 + 1), 1, hr - hr2 - 1), col * (alpha * projAlpha));
+                    
+                    if (isCurrent)
                     {
-                        // Blinking red dot for current room
                         float blink = 0.5f + 0.5f * MathF.Sin(_totalTime * 6f);
-                        _spriteBatch.Draw(_pixel, new Rectangle((int)(rx - sz), (int)(ry - sz), sz * 2, sz * 2), Color.Red * (blink * projAlpha));
-                    }
-                    else
-                    {
-                        _spriteBatch.Draw(_pixel, new Rectangle((int)(rx - sz), (int)(ry - sz), sz * 2, sz * 2), roomColor * projAlpha);
+                        _spriteBatch.Draw(_pixel, new Rectangle((int)(ax - 2), (int)(ay - 2), 4, 4), Color.Red * (blink * projAlpha));
                     }
                 }
                 
-                // Scanline effect
-                float scanY = mapCenterY - 30f + ((_eveMapTimer * 12f) % 60f);
-                _spriteBatch.Draw(_pixel, new Rectangle((int)(mapCenterX - 30f), (int)scanY, 60, 1), Color.Cyan * (0.1f * projAlpha));
+                // "[W] Map" prompt if player is close
+                float distToEve = Vector2.Distance(new Vector2(_player.Position.X + Player.Width / 2f, _player.Position.Y), _eveMapGroundPos);
+                if (distToEve < 80f)
+                {
+                    string prompt = "[W] Map";
+                    var pSize = _fontSmall.MeasureString(SafeText(prompt));
+                    DrawOutlinedString(_fontSmall, SafeText(prompt), new Vector2(mapCX - pSize.X / 2f, mapCY + hexSpacing * 2f), Color.Cyan * (0.7f * projAlpha));
+                }
+                
+                // Scanline
+                float scanTotal = hexSpacing * 4f;
+                float scanY = mapCY - scanTotal * 0.5f + ((_eveMapTimer * 15f) % scanTotal);
+                _spriteBatch.Draw(_pixel, new Rectangle((int)(mapCX - hexSpacing * 1.5f), (int)scanY, (int)(hexSpacing * 3f), 1), Color.Cyan * (0.1f * projAlpha));
             }
         }
 
