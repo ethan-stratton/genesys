@@ -62,6 +62,18 @@ public class Game1 : Game
     private GameState? _fadeTargetState; // state to switch to at peak black
     private Action _fadeCallback;      // optional action at peak black
 
+    // === ROOM TRANSITION PAN SYSTEM ===
+    private bool _roomTransitioning;
+    private float _roomTransTimer;
+    private float _roomTransDuration;
+    private Vector2 _roomTransCamStart;   // camera position at start of pan
+    private Vector2 _roomTransCamEnd;     // camera target position
+    private Vector2 _roomTransPlayerStart;
+    private Vector2 _roomTransPlayerEnd;
+    private string _roomTransDir;         // "left","right","up","down"
+    private bool _roomTransFirstVisit;
+    private bool _roomTransFlicker;       // tech suppression flicker on this room
+
     // Prologue phase durations (seconds)
     private static readonly float[] ProloguePhaseDurations = { 6f, 5f, 5f, 4f };
 
@@ -1594,6 +1606,12 @@ public class Game1 : Game
                 }
                 _totalTime += dt; // keep _totalTime advancing for orbit
                 // Override keyboard to block player input during wake-up
+                kb = new KeyboardState();
+            }
+
+            // Block player input during room transition pan
+            if (_roomTransitioning)
+            {
                 kb = new KeyboardState();
             }
 
@@ -3473,7 +3491,7 @@ public class Game1 : Game
 
         // === Edge-of-screen room transitions (Metroid style) ===
         // Only transitions where tiles are open at the edge (not through solid walls)
-        if (!_isDead && _level.Neighbors != null)
+        if (!_isDead && !_roomTransitioning && _level.Neighbors != null)
         {
             var bounds = _level.Bounds;
             float px = _player.Position.X;
@@ -3488,7 +3506,6 @@ public class Game1 : Game
             
             if (px < bounds.Left - 4 && _level.Neighbors.Left != "")
             {
-                // Check if tiles on left edge at player's Y are open
                 int checkX = bounds.Left + 2;
                 bool open = tg == null || !TileProperties.IsSolid(tg.GetTile(checkX, (int)pcy));
                 if (open) { neighbor = _level.Neighbors.Left; dir = "left"; }
@@ -3514,15 +3531,23 @@ public class Game1 : Game
             
             if (neighbor != null)
             {
-                // Save absolute position for the axis we preserve
-                float savedAbsY = py;  // for left/right transitions
-                float savedAbsX = px;  // for up/down transitions
+                float savedAbsY = py;
+                float savedAbsX = px;
                 float savedVelX = _player.Velocity.X;
                 float savedVelY = _player.Velocity.Y;
                 
                 string nextPath = $"Content/levels/{neighbor}.json";
                 if (System.IO.File.Exists(nextPath))
                 {
+                    // Save old camera position for pan start
+                    _roomTransCamStart = _camera.Position;
+                    _roomTransDir = dir;
+                    
+                    // Calculate where the player will walk FROM (just inside the edge)
+                    // and the old viewport size for camera offset
+                    float oldViewW = _camera.EffectiveViewW;
+                    float oldViewH = _camera.EffectiveViewH;
+                    
                     if (_saveData != null) { SyncInventoryToSave(); _saveData.Save(); }
                     LoadLevel(nextPath);
                     _editorSaveFile = nextPath;
@@ -3531,35 +3556,97 @@ public class Game1 : Game
                     
                     var nb = _level.Bounds;
                     
+                    // Player spawn on opposite edge
                     switch (dir)
                     {
-                        case "left": // entered left, spawn at RIGHT edge of new room, same Y
-                            _player.Position = new Microsoft.Xna.Framework.Vector2(
-                                nb.Right - Player.Width - 8, savedAbsY);
+                        case "left":
+                            _roomTransPlayerEnd = new Vector2(nb.Right - Player.Width - 32, savedAbsY);
+                            _roomTransPlayerStart = new Vector2(nb.Right + 8, savedAbsY);
                             break;
-                        case "right": // entered right, spawn at LEFT edge of new room, same Y
-                            _player.Position = new Microsoft.Xna.Framework.Vector2(
-                                nb.Left + 8, savedAbsY);
+                        case "right":
+                            _roomTransPlayerEnd = new Vector2(nb.Left + 32, savedAbsY);
+                            _roomTransPlayerStart = new Vector2(nb.Left - Player.Width - 8, savedAbsY);
                             break;
-                        case "up": // went up, spawn at BOTTOM of new room, same X
-                            _player.Position = new Microsoft.Xna.Framework.Vector2(
-                                savedAbsX, nb.Bottom - Player.Height - 8);
+                        case "up":
+                            _roomTransPlayerEnd = new Vector2(savedAbsX, nb.Bottom - Player.Height - 32);
+                            _roomTransPlayerStart = new Vector2(savedAbsX, nb.Bottom + 8);
                             break;
-                        case "down": // went down, spawn at TOP of new room, same X
-                            _player.Position = new Microsoft.Xna.Framework.Vector2(
-                                savedAbsX, nb.Top + 8);
+                        case "down":
+                            _roomTransPlayerEnd = new Vector2(savedAbsX, nb.Top + 32);
+                            _roomTransPlayerStart = new Vector2(savedAbsX, nb.Top - Player.Height - 8);
                             break;
                     }
                     
-                    // Clamp to new room bounds so player doesn't spawn inside walls
-                    float clX = MathHelper.Clamp(_player.Position.X, nb.Left + 4, nb.Right - Player.Width - 4);
-                    float clY = MathHelper.Clamp(_player.Position.Y, nb.Top + 4, nb.Bottom - Player.Height - 4);
-                    _player.Position = new Microsoft.Xna.Framework.Vector2(clX, clY);
+                    // Clamp to new room bounds
+                    _roomTransPlayerEnd = new Vector2(
+                        MathHelper.Clamp(_roomTransPlayerEnd.X, nb.Left + 4, nb.Right - Player.Width - 4),
+                        MathHelper.Clamp(_roomTransPlayerEnd.Y, nb.Top + 4, nb.Bottom - Player.Height - 4));
                     
-                    _player.Velocity = new Microsoft.Xna.Framework.Vector2(savedVelX, savedVelY);
-                    _camera.SnapTo(_player.Position, Player.Width, Player.Height);
+                    // Camera end: centered on player end position
+                    float evw = _camera.EffectiveViewW;
+                    float evh = _camera.EffectiveViewH;
+                    _roomTransCamEnd = new Vector2(
+                        MathHelper.Clamp(_roomTransPlayerEnd.X + Player.Width / 2f - evw / 2f,
+                            nb.Left, Math.Max(nb.Left, nb.Right - evw)),
+                        MathHelper.Clamp(_roomTransPlayerEnd.Y + Player.Height / 2f - evh / 2f,
+                            nb.Top, Math.Max(nb.Top, nb.Bottom - evh)));
+                    
+                    // Camera start: offset from end by one viewport in the transition direction
+                    switch (dir)
+                    {
+                        case "left":
+                            _roomTransCamStart = new Vector2(_roomTransCamEnd.X + evw, _roomTransCamEnd.Y);
+                            break;
+                        case "right":
+                            _roomTransCamStart = new Vector2(_roomTransCamEnd.X - evw, _roomTransCamEnd.Y);
+                            break;
+                        case "up":
+                            _roomTransCamStart = new Vector2(_roomTransCamEnd.X, _roomTransCamEnd.Y + evh);
+                            break;
+                        case "down":
+                            _roomTransCamStart = new Vector2(_roomTransCamEnd.X, _roomTransCamEnd.Y - evh);
+                            break;
+                    }
+                    
+                    // Duration scales with room size (bigger rooms = slightly slower pan)
+                    float roomSize = (dir == "left" || dir == "right") ? evw : evh;
+                    _roomTransDuration = MathHelper.Clamp(roomSize / 800f * 0.5f, 0.3f, 0.8f);
+                    _roomTransFirstVisit = false; // TODO: track visited rooms
+                    _roomTransFlicker = false;     // TODO: per-room flag from level data
+                    
+                    _roomTransTimer = 0f;
+                    _roomTransitioning = true;
+                    _player.Position = _roomTransPlayerStart;
+                    _player.Velocity = new Vector2(savedVelX, savedVelY);
+                    _camera.Position = _roomTransCamStart;
                     _gameState = GameState.Playing;
                 }
+            }
+        }
+        
+        // Update room transition pan
+        if (_roomTransitioning)
+        {
+            _roomTransTimer += dt;
+            float t = Math.Min(1f, _roomTransTimer / _roomTransDuration);
+            
+            // Ease-in-out (smoothstep)
+            float st = t * t * (3f - 2f * t);
+            
+            // Pan camera
+            _camera.Position = Vector2.Lerp(_roomTransCamStart, _roomTransCamEnd, st);
+            
+            // Slide player in from edge
+            _player.Position = Vector2.Lerp(_roomTransPlayerStart, _roomTransPlayerEnd, st);
+            _player.Velocity = Vector2.Zero; // frozen during pan
+            
+            // Tech suppression flicker (random scanline offsets near end of pan)
+            // TODO: implement when _roomTransFlicker is true
+            
+            if (t >= 1f)
+            {
+                _roomTransitioning = false;
+                _camera.SnapTo(_player.Position, Player.Width, Player.Height);
             }
         }
         

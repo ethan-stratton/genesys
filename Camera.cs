@@ -5,7 +5,7 @@ namespace Genesis;
 
 public class Camera
 {
-    public Vector2 Position { get; private set; } // top-left of viewport in world coords
+    public Vector2 Position { get; set; } // top-left of viewport in world coords
     
     private readonly int _viewWidth;
     private readonly int _viewHeight;
