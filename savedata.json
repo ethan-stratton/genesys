@@ -1,33 +1,22 @@
 {
-  "currentLevel": "the-descent",
-  "spawnX": 80,
-  "spawnY": 496,
+  "currentLevel": "test-arena",
+  "spawnX": 416,
+  "spawnY": 224,
   "unlockedAbilities": [],
-  "flags": {
-    "eveOrbActive": true
-  },
-  "playTime": 865.5994,
-  "meleeInventory": [
-    "Knife",
-    "Stick"
-  ],
+  "flags": {},
+  "playTime": 0,
+  "meleeInventory": [],
   "rangedInventory": [],
-  "meleeIndex": 1,
+  "meleeIndex": -1,
   "rangedIndex": -1,
-  "collectedItems": [
-    "grapple-2",
-    "knife-4",
-    "grapple-0",
-    "stick-1",
-    "map-module-0"
-  ],
+  "collectedItems": [],
   "windowSizeIndex": 0,
   "crtEnabled": false,
   "moveTier": 1,
   "upgrades": [],
-  "shelterLevel": "debug-room",
-  "shelterX": 400,
-  "shelterY": 496,
+  "shelterLevel": "",
+  "shelterX": 0,
+  "shelterY": 0,
   "deathCount": 0,
   "hp": 100
 }

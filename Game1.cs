@@ -373,6 +373,10 @@ public class Game1 : Game
             _eveSpring = new SecondOrderDynamics2D(3f, 0.5f, -0.5f, _evePos);
             _evePosInitialized = true;
         }
+        else if (_eveSpring == null)
+        {
+            _eveSpring = new SecondOrderDynamics2D(3f, 0.5f, -0.5f, _evePos);
+        }
         
         // Calculate desired target based on mode
         Vector2 target;
@@ -1066,6 +1070,8 @@ public class Game1 : Game
                         SaveData.Delete();
                         _saveData = new SaveData();
                         _eveOrbActive = false;
+                        _evePosInitialized = false;
+                        _eveSpring = null;
                         _prologueSkipped = false;
                         _eveDialogueExhausted = false;
                         _meleeInventory = Array.Empty<WeaponType>();
