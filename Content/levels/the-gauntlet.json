@@ -2535,5 +2535,11 @@
       0,
       0
     ]
+  },
+  "neighbors": {
+    "left": "the-descent",
+    "right": "",
+    "up": "",
+    "down": ""
   }
 }

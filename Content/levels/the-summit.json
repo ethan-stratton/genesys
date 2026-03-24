@@ -310,5 +310,11 @@
       "count": 1
     }
   ],
-  "tileGrid": null
+  "tileGrid": null,
+  "neighbors": {
+    "left": "",
+    "right": "",
+    "up": "",
+    "down": "the-gauntlet"
+  }
 }

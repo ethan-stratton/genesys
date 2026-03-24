@@ -654,6 +654,10 @@ public class Game1 : Game
         _level = LevelData.Load(path);
         Player.WorldLeft = _level.Bounds.Left;
         Player.WorldRight = _level.Bounds.Right;
+        Player.HasLeftNeighbor = !string.IsNullOrEmpty(_level.Neighbors?.Left);
+        Player.HasRightNeighbor = !string.IsNullOrEmpty(_level.Neighbors?.Right);
+        Player.HasUpNeighbor = !string.IsNullOrEmpty(_level.Neighbors?.Up);
+        Player.HasDownNeighbor = !string.IsNullOrEmpty(_level.Neighbors?.Down);
 
         // Clear enemies (SpawnEnemiesFromLevel re-populates if needed)
         _swarms.Clear();
@@ -1252,6 +1256,20 @@ public class Game1 : Game
                 _fullscreenMapOpen = false;
                 _eveProjectingMap = false;
                 _eveMode = EveMovementMode.Orbit;
+                _prevKb = kb;
+                return;
+            }
+            // Backtick from map → debug room
+            if (kb.IsKeyDown(Keys.OemTilde) && _prevKb.IsKeyUp(Keys.OemTilde))
+            {
+                _fullscreenMapOpen = false;
+                _eveProjectingMap = false;
+                _eveMode = EveMovementMode.Orbit;
+                LoadLevel("Content/levels/debug-room.json");
+                _editorSaveFile = "Content/levels/debug-room.json";
+                _camera = MakeCamera();
+                Restart();
+                _gameState = GameState.Playing;
                 _prevKb = kb;
                 return;
             }
@@ -3453,6 +3471,96 @@ public class Game1 : Game
             DamageCreaturesInRect(vkRect, vkDmg, vkKbX, vkKbY, _player.FacingDir, false);
         }
 
+        // === Edge-of-screen room transitions (Metroid style) ===
+        if (!_isDead && _level.Neighbors != null)
+        {
+            var bounds = _level.Bounds;
+            float px = _player.Position.X;
+            float py = _player.Position.Y;
+            string neighbor = null;
+            float newX = px, newY = py;
+            
+            if (px < bounds.Left - 4 && _level.Neighbors.Left != "")
+            {
+                neighbor = _level.Neighbors.Left;
+                // Will set X to right edge of new level after loading
+            }
+            else if (px + Player.Width > bounds.Right + 4 && _level.Neighbors.Right != "")
+            {
+                neighbor = _level.Neighbors.Right;
+            }
+            else if (py < bounds.Top - 4 && _level.Neighbors.Up != "")
+            {
+                neighbor = _level.Neighbors.Up;
+            }
+            else if (py + Player.Height > bounds.Bottom + 4 && _level.Neighbors.Down != "")
+            {
+                neighbor = _level.Neighbors.Down;
+            }
+            
+            if (neighbor != null)
+            {
+                string dir = neighbor == _level.Neighbors.Left ? "left"
+                           : neighbor == _level.Neighbors.Right ? "right"
+                           : neighbor == _level.Neighbors.Up ? "up" : "down";
+                           
+                // Save relative position along the crossing edge (0.0 to 1.0)
+                float relativePos = 0.5f;
+                float boundsW = bounds.Right - bounds.Left;
+                float boundsH = bounds.Bottom - bounds.Top;
+                if (dir == "left" || dir == "right")
+                    relativePos = boundsH > 0 ? (py - bounds.Top) / boundsH : 0.5f;
+                else
+                    relativePos = boundsW > 0 ? (px - bounds.Left) / boundsW : 0.5f;
+                
+                float savedVelX = _player.Velocity.X;
+                float savedVelY = _player.Velocity.Y;
+                
+                string nextPath = $"Content/levels/{neighbor}.json";
+                if (System.IO.File.Exists(nextPath))
+                {
+                    if (_saveData != null) { SyncInventoryToSave(); _saveData.Save(); }
+                    LoadLevel(nextPath);
+                    _editorSaveFile = nextPath;
+                    _camera = MakeCamera();
+                    Restart();
+                    
+                    // Position player on the opposite edge of the new level
+                    var nb = _level.Bounds;
+                    float nbW = nb.Right - nb.Left;
+                    float nbH = nb.Bottom - nb.Top;
+                    
+                    switch (dir)
+                    {
+                        case "left": // entered left, spawn at RIGHT edge of new room
+                            _player.Position = new Microsoft.Xna.Framework.Vector2(
+                                nb.Right - Player.Width - 8,
+                                nb.Top + relativePos * nbH);
+                            break;
+                        case "right": // entered right, spawn at LEFT edge of new room
+                            _player.Position = new Microsoft.Xna.Framework.Vector2(
+                                nb.Left + 8,
+                                nb.Top + relativePos * nbH);
+                            break;
+                        case "up": // went up, spawn at BOTTOM of new room
+                            _player.Position = new Microsoft.Xna.Framework.Vector2(
+                                nb.Left + relativePos * nbW,
+                                nb.Bottom - Player.Height - 8);
+                            break;
+                        case "down": // went down, spawn at TOP of new room
+                            _player.Position = new Microsoft.Xna.Framework.Vector2(
+                                nb.Left + relativePos * nbW,
+                                nb.Top + 8);
+                            break;
+                    }
+                    
+                    _player.Velocity = new Microsoft.Xna.Framework.Vector2(savedVelX, savedVelY);
+                    _camera.SnapTo(_player.Position, Player.Width, Player.Height);
+                    _gameState = GameState.Playing;
+                }
+            }
+        }
+        
         // Exit collision — enter-trigger (only fires on transition from outside → inside)
         if (!_isDead)
         {

@@ -9,6 +9,10 @@ public class Player
 {
     public static float WorldLeft = 0;
     public static float WorldRight = 800;
+    public static bool HasLeftNeighbor;
+    public static bool HasRightNeighbor;
+    public static bool HasUpNeighbor;
+    public static bool HasDownNeighbor;
 
     public Vector2 Position { get; set; }
     public Vector2 Velocity { get; set; }
@@ -2522,7 +2526,10 @@ public class Player
             }
         }
 
-        pos.X = MathHelper.Clamp(pos.X, WorldLeft, WorldRight - Width);
+        // Clamp to world bounds, but allow crossing edges with neighbors
+        float clampLeft = HasLeftNeighbor ? WorldLeft - 32 : WorldLeft;
+        float clampRight = HasRightNeighbor ? WorldRight + 32 : WorldRight - Width;
+        pos.X = MathHelper.Clamp(pos.X, clampLeft, clampRight);
 
         // Float tile effect: gentle upward lift
         if (FloatTimer > 0 && vel.Y > FloatLiftSpeed)

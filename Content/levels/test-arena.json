@@ -2123,5 +2123,11 @@
       0,
       0
     ]
+  },
+  "neighbors": {
+    "left": "crashsite",
+    "right": "the-descent",
+    "up": "",
+    "down": ""
   }
 }

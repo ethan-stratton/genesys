@@ -20,14 +20,12 @@
     {
       "x": 160,
       "top": 384,
-      "bottom": 576,
-      "enabled": true
+      "bottom": 576
     },
     {
       "x": 480,
       "top": 896,
-      "bottom": 1120,
-      "enabled": true
+      "bottom": 1120
     }
   ],
   "walls": [],
@@ -62,20 +60,20 @@
   "switches": [],
   "labels": [
     {
+      "text": "CRASH SITE",
       "x": 224,
       "y": 88,
-      "text": "CRASH SITE"
+      "color": "White",
+      "size": "small"
     }
   ],
   "retractableSpikes": [],
   "shelters": [
     {
       "id": "shelter-crashsite",
-      "type": "shelter",
       "x": 224,
       "y": 1792,
-      "w": 24,
-      "h": 24
+      "name": "Shelter"
     }
   ],
   "tileGrid": {
@@ -1286,5 +1284,11 @@
       1,
       1
     ]
+  },
+  "neighbors": {
+    "left": "",
+    "right": "test-arena",
+    "up": "",
+    "down": "the-descent"
   }
 }
