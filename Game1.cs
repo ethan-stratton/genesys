@@ -1355,10 +1355,19 @@ public class Game1 : Game
                     float bestDist = 200f;
                     string bestType = null;
                     Vector2 bestPos = Vector2.Zero;
-                    foreach (var c in _crawlers) { if (!c.Alive) continue; var ep = c.Position + new Vector2(c.EffectiveWidth/2f, c.EffectiveHeight/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestType = c.Variant.ToString().ToLower(); bestPos = ep; } }
-                    foreach (var h in _hoppers) { if (!h.Alive) continue; var ep = h.Position + new Vector2(Hopper.Width/2f, Hopper.Height/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestType = "hopper"; bestPos = ep; } }
-                    foreach (var t in _thornbacks) { if (!t.Alive) continue; var ep = t.Position + new Vector2(Thornback.Width/2f, Thornback.Height/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestType = "thornback"; bestPos = ep; } }
-                    foreach (var b in _birds) { if (!b.Alive) continue; var ep = b.Position + new Vector2(Bird.Width/2f, Bird.Height/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestType = "bird"; bestPos = ep; } }
+                    foreach (var cr in _creatures)
+                    {
+                        if (!cr.Alive) continue;
+                        if (cr is Crawler crl && crl.IsDummy) continue;
+                        var ep = cr.Position + new Vector2(cr.Rect.Width / 2f, cr.Rect.Height / 2f);
+                        float d2 = Vector2.Distance(pc, ep);
+                        if (d2 < bestDist)
+                        {
+                            bestDist = d2;
+                            bestPos = ep;
+                            bestType = cr switch { Crawler cw => cw.Variant.ToString().ToLower(), Bird => "bird", Wingbeater => "wingbeater", Hopper => "hopper", Thornback => "thornback", _ => "creature" };
+                        }
+                    }
                     if (bestType != null)
                     {
                         _isScanning = true;
@@ -1373,10 +1382,13 @@ public class Game1 : Game
                     float bestDist = 250f;
                     Vector2 bestPos = _scanTargetPos;
                     bool found = false;
-                    if (_scanTarget == "forager" || _scanTarget == "skitter" || _scanTarget == "leaper" || _scanTarget == "bombardier") { foreach (var c in _crawlers) { if (!c.Alive) continue; var ep = c.Position + new Vector2(c.EffectiveWidth/2f, c.EffectiveHeight/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestPos = ep; found = true; } } }
-                    else if (_scanTarget == "hopper") { foreach (var h in _hoppers) { if (!h.Alive) continue; var ep = h.Position + new Vector2(Hopper.Width/2f, Hopper.Height/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestPos = ep; found = true; } } }
-                    else if (_scanTarget == "thornback") { foreach (var t in _thornbacks) { if (!t.Alive) continue; var ep = t.Position + new Vector2(Thornback.Width/2f, Thornback.Height/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestPos = ep; found = true; } } }
-                    else if (_scanTarget == "bird") { foreach (var b in _birds) { if (!b.Alive) continue; var ep = b.Position + new Vector2(Bird.Width/2f, Bird.Height/2f); float d2 = Vector2.Distance(pc, ep); if (d2 < bestDist) { bestDist = d2; bestPos = ep; found = true; } } }
+                    foreach (var cr in _creatures)
+                    {
+                        if (!cr.Alive) continue;
+                        var ep = cr.Position + new Vector2(cr.Rect.Width / 2f, cr.Rect.Height / 2f);
+                        float d2 = Vector2.Distance(pc, ep);
+                        if (d2 < bestDist) { bestDist = d2; bestPos = ep; found = true; }
+                    }
                     if (!found) _isScanning = false;
                     else
                     {
@@ -1447,38 +1459,15 @@ public class Game1 : Game
                 var pt = new Point((int)sp.X, (int)sp.Y);
                 
                 // Check enemies first (before terrain — hook grabs closest thing)
-                // Crawlers
-                for (int ei = 0; ei < _crawlers.Count; ei++)
+                foreach (var creature in _creatures)
                 {
-                    var c = _crawlers[ei];
-                    if (c.IsDummy || c.Hp <= 0) continue;
-                    if (c.Rect.Contains(pt))
+                    if (creature.Hp <= 0) continue;
+                    if (creature is Crawler cr && cr.IsDummy) continue;
+                    if (creature.Rect.Contains(pt))
                     {
-                        _player.GrappleEnemy(ei, "crawler", c.Position + new Vector2(c.EffectiveWidth / 2f, c.EffectiveHeight / 2f));
-                        hit = true; break;
-                    }
-                }
-                if (hit) break;
-                // Birds
-                for (int ei = 0; ei < _birds.Count; ei++)
-                {
-                    var b = _birds[ei];
-                    if (b.Hp <= 0) continue;
-                    if (new Rectangle((int)b.Position.X, (int)b.Position.Y, Bird.Width, Bird.Height).Contains(pt))
-                    {
-                        _player.GrappleEnemy(ei, "bird", b.Position + new Vector2(Bird.Width / 2f, Bird.Height / 2f));
-                        hit = true; break;
-                    }
-                }
-                if (hit) break;
-                // Wingbeaters — grapple yanks them down, damages them
-                for (int ei = 0; ei < _wingbeaters.Count; ei++)
-                {
-                    var w = _wingbeaters[ei];
-                    if (w.Hp <= 0) continue;
-                    if (w.Rect.Contains(pt))
-                    {
-                        _player.GrappleEnemy(ei, "wingbeater", w.Position + new Vector2(Wingbeater.Width / 2f, Wingbeater.Height / 2f));
+                        string etype = creature switch { Crawler => "crawler", Bird => "bird", Wingbeater => "wingbeater", _ => "creature" };
+                        var center = creature.Position + new Vector2(creature.Rect.Width / 2f, creature.Rect.Height / 2f);
+                        _player.GrappleEnemy(-1, etype, center, creature.Id);
                         hit = true; break;
                     }
                 }
@@ -1518,77 +1507,47 @@ public class Game1 : Game
             float pullSpeed = 400f;
             bool done = false;
             
-            if (_player.GrappleEnemyType == "crawler" && _player.GrappleEnemyIndex < _crawlers.Count)
+            // Find creature by Guid (safe across list changes)
+            Creature target = null;
+            if (_player.GrappleCreatureId != Guid.Empty)
+                target = _creatures.FirstOrDefault(c => c.Id == _player.GrappleCreatureId);
+            
+            if (target == null || target.Hp <= 0)
             {
-                var c = _crawlers[_player.GrappleEnemyIndex];
-                if (c.Hp <= 0) { _player.ReleaseGrapple(); done = true; }
-                else
-                {
-                    var dir = playerCenter - c.Position - new Vector2(c.EffectiveWidth / 2f, c.EffectiveHeight / 2f);
-                    float dist = dir.Length();
-                    if (dist < 20f)
-                    {
-                        // Arrived — deal damage and release
-                        c.Hp -= 2;
-                        c.Velocity = new Vector2(0, -150f); // small upward pop
-                        _player.ReleaseGrapple();
-                        done = true;
-                    }
-                    else
-                    {
-                        dir /= dist;
-                        c.Position += dir * pullSpeed * dt;
-                        c.Velocity = dir * pullSpeed; // override AI movement
-                        _player.GrappleAnchor = c.Position + new Vector2(c.EffectiveWidth / 2f, c.EffectiveHeight / 2f);
-                    }
-                }
+                _player.ReleaseGrapple();
+                done = true;
             }
-            else if (_player.GrappleEnemyType == "bird" && _player.GrappleEnemyIndex < _birds.Count)
+            else if (target is Wingbeater w)
             {
-                var b = _birds[_player.GrappleEnemyIndex];
-                if (b.Hp <= 0) { _player.ReleaseGrapple(); done = true; }
-                else
-                {
-                    var dir = playerCenter - b.Position - new Vector2(Bird.Width / 2f, Bird.Height / 2f);
-                    float dist = dir.Length();
-                    if (dist < 20f)
-                    {
-                        b.Hp -= 2;
-                        b.Velocity = new Vector2(0, -100f);
-                        _player.ReleaseGrapple();
-                        done = true;
-                    }
-                    else
-                    {
-                        dir /= dist;
-                        b.Position += dir * pullSpeed * dt;
-                        b.Velocity = dir * pullSpeed;
-                        _player.GrappleAnchor = b.Position + new Vector2(Bird.Width / 2f, Bird.Height / 2f);
-                    }
-                }
-            }
-            else if (_player.GrappleEnemyType == "wingbeater" && _player.GrappleEnemyIndex < _wingbeaters.Count)
-            {
-                var w = _wingbeaters[_player.GrappleEnemyIndex];
-                if (w.Hp <= 0) { _player.ReleaseGrapple(); done = true; }
-                else
-                {
-                    // Wingbeater: yank downward — hollow bones, can't support grapple
-                    // Apply strong downward force + damage
-                    w.Velocity = new Vector2(w.Velocity.X * 0.5f, 500f); // slam downward
-                    w.Hp -= 3; // significant damage (hollow bones!)
-                    _shakeTimer = 0.15f;
-                    _shakeIntensity = 3f;
-                    EveAlert("Hollow bones. They can't take that.", 3f);
-                    _player.ReleaseGrapple();
-                    done = true;
-                }
+                // Wingbeater: yank downward — hollow bones, can't support grapple
+                w.Velocity = new Vector2(w.Velocity.X * 0.5f, 500f);
+                w.Hp -= 3;
+                _shakeTimer = 0.15f;
+                _shakeIntensity = 3f;
+                EveAlert("Hollow bones. They can't take that.", 3f);
+                _player.ReleaseGrapple();
+                done = true;
             }
             else
             {
-                // Enemy died or index invalid
-                _player.ReleaseGrapple();
-                done = true;
+                // Small creatures: pull toward player
+                var cCenter = target.Position + new Vector2(target.Rect.Width / 2f, target.Rect.Height / 2f);
+                var dir = playerCenter - cCenter;
+                float dist = dir.Length();
+                if (dist < 20f)
+                {
+                    target.Hp -= 2;
+                    target.Velocity = new Vector2(0, -150f);
+                    _player.ReleaseGrapple();
+                    done = true;
+                }
+                else
+                {
+                    dir /= dist;
+                    target.Position += dir * pullSpeed * dt;
+                    target.Velocity = dir * pullSpeed;
+                    _player.GrappleAnchor = target.Position + new Vector2(target.Rect.Width / 2f, target.Rect.Height / 2f);
+                }
             }
             
             // Release on E press while pulling
@@ -2051,8 +2010,13 @@ public class Game1 : Game
             }
         }
 
-        _birds.RemoveAll(b => !b.Alive);
         _creatures.RemoveAll(c => !c.Alive);
+        // Sync typed lists (shrinking toward zero over time)
+        _birds.RemoveAll(b => !b.Alive);
+        _crawlers.RemoveAll(c => !c.Alive);
+        _hoppers.RemoveAll(h => !h.Alive);
+        _thornbacks.RemoveAll(t => !t.Alive);
+        _wingbeaters.RemoveAll(w => !w.Alive);
 
         // --- Wingbeater update ---
         foreach (var wb in _wingbeaters)
@@ -2103,7 +2067,7 @@ public class Game1 : Game
             }
         }
 
-        _wingbeaters.RemoveAll(w => !w.Alive);
+        // (wingbeater death removal consolidated into unified RemoveAll block above)
 
         // --- Ecosystem: Trophic Interactions ---
         _birdHuntTimer -= dt;
@@ -3017,48 +2981,7 @@ public class Game1 : Game
 
             // Uppercut hits enemies
             int uppercutDmg = 15;
-            foreach (var c in _crawlers)
-            {
-                if (!c.Alive) continue;
-                if (uppercutRect.Intersects(c.Rect))
-                {
-                    int prevHp = c.Hp;
-                    float kbDir = _player.FacingDir;
-                    bool killed = _knockbackEnabled
-                        ? c.TakeHit(uppercutDmg, kbDir * 200f, -300f)
-                        : c.TakeHit(uppercutDmg);
-                    if (c.Hp < prevHp || killed)
-                    {
-                        var hitPt = new Vector2(c.Position.X + c.EffectiveWidth / 2f, c.Position.Y + c.EffectiveHeight / 2f);
-                        SpawnHitSpray(hitPt, _player.FacingDir, GetEnemyHitColor(c.IsDummy ? "dummy" : "crawler"), 1, false);
-                        if (_hitStopEnabled) _hitStopTimer = 0.04f;
-                    }
-                }
-            }
-            foreach (var t in _thornbacks)
-            {
-                if (!t.Alive || !uppercutRect.Intersects(t.Rect)) continue;
-                t.TakeHit(uppercutDmg, _player.FacingDir * 200f, -300f);
-                SpawnHitSpray(new Vector2(t.Position.X + Thornback.Width / 2f, t.Position.Y + Thornback.Height / 2f), _player.FacingDir, GetEnemyHitColor("thornback"), 1, false);
-            }
-            foreach (var h in _hoppers)
-            {
-                if (!h.Alive || !uppercutRect.Intersects(h.Rect)) continue;
-                h.TakeHit(uppercutDmg, _player.FacingDir * 200f, -300f);
-                SpawnHitSpray(new Vector2(h.Position.X + Hopper.Width / 2f, h.Position.Y + Hopper.Height / 2f), _player.FacingDir, GetEnemyHitColor("hopper"), 1, false);
-            }
-            foreach (var b in _birds)
-            {
-                if (!b.Alive || !uppercutRect.Intersects(b.Rect)) continue;
-                b.TakeHit(uppercutDmg, _player.FacingDir * 200f, -300f);
-                SpawnHitSpray(new Vector2(b.Position.X + Bird.Width / 2f, b.Position.Y + Bird.Height / 2f), _player.FacingDir, GetEnemyHitColor("bird"), 1, false);
-            }
-            foreach (var wb in _wingbeaters)
-            {
-                if (!wb.Alive || !uppercutRect.Intersects(wb.Rect)) continue;
-                wb.TakeHit(uppercutDmg, _player.FacingDir * 200f, -300f);
-                SpawnHitSpray(new Vector2(wb.Position.X + Wingbeater.Width / 2f, wb.Position.Y + Wingbeater.Height / 2f), _player.FacingDir, GetEnemyHitColor("wingbeater"), 1, false);
-            }
+            DamageCreaturesInRect(uppercutRect, uppercutDmg, _player.FacingDir * 200f, -300f, _player.FacingDir);
         }
 
         // Vault kick enemy damage
@@ -3068,36 +2991,7 @@ public class Game1 : Game
             int vkDmg = 12;
             float vkKbX = _player.FacingDir * 250f;
             float vkKbY = -200f;
-            foreach (var c in _crawlers)
-            {
-                if (!c.Alive || c.IsLatched || !vkRect.Intersects(c.Rect)) continue;
-                c.TakeHit(vkDmg, vkKbX, vkKbY);
-                SpawnHitSpray(new Vector2(c.Position.X + c.EffectiveWidth / 2f, c.Position.Y + c.EffectiveHeight / 2f), _player.FacingDir, GetEnemyHitColor("crawler"), 1, false);
-            }
-            foreach (var t in _thornbacks)
-            {
-                if (!t.Alive || !vkRect.Intersects(t.Rect)) continue;
-                t.TakeHit(vkDmg, vkKbX, vkKbY);
-                SpawnHitSpray(new Vector2(t.Position.X + Thornback.Width / 2f, t.Position.Y + Thornback.Height / 2f), _player.FacingDir, GetEnemyHitColor("thornback"), 1, false);
-            }
-            foreach (var h in _hoppers)
-            {
-                if (!h.Alive || !vkRect.Intersects(h.Rect)) continue;
-                h.TakeHit(vkDmg, vkKbX, vkKbY);
-                SpawnHitSpray(new Vector2(h.Position.X + Hopper.Width / 2f, h.Position.Y + Hopper.Height / 2f), _player.FacingDir, GetEnemyHitColor("hopper"), 1, false);
-            }
-            foreach (var b in _birds)
-            {
-                if (!b.Alive || !vkRect.Intersects(b.Rect)) continue;
-                b.TakeHit(vkDmg, vkKbX, vkKbY);
-                SpawnHitSpray(new Vector2(b.Position.X + Bird.Width / 2f, b.Position.Y + Bird.Height / 2f), _player.FacingDir, GetEnemyHitColor("bird"), 1, false);
-            }
-            foreach (var wb in _wingbeaters)
-            {
-                if (!wb.Alive || !vkRect.Intersects(wb.Rect)) continue;
-                wb.TakeHit(vkDmg, vkKbX, vkKbY);
-                SpawnHitSpray(new Vector2(wb.Position.X + Wingbeater.Width / 2f, wb.Position.Y + Wingbeater.Height / 2f), _player.FacingDir, GetEnemyHitColor("wingbeater"), 1, false);
-            }
+            DamageCreaturesInRect(vkRect, vkDmg, vkKbX, vkKbY, _player.FacingDir, false);
         }
 
         // Exit collision — enter-trigger (only fires on transition from outside → inside)
@@ -3393,6 +3287,41 @@ public class Game1 : Game
         "swarm" => Color.OrangeRed,
         _ => new Color(200, 50, 50)
     };
+
+    private static string GetCreatureTypeName(Creature c) => c switch
+    {
+        Crawler cr => cr.IsDummy ? "dummy" : "crawler",
+        Bird => "bird",
+        Wingbeater => "wingbeater",
+        Hopper => "hopper",
+        Thornback => "thornback",
+        _ => "creature"
+    };
+
+    /// <summary>Apply area damage to all creatures intersecting a hitbox. Returns number hit.</summary>
+    private int DamageCreaturesInRect(Rectangle hitbox, int damage, float kbX, float kbY, int facingDir, bool hitStop = true)
+    {
+        int hitCount = 0;
+        foreach (var c in _creatures)
+        {
+            if (!c.Alive) continue;
+            if (c is Crawler cr && cr.IsLatched) continue;
+            if (!hitbox.Intersects(c.Rect)) continue;
+            
+            int prevHp = c.Hp;
+            bool killed = _knockbackEnabled
+                ? c.TakeHit(damage, kbX, kbY)
+                : c.TakeHit(damage);
+            if (c.Hp < prevHp || killed)
+            {
+                var hitPt = new Vector2(c.Position.X + c.Rect.Width / 2f, c.Position.Y + c.Rect.Height / 2f);
+                SpawnHitSpray(hitPt, facingDir, GetEnemyHitColor(GetCreatureTypeName(c)), 1, false);
+                if (hitStop && _hitStopEnabled) _hitStopTimer = 0.04f;
+                hitCount++;
+            }
+        }
+        return hitCount;
+    }
 
     private int ApplyScanBonus(int dmg, string enemyType)
     {
@@ -8372,11 +8301,7 @@ public class Game1 : Game
         if (_enemiesEnabled)
         {
             foreach (var swarm in _swarms) swarm.Draw(_spriteBatch, _pixel);
-            foreach (var c in _crawlers) { if (!_enemySquashEnabled) c.VisualScale = Vector2.One; c.Draw(_spriteBatch, _pixel); }
-            foreach (var h in _hoppers) { if (!_enemySquashEnabled) h.VisualScale = Vector2.One; h.Draw(_spriteBatch, _pixel); }
-            foreach (var t in _thornbacks) { if (!_enemySquashEnabled) t.VisualScale = Vector2.One; t.Draw(_spriteBatch, _pixel); }
-            foreach (var bird in _birds) { if (!_enemySquashEnabled) bird.VisualScale = Vector2.One; bird.Draw(_spriteBatch, _pixel); }
-            foreach (var wb in _wingbeaters) { if (!_enemySquashEnabled) wb.VisualScale = Vector2.One; wb.Draw(_spriteBatch, _pixel); }
+            foreach (var creature in _creatures) { if (!_enemySquashEnabled) creature.VisualScale = Vector2.One; creature.Draw(_spriteBatch, _pixel); }
         }
 
         // --- EVE Scan overlays (world-space) ---
@@ -8497,10 +8422,13 @@ public class Game1 : Game
                 _spriteBatch.Draw(_pixel, new Rectangle((int)pos.X + w, (int)pos.Y, 1, h), c);
             }
         }
-        foreach (var c in _crawlers) { if (c.Alive && !c.IsDummy) DrawScanOverlay("crawler", c.Position, c.EffectiveWidth, c.EffectiveHeight, c.Hp, 3); }
-        foreach (var h in _hoppers) { if (h.Alive) DrawScanOverlay("hopper", h.Position, Hopper.Width, Hopper.Height, h.Hp, 5); }
-        foreach (var t in _thornbacks) { if (t.Alive) DrawScanOverlay("thornback", t.Position, Thornback.Width, Thornback.Height, t.Hp, 8); }
-        foreach (var b in _birds) { if (b.Alive) DrawScanOverlay("bird", b.Position, Bird.Width, Bird.Height, b.Hp, 1); }
+        foreach (var cr in _creatures)
+        {
+            if (!cr.Alive) continue;
+            if (cr is Crawler crl && crl.IsDummy) continue;
+            string typeName = GetCreatureTypeName(cr);
+            DrawScanOverlay(typeName, cr.Position, cr.Rect.Width, cr.Rect.Height, cr.Hp, cr.MaxHp);
+        }
 
         // Draw splatters
         foreach (var s in _splatters)

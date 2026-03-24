@@ -484,8 +484,9 @@ public class Player
     public float GrappleRopeLength;          // current rope length
     
     // Enemy grapple state
-    public int GrappleEnemyIndex = -1;       // index into enemy list (-1 = none)
-    public string GrappleEnemyType = "";     // "crawler", "wingbeater", "bird"
+    public int GrappleEnemyIndex = -1;       // DEPRECATED — use GrappleCreatureId
+    public string GrappleEnemyType = "";     // DEPRECATED — use GrappleCreatureId
+    public Guid GrappleCreatureId = Guid.Empty; // creature being pulled (Guid-based, safe across list changes)
     private const float GrapplePullSpeed = 400f;  // speed to pull small enemies toward player
     private const float GrappleEnemyDamage = 2f;  // damage on arrival
     
@@ -557,15 +558,17 @@ public class Player
         IsGrapplePulling = false;
         GrappleEnemyIndex = -1;
         GrappleEnemyType = "";
+        GrappleCreatureId = Guid.Empty;
     }
     
     /// <summary>Start pulling an enemy (hook hit an enemy, not terrain).</summary>
-    public void GrappleEnemy(int enemyIndex, string enemyType, Vector2 enemyCenter)
+    public void GrappleEnemy(int enemyIndex, string enemyType, Vector2 enemyCenter, Guid creatureId = default)
     {
         IsGrappleFiring = false;
         IsGrapplePulling = true;
         GrappleEnemyIndex = enemyIndex;
         GrappleEnemyType = enemyType;
+        GrappleCreatureId = creatureId;
         GrappleAnchor = enemyCenter; // track enemy pos (updated externally each frame)
     }
     

@@ -860,7 +860,7 @@ public class Crawler : Creature
     /// </summary>
     private bool HasLineOfSight(Vector2 from, Vector2 to)
     {
-        if (!_hasTileGridRef) return true; // no grid = assume visible
+        if (!_hasTileGridRef) return true;
         var tg = _tileGridRef;
         int ts = _tileSizeRef;
         
@@ -875,7 +875,7 @@ public class Crawler : Creature
         {
             float wx = from.X + dir.X * d;
             float wy = from.Y + dir.Y * d;
-            var tile = tg.GetTile(wx, wy, ts);
+            var tile = tg.GetTile((int)wx, (int)wy);
             if (TileProperties.IsSolid(tile))
                 return false;
         }
