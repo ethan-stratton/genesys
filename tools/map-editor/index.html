@@ -21,16 +21,16 @@
   #toolbar button:hover { background: #533483; }
   #toolbar .status { margin-left: auto; font-size: 12px; color: #666; }
   
-  #canvas-wrap { position: fixed; top: 48px; left: 0; right: 350px; bottom: 0; }
+  #canvas-wrap { position: fixed; top: 48px; left: 0; bottom: 0; }
   canvas { width: 100%; height: 100%; display: block; }
   
+  #sidebar-drag { position: fixed; top: 48px; bottom: 0; width: 6px; cursor: col-resize; background: #0f3460; z-index: 50; }
+  #sidebar-drag:hover { background: #533483; }
   #sidebar {
-    position: fixed; top: 48px; right: 0; bottom: 0; width: 350px; min-width: 250px; max-width: 600px;
+    position: fixed; top: 48px; right: 0; bottom: 0; width: 350px;
     background: #16213e; border-left: 2px solid #0f3460;
     overflow-y: auto; padding: 12px;
-    resize: horizontal; direction: rtl; overflow-x: hidden;
   }
-  #sidebar > * { direction: ltr; }
   #sidebar h2 { font-size: 14px; color: #e94560; margin: 12px 0 8px; }
   #sidebar h2:first-child { margin-top: 0; }
   
@@ -73,7 +73,8 @@
   <canvas id="c"></canvas>
 </div>
 
-<div id="sidebar" id="panel">
+<div id="sidebar-drag"></div>
+<div id="sidebar">
   <h2>Select a room</h2>
   <div id="room-detail" class="room-info">Click a room on the map to inspect and edit.</div>
 </div>
@@ -83,6 +84,27 @@
 <script>
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
+const sidebar = document.getElementById('sidebar');
+const sidebarDrag = document.getElementById('sidebar-drag');
+const canvasWrap = document.getElementById('canvas-wrap');
+
+let sidebarWidth = 350;
+function updateSidebarWidth(w) {
+  sidebarWidth = Math.max(250, Math.min(700, w));
+  sidebar.style.width = sidebarWidth + 'px';
+  sidebarDrag.style.right = sidebarWidth + 'px';
+  canvasWrap.style.right = (sidebarWidth + 6) + 'px';
+  resizeCanvas();
+}
+updateSidebarWidth(350);
+
+sidebarDrag.addEventListener('mousedown', (e) => {
+  e.preventDefault();
+  const onMove = (e2) => { updateSidebarWidth(window.innerWidth - e2.clientX); };
+  const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+});
 
 let levels = {};
 let levelIds = [];
@@ -196,6 +218,7 @@ function resize() {
   ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
   draw();
 }
+const resizeCanvas = resize;
 
 function worldToScreen(wx, wy) {
   return { x: (wx - cam.x) * cam.zoom + canvas.width / devicePixelRatio / 2,
@@ -362,8 +385,10 @@ function selectRoom(id) {
   function sel(dir) {
     const raw = level.neighbors ? level.neighbors[dir] : '';
     const zones = getZones(raw);
-    const isMulti = Array.isArray(raw); // explicitly in multi mode
+    const isMulti = Array.isArray(raw);
     const emptyOpt = '<option value="">(none)</option>';
+    
+    console.log(`sel(${dir}):`, { raw, isMulti, zonesLen: zones.length });
     
     function makeSelect(val, onChange) {
       let opts = emptyOpt;
