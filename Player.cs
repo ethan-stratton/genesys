@@ -481,6 +481,7 @@ public class Player
         public int DrawHeight; // height at time of spawn (for crouch/slide)
         public float Alpha;
         public float TimeLeft;
+        public Color TierColor;
     }
     private const int MaxAfterimages = 8;
     private Afterimage[] _afterimages = new Afterimage[MaxAfterimages];
@@ -1236,8 +1237,8 @@ public class Player
             if (_dashTimer >= dashDur || inputX == -_dashDir)
             {
                 IsDashing = false;
-                // Tech: dash ends into sprint if still holding direction
-                if (CurrentTier == MoveTier.Tech && inputX == _dashDir && IsGrounded)
+                // All tiers: dash ends into sprint if still holding direction on ground
+                if (inputX == _dashDir && IsGrounded)
                 {
                     IsSprinting = true;
                     _sprintDir = _dashDir;
@@ -1873,8 +1874,8 @@ public class Player
             float moveSpeed = _speed;
             if (SpeedBoostTimer > 0) moveSpeed *= SpeedBoostMultiplier;
 
-            // Tech Sprint: dash transitions into sprint (hold direction after dash ends)
-            if (CurrentTier == MoveTier.Tech && IsSprinting && IsGrounded && inputX == _sprintDir)
+            // Sprint: dash transitions into sprint (hold direction after dash ends)
+            if (IsSprinting && IsGrounded && inputX == _sprintDir)
             {
                 moveSpeed *= SprintMaxSpeedMult;
             }
@@ -2501,7 +2502,7 @@ public class Player
             _visualScale = Vector2.Lerp(_visualScale, Vector2.One, ScaleLerpSpeed * dt);
 
         // Afterimage trail
-        bool wantsTrail = IsDashing || IsVaultKicking || IsBladeDashing || IsCartwheeling || IsFlipping || IsUppercutting || IsSliding || IsGroundPounding;
+        bool wantsTrail = IsDashing || IsSprinting || IsVaultKicking || IsBladeDashing || IsCartwheeling || IsFlipping || IsUppercutting || IsSliding || IsGroundPounding;
         if (wantsTrail)
         {
             _afterimageSpawnTimer -= dt;
@@ -2517,7 +2518,12 @@ public class Player
                     FacingDir = FacingDir,
                     DrawHeight = CurrentHeight,
                     Alpha = 0.8f,
-                    TimeLeft = AfterimageLifetime
+                    TimeLeft = AfterimageLifetime,
+                    TierColor = CurrentTier switch {
+                        MoveTier.Tech => new Color(150, 180, 255),    // blue
+                        MoveTier.Bio => new Color(100, 220, 120),     // green
+                        _ => new Color(180, 80, 200)                   // crimson purple
+                    }
                 };
                 _afterimageIndex = (_afterimageIndex + 1) % MaxAfterimages;
             }
@@ -2763,7 +2769,7 @@ public class Player
                 var ai = _afterimages[i];
                 int aiW = Width;
                 int aiH = ai.DrawHeight > 0 ? ai.DrawHeight : Height;
-                var aiColor = new Color(150, 180, 255) * ai.Alpha;
+                var aiColor = ai.TierColor * ai.Alpha;
                 // Bottom-aligned: afterimage foot = Position.Y + Height
                 int aiY = (int)ai.Position.Y + Height - aiH;
                 spriteBatch.Draw(pixel,
@@ -2864,7 +2870,7 @@ public class Player
         else
         {
             var bodyColor = IsDashing ? new Color(255, 255, 220) :  // bright flash on burst
-                            IsSprinting ? new Color(255, 220, 150) :  // warm orange sprint
+                            IsSprinting ? new Color(240, 240, 255) :  // whitish sprint glow
                             IsGroundPounding ? new Color(255, 140, 40) : Color.Gray;
             spriteBatch.Draw(pixel,
                 new Rectangle(sqX, sqY, sqW, sqH),
