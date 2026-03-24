@@ -85,7 +85,7 @@ public class Player
                 EnableBladeDash = false;
                 EnableUppercut = false;
                 EnableWallClimb = false;
-                EnableSlide = true;
+                EnableSlide = false;
                 EnableVaultKick = false;
                 EnableCartwheel = false;
                 EnableFlip = false;
@@ -267,6 +267,27 @@ public class Player
     private const float DashDoubleTapWindow = 0.25f;
     private int _dashDir;
 
+    // Tech: Ground Pound (enhanced fast-fall with stomp)
+    public bool IsGroundPounding { get; private set; }
+    public const float GroundPoundSpeed = 800f;
+    public const float GroundPoundDamage = 3f;
+    public const float GroundPoundRadius = 40f; // hitbox width on landing
+    public bool GroundPoundLanded { get; set; } // read by Game1 for shake/dust/damage
+    
+    // Tech: Brace (hold crouch to reduce damage/knockback)
+    public bool IsBracing { get; private set; }
+    private const float BraceDamageReduction = 0.5f; // take 50% damage
+    private const float BraceKnockbackReduction = 0.2f; // 80% less knockback
+    private float _braceTimer;
+    
+    // Tech: Sprint (hold direction to build speed — Wario style)
+    public bool IsSprinting { get; private set; }
+    private float _sprintBuildup; // 0→1 over time
+    private const float SprintBuildTime = 0.8f; // seconds to reach full sprint
+    private const float SprintMaxSpeedMult = 1.8f; // 80% faster at full sprint
+    private const float SprintMinTime = 0.3f; // must hold direction this long before sprint kicks in
+    private int _sprintDir;
+
     // Rope climbing
     public bool IsOnRope { get; private set; }
     private float _ropeX; // X position of the rope we're attached to
@@ -334,6 +355,15 @@ public class Player
     public void TakeDamage(int amount, float knockbackDirX = 0f)
     {
         if (DamageCooldown > 0) return;
+        
+        // Tech Brace: reduce damage and knockback
+        float kbMult = 1f;
+        if (IsBracing)
+        {
+            amount = Math.Max(1, (int)(amount * BraceDamageReduction));
+            kbMult = BraceKnockbackReduction;
+        }
+        
         Hp -= amount;
         DamageCooldown = DamageCooldownTime;
         _regenDelay = 0f;
@@ -341,10 +371,10 @@ public class Player
         if (Hp <= 0) Hp = 0;
         
         // Knockback
-        float kbX = knockbackDirX != 0f ? Math.Sign(knockbackDirX) * KnockbackSpeed : -FacingDir * KnockbackSpeed;
+        float kbX = knockbackDirX != 0f ? Math.Sign(knockbackDirX) * KnockbackSpeed * kbMult : -FacingDir * KnockbackSpeed * kbMult;
         var vel = Velocity;
         vel.X = kbX;
-        vel.Y = KnockbackUpSpeed;
+        vel.Y = KnockbackUpSpeed * kbMult;
         Velocity = vel;
         _knockbackTimer = KnockbackDuration;
         SetSquash(1.3f, 0.75f);
@@ -551,6 +581,7 @@ public class Player
     {
         IsGrappleFiring = false;
         IsGrappling = true;
+        IsGroundPounding = false;
         GrappleAnchor = anchor;
         
         var center = Position + new Vector2(Width / 2f, Height / 2f);
@@ -1176,6 +1207,18 @@ public class Player
 
         // --- Drop through platform (double-tap S only) ---
         _dropIgnoreTimer -= dt;
+
+        // --- Tech Brace (hold crouch while grounded in Tech tier) ---
+        if (CurrentTier == MoveTier.Tech && IsCrouching && IsGrounded && inputX == 0)
+        {
+            IsBracing = true;
+            _braceTimer += dt;
+        }
+        else
+        {
+            IsBracing = false;
+            _braceTimer = 0f;
+        }
         bool sDown = kb.IsKeyDown(Keys.S);
         if (!sDown) _sWasUp = true;
         if (sDown && _sWasUp)
@@ -1767,6 +1810,35 @@ public class Player
             float moveSpeed = (IsDashing && inputX == _dashDir) ? DashSpeed : _speed;
             if (SpeedBoostTimer > 0) moveSpeed *= SpeedBoostMultiplier;
 
+            // Tech Sprint: hold direction to build up speed (Wario dash)
+            if (CurrentTier == MoveTier.Tech && IsGrounded && inputX != 0 && !IsCrouching && !IsSliding)
+            {
+                if (inputX == _sprintDir)
+                {
+                    _sprintBuildup = Math.Min(1f, _sprintBuildup + dt / SprintBuildTime);
+                }
+                else
+                {
+                    _sprintBuildup = 0f;
+                    _sprintDir = inputX;
+                }
+                if (_sprintBuildup > SprintMinTime / SprintBuildTime)
+                {
+                    IsSprinting = true;
+                    float sprintFactor = (_sprintBuildup - SprintMinTime / SprintBuildTime) / (1f - SprintMinTime / SprintBuildTime);
+                    moveSpeed *= 1f + (SprintMaxSpeedMult - 1f) * sprintFactor;
+                }
+                else
+                {
+                    IsSprinting = false;
+                }
+            }
+            else
+            {
+                IsSprinting = false;
+                if (inputX == 0) { _sprintBuildup = 0f; _sprintDir = 0; }
+            }
+
             // Acceleration-based movement (Celeste-style)
             float targetX = inputX * moveSpeed;
             if (IsGrounded || _coyoteTimer > 0)
@@ -1885,6 +1957,26 @@ public class Player
             {
                 vel.Y += _gravity * 1.5f * dt; // extra gravity burst
                 termVel = _maxFall * 1.4f;     // higher terminal velocity
+            }
+            // Tech ground pound: press S in air — heavy stomp with afterimage
+            if (CurrentTier == MoveTier.Tech && !IsGrounded && inputY > 0 && !IsGroundPounding)
+            {
+                IsGroundPounding = true;
+                GroundPoundLanded = false;
+                vel.X = 0; // commit to straight down
+                vel.Y = GroundPoundSpeed;
+            }
+            if (IsGroundPounding)
+            {
+                vel.X = 0;
+                vel.Y = Math.Max(vel.Y, GroundPoundSpeed); // lock to stomp speed
+                termVel = GroundPoundSpeed * 1.2f;
+                if (IsGrounded)
+                {
+                    IsGroundPounding = false;
+                    GroundPoundLanded = true; // Game1 reads this for shake/dust/hitbox
+                    SetSquash(0.6f, 1.5f); // wide squash on impact
+                }
             }
             if (vel.Y > termVel) vel.Y = termVel;
         }
@@ -2359,7 +2451,7 @@ public class Player
             _visualScale = Vector2.Lerp(_visualScale, Vector2.One, ScaleLerpSpeed * dt);
 
         // Afterimage trail
-        bool wantsTrail = IsDashing || IsVaultKicking || IsBladeDashing || IsCartwheeling || IsFlipping || IsUppercutting || IsSliding;
+        bool wantsTrail = IsDashing || IsVaultKicking || IsBladeDashing || IsCartwheeling || IsFlipping || IsUppercutting || IsSliding || IsGroundPounding;
         if (wantsTrail)
         {
             _afterimageSpawnTimer -= dt;
@@ -2694,19 +2786,36 @@ public class Player
             int crouchH = (int)(CrouchHeight * _visualScale.Y);
             int crouchX = (int)Position.X + Width / 2 - crouchW / 2;
             int crouchY = (int)Position.Y + Height - crouchH;
+            
+            // Brace visual: orange-tinted shield stance
+            var crouchColor = IsBracing ? new Color(200, 160, 80) : Color.DarkGray;
             spriteBatch.Draw(pixel,
                 new Rectangle(crouchX, crouchY, crouchW, crouchH),
-                Color.DarkGray);
-            var center = new Vector2(crouchX + crouchW / 2f, crouchY + crouchH / 2f);
-            for (int i = 0; i < 15; i++)
+                crouchColor);
+            if (IsBracing)
             {
-                var p = center + AimDir * (i * 2);
-                spriteBatch.Draw(pixel, new Rectangle((int)p.X, (int)p.Y, 2, 2), Color.Yellow * 0.6f);
+                // Shield arms — wider stance
+                int shieldW = crouchW + 6;
+                int shieldX = crouchX - 3;
+                spriteBatch.Draw(pixel,
+                    new Rectangle(shieldX, crouchY + 2, shieldW, 3),
+                    new Color(255, 200, 100) * 0.6f);
+            }
+            else
+            {
+                var center = new Vector2(crouchX + crouchW / 2f, crouchY + crouchH / 2f);
+                for (int i = 0; i < 15; i++)
+                {
+                    var p = center + AimDir * (i * 2);
+                    spriteBatch.Draw(pixel, new Rectangle((int)p.X, (int)p.Y, 2, 2), Color.Yellow * 0.6f);
+                }
             }
         }
         else
         {
-            var bodyColor = IsDashing ? new Color(180, 180, 180) : Color.Gray;
+            var bodyColor = IsDashing ? new Color(180, 180, 180) : 
+                            IsSprinting ? new Color(200, 200, 180) :
+                            IsGroundPounding ? new Color(255, 180, 80) : Color.Gray;
             spriteBatch.Draw(pixel,
                 new Rectangle(sqX, sqY, sqW, sqH),
                 bodyColor);

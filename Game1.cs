@@ -1712,6 +1712,39 @@ public class Game1 : Game
         _player.Update(dt, kb, _level.Floor.Y, _level.AllPlatforms, ropesToPass, ropeTopsToPass, ropeBottomsToPass, wallsToPass, wallSidesToPass, _level.WallRects, _level.CeilingRects, _level.SolidFloorRects, _level.TileGridInstance, mouseWorld, mouseState);
         _player.UpdateRegen(dt);
         
+        // Tech Ground Pound landing — camera shake, dust, damage nearby enemies
+        if (_player.GroundPoundLanded)
+        {
+            _player.GroundPoundLanded = false;
+            _shakeTimer = 0.25f;
+            _shakeIntensity = 8f;
+            // Spawn dust particles
+            float px = _player.Position.X + Player.Width / 2f;
+            float py = _player.Position.Y + Player.Height;
+            for (int i = 0; i < 12; i++)
+            {
+                float angle = (float)(Math.PI + _rng.NextDouble() * Math.PI); // downward-ish spread
+                float spd = 40f + (float)_rng.NextDouble() * 80f;
+                _particles.Add(new Particle
+                {
+                    Position = new Vector2(px + (_rng.Next(20) - 10), py - 2),
+                    Velocity = new Vector2((float)Math.Cos(angle) * spd, (float)Math.Sin(angle) * spd * 0.3f),
+                    Life = 0.4f + (float)_rng.NextDouble() * 0.3f,
+                    MaxLife = 0.7f,
+                    Color = new Color(180, 160, 130),
+                    Size = 2f + (float)_rng.NextDouble() * 2f,
+                    Gravity = 200f
+                });
+            }
+            // Damage enemies in stomp radius
+            var stompRect = new Rectangle(
+                (int)(px - Player.GroundPoundRadius),
+                (int)(py - 8),
+                (int)(Player.GroundPoundRadius * 2),
+                16);
+            DamageCreaturesInRect(stompRect, (int)Player.GroundPoundDamage, 0, -100f, _player.FacingDir, true);
+        }
+        
         // Grapple hook collision — raycast along hook path
         if (_player.IsGrappleFiring)
         {
