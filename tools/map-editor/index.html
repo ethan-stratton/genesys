@@ -94,9 +94,9 @@ function updateSidebarWidth(w) {
   sidebar.style.width = sidebarWidth + 'px';
   sidebarDrag.style.right = sidebarWidth + 'px';
   canvasWrap.style.right = (sidebarWidth + 6) + 'px';
-  resizeCanvas();
+  if (typeof resize === 'function') resize();
 }
-updateSidebarWidth(350);
+setTimeout(() => updateSidebarWidth(350), 0);
 
 sidebarDrag.addEventListener('mousedown', (e) => {
   e.preventDefault();
