@@ -21,14 +21,16 @@
   #toolbar button:hover { background: #533483; }
   #toolbar .status { margin-left: auto; font-size: 12px; color: #666; }
   
-  #canvas-wrap { position: fixed; top: 48px; left: 0; right: 300px; bottom: 0; }
+  #canvas-wrap { position: fixed; top: 48px; left: 0; right: 350px; bottom: 0; }
   canvas { width: 100%; height: 100%; display: block; }
   
   #sidebar {
-    position: fixed; top: 48px; right: 0; bottom: 0; width: 300px;
+    position: fixed; top: 48px; right: 0; bottom: 0; width: 350px; min-width: 250px; max-width: 600px;
     background: #16213e; border-left: 2px solid #0f3460;
     overflow-y: auto; padding: 12px;
+    resize: horizontal; direction: rtl; overflow-x: hidden;
   }
+  #sidebar > * { direction: ltr; }
   #sidebar h2 { font-size: 14px; color: #e94560; margin: 12px 0 8px; }
   #sidebar h2:first-child { margin-top: 0; }
   
@@ -386,12 +388,21 @@ function selectRoom(id) {
       let html = `<div style="font-size:10px;color:#e94560;margin-bottom:4px">${zones.length} zone(s)</div>`;
       for (let i = 0; i < zones.length; i++) {
         const z = zones[i];
-        html += `<div style="display:flex;gap:4px;align-items:center;margin:2px 0;padding:4px;background:#111;border:1px solid #333;border-radius:3px">
-          <span style="color:#e94560;font-size:10px;min-width:14px">${i+1}.</span>
-          <input type="number" value="${z.from}" step="0.1" min="0" max="1" style="width:40px;background:#1a1a2e;color:#eee;border:1px solid #533483;font-size:11px;padding:2px" onchange="updateZone('${id}','${dir}',${i},'from',this.value)">–
-          <input type="number" value="${z.to}" step="0.1" min="0" max="1" style="width:40px;background:#1a1a2e;color:#eee;border:1px solid #533483;font-size:11px;padding:2px" onchange="updateZone('${id}','${dir}',${i},'to',this.value)">
-          ${makeSelect(z.target, `updateZone('${id}','${dir}',${i},'target',this.value)`)}
-          <button onclick="removeZone('${id}','${dir}',${i})" style="font-size:10px;padding:2px 4px;color:#e94560">×</button>
+        html += `<div style="margin:4px 0;padding:6px;background:#111;border:1px solid #333;border-radius:3px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <span style="color:#e94560;font-size:11px;font-weight:bold">Zone ${i+1}</span>
+            <button onclick="removeZone('${id}','${dir}',${i})" style="font-size:10px;padding:2px 6px;color:#e94560;background:#1a1a2e;border:1px solid #e94560;border-radius:2px;cursor:pointer">×</button>
+          </div>
+          <div style="margin-bottom:4px">
+            ${makeSelect(z.target, `updateZone('${id}','${dir}',${i},'target',this.value)`)}
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;font-size:11px;color:#888">
+            <span>Range:</span>
+            <input type="number" value="${z.from}" step="0.1" min="0" max="1" style="width:50px;background:#1a1a2e;color:#eee;border:1px solid #533483;font-size:11px;padding:3px;border-radius:2px" onchange="updateZone('${id}','${dir}',${i},'from',this.value)">
+            <span>→</span>
+            <input type="number" value="${z.to}" step="0.1" min="0" max="1" style="width:50px;background:#1a1a2e;color:#eee;border:1px solid #533483;font-size:11px;padding:3px;border-radius:2px" onchange="updateZone('${id}','${dir}',${i},'to',this.value)">
+            <span style="color:#555">(0=top 1=bottom)</span>
+          </div>
         </div>`;
       }
       html += `<button onclick="addZone('${id}','${dir}')" style="font-size:10px;padding:2px 5px;margin-top:2px">+ zone</button>`;

@@ -2547,12 +2547,12 @@
     "left": "test-arena",
     "right": [
       {
-        "target": "the-gauntlet",
+        "target": "the-summit",
         "from": 0,
         "to": 0.5
       },
       {
-        "target": "",
+        "target": "the-gauntlet",
         "from": 0.5,
         "to": 1
       }
