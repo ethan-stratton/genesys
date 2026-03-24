@@ -1783,6 +1783,81 @@ public class Game1 : Game
             DamageCreaturesInRect(stompRect, (int)Player.GroundPoundDamage, 0, -100f, _player.FacingDir, true);
         }
         
+        // Movement particles — dash burst, sprint, landing, glide
+        {
+            float px = _player.Position.X + Player.Width / 2f;
+            float py = _player.Position.Y + Player.Height;
+            
+            // Dash burst — puff at origin on dash start
+            if (_player.WantsDashParticles)
+            {
+                for (int i = 0; i < 6; i++)
+                {
+                    float angle = (float)(_rng.NextDouble() * Math.PI * 2);
+                    float spd = 30f + (float)_rng.NextDouble() * 60f;
+                    _particles.Add(new Particle
+                    {
+                        Position = new Vector2(px + (_rng.Next(8) - 4), py - Player.Height / 2f),
+                        Velocity = new Vector2((float)Math.Cos(angle) * spd, (float)Math.Sin(angle) * spd),
+                        Life = 0.2f + (float)_rng.NextDouble() * 0.15f,
+                        MaxLife = 0.35f,
+                        Color = _player.CurrentTier switch {
+                            Player.MoveTier.Tech => new Color(200, 220, 255),  // blue-white exhaust
+                            Player.MoveTier.Bio => new Color(150, 200, 120),   // green organic
+                            _ => new Color(200, 150, 255)                       // purple cipher
+                        },
+                        Size = 2 + _rng.Next(2)
+                    });
+                }
+            }
+            
+            // Sprint — trailing dust every few frames
+            if (_player.WantsSprintParticles && _rng.NextDouble() < 0.3)
+            {
+                _particles.Add(new Particle
+                {
+                    Position = new Vector2(px - _player.FacingDir * 6, py),
+                    Velocity = new Vector2(-_player.FacingDir * (20f + (float)_rng.NextDouble() * 30f), -10f - (float)_rng.NextDouble() * 20f),
+                    Life = 0.3f + (float)_rng.NextDouble() * 0.2f,
+                    MaxLife = 0.5f,
+                    Color = new Color(160, 140, 120),
+                    Size = 1 + _rng.Next(2)
+                });
+            }
+            
+            // Landing puff
+            if (_player.WantsLandingParticles)
+            {
+                for (int i = 0; i < 4; i++)
+                {
+                    float dir = i < 2 ? -1f : 1f;
+                    _particles.Add(new Particle
+                    {
+                        Position = new Vector2(px + dir * (4 + _rng.Next(6)), py),
+                        Velocity = new Vector2(dir * (30f + (float)_rng.NextDouble() * 40f), -15f - (float)_rng.NextDouble() * 25f),
+                        Life = 0.25f + (float)_rng.NextDouble() * 0.15f,
+                        MaxLife = 0.4f,
+                        Color = new Color(180, 170, 150),
+                        Size = 1 + _rng.Next(2)
+                    });
+                }
+            }
+            
+            // Bio glide — trailing wisps
+            if (_player.WantsGlideParticles && _rng.NextDouble() < 0.25)
+            {
+                _particles.Add(new Particle
+                {
+                    Position = new Vector2(px + (_rng.Next(10) - 5), py - Player.Height / 2f),
+                    Velocity = new Vector2(-_player.FacingDir * 15f, 10f + (float)_rng.NextDouble() * 15f),
+                    Life = 0.4f + (float)_rng.NextDouble() * 0.2f,
+                    MaxLife = 0.6f,
+                    Color = new Color(180, 230, 180, 150),
+                    Size = 1
+                });
+            }
+        }
+        
         // Grapple hook collision — raycast along hook path
         if (_player.IsGrappleFiring)
         {

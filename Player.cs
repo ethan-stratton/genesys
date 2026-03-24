@@ -448,6 +448,20 @@ public class Player
     private float _coyoteTimer;
     private const float CoyoteTime = 0.1f;
 
+    // SecondOrderDynamics — visual smoothing for burst movements
+    // Low damping = bouncy overshoot on dashes, high frequency = fast recovery
+    private SecondOrderDynamics _visualSpringX; // horizontal burst smoothing
+    private SecondOrderDynamics _visualSpringY; // vertical (landing, ground pound)
+    public float VisualOffsetX => _visualSpringX?.Value ?? 0f;
+    public float VisualOffsetY => _visualSpringY?.Value ?? 0f;
+    
+    // Movement particles (emitted by Game1)
+    public bool WantsDashParticles => IsDashing && _dashTimer < 0.06f; // first few frames only
+    public bool WantsSprintParticles => IsSprinting && IsGrounded;
+    public bool WantsLandingParticles { get; private set; }
+    public bool WantsGlideParticles => CurrentTier == MoveTier.Bio && !IsGrounded && _gliding;
+    private bool _gliding;
+    
     // Jump buffering
     private float _jumpBufferTimer;
     private const float JumpBufferTime = 0.1f;
@@ -484,6 +498,9 @@ public class Player
         IsGrounded = false;
         _wasGrounded = false;
         AimDir = new Vector2(1, 0);
+        // SecondOrderDynamics: f=4 (fast), z=0.3 (bouncy), r=-2 (anticipation)
+        _visualSpringX = new SecondOrderDynamics(4f, 0.3f, -2f, 0f);
+        _visualSpringY = new SecondOrderDynamics(5f, 0.4f, -1f, 0f);
         ApplyTierConstants();
     }
 
@@ -2438,9 +2455,20 @@ public class Player
         Position = pos;
         Velocity = vel;
 
-        // Landing squash
+        // SecondOrderDynamics visual offset — feed velocity for dash/landing bounce
+        _visualSpringX?.Update(dt, Velocity.X * 0.008f); // scale down to pixel offset
+        _visualSpringY?.Update(dt, Velocity.Y * 0.006f);
+        
+        // Bio glide tracking
+        _gliding = CurrentTier == MoveTier.Bio && !IsGrounded && inputY < 0 && vel.Y > 0;
+
+        // Landing particles
+        WantsLandingParticles = false;
         if (!_wasGrounded && IsGrounded)
+        {
             SetSquash(1.3f, 0.7f);
+            WantsLandingParticles = true;
+        }
 
         // Coyote time: grace period after leaving ground
         if (_wasGrounded && !IsGrounded && vel.Y >= 0 && !_jumpHeld)
@@ -2835,9 +2863,9 @@ public class Player
         }
         else
         {
-            var bodyColor = IsDashing ? new Color(180, 180, 180) : 
-                            IsSprinting ? new Color(200, 200, 180) :
-                            IsGroundPounding ? new Color(255, 180, 80) : Color.Gray;
+            var bodyColor = IsDashing ? new Color(255, 255, 220) :  // bright flash on burst
+                            IsSprinting ? new Color(255, 220, 150) :  // warm orange sprint
+                            IsGroundPounding ? new Color(255, 140, 40) : Color.Gray;
             spriteBatch.Draw(pixel,
                 new Rectangle(sqX, sqY, sqW, sqH),
                 bodyColor);
