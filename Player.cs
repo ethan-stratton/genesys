@@ -48,6 +48,13 @@ public class Player
     private float _jumpCutMultiplier;
     private float _fallGravMultiplier;
 
+    public void CureInjury()
+    {
+        IsInjured = false;
+        _limpTimer = 0f;
+        ApplyTierConstants(); // recalculate speed without debuff
+    }
+
     public void ApplyTierConstants()
     {
         int i = (int)CurrentTier;
@@ -63,6 +70,13 @@ public class Player
         _halfGravThreshold = TierHalfGravThresh[i];
         _jumpCutMultiplier = TierJumpCutMult[i];
         _fallGravMultiplier = TierFallGravMult[i];
+
+        // Injured debuff
+        if (IsInjured)
+        {
+            _speed *= InjuredSpeedMult;
+            _jumpForce *= 0.7f; // weaker jumps
+        }
 
         // Ability gating per tier
         switch (CurrentTier)
@@ -446,6 +460,12 @@ public class Player
     public float StandUpProgress;   // 0 = lying flat, 1 = fully standing
     private float _standUpTimer;
     private const float StandUpDuration = 1.5f; // seconds to stand up
+
+    // Injured state (post-crash, before EVE patch)
+    public bool IsInjured;
+    private float _limpTimer;
+    private const float LimpCycleDuration = 0.6f; // one limp cycle
+    private const float InjuredSpeedMult = 0.45f; // 45% normal speed
     
     /// <summary>Begin the stand-up animation from lying down.</summary>
     public void BeginStandUp()
@@ -974,6 +994,7 @@ public class Player
         if (FloatTimer > 0) FloatTimer -= dt;
         _slideCooldownTimer -= dt;
         _cartwheelCooldownTimer -= dt;
+        if (IsInjured) _limpTimer += dt;
         if (MeleeTimer > 0) MeleeTimer -= dt;
 
         // Combo timers
@@ -2614,6 +2635,20 @@ public class Player
         int sqH = (int)(Height * _visualScale.Y);
         int sqX = (int)Position.X + Width / 2 - sqW / 2;
         int sqY = (int)Position.Y + Height - sqH; // bottom-aligned
+
+        // Injured limp: asymmetric bob + slight lean
+        float limpOffsetY = 0f;
+        float limpLean = 0f;
+        if (IsInjured && IsGrounded && MathF.Abs(Velocity.X) > 10f)
+        {
+            float limpPhase = (_limpTimer % LimpCycleDuration) / LimpCycleDuration;
+            // Asymmetric: one leg dips more than the other
+            limpOffsetY = MathF.Sin(limpPhase * MathF.PI * 2f) * 3f;
+            limpOffsetY += MathF.Sin(limpPhase * MathF.PI * 4f) * 1.5f; // double-frequency wobble
+            limpLean = MathF.Sin(limpPhase * MathF.PI * 2f) * 1.5f * FacingDir;
+            sqY += (int)limpOffsetY;
+            sqX += (int)limpLean;
+        }
 
         if (IsVaulting)
         {

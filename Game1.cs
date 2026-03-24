@@ -276,8 +276,9 @@ public class Game1 : Game
     private Vector2 _fullscreenMapScroll;// scroll offset in fullscreen map
     private string _currentRoomId = "";  // which WorldGraph room the player is in
     private float _eveMessageTimer;
-    private void EveAlert(string msg, float duration = 3f)
+    private void EveAlert(string msg, float duration = 3f, bool ignoresSilence = false)
     {
+        if (!ignoresSilence && _eveSilenceTimer > 0) return; // EVE is silent
         _eveMessage = msg;
         _eveMessageTimer = duration;
     }
@@ -299,6 +300,32 @@ public class Game1 : Game
     private const float EveDrag = 3.5f;
     private const float EveOrbitAccel = 800f;
     private const float EveScanAccel = 500f;
+
+    // --- Passive Scan System ---
+    private class ScannableObject
+    {
+        public string Id;
+        public Vector2 Position;
+        public string ScanL1Text;         // auto-scan (EVE proximity)
+        public string ScanL2Text;         // player-triggered (Q key)
+        public string ScanL3Text;         // deep scan (hold Q, cipher tier)
+        public float ScanCooldown;        // seconds until EVE can re-scan this
+        public bool Scanned;              // has been auto-scanned at least once
+        public float GlowTimer;           // visual pulse timer when being scanned
+    }
+    private List<ScannableObject> _scannables = new();
+    private HashSet<string> _scanLog = new();  // persistent log of scanned IDs
+    private float _passiveScanCooldown;         // global cooldown between auto-scans
+    private const float PassiveScanRange = 192f; // ~6 tiles
+    private const float PassiveScanInterval = 8f; // seconds between auto-scans
+    private bool _scanL2Available;               // unlocked after EVE patches scanner
+
+    // --- Kill Tracking + EVE Silence ---
+    private Dictionary<string, int> _areaKillCounts = new(); // kills per area
+    private int _totalKills;
+    private int _passiveCreatureKills;    // specifically passive/fleeing creatures
+    private float _eveSilenceTimer;       // EVE won't speak while > 0
+    private const float EveSilencePerPassiveKill = 15f; // seconds of silence per passive kill
     
     /// <summary>Command EVE to fly to a world position, then call onArrive.</summary>
     private void EveFlyTo(Vector2 target, float speed = 120f, Action? onArrive = null)
@@ -643,6 +670,28 @@ public class Game1 : Game
                 var adj = _worldGraph.GetRoom(exit.TargetRoomId);
                 if (adj != null) adj.Discovered = true;
             }
+        }
+
+        // Load scannable objects for this level
+        _scannables.Clear();
+        LoadScannables(levelName);
+    }
+
+    private void LoadScannables(string levelName)
+    {
+        // Scannable objects per level — defined in code for now, JSON later
+        switch (levelName)
+        {
+            case "test-arena":
+                _scannables.Add(new ScannableObject { Id = "crash-debris-1", Position = new Vector2(300, 420), ScanL1Text = "Hull fragment. Thermal scoring consistent with atmospheric entry." });
+                _scannables.Add(new ScannableObject { Id = "alien-plant-1", Position = new Vector2(500, 400), ScanL1Text = "Bioluminescent root system. Photosynthesis... no. Chemosynthesis.", ScanL2Text = "Root network extends underground. Interconnected — nutrient sharing across specimens. Colonial organism." });
+                _scannables.Add(new ScannableObject { Id = "thermal-vent-1", Position = new Vector2(800, 430), ScanL1Text = "Thermal signature. Subsurface heat source — volcanic?" });
+                _scannables.Add(new ScannableObject { Id = "adapted-marking-1", Position = new Vector2(1200, 380), ScanL1Text = "Surface scoring. Tool marks? No — too regular. Unknown origin.", ScanL2Text = "Repeating pattern. Not natural erosion. Deliberate marking." });
+                _scannables.Add(new ScannableObject { Id = "chitin-fragment-1", Position = new Vector2(1600, 410), ScanL1Text = "Organic compound. Chitin derivative — exoskeletal.", ScanL2Text = "Cross-section shows growth rings. This was alive. Recently shed, not broken." });
+                break;
+            case "debug-room":
+                _scannables.Add(new ScannableObject { Id = "test-scan-1", Position = new Vector2(400, 400), ScanL1Text = "Test scannable. EVE passive scan working." });
+                break;
         }
     }
 
@@ -1196,7 +1245,42 @@ public class Game1 : Game
 
         _totalTime += dt;
         if (_eveMessageTimer > 0) _eveMessageTimer -= dt;
+        if (_eveSilenceTimer > 0) _eveSilenceTimer -= dt;
+        if (_passiveScanCooldown > 0) _passiveScanCooldown -= dt;
         
+        // --- EVE Passive Scan ---
+        if (_eveOrbActive && _passiveScanCooldown <= 0 && _eveMode == EveMovementMode.Orbit && _wakeUpComplete)
+        {
+            var playerCenter = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
+            ScannableObject nearest = null;
+            float nearestDist = PassiveScanRange;
+            foreach (var sc in _scannables)
+            {
+                if (sc.Scanned || sc.ScanCooldown > 0 || string.IsNullOrEmpty(sc.ScanL1Text)) continue;
+                float dist = Vector2.Distance(playerCenter, sc.Position);
+                if (dist < nearestDist)
+                {
+                    nearestDist = dist;
+                    nearest = sc;
+                }
+            }
+            if (nearest != null)
+            {
+                nearest.Scanned = true;
+                nearest.GlowTimer = 1.5f;
+                nearest.ScanCooldown = 30f; // don't re-scan for 30s
+                _passiveScanCooldown = PassiveScanInterval;
+                _scanLog.Add(nearest.Id);
+                EveAlert(nearest.ScanL1Text, 4f);
+            }
+        }
+        // Tick scannable cooldowns
+        foreach (var sc in _scannables)
+        {
+            if (sc.ScanCooldown > 0) sc.ScanCooldown -= dt;
+            if (sc.GlowTimer > 0) sc.GlowTimer -= dt;
+        }
+
         // Update EVE position every frame
         if (_eveOrbActive)
         {
@@ -1330,7 +1414,13 @@ public class Game1 : Game
                         }
                         if (_player.IsLyingDown)
                             _player.UpdateStandUp(dt);
-                        if (_wakeUpTimer >= 8f) { _wakeUpPhase = 3; _wakeUpTimer = 0; }
+                        if (_wakeUpTimer >= 8f)
+                        {
+                            _wakeUpPhase = 3; _wakeUpTimer = 0;
+                            // EVE patches Adam's suit servos
+                            _player.CureInjury();
+                            EveAlert("Micro-fractures in the suit servos. Compensating.");
+                        }
                         break;
                     }
                     case 3: // Control given (0-2s) — zoom 1.2 → 1.0
@@ -1466,6 +1556,24 @@ public class Game1 : Game
                         _scanTimer = ScanDuration;
                         _scanTarget = bestType;
                         _scanTargetPos = bestPos;
+                    }
+                    else
+                    {
+                        // Check scannables for L2 scan
+                        ScannableObject bestScannable = null;
+                        float bestScDist = PassiveScanRange;
+                        foreach (var sc in _scannables)
+                        {
+                            if (string.IsNullOrEmpty(sc.ScanL2Text)) continue;
+                            float d = Vector2.Distance(pc, sc.Position);
+                            if (d < bestScDist) { bestScDist = d; bestScannable = sc; }
+                        }
+                        if (bestScannable != null)
+                        {
+                            bestScannable.GlowTimer = 2f;
+                            EveAlert(bestScannable.ScanL2Text, 6f);
+                            _scanLog.Add(bestScannable.Id + "-L2");
+                        }
                     }
                 }
                 else if (_isScanning)
@@ -2098,6 +2206,25 @@ public class Game1 : Game
                         if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration * 1.5f; _shakeIntensity = ws.ShakeIntensity * 1.2f; }
                         if (_deathParticlesEnabled) SpawnDeathParticles(new Vector2(bird.Position.X + Bird.Width / 2f, bird.Position.Y + Bird.Height / 2f), new Color(110, 85, 55));
                     }
+                }
+            }
+        }
+
+        // Track kills before removal
+        foreach (var c in _creatures)
+        {
+            if (!c.Alive && c.Hp <= 0)
+            {
+                _totalKills++;
+                string area = _worldGraph?.GetRoom(_currentRoomId)?.AreaId ?? "unknown";
+                _areaKillCounts.TryGetValue(area, out int count);
+                _areaKillCounts[area] = count + 1;
+                // Check if passive/fleeing creature → EVE silence
+                bool isPassive = c is Crawler cr && (cr.Variant == CrawlerVariant.Forager || cr.Variant == CrawlerVariant.Skitter);
+                if (isPassive)
+                {
+                    _passiveCreatureKills++;
+                    _eveSilenceTimer += EveSilencePerPassiveKill;
                 }
             }
         }
@@ -6313,6 +6440,8 @@ public class Game1 : Game
                 _wakeUpPhase = 0;
                 _player.IsLyingDown = true;
                 _player.StandUpProgress = 0f;
+                _player.IsInjured = true;
+                _player.ApplyTierConstants(); // apply injured debuff
             }
         }
     }
@@ -8731,6 +8860,18 @@ public class Game1 : Game
                 float scanTotal = hexSpacing * 4f;
                 float scanY = mapCY - scanTotal * 0.5f + ((_eveMapTimer * 15f) % scanTotal);
                 _spriteBatch.Draw(_pixel, new Rectangle((int)(mapCX - hexSpacing * 1.5f), (int)scanY, (int)(hexSpacing * 3f), 1), Color.Cyan * (0.1f * projAlpha));
+            }
+        }
+
+        // Draw scannable object glows
+        foreach (var sc in _scannables)
+        {
+            if (sc.GlowTimer > 0)
+            {
+                float glowAlpha = MathHelper.Clamp(sc.GlowTimer, 0, 1) * 0.4f;
+                float pulse = 1f + 0.3f * MathF.Sin(sc.GlowTimer * 8f);
+                int glowR = (int)(12f * pulse);
+                _spriteBatch.Draw(_pixel, new Rectangle((int)(sc.Position.X - glowR), (int)(sc.Position.Y - glowR), glowR * 2, glowR * 2), Color.CornflowerBlue * glowAlpha);
             }
         }
 
