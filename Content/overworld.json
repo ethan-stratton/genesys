@@ -11,7 +11,8 @@
       "cleared": true,
       "connections": [
         "the-descent",
-        "debug-room"
+        "debug-room",
+        "crashsite"
       ],
       "ShownName": "The Garden"
     },
@@ -26,7 +27,8 @@
       "cleared": true,
       "connections": [
         "test-arena",
-        "the-gauntlet"
+        "the-gauntlet",
+        "crashsite"
       ],
       "ShownName": "The Descent"
     },
@@ -72,6 +74,21 @@
         "test-arena"
       ],
       "ShownName": "Debug Room"
+    },
+    {
+      "id": "crashsite",
+      "name": "Crash Site",
+      "displayName": "Crash Site",
+      "x": 100,
+      "y": 250,
+      "level": "crashsite",
+      "discovered": true,
+      "cleared": false,
+      "connections": [
+        "test-arena",
+        "the-descent"
+      ],
+      "ShownName": "Crash Site"
     }
   ],
   "startNode": "test-arena"

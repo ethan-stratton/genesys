@@ -1,12 +1,12 @@
 {
   "currentLevel": "the-descent",
-  "spawnX": 80,
-  "spawnY": 496,
+  "spawnX": 17.999939,
+  "spawnY": 472,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 1073.195,
+  "playTime": 1076.9243,
   "meleeInventory": [
     "Knife",
     "Stick"
