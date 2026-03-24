@@ -82,5 +82,11 @@
   "npcs": [],
   "items": [],
   "objects": [],
-  "enemies": []
+  "enemies": [],
+  "neighbors": {
+    "left": "",
+    "right": "",
+    "up": "",
+    "down": ""
+  }
 }

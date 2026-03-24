@@ -358,10 +358,35 @@ function selectRoom(id) {
   const emptyOpt = '<option value="">(none)</option>';
   
   function sel(dir) {
-    const val = n[dir] || '';
-    return `<select onchange="setNeighbor('${id}','${dir}',this.value)">
-      ${emptyOpt}${options.replace(`value="${val}"`, `value="${val}" selected`)}
-    </select>`;
+    const zones = getZones(level.neighbors[dir]);
+    const emptyOpt = '<option value="">(none)</option>';
+    
+    if (zones.length <= 1) {
+      // Simple mode: single dropdown + button to add zone
+      const val = zones.length === 1 ? zones[0].target : '';
+      return `<div>
+        <select onchange="setNeighborSimple('${id}','${dir}',this.value)">
+          ${emptyOpt}${options.replace(new RegExp('value="'+val+'"'), 'value="'+val+'" selected')}
+        </select>
+        <button onclick="addZone('${id}','${dir}')" title="Split edge" style="font-size:10px;padding:2px 5px;margin-left:4px">+</button>
+      </div>`;
+    } else {
+      // Multi-zone mode
+      let html = '';
+      for (let i = 0; i < zones.length; i++) {
+        const z = zones[i];
+        html += `<div style="display:flex;gap:4px;align-items:center;margin:2px 0;">
+          <input type="number" value="${z.from}" step="0.1" min="0" max="1" style="width:40px;background:#1a1a2e;color:#eee;border:1px solid #533483;font-size:11px;padding:2px" onchange="updateZone('${id}','${dir}',${i},'from',this.value)">–
+          <input type="number" value="${z.to}" step="0.1" min="0" max="1" style="width:40px;background:#1a1a2e;color:#eee;border:1px solid #533483;font-size:11px;padding:2px" onchange="updateZone('${id}','${dir}',${i},'to',this.value)">
+          <select style="flex:1;background:#1a1a2e;color:#eee;border:1px solid #533483;font-size:11px;padding:2px" onchange="updateZone('${id}','${dir}',${i},'target',this.value)">
+            ${emptyOpt}${options.replace(new RegExp('value="'+z.target+'"'), 'value="'+z.target+'" selected')}
+          </select>
+          <button onclick="removeZone('${id}','${dir}',${i})" style="font-size:10px;padding:2px 4px;color:#e94560">×</button>
+        </div>`;
+      }
+      html += `<button onclick="addZone('${id}','${dir}')" style="font-size:10px;padding:2px 5px;margin-top:2px">+ zone</button>`;
+      return html;
+    }
   }
   
   panel.innerHTML = `
@@ -400,6 +425,61 @@ window.setNeighbor = function(roomId, dir, value) {
   if (!levels[roomId]) return;
   if (!levels[roomId].neighbors) levels[roomId].neighbors = {};
   levels[roomId].neighbors[dir] = value;
+  dirty = true;
+  setStatus('Unsaved changes');
+  draw();
+};
+
+// Parse neighbor value into zones array
+function getZones(val) {
+  if (!val) return [];
+  if (typeof val === 'string') {
+    return val ? [{ target: val, from: 0, to: 1 }] : [];
+  }
+  if (Array.isArray(val)) return val;
+  return [];
+}
+
+window.setNeighborSimple = function(roomId, dir, value) {
+  if (!levels[roomId]) return;
+  if (!levels[roomId].neighbors) levels[roomId].neighbors = {};
+  levels[roomId].neighbors[dir] = value || '';
+  dirty = true;
+  setStatus('Unsaved changes');
+  draw();
+};
+
+window.addZone = function(roomId, dir) {
+  const n = levels[roomId].neighbors;
+  const zones = getZones(n[dir]);
+  zones.push({ target: '', from: 0, to: 1 });
+  n[dir] = zones;
+  dirty = true;
+  setStatus('Unsaved changes');
+  selectRoom(roomId);
+  draw();
+};
+
+window.removeZone = function(roomId, dir, idx) {
+  const n = levels[roomId].neighbors;
+  let zones = getZones(n[dir]);
+  zones.splice(idx, 1);
+  // Collapse back to simple string if 0 or 1 zones
+  if (zones.length === 0) n[dir] = '';
+  else if (zones.length === 1 && zones[0].from === 0 && zones[0].to === 1) n[dir] = zones[0].target;
+  else n[dir] = zones;
+  dirty = true;
+  setStatus('Unsaved changes');
+  selectRoom(roomId);
+  draw();
+};
+
+window.updateZone = function(roomId, dir, idx, field, value) {
+  const n = levels[roomId].neighbors;
+  let zones = getZones(n[dir]);
+  if (field === 'from' || field === 'to') zones[idx][field] = parseFloat(value);
+  else zones[idx][field] = value;
+  n[dir] = zones;
   dirty = true;
   setStatus('Unsaved changes');
   draw();

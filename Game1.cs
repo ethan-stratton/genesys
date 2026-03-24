@@ -666,10 +666,10 @@ public class Game1 : Game
         _level = LevelData.Load(path);
         Player.WorldLeft = _level.Bounds.Left;
         Player.WorldRight = _level.Bounds.Right;
-        Player.HasLeftNeighbor = !string.IsNullOrEmpty(_level.Neighbors?.Left);
-        Player.HasRightNeighbor = !string.IsNullOrEmpty(_level.Neighbors?.Right);
-        Player.HasUpNeighbor = !string.IsNullOrEmpty(_level.Neighbors?.Up);
-        Player.HasDownNeighbor = !string.IsNullOrEmpty(_level.Neighbors?.Down);
+        Player.HasLeftNeighbor = _level.Neighbors?.HasNeighbor("left") == true;
+        Player.HasRightNeighbor = _level.Neighbors?.HasNeighbor("right") == true;
+        Player.HasUpNeighbor = _level.Neighbors?.HasNeighbor("up") == true;
+        Player.HasDownNeighbor = _level.Neighbors?.HasNeighbor("down") == true;
 
         // Clear enemies (SpawnEnemiesFromLevel re-populates if needed)
         _swarms.Clear();
@@ -3496,37 +3496,46 @@ public class Game1 : Game
             var bounds = _level.Bounds;
             float px = _player.Position.X;
             float py = _player.Position.Y;
-            float pcx = px + Player.Width / 2f;  // player center X
-            float pcy = py + Player.Height / 2f;  // player center Y
+            float pcx = px + Player.Width / 2f;
+            float pcy = py + Player.Height / 2f;
             string neighbor = null;
             string dir = null;
             
-            // Check each edge — only trigger if the tile at the crossing point is empty
             var tg = _level.TileGridInstance;
+            float boundsW = bounds.Right - bounds.Left;
+            float boundsH = bounds.Bottom - bounds.Top;
             
-            if (px < bounds.Left - 4 && _level.Neighbors.Left != "")
+            if (px < bounds.Left - 4 && _level.Neighbors.HasNeighbor("left"))
             {
                 int checkX = bounds.Left + 2;
                 bool open = tg == null || !TileProperties.IsSolid(tg.GetTile(checkX, (int)pcy));
-                if (open) { neighbor = _level.Neighbors.Left; dir = "left"; }
+                float edgePos = boundsH > 0 ? (pcy - bounds.Top) / boundsH : 0.5f;
+                string resolved = _level.Neighbors.ResolveEdge("left", edgePos);
+                if (open && resolved != "") { neighbor = resolved; dir = "left"; }
             }
-            else if (px + Player.Width > bounds.Right + 4 && _level.Neighbors.Right != "")
+            else if (px + Player.Width > bounds.Right + 4 && _level.Neighbors.HasNeighbor("right"))
             {
                 int checkX = bounds.Right - 2;
                 bool open = tg == null || !TileProperties.IsSolid(tg.GetTile(checkX, (int)pcy));
-                if (open) { neighbor = _level.Neighbors.Right; dir = "right"; }
+                float edgePos = boundsH > 0 ? (pcy - bounds.Top) / boundsH : 0.5f;
+                string resolved = _level.Neighbors.ResolveEdge("right", edgePos);
+                if (open && resolved != "") { neighbor = resolved; dir = "right"; }
             }
-            else if (py < bounds.Top - 4 && _level.Neighbors.Up != "")
+            else if (py < bounds.Top - 4 && _level.Neighbors.HasNeighbor("up"))
             {
                 int checkY = bounds.Top + 2;
                 bool open = tg == null || !TileProperties.IsSolid(tg.GetTile((int)pcx, checkY));
-                if (open) { neighbor = _level.Neighbors.Up; dir = "up"; }
+                float edgePos = boundsW > 0 ? (pcx - bounds.Left) / boundsW : 0.5f;
+                string resolved = _level.Neighbors.ResolveEdge("up", edgePos);
+                if (open && resolved != "") { neighbor = resolved; dir = "up"; }
             }
-            else if (py + Player.Height > bounds.Bottom + 4 && _level.Neighbors.Down != "")
+            else if (py + Player.Height > bounds.Bottom + 4 && _level.Neighbors.HasNeighbor("down"))
             {
                 int checkY = bounds.Bottom - 2;
                 bool open = tg == null || !TileProperties.IsSolid(tg.GetTile((int)pcx, checkY));
-                if (open) { neighbor = _level.Neighbors.Down; dir = "down"; }
+                float edgePos = boundsW > 0 ? (pcx - bounds.Left) / boundsW : 0.5f;
+                string resolved = _level.Neighbors.ResolveEdge("down", edgePos);
+                if (open && resolved != "") { neighbor = resolved; dir = "down"; }
             }
             
             if (neighbor != null)

@@ -454,7 +454,7 @@
       "size": "normal"
     },
     {
-      "text": "Up \u002B attack for rising strike",
+      "text": "Up + attack for rising strike",
       "x": 4228,
       "y": 70,
       "color": "Gray",
@@ -601,7 +601,7 @@
       "size": "small"
     },
     {
-      "text": "SD\u002BK or SA\u002BK to blade dash!",
+      "text": "SD+K or SA+K to blade dash!",
       "x": 6168,
       "y": 96,
       "color": "Yellow",
@@ -5041,5 +5041,11 @@
       1,
       1
     ]
+  },
+  "neighbors": {
+    "left": "",
+    "right": "",
+    "up": "",
+    "down": ""
   }
 }

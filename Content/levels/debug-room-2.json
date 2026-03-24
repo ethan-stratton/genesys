@@ -164,7 +164,7 @@
       "size": "small"
     },
     {
-      "text": "4\u002B crawlers nearby = SWARM OVERRIDE",
+      "text": "4+ crawlers nearby = SWARM OVERRIDE",
       "x": 200,
       "y": 40,
       "color": "Green",
@@ -2089,5 +2089,11 @@
       1,
       1
     ]
+  },
+  "neighbors": {
+    "left": "",
+    "right": "",
+    "up": "",
+    "down": ""
   }
 }

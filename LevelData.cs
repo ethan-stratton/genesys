@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -391,10 +392,82 @@ public class ShelterData
     [JsonPropertyName("name")] public string Name { get; set; } = "Shelter"; // display name
 }
 
+public class NeighborZone
+{
+    [JsonPropertyName("target")] public string Target { get; set; } = "";
+    [JsonPropertyName("from")] public float From { get; set; } = 0f;
+    [JsonPropertyName("to")] public float To { get; set; } = 1f;
+}
+
 public class NeighborData
 {
-    [JsonPropertyName("left")] public string Left { get; set; } = "";
-    [JsonPropertyName("right")] public string Right { get; set; } = "";
-    [JsonPropertyName("up")] public string Up { get; set; } = "";
-    [JsonPropertyName("down")] public string Down { get; set; } = "";
+    // Each direction can be: "" (none), "level-name" (whole edge), or [{ target, from, to }, ...] (zones)
+    [JsonPropertyName("left")] public JsonElement? Left { get; set; }
+    [JsonPropertyName("right")] public JsonElement? Right { get; set; }
+    [JsonPropertyName("up")] public JsonElement? Up { get; set; }
+    [JsonPropertyName("down")] public JsonElement? Down { get; set; }
+
+    /// <summary>Parse a direction into zone list. Handles string, array-of-objects, or null.</summary>
+    public static List<NeighborZone> ParseEdge(JsonElement? el)
+    {
+        if (el == null || el.Value.ValueKind == JsonValueKind.Null || el.Value.ValueKind == JsonValueKind.Undefined)
+            return new List<NeighborZone>();
+        if (el.Value.ValueKind == JsonValueKind.String)
+        {
+            string s = el.Value.GetString() ?? "";
+            if (string.IsNullOrEmpty(s)) return new List<NeighborZone>();
+            return new List<NeighborZone> { new NeighborZone { Target = s, From = 0f, To = 1f } };
+        }
+        if (el.Value.ValueKind == JsonValueKind.Array)
+        {
+            var list = new List<NeighborZone>();
+            foreach (var item in el.Value.EnumerateArray())
+            {
+                var zone = new NeighborZone();
+                if (item.TryGetProperty("target", out var t)) zone.Target = t.GetString() ?? "";
+                if (item.TryGetProperty("from", out var f)) zone.From = f.GetSingle();
+                if (item.TryGetProperty("to", out var to)) zone.To = to.GetSingle();
+                if (!string.IsNullOrEmpty(zone.Target)) list.Add(zone);
+            }
+            return list;
+        }
+        return new List<NeighborZone>();
+    }
+
+    public List<NeighborZone> LeftZones => ParseEdge(Left);
+    public List<NeighborZone> RightZones => ParseEdge(Right);
+    public List<NeighborZone> UpZones => ParseEdge(Up);
+    public List<NeighborZone> DownZones => ParseEdge(Down);
+
+    /// <summary>Find which neighbor to load given a position along the edge (0.0–1.0).</summary>
+    public string ResolveEdge(string dir, float pos)
+    {
+        var zones = dir switch
+        {
+            "left" => LeftZones,
+            "right" => RightZones,
+            "up" => UpZones,
+            "down" => DownZones,
+            _ => new List<NeighborZone>()
+        };
+        foreach (var z in zones)
+        {
+            if (pos >= z.From && pos <= z.To) return z.Target;
+        }
+        return "";
+    }
+
+    /// <summary>Check if any neighbor exists in this direction.</summary>
+    public bool HasNeighbor(string dir)
+    {
+        var zones = dir switch
+        {
+            "left" => LeftZones,
+            "right" => RightZones,
+            "up" => UpZones,
+            "down" => DownZones,
+            _ => new List<NeighborZone>()
+        };
+        return zones.Count > 0;
+    }
 }
