@@ -112,11 +112,26 @@ function getColor(id) {
 
 async function loadLevels() {
   const res = await fetch('/api/levels');
-  levels = await res.json();
+  const data = await res.json();
+  levels = data.levels;
   levelIds = Object.keys(levels);
   
-  // Initial layout: use bounds to estimate relative positions
-  autoLayout();
+  // Use saved layout if available, otherwise auto-layout
+  const savedLayout = data.layout || {};
+  if (Object.keys(savedLayout).length > 0) {
+    roomPositions = savedLayout;
+    // Place any new rooms not in saved layout
+    let ox = 0;
+    for (const id of levelIds) {
+      if (!roomPositions[id]) {
+        roomPositions[id] = { x: -200 + ox, y: 500 };
+        ox += 150;
+      }
+    }
+  } else {
+    autoLayout();
+  }
+  
   setStatus(`Loaded ${levelIds.length} rooms`);
   draw();
 }
@@ -398,7 +413,7 @@ async function saveAll() {
   const res = await fetch('/api/save', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(neighbors),
+    body: JSON.stringify({ neighbors, layout: roomPositions }),
   });
   const data = await res.json();
   if (data.ok) {

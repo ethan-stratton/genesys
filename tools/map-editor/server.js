@@ -3,7 +3,16 @@ const fs = require('fs');
 const path = require('path');
 
 const LEVELS_DIR = path.join(__dirname, '../../Content/levels');
+const LAYOUT_FILE = path.join(__dirname, 'layout.json');
 const PORT = 4000;
+
+function loadLayout() {
+  try { return JSON.parse(fs.readFileSync(LAYOUT_FILE, 'utf8')); } catch { return {}; }
+}
+
+function saveLayout(positions) {
+  fs.writeFileSync(LAYOUT_FILE, JSON.stringify(positions, null, 2));
+}
 
 function getLevels() {
   const files = fs.readdirSync(LEVELS_DIR).filter(f => f.endsWith('.json'));
@@ -70,7 +79,7 @@ const server = http.createServer((req, res) => {
   }
   if (req.method === 'GET' && req.url === '/api/levels') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(getLevels()));
+    res.end(JSON.stringify({ levels: getLevels(), layout: loadLayout() }));
     return;
   }
   if (req.method === 'POST' && req.url === '/api/save') {
@@ -79,7 +88,8 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
       try {
         const data = JSON.parse(body);
-        saveAllNeighbors(data);
+        if (data.neighbors) saveAllNeighbors(data.neighbors);
+        if (data.layout) saveLayout(data.layout);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true }));
       } catch (e) {
