@@ -257,9 +257,17 @@ public class Player
     public const int UppercutHitboxW = 20;
     public const int UppercutHitboxH = 30;
 
-    // Dash (double-tap A or D)
+    // Dash (double-tap A or D) — universal burst, tier-flavored
     public bool IsDashing { get; private set; }
-    private const float DashSpeed = 330f;
+    private float _dashTimer;
+    private const float TechDashSpeed = 350f;
+    private const float TechDashDuration = 0.15f; // short jet burst
+    private const float BioDashSpeed = 300f;
+    private const float BioDashDuration = 0.12f; // quick leap
+    private const float CipherDashSpeed = 400f;
+    private const float CipherDashDuration = 0.18f; // longest, can aim
+    private const float DashCooldown = 0.4f;
+    private float _dashCooldownTimer;
     private float _lastATapTime;
     private float _lastDTapTime;
     private bool _aWasUp;
@@ -480,6 +488,7 @@ public class Player
     // Debug getters for tier display
     public float GetTierSpeed() => _speed;
     public float GetTierAccel() => _runAccel;
+    public float GetDashSpeed() => CurrentTier switch { MoveTier.Tech => TechDashSpeed, MoveTier.Bio => BioDashSpeed, _ => CipherDashSpeed };
     public float GetTierAirMult() => _airMult;
     public float GetTierJump() => _jumpForce;
     public bool IsChargingJump => _chargingJump;
@@ -595,7 +604,7 @@ public class Player
     /// <summary>Release grapple and keep velocity with a small boost.</summary>
     public void ReleaseGrapple()
     {
-        if (!IsGrappling && !IsGrappleFiring) return;
+        if (!IsGrappling && !IsGrappleFiring && !IsGrapplePulling) return;
         
         if (IsGrappling)
         {
@@ -1059,7 +1068,7 @@ public class Player
                 if (MathF.Abs(playerCenterX - rx) < 16f && playerCenterY >= rt && playerCenterY <= rb)
                 {
                     nearAnyRope = true;
-                    if (!_ropeDisengaged && !IsSliding && !IsDashing && !IsVaultKicking && !IsBladeDashing && !IsCartwheeling && !IsUppercutting && !IsFlipping)
+                    if (!_ropeDisengaged && !IsSliding && !IsDashing && !IsVaultKicking && !IsBladeDashing && !IsCartwheeling && !IsUppercutting && !IsFlipping && !IsGrappling && !IsGrappleFiring && !IsGrappleRetracting)
                     {
                         IsOnRope = true;
                         _ropeX = rx;
@@ -1162,7 +1171,8 @@ public class Player
 
         // (raw input moved up, was here)
 
-        // --- Dash detection (double-tap A or D) ---
+        // --- Dash detection (double-tap A or D) — burst dash, tier-flavored ---
+        _dashCooldownTimer = Math.Max(0, _dashCooldownTimer - dt);
         if (!EnableDash) IsDashing = false;
         else
         {
@@ -1173,37 +1183,33 @@ public class Player
         if (aDown && _aWasUp)
         {
             _aWasUp = false;
-            if (now_dash - _lastATapTime < DashDoubleTapWindow && _wasGrounded)
-            { IsDashing = true; _dashDir = -1; SetSquash(1.25f, 0.8f); }
+            bool canDash = _dashCooldownTimer <= 0 && (CurrentTier == MoveTier.Cipher || _wasGrounded);
+            if (now_dash - _lastATapTime < DashDoubleTapWindow && canDash)
+            { IsDashing = true; _dashDir = -1; _dashTimer = 0; _dashCooldownTimer = DashCooldown; SetSquash(1.25f, 0.8f); }
             _lastATapTime = now_dash;
         }
         if (!dDown) _dWasUp = true;
         if (dDown && _dWasUp)
         {
             _dWasUp = false;
-            if (now_dash - _lastDTapTime < DashDoubleTapWindow && _wasGrounded)
-            { IsDashing = true; _dashDir = 1; SetSquash(1.25f, 0.8f); }
+            bool canDash = _dashCooldownTimer <= 0 && (CurrentTier == MoveTier.Cipher || _wasGrounded);
+            if (now_dash - _lastDTapTime < DashDoubleTapWindow && canDash)
+            { IsDashing = true; _dashDir = 1; _dashTimer = 0; _dashCooldownTimer = DashCooldown; SetSquash(1.25f, 0.8f); }
             _lastDTapTime = now_dash;
         }
-        // Stop dashing when you release the dash direction key or press opposite
         if (IsDashing)
         {
-            if (inputX == -_dashDir)
+            float dashDur = CurrentTier switch { MoveTier.Tech => TechDashDuration, MoveTier.Bio => BioDashDuration, _ => CipherDashDuration };
+            _dashTimer += dt;
+            if (_dashTimer >= dashDur || inputX == -_dashDir)
             {
                 IsDashing = false;
-                IsSprinting = false;
-            }
-            else if ((_dashDir == -1 && !aDown) || (_dashDir == 1 && !dDown))
-            {
-                // Released dash key — stop dash, but if still holding direction, enter sprint
-                IsDashing = false;
-                IsSprinting = false;
-            }
-            else if (CurrentTier == MoveTier.Tech && IsGrounded)
-            {
-                // Dash naturally continues — transition to sprint state
-                IsSprinting = true;
-                _sprintDir = _dashDir;
+                // Tech: dash ends into sprint if still holding direction
+                if (CurrentTier == MoveTier.Tech && inputX == _dashDir && IsGrounded)
+                {
+                    IsSprinting = true;
+                    _sprintDir = _dashDir;
+                }
             }
         }
         }
@@ -1742,7 +1748,7 @@ public class Player
                 // Chain into dash automatically
                 IsDashing = true;
                 _dashDir = _bladeDashDir;
-                vel.X = _bladeDashDir * DashSpeed;
+                vel.X = _bladeDashDir * GetDashSpeed();
             }
         }
         else if (IsSliding)
@@ -1822,7 +1828,7 @@ public class Player
         }
         else
         {
-            float moveSpeed = (IsDashing && inputX == _dashDir) ? DashSpeed : _speed;
+            float moveSpeed = (IsDashing && inputX == _dashDir) ? GetDashSpeed() : _speed;
             if (SpeedBoostTimer > 0) moveSpeed *= SpeedBoostMultiplier;
 
             // Tech Sprint: dash transitions into sprint (hold direction after dash ends)
