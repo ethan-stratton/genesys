@@ -299,8 +299,8 @@ public class Player
     public Vector2 AimDir { get; private set; }
 
     // Health
-    public int MaxHp { get; set; } = 100;
-    public int Hp { get; set; } = 100;
+    public int MaxHp { get; set; } = 10;
+    public int Hp { get; set; } = 10;
     public float DamageCooldown { get; set; }
     private const float DamageCooldownTime = 1.0f;
     private const float KnockbackSpeed = 200f;

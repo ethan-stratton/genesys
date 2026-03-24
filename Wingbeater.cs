@@ -12,7 +12,7 @@ namespace Genesis;
 public class Wingbeater : Creature
 {
     public Vector2 SpawnPos;
-    public int ContactDamage = 10;
+    public int ContactDamage = 2;
     public bool Passive = false;
     public const int Width = 20, Height = 14;
 

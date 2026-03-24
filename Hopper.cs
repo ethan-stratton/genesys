@@ -34,7 +34,7 @@ public class Hopper : Creature
     private const float RestTime = 0.6f;
     private const float WindUpTime = 0.2f;
     private const float LandingTime = 0.15f;
-    private const int ContactDamage = 6;
+    private const int ContactDamage = 1;
 
     private int _hopCount;
     private int _dir;

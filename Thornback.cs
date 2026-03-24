@@ -42,7 +42,7 @@ public class Thornback : Creature
         if (Rect.Intersects(playerRect))
         {
             DamageCooldown = 0.5f;
-            return 8;
+            return 2;
         }
         return 0;
     }

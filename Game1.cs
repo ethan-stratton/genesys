@@ -256,7 +256,7 @@ public class Game1 : Game
     private float _totalTime;
 
     // Suit integrity (0-100, placeholder — decreases from tech suppression field)
-    private float _suitIntegrity = 85f; // starts damaged from crash
+    private float _suitIntegrity = 30f; // starts heavily damaged from crash
 
     // EVE status
     private enum EveStatus { Ok, Scanning, Overheat, Offline }
@@ -2425,7 +2425,7 @@ public class Game1 : Game
                         var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.SpriteW, Player.SpriteH);
                         if (sRect.Intersects(pRect) && c.DamageCooldown <= 0)
                         {
-                            int dmg = c.Variant == CrawlerVariant.Leaper ? 5 : 2;
+                            int dmg = c.Variant == CrawlerVariant.Leaper ? 2 : 1;
                             _lastDamageSource = "Crawler Swarm";
                             _player.TakeDamage(dmg, _player.Position.X - c.Position.X);
                             c.DamageCooldown = 0.8f;
@@ -2802,7 +2802,7 @@ public class Game1 : Game
                 if (!item.Collected && item.ItemType == "heart" && pRect.Intersects(item.Rect))
                 {
                     item.Collected = true;
-                    _player.Hp = Math.Min(_player.Hp + 25, _player.MaxHp);
+                    _player.Hp = Math.Min(_player.Hp + 3, _player.MaxHp);
                 }
             }
         }
@@ -2965,7 +2965,7 @@ public class Game1 : Game
                         case "bow": EquipRanged(WeaponType.Bow); break;
                         case "gun": EquipRanged(WeaponType.Gun); break;
                         case "heart":
-                            _player.Hp = Math.Min(_player.Hp + 25, _player.MaxHp);
+                            _player.Hp = Math.Min(_player.Hp + 3, _player.MaxHp);
                             break;
                     }
                     break; // pick up one at a time
@@ -2985,7 +2985,7 @@ public class Game1 : Game
                     if (_spawnInvincibility <= 0f)
                     {
                         _lastDamageSource = "Spikes";
-                        _player.TakeDamage(33, _player.Position.X - spike.Center.X);
+                        _player.TakeDamage(3, _player.Position.X - spike.Center.X);
                         if (_player.Hp <= 0) { _isDead = true; LogDeath(); }
                     }
                     break;
@@ -3050,7 +3050,7 @@ public class Game1 : Game
                     if (pRect.Intersects(spikeRect))
                     {
                         _lastDamageSource = "Spikes";
-                        _player.TakeDamage(33, _player.Position.X - spikeRect.Center.X);
+                        _player.TakeDamage(3, _player.Position.X - spikeRect.Center.X);
                         if (_player.Hp <= 0) { _isDead = true; LogDeath(); }
                         hit = true;
                     }
@@ -3086,7 +3086,7 @@ public class Game1 : Game
                                 if (_spawnInvincibility <= 0f)
                                 {
                                     _lastDamageSource = "Hazard";
-                                    _player.TakeDamage(5, _player.Position.X - tileRect.Center.X);
+                                    _player.TakeDamage(1, _player.Position.X - tileRect.Center.X);
                                     if (_player.Hp <= 0) { _isDead = true; LogDeath(); }
                                 }
                                 break;
@@ -6475,6 +6475,8 @@ public class Game1 : Game
                 _player.IsLyingDown = true;
                 _player.StandUpProgress = 0f;
                 _player.IsInjured = true;
+                _player.Hp = 2; // barely survived the crash
+                _suitIntegrity = 30f;
                 _player.ApplyTierConstants(); // apply injured debuff
             }
         }
