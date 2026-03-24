@@ -607,15 +607,15 @@ public class Player
         if (CurrentTier == MoveTier.Cipher)
         {
             if (_cipherTeleportCooldownTimer > 0 || IsCipherTeleporting) return false;
-            var center = Position + new Vector2(Width / 2f, Height / 2f);
-            var dir = target - center;
-            float dist = dir.Length();
+            var cCenter = Position + new Vector2(Width / 2f, Height / 2f);
+            var cDir = target - cCenter;
+            float dist = cDir.Length();
             if (dist < 1f) return false;
-            dir /= dist;
+            cDir /= dist;
             dist = Math.Min(dist, CipherTeleportMaxRange);
             
-            CipherTeleportStart = center;
-            CipherTeleportEnd = center + dir * dist;
+            CipherTeleportStart = cCenter;
+            CipherTeleportEnd = cCenter + cDir * dist;
             _cipherTeleportTimer = 0f;
             _cipherTeleportCooldownTimer = CipherTeleportCooldown;
             IsCipherTeleporting = true;
@@ -625,10 +625,10 @@ public class Player
             for (int i = 0; i < steps && i < MaxAfterimages; i++)
             {
                 float t = (float)i / steps;
-                var pos = Vector2.Lerp(CipherTeleportStart, CipherTeleportEnd, t);
+                var aiPos = Vector2.Lerp(CipherTeleportStart, CipherTeleportEnd, t);
                 _afterimages[(_afterimageIndex + i) % MaxAfterimages] = new Afterimage
                 {
-                    Position = new Vector2(pos.X - Width / 2f, pos.Y - Height / 2f),
+                    Position = new Vector2(aiPos.X - Width / 2f, aiPos.Y - Height / 2f),
                     SpriteRow = 0, SpriteFrame = 0,
                     FacingDir = FacingDir,
                     DrawHeight = Height,
@@ -2236,8 +2236,8 @@ public class Player
             float t = Math.Min(_cipherTeleportTimer / CipherTeleportDuration, 1f);
             // Ease-out for snappy arrival
             float eased = 1f - (1f - t) * (1f - t);
-            var pos = Vector2.Lerp(CipherTeleportStart, CipherTeleportEnd, eased);
-            Position = new Vector2(pos.X - Width / 2f, pos.Y - Height / 2f);
+            var tpPos = Vector2.Lerp(CipherTeleportStart, CipherTeleportEnd, eased);
+            Position = new Vector2(tpPos.X - Width / 2f, tpPos.Y - Height / 2f);
             Velocity = Vector2.Zero;
             
             if (t >= 1f)
