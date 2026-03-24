@@ -3472,47 +3472,51 @@ public class Game1 : Game
         }
 
         // === Edge-of-screen room transitions (Metroid style) ===
+        // Only transitions where tiles are open at the edge (not through solid walls)
         if (!_isDead && _level.Neighbors != null)
         {
             var bounds = _level.Bounds;
             float px = _player.Position.X;
             float py = _player.Position.Y;
+            float pcx = px + Player.Width / 2f;  // player center X
+            float pcy = py + Player.Height / 2f;  // player center Y
             string neighbor = null;
-            float newX = px, newY = py;
+            string dir = null;
+            
+            // Check each edge — only trigger if the tile at the crossing point is empty
+            var tg = _level.TileGridInstance;
             
             if (px < bounds.Left - 4 && _level.Neighbors.Left != "")
             {
-                neighbor = _level.Neighbors.Left;
-                // Will set X to right edge of new level after loading
+                // Check if tiles on left edge at player's Y are open
+                int checkX = bounds.Left + 2;
+                bool open = tg == null || !TileProperties.IsSolid(tg.GetTile(checkX, (int)pcy));
+                if (open) { neighbor = _level.Neighbors.Left; dir = "left"; }
             }
             else if (px + Player.Width > bounds.Right + 4 && _level.Neighbors.Right != "")
             {
-                neighbor = _level.Neighbors.Right;
+                int checkX = bounds.Right - 2;
+                bool open = tg == null || !TileProperties.IsSolid(tg.GetTile(checkX, (int)pcy));
+                if (open) { neighbor = _level.Neighbors.Right; dir = "right"; }
             }
             else if (py < bounds.Top - 4 && _level.Neighbors.Up != "")
             {
-                neighbor = _level.Neighbors.Up;
+                int checkY = bounds.Top + 2;
+                bool open = tg == null || !TileProperties.IsSolid(tg.GetTile((int)pcx, checkY));
+                if (open) { neighbor = _level.Neighbors.Up; dir = "up"; }
             }
             else if (py + Player.Height > bounds.Bottom + 4 && _level.Neighbors.Down != "")
             {
-                neighbor = _level.Neighbors.Down;
+                int checkY = bounds.Bottom - 2;
+                bool open = tg == null || !TileProperties.IsSolid(tg.GetTile((int)pcx, checkY));
+                if (open) { neighbor = _level.Neighbors.Down; dir = "down"; }
             }
             
             if (neighbor != null)
             {
-                string dir = neighbor == _level.Neighbors.Left ? "left"
-                           : neighbor == _level.Neighbors.Right ? "right"
-                           : neighbor == _level.Neighbors.Up ? "up" : "down";
-                           
-                // Save relative position along the crossing edge (0.0 to 1.0)
-                float relativePos = 0.5f;
-                float boundsW = bounds.Right - bounds.Left;
-                float boundsH = bounds.Bottom - bounds.Top;
-                if (dir == "left" || dir == "right")
-                    relativePos = boundsH > 0 ? (py - bounds.Top) / boundsH : 0.5f;
-                else
-                    relativePos = boundsW > 0 ? (px - bounds.Left) / boundsW : 0.5f;
-                
+                // Save absolute position for the axis we preserve
+                float savedAbsY = py;  // for left/right transitions
+                float savedAbsX = px;  // for up/down transitions
                 float savedVelX = _player.Velocity.X;
                 float savedVelY = _player.Velocity.Y;
                 
@@ -3525,34 +3529,32 @@ public class Game1 : Game
                     _camera = MakeCamera();
                     Restart();
                     
-                    // Position player on the opposite edge of the new level
                     var nb = _level.Bounds;
-                    float nbW = nb.Right - nb.Left;
-                    float nbH = nb.Bottom - nb.Top;
                     
                     switch (dir)
                     {
-                        case "left": // entered left, spawn at RIGHT edge of new room
+                        case "left": // entered left, spawn at RIGHT edge of new room, same Y
                             _player.Position = new Microsoft.Xna.Framework.Vector2(
-                                nb.Right - Player.Width - 8,
-                                nb.Top + relativePos * nbH);
+                                nb.Right - Player.Width - 8, savedAbsY);
                             break;
-                        case "right": // entered right, spawn at LEFT edge of new room
+                        case "right": // entered right, spawn at LEFT edge of new room, same Y
                             _player.Position = new Microsoft.Xna.Framework.Vector2(
-                                nb.Left + 8,
-                                nb.Top + relativePos * nbH);
+                                nb.Left + 8, savedAbsY);
                             break;
-                        case "up": // went up, spawn at BOTTOM of new room
+                        case "up": // went up, spawn at BOTTOM of new room, same X
                             _player.Position = new Microsoft.Xna.Framework.Vector2(
-                                nb.Left + relativePos * nbW,
-                                nb.Bottom - Player.Height - 8);
+                                savedAbsX, nb.Bottom - Player.Height - 8);
                             break;
-                        case "down": // went down, spawn at TOP of new room
+                        case "down": // went down, spawn at TOP of new room, same X
                             _player.Position = new Microsoft.Xna.Framework.Vector2(
-                                nb.Left + relativePos * nbW,
-                                nb.Top + 8);
+                                savedAbsX, nb.Top + 8);
                             break;
                     }
+                    
+                    // Clamp to new room bounds so player doesn't spawn inside walls
+                    float clX = MathHelper.Clamp(_player.Position.X, nb.Left + 4, nb.Right - Player.Width - 4);
+                    float clY = MathHelper.Clamp(_player.Position.Y, nb.Top + 4, nb.Bottom - Player.Height - 4);
+                    _player.Position = new Microsoft.Xna.Framework.Vector2(clX, clY);
                     
                     _player.Velocity = new Microsoft.Xna.Framework.Vector2(savedVelX, savedVelY);
                     _camera.SnapTo(_player.Position, Player.Width, Player.Height);
