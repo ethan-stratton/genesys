@@ -312,7 +312,7 @@
   ],
   "tileGrid": null,
   "neighbors": {
-    "left": "",
+    "left": "the-descent",
     "right": "",
     "up": "",
     "down": "the-gauntlet"

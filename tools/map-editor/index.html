@@ -358,17 +358,28 @@ function selectRoom(id) {
   const emptyOpt = '<option value="">(none)</option>';
   
   function sel(dir) {
-    const zones = getZones(level.neighbors[dir]);
+    const raw = level.neighbors ? level.neighbors[dir] : '';
+    const zones = getZones(raw);
+    const isMulti = Array.isArray(raw); // explicitly in multi mode
     const emptyOpt = '<option value="">(none)</option>';
     
-    if (zones.length <= 1) {
-      // Simple mode: single dropdown + button to add zone
+    function makeSelect(val, onChange) {
+      let opts = emptyOpt;
+      for (const lid of levelIds) {
+        if (lid === id) continue;
+        const name = levels[lid]?.name || lid;
+        const sel = lid === val ? ' selected' : '';
+        opts += `<option value="${lid}"${sel}>${name}</option>`;
+      }
+      return `<select style="flex:1;background:#1a1a2e;color:#eee;border:1px solid #533483;font-size:11px;padding:2px" onchange="${onChange}">${opts}</select>`;
+    }
+    
+    if (!isMulti) {
+      // Simple mode: single dropdown + button to split
       const val = zones.length === 1 ? zones[0].target : '';
-      return `<div>
-        <select onchange="setNeighborSimple('${id}','${dir}',this.value)">
-          ${emptyOpt}${options.replace(new RegExp('value="'+val+'"'), 'value="'+val+'" selected')}
-        </select>
-        <button onclick="addZone('${id}','${dir}')" title="Split edge" style="font-size:10px;padding:2px 5px;margin-left:4px">+</button>
+      return `<div style="display:flex;gap:4px;align-items:center">
+        ${makeSelect(val, `setNeighborSimple('${id}','${dir}',this.value)`)}
+        <button onclick="addZone('${id}','${dir}')" title="Split edge into zones" style="font-size:10px;padding:2px 5px">+</button>
       </div>`;
     } else {
       // Multi-zone mode
@@ -378,9 +389,7 @@ function selectRoom(id) {
         html += `<div style="display:flex;gap:4px;align-items:center;margin:2px 0;">
           <input type="number" value="${z.from}" step="0.1" min="0" max="1" style="width:40px;background:#1a1a2e;color:#eee;border:1px solid #533483;font-size:11px;padding:2px" onchange="updateZone('${id}','${dir}',${i},'from',this.value)">–
           <input type="number" value="${z.to}" step="0.1" min="0" max="1" style="width:40px;background:#1a1a2e;color:#eee;border:1px solid #533483;font-size:11px;padding:2px" onchange="updateZone('${id}','${dir}',${i},'to',this.value)">
-          <select style="flex:1;background:#1a1a2e;color:#eee;border:1px solid #533483;font-size:11px;padding:2px" onchange="updateZone('${id}','${dir}',${i},'target',this.value)">
-            ${emptyOpt}${options.replace(new RegExp('value="'+z.target+'"'), 'value="'+z.target+'" selected')}
-          </select>
+          ${makeSelect(z.target, `updateZone('${id}','${dir}',${i},'target',this.value)`)}
           <button onclick="removeZone('${id}','${dir}',${i})" style="font-size:10px;padding:2px 4px;color:#e94560">×</button>
         </div>`;
       }
@@ -451,9 +460,16 @@ window.setNeighborSimple = function(roomId, dir, value) {
 
 window.addZone = function(roomId, dir) {
   const n = levels[roomId].neighbors;
-  const zones = getZones(n[dir]);
-  zones.push({ target: '', from: 0, to: 1 });
-  n[dir] = zones;
+  let zones;
+  if (Array.isArray(n[dir])) {
+    zones = n[dir];
+  } else {
+    // Convert from simple string to array
+    const existing = n[dir] || '';
+    zones = existing ? [{ target: existing, from: 0, to: 0.5 }] : [];
+  }
+  zones.push({ target: '', from: zones.length > 0 ? 0.5 : 0, to: 1 });
+  n[dir] = zones; // always array now
   dirty = true;
   setStatus('Unsaved changes');
   selectRoom(roomId);

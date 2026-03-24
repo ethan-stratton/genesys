@@ -2545,7 +2545,18 @@
   },
   "neighbors": {
     "left": "test-arena",
-    "right": "the-gauntlet",
+    "right": [
+      {
+        "target": "the-gauntlet",
+        "from": 0.6,
+        "to": 1
+      },
+      {
+        "target": "",
+        "from": 0,
+        "to": 1
+      }
+    ],
     "up": "crashsite",
     "down": ""
   }
