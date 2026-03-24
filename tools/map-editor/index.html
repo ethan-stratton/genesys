@@ -383,10 +383,11 @@ function selectRoom(id) {
       </div>`;
     } else {
       // Multi-zone mode
-      let html = '';
+      let html = `<div style="font-size:10px;color:#e94560;margin-bottom:4px">${zones.length} zone(s)</div>`;
       for (let i = 0; i < zones.length; i++) {
         const z = zones[i];
-        html += `<div style="display:flex;gap:4px;align-items:center;margin:2px 0;">
+        html += `<div style="display:flex;gap:4px;align-items:center;margin:2px 0;padding:4px;background:#111;border:1px solid #333;border-radius:3px">
+          <span style="color:#e94560;font-size:10px;min-width:14px">${i+1}.</span>
           <input type="number" value="${z.from}" step="0.1" min="0" max="1" style="width:40px;background:#1a1a2e;color:#eee;border:1px solid #533483;font-size:11px;padding:2px" onchange="updateZone('${id}','${dir}',${i},'from',this.value)">–
           <input type="number" value="${z.to}" step="0.1" min="0" max="1" style="width:40px;background:#1a1a2e;color:#eee;border:1px solid #533483;font-size:11px;padding:2px" onchange="updateZone('${id}','${dir}',${i},'to',this.value)">
           ${makeSelect(z.target, `updateZone('${id}','${dir}',${i},'target',this.value)`)}
@@ -462,16 +463,15 @@ window.addZone = function(roomId, dir) {
   const n = levels[roomId].neighbors;
   let zones;
   if (Array.isArray(n[dir])) {
-    zones = n[dir];
+    zones = n[dir].slice(); // copy
   } else {
-    // Convert from simple string to array
     const existing = n[dir] || '';
     zones = existing ? [{ target: existing, from: 0, to: 0.5 }] : [];
   }
-  zones.push({ target: '', from: zones.length > 0 ? 0.5 : 0, to: 1 });
-  n[dir] = zones; // always array now
+  zones.push({ target: '', from: zones.length > 0 ? zones[zones.length-1].to : 0, to: 1 });
+  levels[roomId].neighbors[dir] = zones; // write directly to levels object
   dirty = true;
-  setStatus('Unsaved changes');
+  setStatus(`Unsaved — ${dir} now has ${zones.length} zones`);
   selectRoom(roomId);
   draw();
 };

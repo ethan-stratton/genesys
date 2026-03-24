@@ -2548,12 +2548,12 @@
     "right": [
       {
         "target": "the-gauntlet",
-        "from": 0.6,
-        "to": 1
+        "from": 0,
+        "to": 0.5
       },
       {
         "target": "",
-        "from": 0,
+        "from": 0.5,
         "to": 1
       }
     ],
