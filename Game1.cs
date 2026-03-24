@@ -1053,6 +1053,9 @@ public class Game1 : Game
         // Toggle menu with Escape (only open — closing is handled inside UpdateMenu)
         if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape) && !_menuOpen)
         {
+            // Close any map state first
+            _fullscreenMapOpen = false;
+            if (_eveProjectingMap) { _eveProjectingMap = false; _eveMode = EveMovementMode.Orbit; }
             _menuOpen = true;
             _settingsCategoryCursor = 0;
             _settingsActiveCategory = null;
@@ -1101,6 +1104,16 @@ public class Game1 : Game
         // Fullscreen map blocks gameplay input, handles scroll
         if (_fullscreenMapOpen)
         {
+            // Escape or M closes the map
+            if ((kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape)) ||
+                (kb.IsKeyDown(Keys.M) && _prevKb.IsKeyUp(Keys.M)))
+            {
+                _fullscreenMapOpen = false;
+                _eveProjectingMap = false;
+                _eveMode = EveMovementMode.Orbit;
+                _prevKb = kb;
+                return;
+            }
             float scrollSpeed = 3f;
             if (kb.IsKeyDown(Keys.W)) _fullscreenMapScroll.Y += scrollSpeed;
             if (kb.IsKeyDown(Keys.S)) _fullscreenMapScroll.Y -= scrollSpeed;
