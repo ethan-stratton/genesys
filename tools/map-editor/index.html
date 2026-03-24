@@ -21,7 +21,7 @@
   #toolbar button:hover { background: #533483; }
   #toolbar .status { margin-left: auto; font-size: 12px; color: #666; }
   
-  #canvas-wrap { position: fixed; top: 48px; left: 0; bottom: 0; }
+  #canvas-wrap { position: fixed; top: 48px; left: 0; bottom: 0; right: 356px; }
   canvas { width: 100%; height: 100%; display: block; }
   
   #sidebar-drag { position: fixed; top: 48px; bottom: 0; width: 6px; cursor: col-resize; background: #0f3460; z-index: 50; }
@@ -557,7 +557,14 @@ async function saveAll() {
 }
 
 function resetView() {
-  cam = { x: 400, y: 300, zoom: 1 };
+  // Center on the average of all room positions
+  let cx = 0, cy = 0, n = 0;
+  for (const id of levelIds) {
+    const p = roomPositions[id];
+    if (p) { cx += p.x; cy += p.y; n++; }
+  }
+  if (n > 0) { cx /= n; cy /= n; }
+  cam = { x: cx, y: cy, zoom: 1 };
   draw();
 }
 
