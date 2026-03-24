@@ -1,12 +1,12 @@
 {
-  "currentLevel": "test-arena",
-  "spawnX": 440.45856,
-  "spawnY": 472,
+  "currentLevel": "the-descent",
+  "spawnX": 80,
+  "spawnY": 496,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 803.98114,
+  "playTime": 846.1375,
   "meleeInventory": [
     "Knife",
     "Stick"
@@ -23,7 +23,7 @@
   ],
   "windowSizeIndex": 0,
   "crtEnabled": false,
-  "moveTier": 1,
+  "moveTier": 2,
   "upgrades": [],
   "shelterLevel": "debug-room",
   "shelterX": 400,

@@ -267,6 +267,11 @@ public class Game1 : Game
     #pragma warning restore CS0414
     private string _eveMessage = "";
 
+    // --- EVE Dialogue Log ---
+    private struct EveLogEntry { public string Text; public float Timestamp; }
+    private List<EveLogEntry> _eveDialogueLog = new();
+    private bool _eveLogVisible; // toggled in settings
+
     // --- EVE Map Projection ---
     private bool _hasMapModule;          // player found the cartographic module
     private bool _eveProjectingMap;      // EVE is on ground projecting mini-map
@@ -281,6 +286,8 @@ public class Game1 : Game
         if (!ignoresSilence && _eveSilenceTimer > 0) return; // EVE is silent
         _eveMessage = msg;
         _eveMessageTimer = duration;
+        _eveDialogueLog.Add(new EveLogEntry { Text = msg, Timestamp = _totalTime });
+        if (_eveDialogueLog.Count > 200) _eveDialogueLog.RemoveAt(0);
     }
 
     // EVE world position + movement system
@@ -680,17 +687,30 @@ public class Game1 : Game
     private void LoadScannables(string levelName)
     {
         // Scannable objects per level — defined in code for now, JSON later
+        // L1 = short tag (passive, auto-scan). L2/L3 = full dialogue (player-initiated).
         switch (levelName)
         {
             case "test-arena":
-                _scannables.Add(new ScannableObject { Id = "crash-debris-1", Position = new Vector2(300, 420), ScanL1Text = "Hull fragment. Thermal scoring consistent with atmospheric entry." });
-                _scannables.Add(new ScannableObject { Id = "alien-plant-1", Position = new Vector2(500, 400), ScanL1Text = "Bioluminescent root system. Photosynthesis... no. Chemosynthesis.", ScanL2Text = "Root network extends underground. Interconnected — nutrient sharing across specimens. Colonial organism." });
-                _scannables.Add(new ScannableObject { Id = "thermal-vent-1", Position = new Vector2(800, 430), ScanL1Text = "Thermal signature. Subsurface heat source — volcanic?" });
-                _scannables.Add(new ScannableObject { Id = "adapted-marking-1", Position = new Vector2(1200, 380), ScanL1Text = "Surface scoring. Tool marks? No — too regular. Unknown origin.", ScanL2Text = "Repeating pattern. Not natural erosion. Deliberate marking." });
-                _scannables.Add(new ScannableObject { Id = "chitin-fragment-1", Position = new Vector2(1600, 410), ScanL1Text = "Organic compound. Chitin derivative — exoskeletal.", ScanL2Text = "Cross-section shows growth rings. This was alive. Recently shed, not broken." });
+                _scannables.Add(new ScannableObject { Id = "crash-debris-1", Position = new Vector2(300, 420),
+                    ScanL1Text = "[Hull fragment]",
+                    ScanL2Text = "Thermal scoring consistent with atmospheric entry. Alloy stress fractures suggest... Adam, this impact should have been terminal." });
+                _scannables.Add(new ScannableObject { Id = "alien-plant-1", Position = new Vector2(500, 400),
+                    ScanL1Text = "[Bioluminescent flora]",
+                    ScanL2Text = "Not photosynthesis — chemosynthesis. Root network extends underground, interconnected. Nutrient sharing across specimens. This is one organism." });
+                _scannables.Add(new ScannableObject { Id = "thermal-vent-1", Position = new Vector2(800, 430),
+                    ScanL1Text = "[Thermal signature]",
+                    ScanL2Text = "Subsurface heat source. Not volcanic — too regular, too distributed. Something is circulating energy beneath us." });
+                _scannables.Add(new ScannableObject { Id = "adapted-marking-1", Position = new Vector2(1200, 380),
+                    ScanL1Text = "[Surface markings]",
+                    ScanL2Text = "Repeating pattern. Not natural erosion. Tool marks — deliberate. Someone made this." });
+                _scannables.Add(new ScannableObject { Id = "chitin-fragment-1", Position = new Vector2(1600, 410),
+                    ScanL1Text = "[Organic compound]",
+                    ScanL2Text = "Chitin derivative — exoskeletal. Growth rings indicate recent shedding. This was alive. Recently." });
                 break;
             case "debug-room":
-                _scannables.Add(new ScannableObject { Id = "test-scan-1", Position = new Vector2(400, 400), ScanL1Text = "Test scannable. EVE passive scan working." });
+                _scannables.Add(new ScannableObject { Id = "test-scan-1", Position = new Vector2(400, 400),
+                    ScanL1Text = "[Test object]",
+                    ScanL2Text = "EVE scan system test. If you're reading this, it works." });
                 break;
         }
     }
@@ -1112,6 +1132,10 @@ public class Game1 : Game
             _prevKb = kb; // consume the Escape press so UpdateMenu doesn't immediately close
         }
 
+        // L key — toggle EVE dialogue log
+        if (kb.IsKeyDown(Keys.L) && _prevKb.IsKeyUp(Keys.L) && !_menuOpen)
+            _eveLogVisible = !_eveLogVisible;
+
         // M key — EVE map projection toggle
         if (kb.IsKeyDown(Keys.M) && _prevKb.IsKeyUp(Keys.M) && !_menuOpen && !_dialogueOpen && _eveOrbActive)
         {
@@ -1441,7 +1465,17 @@ public class Game1 : Game
                             EveAlert("Try to move. Carefully.", 3f);
                             // Save EVE state so Continue remembers her
                             _saveData.Flags["eveOrbActive"] = true;
+                            _scanL2Available = true; // EVE's scanner is online
                             SyncInventoryToSave(); _saveData.Save();
+                        }
+                        // Delayed crash survival hint (5s after control given)
+                        if (_wakeUpTimer >= 5f && _wakeUpTimer < 5f + dt * 2f)
+                        {
+                            EveAlert("Adam... I've lost all telemetry from the descent. Flight recorder is gone.", 5f);
+                        }
+                        if (_wakeUpTimer >= 11f && _wakeUpTimer < 11f + dt * 2f)
+                        {
+                            EveAlert("Based on impact analysis... survival probability was 0.003%. Something doesn't add up.", 6f);
                         }
                         break;
                     }
@@ -9030,6 +9064,30 @@ public class Game1 : Game
                     int y = ViewH - 50 - (_deathLog.Count - i) * 16;
                     DrawOutlinedString(_font, _deathLog[i], new Vector2(10, y), Color.White * 0.6f * alpha);
                 }
+            }
+        }
+
+        // --- EVE Dialogue Log (toggleable, right side) ---
+        if (_eveLogVisible && _eveDialogueLog.Count > 0)
+        {
+            int logX = ViewW - 320;
+            int logY = 30;
+            int maxLines = 12;
+            int lineH = 14;
+            // Background
+            int bgH = Math.Min(_eveDialogueLog.Count, maxLines) * lineH + 12;
+            _spriteBatch.Draw(_pixel, new Rectangle(logX - 6, logY - 4, 316, bgH), Color.Black * 0.5f);
+            DrawOutlinedString(_fontSmall, "EVE LOG [L]", new Vector2(logX, logY - 2), Color.Cyan * 0.7f);
+            logY += 14;
+            int start = Math.Max(0, _eveDialogueLog.Count - maxLines);
+            for (int i = start; i < _eveDialogueLog.Count; i++)
+            {
+                var entry = _eveDialogueLog[i];
+                float age = _totalTime - entry.Timestamp;
+                float alpha = age < 5f ? 1f : MathHelper.Clamp(1f - (age - 5f) / 30f, 0.3f, 1f);
+                string text = entry.Text.Length > 45 ? entry.Text.Substring(0, 42) + "..." : entry.Text;
+                _spriteBatch.DrawString(_fontSmall, SafeText(text), new Vector2(logX, logY), Color.Cyan * (alpha * 0.8f));
+                logY += lineH;
             }
         }
 
