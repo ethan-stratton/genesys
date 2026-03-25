@@ -1,18 +1,21 @@
 {
   "currentLevel": "ship-interior",
-  "spawnX": 2468.3784,
-  "spawnY": 408,
+  "spawnX": 2281.0515,
+  "spawnY": 472,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 197.66252,
+  "playTime": 279.30927,
   "meleeInventory": [],
-  "rangedInventory": [],
+  "rangedInventory": [
+    "Gun"
+  ],
   "meleeIndex": -1,
-  "rangedIndex": -1,
+  "rangedIndex": 0,
   "collectedItems": [
-    "grapple-0"
+    "grapple-0",
+    "gun-1"
   ],
   "windowSizeIndex": 0,
   "crtEnabled": false,
@@ -23,6 +26,6 @@
   "shelterY": 0,
   "deathCount": 0,
   "hp": 10,
-  "suitIntegrity": 31,
-  "battery": 65.5
+  "suitIntegrity": 50,
+  "battery": 60
 }

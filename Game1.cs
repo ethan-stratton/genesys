@@ -1736,13 +1736,21 @@ public class Game1 : Game
                 if (_saveData != null) { SyncInventoryToSave(); _saveData.Save(); }
             }
 
-            if (kb.IsKeyDown(Keys.D1) && _prevKb.IsKeyUp(Keys.D1) && _rangedInventory.Length > 0)
+            if (kb.IsKeyDown(Keys.D1) && _prevKb.IsKeyUp(Keys.D1))
             {
-                _rangedIndex = (_rangedIndex + 1) % _rangedInventory.Length;
+                if (_rangedInventory.Length > 0)
+                {
+                    _rangedIndex++;
+                    if (_rangedIndex >= _rangedInventory.Length) _rangedIndex = -1; // cycle to unequipped
+                }
             }
-            if (kb.IsKeyDown(Keys.D2) && _prevKb.IsKeyUp(Keys.D2) && _meleeInventory.Length > 0)
+            if (kb.IsKeyDown(Keys.D2) && _prevKb.IsKeyUp(Keys.D2))
             {
-                _meleeIndex = (_meleeIndex + 1) % _meleeInventory.Length;
+                if (_meleeInventory.Length > 0)
+                {
+                    _meleeIndex++;
+                    if (_meleeIndex >= _meleeInventory.Length) _meleeIndex = -1; // cycle to unequipped
+                }
             }
 
             // --- Spawn weapon menu (P key) ---
@@ -10624,7 +10632,17 @@ public class Game1 : Game
             DrawOutlinedString(_font, $"EVE: {eveStatusText}", new Vector2(hpBarX + 14, eveY), eveStatusColor * 0.9f);
             } // end _eveOrbActive
 
-            // Weapon HUD (bottom-right)
+            // Weapon hand indicators (bottom-left, always visible)
+            {
+                string rangedName = CurrentRanged != WeaponType.None ? CurrentRanged.ToString() : "---";
+                string meleeName = CurrentMelee != WeaponType.None ? CurrentMelee.ToString() : "Fists";
+                var r1Color = CurrentRanged != WeaponType.None ? Color.White * 0.8f : Color.Gray * 0.5f;
+                var r2Color = CurrentMelee != WeaponType.None ? Color.White * 0.8f : Color.Gray * 0.5f;
+                DrawOutlinedString(_font, $"[1] R: {rangedName}", new Vector2(10, ViewH - 36), r1Color);
+                DrawOutlinedString(_font, $"[2] L: {meleeName}", new Vector2(10, ViewH - 18), r2Color);
+            }
+
+            // Sidearm detail HUD (bottom-right, only when gun equipped)
             {
                 int hudRight = ViewW - 10;
                 int hudBottom = ViewH - 10;
@@ -10654,8 +10672,7 @@ public class Game1 : Game
                         _spriteBatch.Draw(_pixel, new Rectangle(dotX + col * 8, dotY + row * 10, 5, 7), dotColor);
                     }
 
-                    // Clip count + reload indicator
-                    string clipText = _sidearmClips < 0 ? "∞" : _sidearmClips.ToString();
+                    // Reload indicator
                     if (_sidearmReloading)
                     {
                         float reloadPct = 1f - _sidearmReloadTimer / SidearmReloadTime;
@@ -10668,13 +10685,6 @@ public class Game1 : Game
                     {
                         DrawOutlinedString(_font, $"{_sidearmRounds}/{SidearmClipSize}", new Vector2(gunX + gunW + 4, gunY + 20), Color.White * 0.7f);
                     }
-                }
-                else
-                {
-                    string rangedName = CurrentRanged != WeaponType.None ? CurrentRanged.ToString() : "---";
-                    string meleeName = CurrentMelee != WeaponType.None ? CurrentMelee.ToString() : "Fists";
-                    _spriteBatch.DrawString(_font, SafeText($"[1] {rangedName}"), new Vector2(hudRight - 240, hudBottom - 20), Color.White * 0.7f);
-                    _spriteBatch.DrawString(_font, SafeText($"[2] {meleeName}"), new Vector2(hudRight - 120, hudBottom - 20), Color.White * 0.7f);
                 }
             }
 
