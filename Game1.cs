@@ -598,7 +598,7 @@ public class Game1 : Game
 
         _audioSettings = new SettingEntry[]
         {
-            new() { Label = "Music", Get = () => _enableMusic, Toggle = () => { _enableMusic = !_enableMusic; if (_enableMusic) { MediaPlayer.IsRepeating = true; MediaPlayer.Play(_bgm); } else { MediaPlayer.Stop(); } } },
+            new() { Label = "Music", Get = () => _enableMusic, Toggle = () => { _enableMusic = !_enableMusic; if (_enableMusic && _bgm != null) { MediaPlayer.IsRepeating = true; MediaPlayer.Play(_bgm); } else { MediaPlayer.Stop(); } } },
         };
 
         _debugSettings = new SettingEntry[]
@@ -974,7 +974,14 @@ public class Game1 : Game
         _font = _fontSystem.GetFont(12);       // main text (was 16, too large for Press Start 2P)
         _fontSmall = _fontSystem.GetFont(9);   // small UI hints
         _fontLarge = _fontSystem.GetFont(22);  // titles, boss names
-        _bgm = Content.Load<Song>("bgm");
+        try
+        {
+            _bgm = Song.FromUri("overworld", new Uri(Path.GetFullPath("Content/audio/music/overworld.ogg")));
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Failed to load BGM: {ex.Message}");
+        }
     }
 
     private Vector2 PlayerCenter =>
