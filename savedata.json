@@ -1,12 +1,12 @@
 {
-  "currentLevel": "the-summit",
-  "spawnX": 138.76431,
-  "spawnY": 344,
+  "currentLevel": "the-descent",
+  "spawnX": 80,
+  "spawnY": 496,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 187.01512,
+  "playTime": 211.9257,
   "meleeInventory": [
     "Knife"
   ],

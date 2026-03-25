@@ -562,18 +562,24 @@ window.updateZone = function(roomId, dir, idx, field, value) {
 
 window.deleteRoom = async function(id) {
   if (!confirm(`Delete room "${id}"? (Moved to trash, neighbor references removed)`)) return;
-  const res = await fetch('/api/delete', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id }),
-  });
-  const data = await res.json();
-  if (data.ok) {
-    setStatus(`Deleted ${id}`);
-    await loadLevels();
-    selectRoom(null);
-  } else {
-    setStatus(`Error: ${data.error}`);
+  try {
+    const res = await fetch('/api/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      setStatus(`Deleted ${id}`);
+      await loadLevels();
+      selectRoom(null);
+    } else {
+      alert(`Delete failed: ${data.error}`);
+      setStatus(`Error: ${data.error}`);
+    }
+  } catch (e) {
+    alert(`Delete failed: ${e.message}`);
+    setStatus(`Error: ${e.message}`);
   }
 };
 
@@ -603,18 +609,22 @@ window.resizeRoom = async function(id) {
   const h = parseInt(document.getElementById('resize-h').value);
   const anchor = document.getElementById('resize-anchor').value;
   if (!confirm(`Resize "${id}" to ${w}×${h}? Anchor: ${anchor}. Tiles outside new bounds will be cropped.`)) return;
-  const res = await fetch('/api/resize', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id, width: w, height: h, anchor }),
-  });
-  const data = await res.json();
-  if (data.ok) {
-    setStatus(`Resized ${id} to ${data.newWidth}×${data.newHeight}`);
-    await loadLevels();
-    selectRoom(id);
-  } else {
-    alert(`Error: ${data.error}`);
+  try {
+    const res = await fetch('/api/resize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, width: w, height: h, anchor }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      setStatus(`Resized ${id} to ${data.newWidth}×${data.newHeight}`);
+      await loadLevels();
+      selectRoom(id);
+    } else {
+      alert(`Resize failed: ${data.error}`);
+    }
+  } catch (e) {
+    alert(`Resize failed: ${e.message}`);
   }
 };
 

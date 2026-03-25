@@ -8671,6 +8671,9 @@
     false,
     false,
     false,
+    true,
+    true,
+    true,
     false,
     false,
     false,
@@ -8728,12 +8731,9 @@
     false,
     false,
     false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
+    true,
+    true,
+    true,
     false,
     false,
     false,
@@ -12012,7 +12012,7 @@
           "id": "garden",
           "name": "The Garden",
           "level": "test-arena",
-          "cleared": false,
+          "cleared": true,
           "discovered": true,
           "order": 0
         },
@@ -12021,7 +12021,7 @@
           "name": "The Descent",
           "level": "the-descent",
           "cleared": true,
-          "discovered": false,
+          "discovered": true,
           "order": 1
         },
         {
@@ -12036,16 +12036,16 @@
           "id": "summit",
           "name": "The Summit",
           "level": "the-summit",
-          "cleared": false,
+          "cleared": true,
           "discovered": true,
           "order": 3
         }
       ],
-      "cleared": false
+      "cleared": true
     }
   ],
   "playerX": 30,
-  "playerY": 47,
+  "playerY": 45,
   "points": [
     {
       "x": 30,

@@ -8,7 +8,7 @@
       "y": 350,
       "level": "test-arena",
       "discovered": true,
-      "cleared": false,
+      "cleared": true,
       "connections": [
         "the-descent",
         "debug-room",
@@ -55,7 +55,7 @@
       "y": 200,
       "level": "the-summit",
       "discovered": true,
-      "cleared": false,
+      "cleared": true,
       "connections": [
         "the-gauntlet"
       ],
@@ -68,12 +68,12 @@
       "x": 50,
       "y": 350,
       "level": "debug-room",
-      "discovered": false,
+      "discovered": true,
       "cleared": false,
       "connections": [
         "test-arena"
       ],
-      "ShownName": "???"
+      "ShownName": "Debug Room"
     },
     {
       "id": "crashsite",
