@@ -1,3 +1,3 @@
 Source File,Dest File,Processor Type,Content Type,Source File Size,Dest File Size,Build Seconds
-"/home/node/.openclaw/workspace/genesis/Content/bgm.mp3","/home/node/.openclaw/workspace/genesis/Content/bin/DesktopGL/Content/bgm.xnb","SongProcessor","SongContent",2894204,121,3.0295737
-"/home/node/.openclaw/workspace/genesis/Content/DefaultFont.spritefont","/home/node/.openclaw/workspace/genesis/Content/bin/DesktopGL/Content/DefaultFont.xnb","FontDescriptionProcessor","SpriteFontContent",474,37913,0.1421529
+"/home/node/.openclaw/workspace/genesis/Content/bgm.mp3","/home/node/.openclaw/workspace/genesis/Content/bin/DesktopGL/Content/bgm.xnb","SongProcessor","SongContent",2894204,121,3.0864232
+"/home/node/.openclaw/workspace/genesis/Content/DefaultFont.spritefont","/home/node/.openclaw/workspace/genesis/Content/bin/DesktopGL/Content/DefaultFont.xnb","FontDescriptionProcessor","SpriteFontContent",474,37913,0.1746919

@@ -1377,15 +1377,15 @@ public class Game1 : Game
         {
             _inventoryOpen = !_inventoryOpen;
             if (_inventoryOpen) { _inventoryCategory = 0; _inventoryIndex = 0; _inventoryRightFocused = false; }
-            Console.WriteLine($"[INV] Toggle pressed, inventoryOpen={_inventoryOpen}, state={_gameState}");
         }
 
         if (_inventoryOpen)
         {
-            UpdateInventory(kb);
+            if (!invToggle) // skip UpdateInventory on the frame we just opened (prevents same-frame close)
+                UpdateInventory(kb);
             _prevKb = kb;
             base.Update(gameTime);
-            return; // game is paused while inventory is open
+            return;
         }
 
         if (_isDead)
