@@ -6,10 +6,10 @@
     "y": 416
   },
   "bounds": {
-    "left": 2144,
-    "right": 2752,
-    "top": 256,
-    "bottom": 640
+    "left": 0,
+    "right": 4800,
+    "top": 0,
+    "bottom": 6400
   },
   "floor": {
     "y": 576,
