@@ -18,5 +18,9 @@
   "training-hall": {
     "x": 400,
     "y": 500
+  },
+  "ship-interior": {
+    "x": 0,
+    "y": 0
   }
 }
