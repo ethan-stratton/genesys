@@ -252,8 +252,9 @@ public class Game1 : Game
 
     // --- Inventory state ---
     private bool _inventoryOpen;
-    private int _inventorySection; // 0=ranged, 1=melee
-    private int _inventoryIndex; // index within current section
+    private int _inventoryCategory; // 0=Weapons, 1=Suit, 2=Tools, 3=Log
+    private int _inventoryIndex; // index within current category's item list
+    private static readonly string[] InventoryCategories = { "Weapons", "Suit", "Tools", "Log" };
 
     // Spawn weapon menu (P key)
     private bool _spawnMenuOpen;
@@ -1357,7 +1358,7 @@ public class Game1 : Game
         if (kb.IsKeyDown(Keys.Tab) && _prevKb.IsKeyUp(Keys.Tab) && !_dialogueOpen)
         {
             _inventoryOpen = !_inventoryOpen;
-            if (_inventoryOpen) { _inventorySection = 0; _inventoryIndex = 0; }
+            if (_inventoryOpen) { _inventoryCategory = 0; _inventoryIndex = 0; }
         }
 
         if (_inventoryOpen)
@@ -6811,56 +6812,70 @@ public class Game1 : Game
 
     private void UpdateInventory(KeyboardState kb)
     {
-        // Sections: 0=Ranged, 1=Melee
-        // Navigate sections with A/D, items with W/S
-        if (kb.IsKeyDown(Keys.A) && _prevKb.IsKeyUp(Keys.A))
-        { _inventorySection = 0; _inventoryIndex = 0; }
-        if (kb.IsKeyDown(Keys.D) && _prevKb.IsKeyUp(Keys.D))
-        { _inventorySection = 1; _inventoryIndex = 0; }
+        // A/D or Left/Right = switch category
+        bool left = (kb.IsKeyDown(Keys.A) && _prevKb.IsKeyUp(Keys.A)) || (kb.IsKeyDown(Keys.Left) && _prevKb.IsKeyUp(Keys.Left));
+        bool right = (kb.IsKeyDown(Keys.D) && _prevKb.IsKeyUp(Keys.D)) || (kb.IsKeyDown(Keys.Right) && _prevKb.IsKeyUp(Keys.Right));
+        bool up = (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W)) || (kb.IsKeyDown(Keys.Up) && _prevKb.IsKeyUp(Keys.Up));
+        bool down = (kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S)) || (kb.IsKeyDown(Keys.Down) && _prevKb.IsKeyUp(Keys.Down));
+        bool confirm = (kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter)) || (kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space));
+        bool discard = kb.IsKeyDown(Keys.X) && _prevKb.IsKeyUp(Keys.X);
 
-        var inv = _inventorySection == 0 ? _rangedInventory : _meleeInventory;
-        if (inv.Length > 0)
+        if (left) { _inventoryCategory = (_inventoryCategory - 1 + InventoryCategories.Length) % InventoryCategories.Length; _inventoryIndex = 0; }
+        if (right) { _inventoryCategory = (_inventoryCategory + 1) % InventoryCategories.Length; _inventoryIndex = 0; }
+
+        int itemCount = GetInventoryCategoryItemCount(_inventoryCategory);
+        if (itemCount > 0)
         {
-            if (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W))
-                _inventoryIndex = (_inventoryIndex - 1 + inv.Length) % inv.Length;
-            if (kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S))
-                _inventoryIndex = (_inventoryIndex + 1) % inv.Length;
+            if (up) _inventoryIndex = (_inventoryIndex - 1 + itemCount) % itemCount;
+            if (down) _inventoryIndex = (_inventoryIndex + 1) % itemCount;
+        }
 
-            // Space/Enter = equip (set as active)
-            if ((kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space)) ||
-                (kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter)))
+        // Category-specific actions
+        if (_inventoryCategory == 0 && itemCount > 0) // Weapons
+        {
+            // Weapons list: ranged first, then melee
+            if (confirm)
             {
-                if (_inventorySection == 0)
+                if (_inventoryIndex < _rangedInventory.Length)
                     _rangedIndex = _inventoryIndex;
                 else
-                    _meleeIndex = _inventoryIndex;
+                    _meleeIndex = _inventoryIndex - _rangedInventory.Length;
             }
-
-            // X = discard selected weapon
-            if (kb.IsKeyDown(Keys.X) && _prevKb.IsKeyUp(Keys.X))
+            if (discard)
             {
-                var w = inv[_inventoryIndex];
-                if (_inventorySection == 0)
+                WeaponType w;
+                if (_inventoryIndex < _rangedInventory.Length)
+                {
+                    w = _rangedInventory[_inventoryIndex];
                     UnequipRanged(w);
+                }
                 else
+                {
+                    w = _meleeInventory[_inventoryIndex - _rangedInventory.Length];
                     UnequipMelee(w);
-                // Drop item back into world at player position
+                }
                 _itemPickups.Add(new ItemPickup
                 {
-                    X = _player.Position.X,
-                    Y = _player.Position.Y + Player.Height - 12,
-                    W = 24, H = 12,
-                    ItemType = w.ToString().ToLower()
+                    X = _player.Position.X, Y = _player.Position.Y + Player.Height - 12,
+                    W = 24, H = 12, ItemType = w.ToString().ToLower()
                 });
-                inv = _inventorySection == 0 ? _rangedInventory : _meleeInventory;
-                if (_inventoryIndex >= inv.Length) _inventoryIndex = Math.Max(0, inv.Length - 1);
+                itemCount = GetInventoryCategoryItemCount(0);
+                if (_inventoryIndex >= itemCount) _inventoryIndex = Math.Max(0, itemCount - 1);
             }
         }
 
-        // Tab or Esc closes
         if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape))
             _inventoryOpen = false;
     }
+
+    private int GetInventoryCategoryItemCount(int cat) => cat switch
+    {
+        0 => _rangedInventory.Length + _meleeInventory.Length, // Weapons
+        1 => 3, // Suit: integrity, battery, movement tier
+        2 => (_player.HasGrapple ? 1 : 0) + (_hasMapModule ? 1 : 0), // Tools
+        3 => 0, // Log: placeholder for future
+        _ => 0
+    };
 
     private void DrawSpawnMenu()
     {
@@ -6882,68 +6897,314 @@ public class Game1 : Game
 
     private void DrawInventory()
     {
-        // Semi-transparent overlay
-        _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), Color.Black * 0.75f);
+        // === Metroid Prime-style inventory screen ===
+        // Full-screen dark overlay with sci-fi frame
+        _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), new Color(5, 8, 15) * 0.92f);
 
-        { var hdr = "INVENTORY"; var hs = _fontLarge.MeasureString(hdr); _spriteBatch.DrawString(_fontLarge, hdr, new Vector2(ViewW / 2f - hs.X / 2, 35), Color.White); }
-        { var hint = "[A/D] Section  [W/S] Navigate  [Enter] Equip  [X] Discard  [Tab/Esc] Close"; var hs2 = _font.MeasureString(hint); _spriteBatch.DrawString(_font, SafeText(hint),
-            new Vector2(ViewW / 2f - hs2.X / 2, ViewH - 40), Color.Gray * 0.5f); }
+        // Outer frame — double border with glow
+        var frameColor = new Color(40, 80, 120);
+        var frameGlow = new Color(60, 130, 180) * 0.3f;
+        int pad = 16;
+        // Outer glow
+        _spriteBatch.Draw(_pixel, new Rectangle(pad - 2, pad - 2, ViewW - pad * 2 + 4, ViewH - pad * 2 + 4), frameGlow);
+        // Outer border
+        DrawHollowRect(pad, pad, ViewW - pad * 2, ViewH - pad * 2, frameColor);
+        DrawHollowRect(pad + 2, pad + 2, ViewW - pad * 2 - 4, ViewH - pad * 2 - 4, frameColor * 0.5f);
 
-        // Two columns
-        float colX0 = 200, colX1 = 450;
-        float startY = 100;
+        // Header bar
+        int headerY = pad + 8;
+        _spriteBatch.Draw(_pixel, new Rectangle(pad + 4, headerY, ViewW - pad * 2 - 8, 2), frameColor);
+        string title = "INVENTORY";
+        var titleSize = _fontLarge.MeasureString(title);
+        // Title background pill
+        int titleBgW = (int)titleSize.X + 40;
+        _spriteBatch.Draw(_pixel, new Rectangle(ViewW / 2 - titleBgW / 2, headerY - 12, titleBgW, 26), new Color(10, 20, 35));
+        DrawOutlinedString(_fontLarge, title, new Vector2(ViewW / 2f - titleSize.X / 2, headerY - 10), new Color(120, 200, 255));
+        _spriteBatch.Draw(_pixel, new Rectangle(pad + 4, headerY + 20, ViewW - pad * 2 - 8, 1), frameColor * 0.3f);
 
-        // Ranged column
-        bool rangedSelected = _inventorySection == 0;
-        _spriteBatch.DrawString(_font, SafeText("RANGED [1]"), new Vector2(colX0, startY),
-            rangedSelected ? Color.Yellow : Color.Gray);
-        if (_rangedInventory.Length == 0)
+        // Layout regions
+        int contentY = headerY + 35;
+        int contentH = ViewH - contentY - 60;
+        int leftW = 150; // category tabs
+        int rightW = 220; // detail panel
+        int centerW = ViewW - pad * 2 - leftW - rightW - 24;
+        int leftX = pad + 8;
+        int centerX = leftX + leftW + 8;
+        int rightX = centerX + centerW + 8;
+
+        // === LEFT PANEL: Category tabs ===
+        _spriteBatch.Draw(_pixel, new Rectangle(leftX, contentY, leftW, contentH), new Color(15, 25, 40) * 0.6f);
+        DrawHollowRect(leftX, contentY, leftW, contentH, frameColor * 0.4f);
+
+        for (int i = 0; i < InventoryCategories.Length; i++)
         {
-            _spriteBatch.DrawString(_font, SafeText("(empty)"), new Vector2(colX0, startY + 30), Color.Gray * 0.5f);
-        }
-        for (int i = 0; i < _rangedInventory.Length; i++)
-        {
-            bool isCurrent = i == _rangedIndex;
-            bool isHover = rangedSelected && i == _inventoryIndex;
-            string prefix = isCurrent ? "> " : "  ";
-            Color c = isHover ? Color.Yellow : (isCurrent ? Color.White : Color.Gray * 0.7f);
-            if (isHover)
-                _spriteBatch.Draw(_pixel, new Rectangle((int)colX0 - 4, (int)(startY + 30 + i * 24), 160, 22), Color.Yellow * 0.1f);
-            _spriteBatch.DrawString(_font, SafeText($"{prefix}{_rangedInventory[i]}"), new Vector2(colX0, startY + 30 + i * 24), c);
+            int tabY = contentY + 8 + i * 42;
+            int tabH = 36;
+            bool selected = i == _inventoryCategory;
+
+            if (selected)
+            {
+                // Active tab: bright fill + left accent bar
+                _spriteBatch.Draw(_pixel, new Rectangle(leftX + 2, tabY, leftW - 4, tabH), new Color(30, 60, 90) * 0.8f);
+                _spriteBatch.Draw(_pixel, new Rectangle(leftX + 2, tabY, 3, tabH), new Color(80, 180, 255));
+            }
+
+            // Category icon (text symbol for now)
+            string icon = i switch { 0 => "⚔", 1 => "◈", 2 => "⚙", 3 => "◉", _ => "?" };
+            Color tabColor = selected ? Color.White : Color.Gray * 0.6f;
+            _spriteBatch.DrawString(_font, SafeText(icon), new Vector2(leftX + 12, tabY + 10), tabColor);
+            _spriteBatch.DrawString(_font, SafeText(InventoryCategories[i]), new Vector2(leftX + 30, tabY + 10), tabColor);
         }
 
-        // Melee column
-        bool meleeSelected = _inventorySection == 1;
-        _spriteBatch.DrawString(_font, SafeText("MELEE [2]"), new Vector2(colX1, startY),
-            meleeSelected ? Color.Yellow : Color.Gray);
-        if (_meleeInventory.Length == 0)
+        // === CENTER PANEL: Character / suit status display ===
+        _spriteBatch.Draw(_pixel, new Rectangle(centerX, contentY, centerW, contentH), new Color(10, 18, 30) * 0.5f);
+        DrawHollowRect(centerX, contentY, centerW, contentH, frameColor * 0.3f);
+
+        // Character silhouette area (simple placeholder — standing figure outline)
+        int silW = 60, silH = 120;
+        int silX = centerX + centerW / 2 - silW / 2;
+        int silY = contentY + 30;
+        var silColor = new Color(60, 120, 180) * 0.4f;
+        // Head
+        _spriteBatch.Draw(_pixel, new Rectangle(silX + silW / 2 - 8, silY, 16, 16), silColor);
+        // Torso
+        _spriteBatch.Draw(_pixel, new Rectangle(silX + silW / 2 - 12, silY + 18, 24, 40), silColor);
+        // Arms
+        _spriteBatch.Draw(_pixel, new Rectangle(silX + silW / 2 - 20, silY + 20, 8, 30), silColor * 0.7f);
+        _spriteBatch.Draw(_pixel, new Rectangle(silX + silW / 2 + 12, silY + 20, 8, 30), silColor * 0.7f);
+        // Legs
+        _spriteBatch.Draw(_pixel, new Rectangle(silX + silW / 2 - 10, silY + 60, 8, 50), silColor * 0.8f);
+        _spriteBatch.Draw(_pixel, new Rectangle(silX + silW / 2 + 2, silY + 60, 8, 50), silColor * 0.8f);
+
+        // Suit status readout below silhouette
+        int readoutY = silY + silH + 20;
+        var readoutColor = new Color(100, 180, 220);
+        DrawOutlinedString(_font, $"HP: {_player.Hp}/{_player.MaxHp}", new Vector2(centerX + 20, readoutY), Color.Red * 0.9f);
+        readoutY += 20;
+
+        float siPct = _player.SuitIntegrity;
+        var siColor2 = siPct > 60 ? new Color(100, 180, 255) : (siPct > 30 ? Color.Orange : Color.Red);
+        DrawOutlinedString(_font, $"Suit: {(int)siPct}%", new Vector2(centerX + 20, readoutY), siColor2);
+        // Mini bar
+        int barX = centerX + 100, barW2 = centerW - 120;
+        _spriteBatch.Draw(_pixel, new Rectangle(barX, readoutY + 3, barW2, 10), new Color(20, 30, 50) * 0.8f);
+        _spriteBatch.Draw(_pixel, new Rectangle(barX, readoutY + 3, (int)(barW2 * siPct / 100f), 10), siColor2 * 0.8f);
+        readoutY += 20;
+
+        float batPct = _player.Battery;
+        var batColor2 = batPct > 50 ? new Color(220, 200, 60) : (batPct > 20 ? Color.Orange : Color.Red);
+        DrawOutlinedString(_font, $"Power: {(int)batPct}%", new Vector2(centerX + 20, readoutY), batColor2);
+        _spriteBatch.Draw(_pixel, new Rectangle(barX, readoutY + 3, barW2, 10), new Color(40, 35, 10) * 0.8f);
+        _spriteBatch.Draw(_pixel, new Rectangle(barX, readoutY + 3, (int)(barW2 * batPct / 100f), 10), batColor2 * 0.8f);
+        readoutY += 20;
+
+        string tierName = _player.CurrentTier switch
         {
-            _spriteBatch.DrawString(_font, SafeText("(empty)"), new Vector2(colX1, startY + 30), Color.Gray * 0.5f);
-        }
-        for (int i = 0; i < _meleeInventory.Length; i++)
+            Player.MoveTier.Tech => "TECH",
+            Player.MoveTier.Bio => "BIO",
+            Player.MoveTier.Cipher => "CIPHER",
+            _ => "???"
+        };
+        var tierColor = _player.CurrentTier switch
         {
-            bool isCurrent = i == _meleeIndex;
-            bool isHover = meleeSelected && i == _inventoryIndex;
-            string prefix = isCurrent ? "> " : "  ";
-            Color c = isHover ? Color.Yellow : (isCurrent ? Color.White : Color.Gray * 0.7f);
-            if (isHover)
-                _spriteBatch.Draw(_pixel, new Rectangle((int)colX1 - 4, (int)(startY + 30 + i * 24), 160, 22), Color.Yellow * 0.1f);
-            _spriteBatch.DrawString(_font, SafeText($"{prefix}{_meleeInventory[i]}"), new Vector2(colX1, startY + 30 + i * 24), c);
+            Player.MoveTier.Tech => new Color(100, 180, 255),
+            Player.MoveTier.Bio => new Color(80, 200, 80),
+            Player.MoveTier.Cipher => new Color(200, 120, 255),
+            _ => Color.Gray
+        };
+        DrawOutlinedString(_font, $"Tier: {tierName}", new Vector2(centerX + 20, readoutY), tierColor);
+        readoutY += 28;
+
+        // Collection stats
+        int collected = _saveData?.CollectedItems?.Count ?? 0;
+        DrawOutlinedString(_font, $"Items: {collected}", new Vector2(centerX + 20, readoutY), readoutColor * 0.6f);
+        readoutY += 18;
+        int deaths = _saveData?.DeathCount ?? 0;
+        DrawOutlinedString(_font, $"Deaths: {deaths}", new Vector2(centerX + 20, readoutY), readoutColor * 0.6f);
+
+        // === RIGHT PANEL: Category-specific item list ===
+        _spriteBatch.Draw(_pixel, new Rectangle(rightX, contentY, rightW, contentH), new Color(15, 25, 40) * 0.6f);
+        DrawHollowRect(rightX, contentY, rightW, contentH, frameColor * 0.4f);
+
+        string catLabel = InventoryCategories[_inventoryCategory];
+        DrawOutlinedString(_font, catLabel, new Vector2(rightX + 10, contentY + 8), new Color(120, 200, 255));
+        _spriteBatch.Draw(_pixel, new Rectangle(rightX + 8, contentY + 26, rightW - 16, 1), frameColor * 0.4f);
+
+        int listY = contentY + 34;
+
+        switch (_inventoryCategory)
+        {
+            case 0: // Weapons
+                // Ranged header
+                DrawOutlinedString(_font, "RANGED", new Vector2(rightX + 10, listY), new Color(180, 140, 80) * 0.8f);
+                listY += 20;
+                if (_rangedInventory.Length == 0)
+                {
+                    _spriteBatch.DrawString(_font, SafeText("(none)"), new Vector2(rightX + 16, listY), Color.Gray * 0.4f);
+                    listY += 20;
+                }
+                for (int i = 0; i < _rangedInventory.Length; i++)
+                {
+                    bool equipped = i == _rangedIndex;
+                    bool hover = _inventoryIndex == i;
+                    if (hover)
+                        _spriteBatch.Draw(_pixel, new Rectangle(rightX + 4, listY - 1, rightW - 8, 18), new Color(40, 80, 120) * 0.5f);
+                    string prefix = equipped ? "► " : "  ";
+                    Color wc = hover ? Color.White : (equipped ? new Color(120, 200, 255) : Color.Gray * 0.7f);
+                    _spriteBatch.DrawString(_font, SafeText($"{prefix}{_rangedInventory[i]}"), new Vector2(rightX + 12, listY), wc);
+                    listY += 20;
+                }
+                listY += 8;
+                // Melee header
+                DrawOutlinedString(_font, "MELEE", new Vector2(rightX + 10, listY), new Color(180, 80, 80) * 0.8f);
+                listY += 20;
+                if (_meleeInventory.Length == 0)
+                {
+                    _spriteBatch.DrawString(_font, SafeText("(none)"), new Vector2(rightX + 16, listY), Color.Gray * 0.4f);
+                    listY += 20;
+                }
+                for (int i = 0; i < _meleeInventory.Length; i++)
+                {
+                    bool equipped = i == _meleeIndex;
+                    int globalIdx = _rangedInventory.Length + i;
+                    bool hover = _inventoryIndex == globalIdx;
+                    if (hover)
+                        _spriteBatch.Draw(_pixel, new Rectangle(rightX + 4, listY - 1, rightW - 8, 18), new Color(40, 80, 120) * 0.5f);
+                    string prefix = equipped ? "► " : "  ";
+                    Color wc = hover ? Color.White : (equipped ? new Color(120, 200, 255) : Color.Gray * 0.7f);
+                    _spriteBatch.DrawString(_font, SafeText($"{prefix}{_meleeInventory[i]}"), new Vector2(rightX + 12, listY), wc);
+                    listY += 20;
+                }
+                break;
+
+            case 1: // Suit
+                DrawInventorySuitPanel(rightX, rightW, listY);
+                break;
+
+            case 2: // Tools
+                if (_player.HasGrapple)
+                {
+                    bool hover = _inventoryIndex == 0;
+                    if (hover)
+                        _spriteBatch.Draw(_pixel, new Rectangle(rightX + 4, listY - 1, rightW - 8, 18), new Color(40, 80, 120) * 0.5f);
+                    _spriteBatch.DrawString(_font, SafeText("Grapple Gun"), new Vector2(rightX + 12, listY), hover ? Color.White : Color.Gray * 0.8f);
+                    listY += 20;
+                    if (hover)
+                    {
+                        _spriteBatch.DrawString(_font, SafeText("[E] to fire"), new Vector2(rightX + 16, listY), Color.Gray * 0.5f);
+                        listY += 16;
+                        _spriteBatch.DrawString(_font, SafeText($"Cost: {GrappleBatteryCost}% battery"), new Vector2(rightX + 16, listY), new Color(220, 200, 60) * 0.5f);
+                    }
+                    listY += 24;
+                }
+                if (_hasMapModule)
+                {
+                    int toolIdx = _player.HasGrapple ? 1 : 0;
+                    bool hover = _inventoryIndex == toolIdx;
+                    if (hover)
+                        _spriteBatch.Draw(_pixel, new Rectangle(rightX + 4, listY - 1, rightW - 8, 18), new Color(40, 80, 120) * 0.5f);
+                    _spriteBatch.DrawString(_font, SafeText("Map Module"), new Vector2(rightX + 12, listY), hover ? Color.White : Color.Gray * 0.8f);
+                    listY += 20;
+                }
+                if (!_player.HasGrapple && !_hasMapModule)
+                    _spriteBatch.DrawString(_font, SafeText("(no tools found)"), new Vector2(rightX + 16, listY), Color.Gray * 0.4f);
+                break;
+
+            case 3: // Log
+                _spriteBatch.DrawString(_font, SafeText("No entries yet."), new Vector2(rightX + 16, listY), Color.Gray * 0.4f);
+                listY += 20;
+                _spriteBatch.DrawString(_font, SafeText("Scan objects with"), new Vector2(rightX + 16, listY), Color.Gray * 0.3f);
+                listY += 16;
+                _spriteBatch.DrawString(_font, SafeText("EVE to add entries."), new Vector2(rightX + 16, listY), Color.Gray * 0.3f);
+                break;
         }
 
-        // Tools column (grapple, future items)
-        float colX2 = 200;
-        float toolsY = startY + 30 + MathF.Max(_rangedInventory.Length, _meleeInventory.Length) * 24 + 40;
-        _spriteBatch.DrawString(_font, SafeText("TOOLS"), new Vector2(colX2, toolsY), Color.Cyan);
-        float toolItemY = toolsY + 28;
-        if (_player.HasGrapple)
+        // Footer controls
+        int footerY = ViewH - pad - 30;
+        _spriteBatch.Draw(_pixel, new Rectangle(pad + 4, footerY - 4, ViewW - pad * 2 - 8, 1), frameColor * 0.3f);
+        string controls = _inventoryCategory == 0
+            ? "[A/D] Category  [W/S] Select  [Enter] Equip  [X] Drop  [Tab] Close"
+            : "[A/D] Category  [W/S] Select  [Tab] Close";
+        var ctrlSize = _font.MeasureString(controls);
+        _spriteBatch.DrawString(_font, SafeText(controls), new Vector2(ViewW / 2f - ctrlSize.X / 2, footerY), Color.Gray * 0.5f);
+    }
+
+    private void DrawInventorySuitPanel(int rx, int rw, int y)
+    {
+        // Suit integrity detail
+        float si = _player.SuitIntegrity;
+        string siStatus = si > 75 ? "Operational" : si > 50 ? "Worn" : si > 25 ? "Damaged" : si > 10 ? "Critical" : "Failing";
+        var siCol = si > 60 ? new Color(100, 180, 255) : (si > 30 ? Color.Orange : Color.Red);
+        bool h0 = _inventoryIndex == 0;
+        if (h0) _spriteBatch.Draw(_pixel, new Rectangle(rx + 4, y - 1, rw - 8, 18), new Color(40, 80, 120) * 0.5f);
+        _spriteBatch.DrawString(_font, SafeText($"Integrity: {(int)si}%"), new Vector2(rx + 12, y), h0 ? Color.White : siCol);
+        y += 20;
+        if (h0)
         {
-            _spriteBatch.Draw(_pixel, new Rectangle((int)colX2 - 2, (int)toolItemY - 1, 8, 8), new Color(80, 90, 100));
-            _spriteBatch.DrawString(_font, SafeText("  Grapple Gun  [E] to fire"), new Vector2(colX2, toolItemY), Color.White);
-            toolItemY += 24;
+            _spriteBatch.DrawString(_font, SafeText($"Status: {siStatus}"), new Vector2(rx + 16, y), siCol * 0.7f);
+            y += 16;
+            _spriteBatch.DrawString(_font, SafeText("Protects against"), new Vector2(rx + 16, y), Color.Gray * 0.4f);
+            y += 14;
+            _spriteBatch.DrawString(_font, SafeText("environmental hazards."), new Vector2(rx + 16, y), Color.Gray * 0.4f);
+            y += 14;
+            _spriteBatch.DrawString(_font, SafeText("Repair at shelters."), new Vector2(rx + 16, y), Color.Gray * 0.4f);
         }
-        if (toolItemY == toolsY + 28) // nothing in tools
-            _spriteBatch.DrawString(_font, SafeText("(none)"), new Vector2(colX2, toolItemY), Color.Gray * 0.5f);
+        y += 24;
+
+        // Battery detail
+        float bat = _player.Battery;
+        string batStatus = bat > 75 ? "Full" : bat > 50 ? "Good" : bat > 25 ? "Low" : bat > 10 ? "Critical" : "Depleted";
+        var batCol = bat > 50 ? new Color(220, 200, 60) : (bat > 20 ? Color.Orange : Color.Red);
+        bool h1 = _inventoryIndex == 1;
+        if (h1) _spriteBatch.Draw(_pixel, new Rectangle(rx + 4, y - 1, rw - 8, 18), new Color(40, 80, 120) * 0.5f);
+        _spriteBatch.DrawString(_font, SafeText($"Battery: {(int)bat}%"), new Vector2(rx + 12, y), h1 ? Color.White : batCol);
+        y += 20;
+        if (h1)
+        {
+            _spriteBatch.DrawString(_font, SafeText($"Status: {batStatus}"), new Vector2(rx + 16, y), batCol * 0.7f);
+            y += 16;
+            _spriteBatch.DrawString(_font, SafeText("Powers tech abilities."), new Vector2(rx + 16, y), Color.Gray * 0.4f);
+            y += 14;
+            _spriteBatch.DrawString(_font, SafeText($"Dash: -{TechDashBatteryCost}%"), new Vector2(rx + 16, y), Color.Gray * 0.4f);
+            y += 14;
+            _spriteBatch.DrawString(_font, SafeText($"Grapple: -{GrappleBatteryCost}%"), new Vector2(rx + 16, y), Color.Gray * 0.4f);
+        }
+        y += 24;
+
+        // Movement tier
+        string tierName = _player.CurrentTier switch
+        {
+            Player.MoveTier.Tech => "TECH",
+            Player.MoveTier.Bio => "BIO",
+            Player.MoveTier.Cipher => "CIPHER",
+            _ => "???"
+        };
+        var tierColor = _player.CurrentTier switch
+        {
+            Player.MoveTier.Tech => new Color(100, 180, 255),
+            Player.MoveTier.Bio => new Color(80, 200, 80),
+            Player.MoveTier.Cipher => new Color(200, 120, 255),
+            _ => Color.Gray
+        };
+        bool h2 = _inventoryIndex == 2;
+        if (h2) _spriteBatch.Draw(_pixel, new Rectangle(rx + 4, y - 1, rw - 8, 18), new Color(40, 80, 120) * 0.5f);
+        _spriteBatch.DrawString(_font, SafeText($"Tier: {tierName}"), new Vector2(rx + 12, y), h2 ? Color.White : tierColor);
+        y += 20;
+        if (h2)
+        {
+            string desc = _player.CurrentTier switch
+            {
+                Player.MoveTier.Tech => "Federation suit systems.\nRocket dash, grapple.",
+                Player.MoveTier.Bio => "Organic adaptation.\nGlide, wall cling.",
+                Player.MoveTier.Cipher => "Unknown energy.\nTeleport, phase.",
+                _ => ""
+            };
+            foreach (var line in desc.Split('\n'))
+            {
+                _spriteBatch.DrawString(_font, SafeText(line), new Vector2(rx + 16, y), Color.Gray * 0.4f);
+                y += 14;
+            }
+        }
     }
 
     private void UpdateMenu(KeyboardState kb)
