@@ -538,6 +538,15 @@ public class Game1 : Game
     private string _editorSaveFile = "Content/levels/crashsite.json";
     private string _editorStatusMsg = "";
     private float _editorStatusTimer;
+
+    // Exit target search overlay
+    private bool _exitSearchOpen;
+    private string _exitSearchQuery = "";
+    private string[] _exitSearchResults = Array.Empty<string>();
+    private int _exitSearchCursor;
+    private int _exitSearchExitIndex = -1; // which exit we're editing
+    private enum ExitSearchMode { TargetLevel, TargetExitId, ExitId }
+    private ExitSearchMode _exitSearchMode;
     // Entity drag-move state
     private object _editorMovingEntity; // reference to the entity being moved (EnemySpawnData, EnvObjectData, NpcData, ItemData)
     private Vector2 _editorMoveOffset; // offset from entity origin to grab point
@@ -659,6 +668,8 @@ public class Game1 : Game
         _worldGraph = WorldGraph.Load();
 
         base.Initialize();
+
+        Window.TextInput += OnTextInput;
     }
 
     private void LoadLevel(string path)
@@ -4930,10 +4941,10 @@ public class Game1 : Game
             SetEditorStatus($"Wall climb side: {sideStr}");
         }
 
-        // Tab — cycle exit target (hover mouse over an exit)
-        // Shift+Tab — cycle targetExitId
-        // Ctrl+Tab — cycle exit's own id
-        if (kb.IsKeyDown(Keys.Tab) && _prevKb.IsKeyUp(Keys.Tab))
+        // Tab — type-to-search exit target (hover mouse over an exit)
+        // Shift+Tab — search targetExitId
+        // Ctrl+Tab — search exit's own id
+        if (kb.IsKeyDown(Keys.Tab) && _prevKb.IsKeyUp(Keys.Tab) && !_exitSearchOpen)
         {
             var worldMouse2 = Vector2.Transform(new Vector2(mouse.X, mouse.Y), Matrix.Invert(_camera.TransformMatrix));
             var mp = new Point((int)worldMouse2.X, (int)worldMouse2.Y);
@@ -4946,78 +4957,27 @@ public class Game1 : Game
                 if (new Rectangle(e.X, e.Y, e.W, e.H).Contains(mp))
                 {
                     if (ctrl)
-                    {
-                        // Cycle exit's own id
-                        string[] suggestions = { "exit-left", "exit-right", "exit-top", "exit-bottom", "exit-overworld",
-                            $"exit-{i}", $"exit-{i + 1}" };
-                        var options = new List<string>(suggestions);
-                        if (!options.Contains(e.Id) && !string.IsNullOrEmpty(e.Id))
-                            options.Insert(0, e.Id);
-                        int idx = options.IndexOf(e.Id);
-                        idx = (idx + 1) % options.Count;
-                        _level.Exits[i].Id = options[idx];
-                        _level.Build();
-                        SetEditorStatus($"Exit ID: {options[idx]}");
-                    }
+                        OpenExitSearch(i, ExitSearchMode.ExitId);
                     else if (shift)
-                    {
-                        // Cycle targetExitId from target level's exits
-                        if (!string.IsNullOrEmpty(e.TargetLevel) && e.TargetLevel != "__overworld__")
-                        {
-                            string targetPath = $"Content/levels/{e.TargetLevel}.json";
-                            if (System.IO.File.Exists(targetPath))
-                            {
-                                try
-                                {
-                                    var targetLevel = LevelData.Load(targetPath);
-                                    var exitIds = new List<string> { "" }; // "" = none
-                                    foreach (var te in targetLevel.Exits)
-                                    {
-                                        if (!string.IsNullOrEmpty(te.Id))
-                                            exitIds.Add(te.Id);
-                                    }
-                                    int idx = exitIds.IndexOf(e.TargetExitId);
-                                    idx = (idx + 1) % exitIds.Count;
-                                    _level.Exits[i].TargetExitId = exitIds[idx];
-                                    _level.Build();
-                                    SetEditorStatus($"Target exit: {(exitIds[idx] == "" ? "(none)" : exitIds[idx])}");
-                                }
-                                catch
-                                {
-                                    SetEditorStatus("Failed to read target level");
-                                }
-                            }
-                            else
-                            {
-                                SetEditorStatus("Target level file not found");
-                            }
-                        }
-                        else
-                        {
-                            SetEditorStatus("Set a target level first (Tab)");
-                        }
-                    }
+                        OpenExitSearch(i, ExitSearchMode.TargetExitId);
                     else
-                    {
-                        // Cycle target level
-                        var levelsDir = "Content/levels";
-                        var files = System.IO.Directory.Exists(levelsDir)
-                            ? System.IO.Directory.GetFiles(levelsDir, "*.json")
-                            : Array.Empty<string>();
-                        var names = new List<string> { "" };
-                        foreach (var f in files)
-                            names.Add(System.IO.Path.GetFileNameWithoutExtension(f));
-                        int idx = names.IndexOf(e.TargetLevel);
-                        idx = (idx + 1) % names.Count;
-                        _level.Exits[i].TargetLevel = names[idx];
-                        _level.Build();
-                        SetEditorStatus($"Exit target: {(names[idx] == "" ? "(none)" : names[idx])}");
-                    }
+                        OpenExitSearch(i, ExitSearchMode.TargetLevel);
                     break;
                 }
             }
         }
-        // editorEnd: (label removed — no longer needed)
+
+        // Exit search overlay input (arrow keys, enter, escape handled by TextInput; arrows here)
+        if (_exitSearchOpen)
+        {
+            if (kb.IsKeyDown(Keys.Up) && _prevKb.IsKeyUp(Keys.Up))
+                _exitSearchCursor = Math.Max(0, _exitSearchCursor - 1);
+            if (kb.IsKeyDown(Keys.Down) && _prevKb.IsKeyUp(Keys.Down))
+                _exitSearchCursor = Math.Min(_exitSearchResults.Length - 1, _exitSearchCursor + 1);
+            if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape))
+                _exitSearchOpen = false;
+            return; // block all other editor input while search is open
+        }
     }
 
     private bool TryDeleteAt(Point p)
@@ -5557,6 +5517,126 @@ public class Game1 : Game
         foreach (var (col, row, oldTile, _) in batch)
             tg.SetTileAt(col, row, oldTile);
         SetEditorStatus($"Undo ({batch.Count} tiles)");
+    }
+
+    // --- Exit target type-to-search ---
+    private void OnTextInput(object sender, TextInputEventArgs e)
+    {
+        if (!_exitSearchOpen) return;
+        char c = e.Character;
+        if (c == '\b') // backspace
+        {
+            if (_exitSearchQuery.Length > 0)
+                _exitSearchQuery = _exitSearchQuery[..^1];
+        }
+        else if (c == '\r' || c == '\n') // enter — confirm selection
+        {
+            ExitSearchConfirm();
+            return;
+        }
+        else if (c == '\x1b') // escape — cancel
+        {
+            _exitSearchOpen = false;
+            return;
+        }
+        else if (c >= ' ' && c <= '~') // printable
+        {
+            _exitSearchQuery += c;
+        }
+        ExitSearchUpdateResults();
+    }
+
+    private void OpenExitSearch(int exitIndex, ExitSearchMode mode)
+    {
+        _exitSearchOpen = true;
+        _exitSearchExitIndex = exitIndex;
+        _exitSearchMode = mode;
+        _exitSearchQuery = "";
+        _exitSearchCursor = 0;
+        ExitSearchUpdateResults();
+    }
+
+    private void ExitSearchUpdateResults()
+    {
+        string[] candidates;
+        if (_exitSearchMode == ExitSearchMode.TargetLevel)
+        {
+            var levelsDir = "Content/levels";
+            var files = System.IO.Directory.Exists(levelsDir)
+                ? System.IO.Directory.GetFiles(levelsDir, "*.json")
+                : Array.Empty<string>();
+            var names = new List<string> { "(none)" };
+            foreach (var f in files)
+                names.Add(System.IO.Path.GetFileNameWithoutExtension(f));
+            candidates = names.ToArray();
+        }
+        else if (_exitSearchMode == ExitSearchMode.TargetExitId)
+        {
+            var exit = _level.Exits[_exitSearchExitIndex];
+            var ids = new List<string> { "(none)" };
+            if (!string.IsNullOrEmpty(exit.TargetLevel) && exit.TargetLevel != "__overworld__")
+            {
+                string targetPath = $"Content/levels/{exit.TargetLevel}.json";
+                if (System.IO.File.Exists(targetPath))
+                {
+                    try
+                    {
+                        var targetLevel = LevelData.Load(targetPath);
+                        foreach (var te in targetLevel.Exits)
+                            if (!string.IsNullOrEmpty(te.Id)) ids.Add(te.Id);
+                    }
+                    catch { }
+                }
+            }
+            candidates = ids.ToArray();
+        }
+        else // ExitId
+        {
+            candidates = new[] { "exit-left", "exit-right", "exit-top", "exit-bottom",
+                "exit-overworld", "exit-door-1", "exit-door-2", "exit-to-crashsite",
+                "exit-to-ship", "exit-to-hub" };
+            // Include current id if not already listed
+            var exit = _level.Exits[_exitSearchExitIndex];
+            if (!string.IsNullOrEmpty(exit.Id) && !candidates.Contains(exit.Id))
+                candidates = candidates.Prepend(exit.Id).ToArray();
+        }
+
+        if (string.IsNullOrEmpty(_exitSearchQuery))
+            _exitSearchResults = candidates;
+        else
+            _exitSearchResults = candidates.Where(n =>
+                n.Contains(_exitSearchQuery, StringComparison.OrdinalIgnoreCase)).ToArray();
+
+        _exitSearchCursor = Math.Clamp(_exitSearchCursor, 0, Math.Max(0, _exitSearchResults.Length - 1));
+    }
+
+    private void ExitSearchConfirm()
+    {
+        if (_exitSearchResults.Length == 0 || _exitSearchExitIndex < 0 || _exitSearchExitIndex >= _level.Exits.Length)
+        {
+            _exitSearchOpen = false;
+            return;
+        }
+        string selected = _exitSearchResults[_exitSearchCursor];
+        if (selected == "(none)") selected = "";
+
+        switch (_exitSearchMode)
+        {
+            case ExitSearchMode.TargetLevel:
+                _level.Exits[_exitSearchExitIndex].TargetLevel = selected;
+                SetEditorStatus($"Exit target: {(selected == "" ? "(none)" : selected)}");
+                break;
+            case ExitSearchMode.TargetExitId:
+                _level.Exits[_exitSearchExitIndex].TargetExitId = selected;
+                SetEditorStatus($"Target exit ID: {(selected == "" ? "(none)" : selected)}");
+                break;
+            case ExitSearchMode.ExitId:
+                _level.Exits[_exitSearchExitIndex].Id = selected;
+                SetEditorStatus($"Exit ID: {selected}");
+                break;
+        }
+        _level.Build();
+        _exitSearchOpen = false;
     }
 
     // --- Editor: set tile with undo tracking ---
@@ -6244,6 +6324,41 @@ public class Game1 : Game
         // Status message
         if (_editorStatusTimer > 0)
             _spriteBatch.DrawString(_fontSmall, SafeText(_editorStatusMsg), new Vector2(10, ViewH - 30), Color.Yellow);
+
+        // Exit search overlay
+        if (_exitSearchOpen)
+        {
+            int boxW = 320, boxH = Math.Min(300, 50 + _exitSearchResults.Length * 20);
+            int boxX = (ViewW - boxW) / 2, boxY = (ViewH - boxH) / 2;
+            // Background
+            _spriteBatch.Draw(_pixel, new Rectangle(boxX - 2, boxY - 2, boxW + 4, boxH + 4), Color.White * 0.8f);
+            _spriteBatch.Draw(_pixel, new Rectangle(boxX, boxY, boxW, boxH), new Color(20, 20, 40));
+            // Title
+            string modeLabel = _exitSearchMode switch
+            {
+                ExitSearchMode.TargetLevel => "Target Level",
+                ExitSearchMode.TargetExitId => "Target Exit ID",
+                ExitSearchMode.ExitId => "Exit ID",
+                _ => "Search"
+            };
+            _spriteBatch.DrawString(_fontSmall, SafeText(modeLabel), new Vector2(boxX + 8, boxY + 4), Color.LimeGreen);
+            // Search input
+            string prompt = "> " + _exitSearchQuery + "_";
+            _spriteBatch.DrawString(_fontSmall, SafeText(prompt), new Vector2(boxX + 8, boxY + 22), Color.White);
+            // Results
+            int maxVisible = Math.Min(_exitSearchResults.Length, 12);
+            int scrollStart = Math.Max(0, _exitSearchCursor - 6);
+            for (int i = 0; i < maxVisible && scrollStart + i < _exitSearchResults.Length; i++)
+            {
+                int ri = scrollStart + i;
+                bool selected = ri == _exitSearchCursor;
+                int ry = boxY + 42 + i * 20;
+                if (selected)
+                    _spriteBatch.Draw(_pixel, new Rectangle(boxX + 4, ry, boxW - 8, 18), Color.LimeGreen * 0.25f);
+                var col = selected ? Color.White : Color.Gray;
+                _spriteBatch.DrawString(_fontSmall, SafeText(_exitSearchResults[ri]), new Vector2(boxX + 12, ry + 1), col);
+            }
+        }
 
         // Controls hint
         string controlsHint = _editorTool switch
