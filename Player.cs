@@ -349,6 +349,7 @@ public class Player
     
     // Effect tile state
     public float SpeedBoostTimer { get; set; }
+    public float PuddleSlowTimer { get; set; }
     private const float SpeedBoostDuration = 3.0f;
     private const float SpeedBoostMultiplier = 1.8f;
     public float FloatTimer { get; set; }
@@ -1104,6 +1105,7 @@ public class Player
         _meleeCooldown -= dt;
         if (DamageCooldown > 0) DamageCooldown -= dt;
         if (SpeedBoostTimer > 0) SpeedBoostTimer -= dt;
+        if (PuddleSlowTimer > 0) PuddleSlowTimer -= dt;
         if (FloatTimer > 0) FloatTimer -= dt;
         _slideCooldownTimer -= dt;
         _cartwheelCooldownTimer -= dt;
@@ -1927,6 +1929,7 @@ public class Player
         {
             float moveSpeed = _speed;
             if (SpeedBoostTimer > 0) moveSpeed *= SpeedBoostMultiplier;
+            if (PuddleSlowTimer > 0) moveSpeed *= 0.4f; // puddle slows to 40%
 
             // Sprint: dash transitions into sprint (hold direction after dash ends)
             if (IsSprinting && IsGrounded && inputX == _sprintDir)

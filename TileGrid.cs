@@ -85,10 +85,17 @@ public enum TileType : byte
     DamageNoKBTile = 83,  // continuous damage, no knockback (dark red)
     DamageFloorTile = 84, // solid + continuous damage, no knockback (dark red, standable)
 
+    // Crash-site hazard/environment tiles
+    Fire = 86,             // non-solid, damages on contact, animated flicker
+    BrokenPipe = 87,       // non-solid background, leaking air visual
+    ElectricShock = 88,    // non-solid, intermittent damage (cycles like retract spikes)
+    Puddle = 89,           // non-solid, slows movement on contact
+
     // Liquid tiles
     Water = 90,
     Lava = 91,
     Acid = 92,
+    BreakableGlass = 93,   // solid until hit, shatters like Breakable but translucent
 
     // Platforms
     PlatformTop = 22,     // half platform spanning top half of tile
@@ -106,7 +113,7 @@ public enum TileType : byte
 
 public static class TileProperties
 {
-    public static bool IsSolid(TileType t) => (t >= TileType.Dirt && t <= TileType.Sand) || t == TileType.Breakable || t == TileType.DamageFloorTile;
+    public static bool IsSolid(TileType t) => (t >= TileType.Dirt && t <= TileType.Sand) || t == TileType.Breakable || t == TileType.DamageFloorTile || t == TileType.BreakableGlass;
     public static bool IsPlatform(TileType t) => t >= TileType.PlatformWood && t <= TileType.PlatformBottom;
     /// <summary>Standard thin platforms only (for merged rects). Half platforms use custom rects.</summary>
     public static bool IsStandardPlatform(TileType t) => t == TileType.PlatformWood || t == TileType.PlatformStone;
@@ -128,7 +135,8 @@ public static class TileProperties
         || t == TileType.GentleCeilRight || t == TileType.GentleCeilLeft
         || t == TileType.ShavedCeilRight || t == TileType.ShavedCeilLeft
         || (t >= TileType.Gentle4CeilRightA && t <= TileType.Gentle4CeilLeftD);
-    public static bool IsEffectTile(TileType t) => (t >= TileType.DamageTile && t <= TileType.FloatTile) || t == TileType.DamageNoKBTile || t == TileType.DamageFloorTile;
+    public static bool IsEffectTile(TileType t) => (t >= TileType.DamageTile && t <= TileType.FloatTile) || t == TileType.DamageNoKBTile || t == TileType.DamageFloorTile
+        || t == TileType.Fire || t == TileType.BrokenPipe || t == TileType.ElectricShock || t == TileType.Puddle || t == TileType.BreakableGlass;
     public static bool IsLiquid(TileType t) => t == TileType.Water || t == TileType.Lava || t == TileType.Acid;
 
     public static Color GetColor(TileType t) => t switch
@@ -201,6 +209,11 @@ public static class TileProperties
         TileType.Water => new Color(30, 90, 180),
         TileType.Lava => new Color(200, 60, 20),
         TileType.Acid => new Color(60, 200, 40),
+        TileType.Fire => new Color(255, 100, 20),
+        TileType.BrokenPipe => new Color(80, 90, 100),
+        TileType.ElectricShock => new Color(255, 255, 60),
+        TileType.Puddle => new Color(60, 120, 160),
+        TileType.BreakableGlass => new Color(180, 220, 240),
         _ => Color.Transparent,
     };
 
@@ -347,6 +360,11 @@ public static class TileProperties
         TileType.Water,
         TileType.Lava,
         TileType.Acid,
+        TileType.Fire,
+        TileType.BrokenPipe,
+        TileType.ElectricShock,
+        TileType.Puddle,
+        TileType.BreakableGlass,
     };
 }
 

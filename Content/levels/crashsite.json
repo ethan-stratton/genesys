@@ -2,8 +2,8 @@
   "name": "Crash Site",
   "author": "dantalion",
   "playerSpawn": {
-    "x": 224,
-    "y": 128
+    "x": 180,
+    "y": 205
   },
   "bounds": {
     "left": -32,

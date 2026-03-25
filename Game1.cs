@@ -516,7 +516,7 @@ public class Game1 : Game
     private bool _debugGun;
 
     private List<ItemPickup> _itemPickups = new();
-    private HashSet<(int col, int row)> _destroyedBreakables = new();
+    private HashSet<(int col, int row, TileType origType)> _destroyedBreakables = new();
     private HashSet<string> _activatedSwitches = new();
     private float _nextLatchDelay; // stagger delay between consecutive latches
     private const int MaxLatched = 4; // max crawlers latched at once
@@ -2772,23 +2772,27 @@ public class Game1 : Game
                 int br2 = ((int)b.Position.Y + Bullet.Size / 2 - oy) / ts;
                 if (bc >= 0 && bc < tgi.Width && br2 >= 0 && br2 < tgi.Height)
                 {
-                    if (tgi.GetTileAt(bc, br2) == TileType.Breakable)
+                    if (tgi.GetTileAt(bc, br2) == TileType.Breakable || tgi.GetTileAt(bc, br2) == TileType.BreakableGlass)
                     {
-                        _destroyedBreakables.Add((bc, br2));
+                        var origT = tgi.GetTileAt(bc, br2);
+                        _destroyedBreakables.Add((bc, br2, origT));
                         tgi.SetTileAt(bc, br2, TileType.Empty);
                         _level.RebuildTileCollision();
                         int twx = ox + bc * ts, twy = oy + br2 * ts;
-                        _itemPickups.Add(new ItemPickup
+                        if (origT == TileType.Breakable)
                         {
-                            Id = $"heart-break-{twx}-{twy}",
-                            X = twx + ts / 2f - 8,
-                            Y = twy,
-                            W = 16, H = 16,
-                            ItemType = "heart",
-                            Collected = false,
-                            HasGravity = true,
-                            VelY = -150f
-                        });
+                            _itemPickups.Add(new ItemPickup
+                            {
+                                Id = $"heart-break-{twx}-{twy}",
+                                X = twx + ts / 2f - 8,
+                                Y = twy,
+                                W = 16, H = 16,
+                                ItemType = "heart",
+                                Collected = false,
+                                HasGravity = true,
+                                VelY = -150f
+                            });
+                        }
                         b.IsDead = true;
                     }
                 }
@@ -3418,6 +3422,26 @@ public class Game1 : Game
                             case TileType.FloatTile:
                                 _player.FloatTimer = 2.0f;
                                 break;
+                            case TileType.Fire:
+                                if (_spawnInvincibility <= 0f)
+                                {
+                                    _lastDamageSource = "Fire";
+                                    _player.TakeDamage(1, _player.Position.X - tileRect.Center.X);
+                                    if (_player.Hp <= 0) { _isDead = true; LogDeath(); }
+                                }
+                                break;
+                            case TileType.ElectricShock:
+                                // Intermittent: active when retract spikes are extended
+                                if (_level.TileGridInstance.RetractExtended && _spawnInvincibility <= 0f)
+                                {
+                                    _lastDamageSource = "Electric shock";
+                                    _player.TakeDamage(2, _player.Position.X - tileRect.Center.X);
+                                    if (_player.Hp <= 0) { _isDead = true; LogDeath(); }
+                                }
+                                break;
+                            case TileType.Puddle:
+                                _player.PuddleSlowTimer = 0.2f; // refreshed each frame while in puddle
+                                break;
                         }
                     }
                 }
@@ -3441,23 +3465,28 @@ public class Game1 : Game
                 {
                     for (int col = startCol; col <= endCol; col++)
                     {
-                        if (tgi.GetTileAt(col, row) == TileType.Breakable)
+                        var bt = tgi.GetTileAt(col, row);
+                        if (bt == TileType.Breakable || bt == TileType.BreakableGlass)
                         {
-                            _destroyedBreakables.Add((col, row));
+                            _destroyedBreakables.Add((col, row, bt));
                             tgi.SetTileAt(col, row, TileType.Empty);
                             _level.RebuildTileCollision();
                             int twx = ox + col * ts, twy = oy + row * ts;
-                            _itemPickups.Add(new ItemPickup
+                            if (bt == TileType.Breakable)
                             {
-                                Id = $"heart-break-{twx}-{twy}",
-                                X = twx + ts / 2f - 8,
-                                Y = twy,
-                                W = 16, H = 16,
-                                ItemType = "heart",
-                                Collected = false,
-                                HasGravity = true,
-                                VelY = -150f // pop upward then fall
-                            });
+                                _itemPickups.Add(new ItemPickup
+                                {
+                                    Id = $"heart-break-{twx}-{twy}",
+                                    X = twx + ts / 2f - 8,
+                                    Y = twy,
+                                    W = 16, H = 16,
+                                    ItemType = "heart",
+                                    Collected = false,
+                                    HasGravity = true,
+                                    VelY = -150f // pop upward then fall
+                                });
+                            }
+                            // BreakableGlass shatters with no drop
                         }
                     }
                 }
@@ -3481,23 +3510,27 @@ public class Game1 : Game
                 {
                     for (int col = startCol; col <= endCol; col++)
                     {
-                        if (tgi.GetTileAt(col, row) == TileType.Breakable)
+                        var bt = tgi.GetTileAt(col, row);
+                        if (bt == TileType.Breakable || bt == TileType.BreakableGlass)
                         {
-                            _destroyedBreakables.Add((col, row));
+                            _destroyedBreakables.Add((col, row, bt));
                             tgi.SetTileAt(col, row, TileType.Empty);
                             _level.RebuildTileCollision();
                             int twx = ox + col * ts, twy = oy + row * ts;
-                            _itemPickups.Add(new ItemPickup
+                            if (bt == TileType.Breakable)
                             {
-                                Id = $"heart-break-{twx}-{twy}",
-                                X = twx + ts / 2f - 8,
-                                Y = twy,
-                                W = 16, H = 16,
-                                ItemType = "heart",
-                                Collected = false,
-                                HasGravity = true,
-                                VelY = -150f
-                            });
+                                _itemPickups.Add(new ItemPickup
+                                {
+                                    Id = $"heart-break-{twx}-{twy}",
+                                    X = twx + ts / 2f - 8,
+                                    Y = twy,
+                                    W = 16, H = 16,
+                                    ItemType = "heart",
+                                    Collected = false,
+                                    HasGravity = true,
+                                    VelY = -150f
+                                });
+                            }
                         }
                     }
                 }
@@ -5540,8 +5573,8 @@ public class Game1 : Game
         // Restore destroyed breakables before saving (runtime-only changes)
         if (_level.TileGridInstance != null)
         {
-            foreach (var (col, row) in _destroyedBreakables)
-                _level.TileGridInstance.SetTileAt(col, row, TileType.Breakable);
+            foreach (var (col, row, origType) in _destroyedBreakables)
+                _level.TileGridInstance.SetTileAt(col, row, origType);
         }
 
         // Sync tile grid instance to serializable data
@@ -5555,7 +5588,7 @@ public class Game1 : Game
         // Re-destroy breakables after saving
         if (_level.TileGridInstance != null)
         {
-            foreach (var (col, row) in _destroyedBreakables)
+            foreach (var (col, row, origType) in _destroyedBreakables)
                 _level.TileGridInstance.SetTileAt(col, row, TileType.Empty);
         }
 
@@ -5780,6 +5813,83 @@ public class Game1 : Game
                                 int fw = flameW[i];
                                 _spriteBatch.Draw(_pixel, new Rectangle(cx - fw/2, fy, fw, 2), bright);
                             }
+                        }
+                        else if (tile == TileType.Fire)
+                        {
+                            // Animated fire — wider flame with flicker using game time
+                            float t = _totalTime;
+                            int flicker = (int)(MathF.Sin(t * 8f + cx * 0.1f) * 2);
+                            int[] flameW = { 3, 5, 8, 10, 12, 12, 10, 8, 6, 4, 2 };
+                            var inner = new Color(255, 200, 50);
+                            for (int i = 0; i < flameW.Length; i++)
+                            {
+                                int fy = cy + 10 - i * 2 + (i > 5 ? flicker : 0);
+                                int fw = flameW[i] + (i < 6 ? flicker : -flicker);
+                                if (fw < 1) fw = 1;
+                                var fc = i > 6 ? inner : bright;
+                                _spriteBatch.Draw(_pixel, new Rectangle(cx - fw/2, fy, fw, 2), fc);
+                            }
+                        }
+                        else if (tile == TileType.BrokenPipe)
+                        {
+                            // Pipe shape: vertical rectangle with dashes for leaking air
+                            _spriteBatch.Draw(_pixel, new Rectangle(cx - 3, wy + 2, 7, ts - 4), bright);
+                            // Leak dashes to the right
+                            float t = _totalTime;
+                            int drift = ((int)(t * 40f)) % 12;
+                            var leak = bright * 0.6f;
+                            for (int d = 0; d < 3; d++)
+                            {
+                                int lx = cx + 5 + d * 5 + drift;
+                                int ly = cy - 1 + (d % 2 == 0 ? -2 : 2);
+                                if (lx < wx + ts)
+                                    _spriteBatch.Draw(_pixel, new Rectangle(lx, ly, 3, 1), leak);
+                            }
+                        }
+                        else if (tile == TileType.ElectricShock)
+                        {
+                            // Lightning bolt — only bright when retract-active
+                            var eColor = (_level?.TileGridInstance?.RetractExtended ?? false) ? new Color(255, 255, 100) : bright * 0.3f;
+                            // Zigzag bolt
+                            int bx = cx - 2;
+                            int by = wy + 4;
+                            int[] zigX = { 0, 4, -2, 3, 0 };
+                            for (int i = 0; i < zigX.Length - 1; i++)
+                            {
+                                int x1 = bx + zigX[i], x2 = bx + zigX[i + 1];
+                                int y1 = by + i * 5, y2 = by + (i + 1) * 5;
+                                int steps = Math.Max(Math.Abs(x2 - x1), Math.Abs(y2 - y1));
+                                if (steps == 0) steps = 1;
+                                for (int s = 0; s <= steps; s++)
+                                {
+                                    int px = x1 + (x2 - x1) * s / steps;
+                                    int py = y1 + (y2 - y1) * s / steps;
+                                    _spriteBatch.Draw(_pixel, new Rectangle(px, py, 3, 2), eColor);
+                                }
+                            }
+                        }
+                        else if (tile == TileType.Puddle)
+                        {
+                            // Flat puddle: shallow ellipse at bottom of tile
+                            var pColor = new Color(60, 120, 180) * 0.6f;
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx + 2, wy + ts - 6, ts - 4, 4), pColor);
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx + 5, wy + ts - 8, ts - 10, 2), pColor * 0.4f);
+                            // Ripple
+                            float t = _totalTime;
+                            int rippleX = wx + 6 + ((int)(t * 10f + cx) % (ts - 12));
+                            _spriteBatch.Draw(_pixel, new Rectangle(rippleX, wy + ts - 8, 4, 1), Color.White * 0.3f);
+                        }
+                        else if (tile == TileType.BreakableGlass)
+                        {
+                            // Translucent fill with grid lines
+                            _spriteBatch.Draw(_pixel, rect, new Color(180, 220, 240) * 0.25f);
+                            var glassLine = bright * 0.5f;
+                            // Diagonal crack lines
+                            for (int i = 0; i < ts; i += 8)
+                            {
+                                _spriteBatch.Draw(_pixel, new Rectangle(wx + i, wy, 1, ts), glassLine);
+                            }
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts / 2, ts, 1), glassLine);
                         }
                         
                         // Border
