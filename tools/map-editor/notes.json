@@ -1,0 +1,40 @@
+{
+  "roomNotes": {
+    "crashsite": "Vertical shaft, 20x60. Grey wreckage vibe.\nJutting platforms from both walls.\nTop exit → Ship Interior (future)\nBottom → Forest Edge (future)\nQuiet, eerie. No enemies.\nFirst room after prologue.",
+    "debug-room": "Debug/test room. Keep.",
+    "debug-room-2": "Debug/test room. Keep.",
+    "training-hall": "Debug room (Untitled). Keep."
+  },
+  "mapNotes": [
+    {
+      "x": -200, "y": -100,
+      "text": "=== CRITICAL PATH ===\nShip Interior → Crash Exterior\n→ Forest Edge (gentle, inviting)\n→ Living Forest (main progression)\n→ Native Ruins (gated by tool)\n→ Bone Reef → Deep Ruins\n→ Transformed Lands\n→ Dragon's Sanctum",
+      "color": "#fbbf24"
+    },
+    {
+      "x": -200, "y": 200,
+      "text": "=== ITEM SEQUENCE ===\nShip Interior: nothing (injured)\nCrash Exterior: EVE arrives\nWrackage: Knife + Scanner\nForest Edge: Grapple Gun\nLiving Forest: First Bio unlock\nNative Ruins: Resonance Probe",
+      "color": "#4ade80"
+    },
+    {
+      "x": 100, "y": -100,
+      "text": "=== ROOM SCALE GUIDE ===\nIntimate/story: 20-25 x 15-20\nStandard explore: 30-50 x 20-30\nGrand vistas: 60-80 x 30-50 (rare)\nVertical shafts: 15-20 x 40-60",
+      "color": "#60a5fa"
+    },
+    {
+      "x": 100, "y": 200,
+      "text": "=== WORLD AREAS ===\n(Stages of the Fall)\n1. Wreckage (Shock) — HUB\n2. Living Forest (Wonder)\n3. Native Ruins (Humility)\n4. Bone Reef (Struggle)\n5. Deep Ruins (Truth)\n6. Transformed Lands (Acceptance)\n7. Dragon's Sanctum (Transcendence)",
+      "color": "#c084fc"
+    },
+    {
+      "x": 400, "y": -100,
+      "text": "=== DESIGN RULES ===\nEvery room needs a reason:\n• Teaches something\n• Tests something\n• Rewards exploration\n• Advances story/mood\nNonlinear but NUDGE players.\nDark Souls 1 Firelink model.",
+      "color": "#fb923c"
+    },
+    {
+      "x": 400, "y": 200,
+      "text": "=== FIRST 30 MINUTES ===\nShip Interior (wake up, injured)\n→ Crash Exterior (EVE arrives)\n→ Wreckage explore (knife found)\n→ First creature (passive)\n→ Suit sparking / hazard\n→ Forest entry\n→ Grapple found\n→ THE SCREAM (Dragon)\n→ First Adapted sighting\n→ First shelter",
+      "color": "#f87171"
+    }
+  ]
+}

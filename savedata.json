@@ -1,0 +1,26 @@
+{
+  "currentLevel": "debug-room",
+  "spawnX": 68.7543,
+  "spawnY": 245.2457,
+  "unlockedAbilities": [],
+  "flags": {
+    "eveOrbActive": true
+  },
+  "playTime": 388.84918,
+  "meleeInventory": [],
+  "rangedInventory": [],
+  "meleeIndex": -1,
+  "rangedIndex": -1,
+  "collectedItems": [
+    "grapple-0"
+  ],
+  "windowSizeIndex": 0,
+  "crtEnabled": false,
+  "moveTier": 2,
+  "upgrades": [],
+  "shelterLevel": "",
+  "shelterX": 0,
+  "shelterY": 0,
+  "deathCount": 0,
+  "hp": 100
+}

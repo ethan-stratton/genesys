@@ -4,6 +4,7 @@ const path = require('path');
 
 const LEVELS_DIR = path.join(__dirname, '../../Content/levels');
 const LAYOUT_FILE = path.join(__dirname, 'layout.json');
+const NOTES_FILE = path.join(__dirname, 'notes.json');
 const PORT = 4000;
 
 function loadLayout() {
@@ -12,6 +13,14 @@ function loadLayout() {
 
 function saveLayout(positions) {
   fs.writeFileSync(LAYOUT_FILE, JSON.stringify(positions, null, 2));
+}
+
+function loadNotes() {
+  try { return JSON.parse(fs.readFileSync(NOTES_FILE, 'utf8')); } catch { return { roomNotes: {}, mapNotes: [] }; }
+}
+
+function saveNotes(notes) {
+  fs.writeFileSync(NOTES_FILE, JSON.stringify(notes, null, 2));
 }
 
 function getLevels() {
@@ -79,7 +88,7 @@ const server = http.createServer((req, res) => {
   }
   if (req.method === 'GET' && req.url === '/api/levels') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ levels: getLevels(), layout: loadLayout() }));
+    res.end(JSON.stringify({ levels: getLevels(), layout: loadLayout(), notes: loadNotes() }));
     return;
   }
   if (req.method === 'POST' && req.url === '/api/save') {
@@ -90,6 +99,7 @@ const server = http.createServer((req, res) => {
         const data = JSON.parse(body);
         if (data.neighbors) saveAllNeighbors(data.neighbors);
         if (data.layout) saveLayout(data.layout);
+        if (data.notes) saveNotes(data.notes);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true }));
       } catch (e) {

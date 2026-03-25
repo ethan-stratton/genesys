@@ -2,8 +2,8 @@
   "name": "debug-room",
   "author": "",
   "playerSpawn": {
-    "x": 1216,
-    "y": 272
+    "x": 384,
+    "y": 240
   },
   "bounds": {
     "left": -32,
@@ -76,13 +76,6 @@
     }
   ],
   "walls": [
-    {
-      "x": -32,
-      "y": 0,
-      "w": 32,
-      "h": 352,
-      "climbSide": 99
-    },
     {
       "x": 5600,
       "y": 340,
@@ -325,15 +318,6 @@
   "wallSpikes": [],
   "exits": [
     {
-      "x": 15,
-      "y": 280,
-      "w": 30,
-      "h": 48,
-      "targetLevel": "__overworld__",
-      "id": "exit-overworld",
-      "targetExitId": ""
-    },
-    {
       "x": 2500,
       "y": 81,
       "w": 30,
@@ -352,13 +336,22 @@
       "targetExitId": "exit-to-debug1"
     },
     {
-      "x": 1043,
-      "y": 159,
+      "x": 1042,
+      "y": 50,
       "w": 30,
       "h": 48,
       "targetLevel": "training-hall",
       "id": "exit-to-training",
       "targetExitId": "exit-to-debug"
+    },
+    {
+      "x": 35,
+      "y": 127,
+      "w": 32,
+      "h": 63,
+      "targetLevel": "crashsite",
+      "id": "exit-left",
+      "targetExitId": ""
     }
   ],
   "npcs": [],
@@ -1409,6 +1402,16 @@
   ],
   "retractableSpikes": [],
   "shelters": [],
+  "neighbors": {
+    "left": "",
+    "right": "",
+    "up": "",
+    "down": "",
+    "LeftZones": [],
+    "RightZones": [],
+    "UpZones": [],
+    "DownZones": []
+  },
   "tileGrid": {
     "width": 351,
     "height": 38,
@@ -14755,11 +14758,5 @@
       1,
       1
     ]
-  },
-  "neighbors": {
-    "left": "",
-    "right": "",
-    "up": "",
-    "down": ""
   }
 }

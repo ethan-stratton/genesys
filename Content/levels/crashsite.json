@@ -15,13 +15,21 @@
     "y": 9999,
     "height": 0
   },
-  "platforms": [],
-  "ropes": [
+  "platforms": [
     {
-      "x": 160,
-      "top": 384,
-      "bottom": 576
+      "x": 608,
+      "y": -160,
+      "w": 352,
+      "h": 12
     },
+    {
+      "x": 352,
+      "y": 288,
+      "w": 224,
+      "h": 12
+    }
+  ],
+  "ropes": [
     {
       "x": 480,
       "top": 896,
@@ -44,17 +52,26 @@
       "targetExitId": "exit-to-crashsite"
     },
     {
-      "x": 256,
-      "y": 1792,
-      "w": 128,
-      "h": 48,
-      "targetLevel": "the-descent",
-      "id": "exit-bottom",
-      "targetExitId": "exit-from-crashsite"
+      "x": 74,
+      "y": 173,
+      "w": 32,
+      "h": 29,
+      "targetLevel": "debug-room",
+      "id": "exit-left",
+      "targetExitId": ""
     }
   ],
   "npcs": [],
-  "items": [],
+  "items": [
+    {
+      "id": "grapple-0",
+      "type": "grapple",
+      "x": 352,
+      "y": 1760,
+      "w": 20,
+      "h": 20
+    }
+  ],
   "objects": [],
   "enemies": [],
   "switches": [],
@@ -76,6 +93,16 @@
       "name": "Shelter"
     }
   ],
+  "neighbors": {
+    "left": "",
+    "right": "",
+    "up": "",
+    "down": "",
+    "LeftZones": [],
+    "RightZones": [],
+    "UpZones": [],
+    "DownZones": []
+  },
   "tileGrid": {
     "width": 20,
     "height": 60,
@@ -1284,11 +1311,5 @@
       1,
       1
     ]
-  },
-  "neighbors": {
-    "left": "",
-    "right": "",
-    "up": "",
-    "down": ""
   }
 }

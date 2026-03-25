@@ -80,7 +80,7 @@
   <div id="room-detail" class="room-info">Click a room on the map to inspect and edit.</div>
 </div>
 
-<div id="help">Scroll: zoom · Drag: pan · Click: select room · Drag room: reposition</div>
+<div id="help">Scroll: zoom · Drag: pan · Click: select room · Drag room: reposition · Double-click: add note · Double-click note: edit/delete</div>
 
 <script>
 const canvas = document.getElementById('c');
@@ -110,6 +110,8 @@ sidebarDrag.addEventListener('mousedown', (e) => {
 let levels = {};
 let levelIds = [];
 let roomPositions = {}; // visual positions on canvas (not game coords)
+let notes = { roomNotes: {}, mapNotes: [] }; // { roomNotes: { roomId: "text" }, mapNotes: [{ x, y, text, color }] }
+let dragNote = null; // index of map note being dragged
 
 let cam = { x: 0, y: 0, zoom: 1 };
 let selected = null;
@@ -140,6 +142,9 @@ async function loadLevels() {
   const data = await res.json();
   levels = data.levels;
   levelIds = Object.keys(levels);
+  notes = data.notes || { roomNotes: {}, mapNotes: [] };
+  if (!notes.roomNotes) notes.roomNotes = {};
+  if (!notes.mapNotes) notes.mapNotes = [];
   
   // Use saved layout if available, otherwise auto-layout
   const savedLayout = data.layout || {};
@@ -350,9 +355,65 @@ function draw() {
     ctx.fillStyle = '#888';
     ctx.fillText(`${level.grid.width}×${level.grid.height}`, s.x, s.y + 12);
   }
+  
+  // Draw map notes (sticky notes)
+  for (let i = 0; i < notes.mapNotes.length; i++) {
+    const note = notes.mapNotes[i];
+    const s = worldToScreen(note.x, note.y);
+    const lines = note.text.split('\n');
+    const lineH = 13;
+    const pad = 8;
+    const maxLineW = Math.max(...lines.map(l => l.length)) * 6.5;
+    const nw = Math.max(80, maxLineW + pad * 2);
+    const nh = lines.length * lineH + pad * 2;
+    
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.fillRect(s.x + 2, s.y + 2, nw, nh);
+    
+    // Note background
+    ctx.fillStyle = note.color || '#fbbf24';
+    ctx.globalAlpha = 0.9;
+    ctx.fillRect(s.x, s.y, nw, nh);
+    ctx.globalAlpha = 1;
+    
+    // Border
+    ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(s.x, s.y, nw, nh);
+    
+    // Text
+    ctx.fillStyle = '#111';
+    ctx.font = '11px Consolas, monospace';
+    ctx.textAlign = 'left';
+    for (let j = 0; j < lines.length; j++) {
+      ctx.fillText(lines[j], s.x + pad, s.y + pad + 10 + j * lineH);
+    }
+    
+    // Index badge
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.font = '9px Consolas, monospace';
+    ctx.fillText(`#${i+1}`, s.x + 3, s.y + nh - 3);
+  }
+  ctx.textAlign = 'center'; // reset
 }
 
 function hitTest(sx, sy) {
+  // Check map notes first (on top)
+  for (let i = notes.mapNotes.length - 1; i >= 0; i--) {
+    const note = notes.mapNotes[i];
+    const s = worldToScreen(note.x, note.y);
+    const lines = note.text.split('\n');
+    const lineH = 13;
+    const pad = 8;
+    const maxLineW = Math.max(...lines.map(l => l.length)) * 6.5;
+    const nw = Math.max(80, maxLineW + pad * 2);
+    const nh = lines.length * lineH + pad * 2;
+    if (sx >= s.x && sx <= s.x + nw && sy >= s.y && sy <= s.y + nh) {
+      return { type: 'note', index: i };
+    }
+  }
+  // Check rooms
   for (const id of levelIds) {
     const pos = roomPositions[id];
     if (!pos) continue;
@@ -361,7 +422,7 @@ function hitTest(sx, sy) {
     const rw = Math.max(60, (level.grid.width || 10) * 0.8) * cam.zoom;
     const rh = Math.max(30, (level.grid.height || 10) * 0.8) * cam.zoom;
     if (sx >= s.x - rw/2 && sx <= s.x + rw/2 && sy >= s.y - rh/2 && sy <= s.y + rh/2) {
-      return id;
+      return { type: 'room', id };
     }
   }
   return null;
@@ -483,6 +544,9 @@ function selectRoom(id) {
     <h2>Old Exit Zones</h2>
     ${level.exits.map(e => `<div style="font-size:11px;color:#888">→ ${e.targetLevel} (${e.id || '?'})</div>`).join('')}
     
+    <h2>📝 Room Notes</h2>
+    <textarea id="room-notes" rows="6" style="width:100%;background:#111;color:#eee;border:1px solid #533483;padding:6px;font-family:inherit;font-size:11px;resize:vertical;border-radius:3px" placeholder="Planning notes for this room..." onchange="updateRoomNote('${id}',this.value)" oninput="updateRoomNote('${id}',this.value)">${(notes.roomNotes[id] || '').replace(/</g, '&lt;')}</textarea>
+    
     <h2 style="margin-top:16px">Danger Zone</h2>
     <button onclick="deleteRoom('${id}')" style="background:#3a0a0a;color:#e94560;border:1px solid #e94560;padding:6px 14px;font-size:12px;cursor:pointer;border-radius:3px">🗑 Delete Room</button>
   `;
@@ -555,6 +619,37 @@ window.updateZone = function(roomId, dir, idx, field, value) {
   if (field === 'from' || field === 'to') zones[idx][field] = parseFloat(value);
   else zones[idx][field] = value;
   n[dir] = zones;
+  dirty = true;
+  setStatus('Unsaved changes');
+  draw();
+};
+
+window.updateRoomNote = function(roomId, text) {
+  notes.roomNotes[roomId] = text;
+  dirty = true;
+  setStatus('Unsaved changes');
+};
+
+window.addMapNote = function(x, y) {
+  const text = prompt('Note text:');
+  if (!text) return;
+  const colors = ['#fbbf24', '#4ade80', '#60a5fa', '#f87171', '#c084fc', '#fb923c'];
+  notes.mapNotes.push({ x, y, text, color: colors[notes.mapNotes.length % colors.length] });
+  dirty = true;
+  setStatus('Unsaved changes');
+  draw();
+};
+
+window.editMapNote = function(idx) {
+  const note = notes.mapNotes[idx];
+  if (!note) return;
+  const text = prompt('Edit note (empty to delete):', note.text);
+  if (text === null) return;
+  if (text === '') {
+    notes.mapNotes.splice(idx, 1);
+  } else {
+    note.text = text;
+  }
   dirty = true;
   setStatus('Unsaved changes');
   draw();
@@ -636,7 +731,7 @@ async function saveAll() {
   const res = await fetch('/api/save', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ neighbors, layout: roomPositions }),
+    body: JSON.stringify({ neighbors, layout: roomPositions, notes }),
   });
   const data = await res.json();
   if (data.ok) {
@@ -676,9 +771,11 @@ canvas.addEventListener('mousedown', e => {
   
   if (e.button === 0) {
     const hit = hitTest(sx, sy);
-    if (hit) {
-      dragging = hit;
-      selectRoom(hit);
+    if (hit && hit.type === 'room') {
+      dragging = hit.id;
+      selectRoom(hit.id);
+    } else if (hit && hit.type === 'note') {
+      dragNote = hit.index;
     } else {
       selectRoom(null);
       panning = true;
@@ -698,6 +795,13 @@ canvas.addEventListener('mousemove', e => {
     const w = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
     roomPositions[dragging] = { x: w.x, y: w.y };
     draw();
+  } else if (dragNote !== null) {
+    const rect = canvas.getBoundingClientRect();
+    const w = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+    notes.mapNotes[dragNote].x = w.x;
+    notes.mapNotes[dragNote].y = w.y;
+    dirty = true;
+    draw();
   } else if (panning) {
     cam.x = camStart.x - (e.clientX - panStart.x) / cam.zoom;
     cam.y = camStart.y - (e.clientY - panStart.y) / cam.zoom;
@@ -708,6 +812,7 @@ canvas.addEventListener('mousemove', e => {
 canvas.addEventListener('mouseup', () => {
   mouseDown = false;
   dragging = null;
+  dragNote = null;
   panning = false;
 });
 
@@ -719,6 +824,19 @@ canvas.addEventListener('wheel', e => {
 }, { passive: false });
 
 canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+canvas.addEventListener('dblclick', e => {
+  const rect = canvas.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+  const hit = hitTest(sx, sy);
+  if (hit && hit.type === 'note') {
+    editMapNote(hit.index);
+  } else if (!hit || hit.type !== 'room') {
+    const w = screenToWorld(sx, sy);
+    addMapNote(w.x, w.y);
+  }
+});
 
 window.addEventListener('resize', resize);
 resize();

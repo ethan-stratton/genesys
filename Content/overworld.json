@@ -8,7 +8,7 @@
       "y": 350,
       "level": "test-arena",
       "discovered": true,
-      "cleared": true,
+      "cleared": false,
       "connections": [
         "the-descent",
         "debug-room",
@@ -24,7 +24,7 @@
       "y": 250,
       "level": "the-descent",
       "discovered": true,
-      "cleared": true,
+      "cleared": false,
       "connections": [
         "test-arena",
         "the-gauntlet",
@@ -39,13 +39,13 @@
       "x": 500,
       "y": 350,
       "level": "the-gauntlet",
-      "discovered": true,
-      "cleared": true,
+      "discovered": false,
+      "cleared": false,
       "connections": [
         "the-descent",
         "the-summit"
       ],
-      "ShownName": "The Gauntlet"
+      "ShownName": "???"
     },
     {
       "id": "the-summit",
@@ -54,12 +54,12 @@
       "x": 650,
       "y": 200,
       "level": "the-summit",
-      "discovered": true,
-      "cleared": true,
+      "discovered": false,
+      "cleared": false,
       "connections": [
         "the-gauntlet"
       ],
-      "ShownName": "The Summit"
+      "ShownName": "???"
     },
     {
       "id": "debug-room",
@@ -69,7 +69,7 @@
       "y": 350,
       "level": "debug-room",
       "discovered": true,
-      "cleared": false,
+      "cleared": true,
       "connections": [
         "test-arena"
       ],
@@ -83,7 +83,7 @@
       "y": 250,
       "level": "crashsite",
       "discovered": true,
-      "cleared": false,
+      "cleared": true,
       "connections": [
         "test-arena",
         "the-descent"
