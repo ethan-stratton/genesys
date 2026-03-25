@@ -35,6 +35,17 @@ public class Game1 : Game
         ? new[] { "Continue", "New Game", "Settings", "Quit" }
         : new[] { "New Game", "Settings", "Quit" };
 
+    // Title screen "The Descent" animation
+    private float _titleTime;           // total elapsed time on title screen
+    private float _titleScrollY;        // vertical scroll position (increases = descending)
+    private Random _titleRng = new Random(42); // deterministic seed for consistent visuals
+    private struct TitleStar { public float X, Y, Brightness, Speed; }
+    private TitleStar[] _titleStars;
+    private struct TitleCloud { public float X, Y, W, H; public float Alpha; }
+    private TitleCloud[] _titleClouds;
+    private struct TitleTree { public float X, BaseY, Height, Width; public Color Trunk, Canopy; }
+    private TitleTree[] _titleTrees;
+
     // === PROLOGUE / TITLE CARD STATE ===
     private int _prologuePhase;        // 0-3: Ship, Override, Descent, Eye
     private float _prologueTimer;      // time within current phase
@@ -1017,6 +1028,7 @@ public class Game1 : Game
         catch (Exception ex) { Console.WriteLine($"[MUSIC] menu FAILED: {ex.Message}. Convert to OGG: ffmpeg -i 'Glitch - Prehistory (main menu).mp3' menu.ogg"); }
         // Start with menu music
         PlaySong(_menuBgm);
+        GenerateTitleScene();
     }
 
     private void PlaySong(Song song)
@@ -1052,6 +1064,12 @@ public class Game1 : Game
                 PlaySong(_bgm);
             _prevGameState = _gameState;
         }
+
+        // Fade music volume with screen fade (smooth transition)
+        if (_enableMusic && _fadeAlpha > 0f)
+            MediaPlayer.Volume = Math.Max(0f, 0.5f * (1f - _fadeAlpha));
+        else if (_enableMusic && MediaPlayer.Volume < 0.5f)
+            MediaPlayer.Volume = Math.Min(0.5f, MediaPlayer.Volume + dt * 0.5f); // fade back in over ~1s
 
         // === FADE TRANSITION UPDATE ===
         if (_fadingOut)
@@ -1109,6 +1127,7 @@ public class Game1 : Game
         }
         if (_gameState == GameState.Title)
         {
+            UpdateTitleAnimation(dt);
             // Handle settings menu first (consumes input)
             if (_menuOpen && _settingsFromTitle)
             {
@@ -1134,51 +1153,48 @@ public class Game1 : Game
                         _saveData = SaveData.Load();
                         if (_saveData != null)
                         {
-                            string path = $"Content/levels/{_saveData.CurrentLevel}.json";
-                            if (System.IO.File.Exists(path))
+                            StartFadeTo(GameState.Playing, 1.0f, () =>
                             {
-                                LoadLevel(path);
-                                _editorSaveFile = path;
-                            }
-                            else
-                            {
-                                LoadLevel(DefaultLevel);
-                                _editorSaveFile = DefaultLevel;
-                            }
-                            _camera = MakeCamera();
-                            _gameState = GameState.Playing;
-                            _rng = new Random();
-                            SpawnEnemiesFromLevel();
-                            _player = new Player(new Microsoft.Xna.Framework.Vector2(_saveData.SpawnX, _saveData.SpawnY));
-                            _camera.SnapTo(_player.Position, Player.Width, Player.Height);
-                            _bullets = new List<Bullet>();
-                            _prevInExit = new bool[_level.ExitRects.Length];
-                            for (int k = 0; k < _prevInExit.Length; k++)
-                                _prevInExit[k] = true;
-                            // Restore EVE orb state
-                            if (_saveData.Flags.ContainsKey("eveOrbActive"))
-                                _eveOrbActive = _saveData.Flags["eveOrbActive"];
-                            // Restore inventory
-                            _meleeInventory = _saveData.MeleeInventory.ConvertAll(s => Enum.Parse<WeaponType>(s)).ToArray();
-                            _meleeIndex = _saveData.MeleeIndex;
-                            _rangedInventory = _saveData.RangedInventory.ConvertAll(s => Enum.Parse<WeaponType>(s)).ToArray();
-                            _rangedIndex = _saveData.RangedIndex;
-                            if (_meleeIndex >= _meleeInventory.Length) _meleeIndex = _meleeInventory.Length > 0 ? 0 : -1;
-                            if (_rangedIndex >= _rangedInventory.Length) _rangedIndex = _rangedInventory.Length > 0 ? 0 : -1;
-                            // Skip wake-up on continue
-                            _wakeUpComplete = true;
-                            _player.IsLyingDown = false;
-                            _player.HasGrapple = _saveData?.CollectedItems?.Any(id => id.StartsWith("grapple")) == true;
-                            _hasMapModule = _saveData?.CollectedItems?.Any(id => id.StartsWith("map-module")) == true;
-                            _camera.Zoom = 1f;
-                            _camera.TargetZoom = 1f;
-
-                            // Load movement tier
-                            _player.CurrentTier = (Player.MoveTier)Math.Clamp(_saveData.MoveTier, 0, 2);
-                            _player.ApplyTierConstants();
-                            _player.SuitIntegrity = _saveData.SuitIntegrity;
-                            _player.Battery = _saveData.Battery;
-                            _player.Hp = _saveData.Hp;
+                                string path = $"Content/levels/{_saveData.CurrentLevel}.json";
+                                if (System.IO.File.Exists(path))
+                                {
+                                    LoadLevel(path);
+                                    _editorSaveFile = path;
+                                }
+                                else
+                                {
+                                    LoadLevel(DefaultLevel);
+                                    _editorSaveFile = DefaultLevel;
+                                }
+                                _camera = MakeCamera();
+                                _rng = new Random();
+                                SpawnEnemiesFromLevel();
+                                _player = new Player(new Microsoft.Xna.Framework.Vector2(_saveData.SpawnX, _saveData.SpawnY));
+                                _camera.SnapTo(_player.Position, Player.Width, Player.Height);
+                                _bullets = new List<Bullet>();
+                                _prevInExit = new bool[_level.ExitRects.Length];
+                                for (int k = 0; k < _prevInExit.Length; k++)
+                                    _prevInExit[k] = true;
+                                if (_saveData.Flags.ContainsKey("eveOrbActive"))
+                                    _eveOrbActive = _saveData.Flags["eveOrbActive"];
+                                _meleeInventory = _saveData.MeleeInventory.ConvertAll(s => Enum.Parse<WeaponType>(s)).ToArray();
+                                _meleeIndex = _saveData.MeleeIndex;
+                                _rangedInventory = _saveData.RangedInventory.ConvertAll(s => Enum.Parse<WeaponType>(s)).ToArray();
+                                _rangedIndex = _saveData.RangedIndex;
+                                if (_meleeIndex >= _meleeInventory.Length) _meleeIndex = _meleeInventory.Length > 0 ? 0 : -1;
+                                if (_rangedIndex >= _rangedInventory.Length) _rangedIndex = _rangedInventory.Length > 0 ? 0 : -1;
+                                _wakeUpComplete = true;
+                                _player.IsLyingDown = false;
+                                _player.HasGrapple = _saveData?.CollectedItems?.Any(id => id.StartsWith("grapple")) == true;
+                                _hasMapModule = _saveData?.CollectedItems?.Any(id => id.StartsWith("map-module")) == true;
+                                _camera.Zoom = 1f;
+                                _camera.TargetZoom = 1f;
+                                _player.CurrentTier = (Player.MoveTier)Math.Clamp(_saveData.MoveTier, 0, 2);
+                                _player.ApplyTierConstants();
+                                _player.SuitIntegrity = _saveData.SuitIntegrity;
+                                _player.Battery = _saveData.Battery;
+                                _player.Hp = _saveData.Hp;
+                            });
                         }
                         break;
                     case "New Game":
@@ -1190,11 +1206,6 @@ public class Game1 : Game
                         _wakeUpComplete = false;
                         _wakeUpPhase = 0;
                         _wakeUpTimer = 0f;
-                        _fadingOut = false;
-                        _fadeAlpha = 0f;
-                        _fadeTargetState = null;
-                        _fadeCallback = null;
-                        _fadeSpeed = 1.5f;
                         _eveMode = EveMovementMode.Orbit;
                         _eveMessageTimer = 0f;
                         _eveMessage = "";
@@ -1217,7 +1228,13 @@ public class Game1 : Game
                         _meleeIndex = -1;
                         _rangedInventory = Array.Empty<WeaponType>();
                         _rangedIndex = -1;
-                        StartPrologue();
+                        StartFadeTo(GameState.Prologue, 1.0f, () =>
+                        {
+                            _prologuePhase = 0;
+                            _prologueTimer = 0f;
+                            _prologueFadeAlpha = 1f;
+                            _prologueSkipTimer = 0f;
+                        });
                         break;
                     case "Settings":
                         _menuOpen = true;
@@ -7497,6 +7514,248 @@ public class Game1 : Game
         _spriteBatch.End();
     }
 
+    // === TITLE SCREEN ANIMATION: "The Descent" ===
+    // Camera descends through: stars → atmosphere → clouds → canopy → ground
+    // Total descent height: 3000 virtual pixels, auto-scrolls at ~40px/s (~75 seconds full loop)
+    private const float TitleDescentHeight = 3000f;
+    private const float TitleScrollSpeed = 40f;
+    // Layer boundaries (Y positions in descent space)
+    private const float TitleStarsEnd = 600f;      // 0-600: deep space
+    private const float TitleAtmoStart = 400f;      // atmosphere entry begins
+    private const float TitleAtmoEnd = 900f;        // atmosphere fully entered
+    private const float TitleCloudsStart = 700f;
+    private const float TitleCloudsEnd = 1400f;
+    private const float TitleCanopyStart = 1200f;
+    private const float TitleCanopyEnd = 2200f;
+    private const float TitleGroundStart = 2000f;
+    private const float TitleGroundLevel = 2600f;   // ground + crash site smoke
+
+    private void GenerateTitleScene()
+    {
+        _titleRng = new Random(42);
+        // Stars
+        _titleStars = new TitleStar[200];
+        for (int i = 0; i < _titleStars.Length; i++)
+            _titleStars[i] = new TitleStar
+            {
+                X = _titleRng.NextSingle() * 800,
+                Y = _titleRng.NextSingle() * TitleStarsEnd,
+                Brightness = 0.3f + _titleRng.NextSingle() * 0.7f,
+                Speed = 0.2f + _titleRng.NextSingle() * 0.8f // parallax depth
+            };
+        // Clouds
+        _titleClouds = new TitleCloud[30];
+        for (int i = 0; i < _titleClouds.Length; i++)
+            _titleClouds[i] = new TitleCloud
+            {
+                X = _titleRng.NextSingle() * 900 - 50,
+                Y = TitleCloudsStart + _titleRng.NextSingle() * (TitleCloudsEnd - TitleCloudsStart),
+                W = 80 + _titleRng.NextSingle() * 200,
+                H = 20 + _titleRng.NextSingle() * 40,
+                Alpha = 0.15f + _titleRng.NextSingle() * 0.35f
+            };
+        // Trees
+        _titleTrees = new TitleTree[60];
+        for (int i = 0; i < _titleTrees.Length; i++)
+        {
+            float h = 30 + _titleRng.NextSingle() * 80;
+            _titleTrees[i] = new TitleTree
+            {
+                X = _titleRng.NextSingle() * 800,
+                BaseY = TitleGroundLevel + _titleRng.NextSingle() * 10 - 5,
+                Height = h,
+                Width = h * (0.3f + _titleRng.NextSingle() * 0.3f),
+                Trunk = new Color(40 + _titleRng.Next(20), 25 + _titleRng.Next(15), 15),
+                Canopy = new Color(20 + _titleRng.Next(30), 60 + _titleRng.Next(60), 15 + _titleRng.Next(20))
+            };
+        }
+    }
+
+    private void UpdateTitleAnimation(float dt)
+    {
+        _titleTime += dt;
+        _titleScrollY += TitleScrollSpeed * dt;
+        if (_titleScrollY > TitleDescentHeight)
+            _titleScrollY -= TitleDescentHeight; // loop
+    }
+
+    private void DrawTitleBackground()
+    {
+        float camY = _titleScrollY;
+        int vw = ViewW, vh = ViewH;
+
+        // Sky color gradient based on depth
+        Color skyTop, skyBot;
+        if (camY < TitleAtmoStart)
+        {
+            // Deep space — black
+            skyTop = new Color(2, 2, 8);
+            skyBot = new Color(2, 2, 8);
+        }
+        else if (camY < TitleAtmoEnd)
+        {
+            float t = (camY - TitleAtmoStart) / (TitleAtmoEnd - TitleAtmoStart);
+            skyTop = Color.Lerp(new Color(2, 2, 8), new Color(10, 15, 40), t);
+            skyBot = Color.Lerp(new Color(2, 2, 8), new Color(25, 35, 80), t);
+        }
+        else if (camY < TitleCloudsEnd)
+        {
+            float t = (camY - TitleAtmoEnd) / (TitleCloudsEnd - TitleAtmoEnd);
+            skyTop = Color.Lerp(new Color(10, 15, 40), new Color(30, 50, 90), t);
+            skyBot = Color.Lerp(new Color(25, 35, 80), new Color(60, 80, 120), t);
+        }
+        else if (camY < TitleCanopyEnd)
+        {
+            float t = (camY - TitleCloudsEnd) / (TitleCanopyEnd - TitleCloudsEnd);
+            skyTop = Color.Lerp(new Color(30, 50, 90), new Color(20, 40, 30), t);
+            skyBot = Color.Lerp(new Color(60, 80, 120), new Color(15, 30, 20), t);
+        }
+        else
+        {
+            skyTop = new Color(20, 40, 30);
+            skyBot = new Color(15, 30, 20);
+        }
+
+        // Draw gradient background (4 horizontal bands)
+        for (int row = 0; row < 4; row++)
+        {
+            float t = row / 3f;
+            var c = Color.Lerp(skyTop, skyBot, t);
+            _spriteBatch.Draw(_pixel, new Rectangle(0, row * vh / 4, vw, vh / 4 + 1), c);
+        }
+
+        // Stars (visible when camY < TitleStarsEnd + vh)
+        if (camY < TitleStarsEnd + vh)
+        {
+            float starFade = camY > TitleAtmoStart ? 1f - (camY - TitleAtmoStart) / (TitleAtmoEnd - TitleAtmoStart) : 1f;
+            starFade = Math.Clamp(starFade, 0f, 1f);
+            for (int i = 0; i < _titleStars.Length; i++)
+            {
+                ref var s = ref _titleStars[i];
+                float sy = s.Y - camY * s.Speed;
+                // Wrap
+                while (sy < -10) sy += TitleStarsEnd + vh;
+                while (sy > vh + 10) sy -= TitleStarsEnd + vh;
+                if (sy < -5 || sy > vh + 5) continue;
+                float twinkle = 0.7f + 0.3f * MathF.Sin(_titleTime * (1.5f + s.Speed * 2f) + s.X);
+                float alpha = s.Brightness * twinkle * starFade;
+                int size = s.Brightness > 0.8f ? 2 : 1;
+                _spriteBatch.Draw(_pixel, new Rectangle((int)s.X, (int)sy, size, size), Color.White * alpha);
+            }
+        }
+
+        // Atmosphere entry streaks (reentry particles)
+        if (camY > TitleAtmoStart - 100 && camY < TitleAtmoEnd + 200)
+        {
+            float intensity = 1f - MathF.Abs(camY - (TitleAtmoStart + TitleAtmoEnd) / 2f) / ((TitleAtmoEnd - TitleAtmoStart) / 2f + 200);
+            intensity = Math.Clamp(intensity, 0f, 1f);
+            var streakRng = new Random(7);
+            int count = (int)(20 * intensity);
+            for (int i = 0; i < count; i++)
+            {
+                float sx = streakRng.NextSingle() * vw;
+                float sy = streakRng.NextSingle() * vh;
+                float len = 8 + streakRng.NextSingle() * 25;
+                float drift = MathF.Sin(_titleTime * 0.5f + i) * 15;
+                var streakColor = Color.Lerp(new Color(255, 200, 100), new Color(255, 100, 50), streakRng.NextSingle());
+                _spriteBatch.Draw(_pixel, new Rectangle((int)(sx + drift), (int)sy, 1, (int)len), streakColor * (intensity * 0.6f));
+            }
+        }
+
+        // Clouds
+        if (camY > TitleCloudsStart - vh && camY < TitleCloudsEnd + vh)
+        {
+            for (int i = 0; i < _titleClouds.Length; i++)
+            {
+                ref var c = ref _titleClouds[i];
+                float cy2 = c.Y - camY * 0.7f;
+                float drift = MathF.Sin(_titleTime * 0.3f + c.X * 0.01f) * 20;
+                if (cy2 < -c.H - 50 || cy2 > vh + 50) continue;
+                var cloudColor = new Color(180, 190, 210) * c.Alpha;
+                // Soft cloud: 3 overlapping ovals
+                _spriteBatch.Draw(_pixel, new Rectangle((int)(c.X + drift), (int)cy2, (int)c.W, (int)c.H), cloudColor);
+                _spriteBatch.Draw(_pixel, new Rectangle((int)(c.X + drift + c.W * 0.2f), (int)(cy2 - c.H * 0.3f), (int)(c.W * 0.6f), (int)(c.H * 0.8f)), cloudColor * 0.7f);
+                _spriteBatch.Draw(_pixel, new Rectangle((int)(c.X + drift - c.W * 0.1f), (int)(cy2 + c.H * 0.1f), (int)(c.W * 0.5f), (int)(c.H * 0.6f)), cloudColor * 0.5f);
+            }
+        }
+
+        // Canopy (vertical lines for tree trunks + leafy blobs)
+        if (camY > TitleCanopyStart - vh && camY < TitleCanopyEnd + vh)
+        {
+            float canopyAlpha = Math.Clamp((camY - TitleCanopyStart + vh * 0.3f) / (float)vh, 0f, 1f);
+            var leafRng = new Random(99);
+            for (int i = 0; i < 40; i++)
+            {
+                float lx = leafRng.NextSingle() * vw;
+                float ly = TitleCanopyStart + leafRng.NextSingle() * (TitleCanopyEnd - TitleCanopyStart);
+                float screenY = ly - camY * 0.6f;
+                if (screenY < -60 || screenY > vh + 60) continue;
+                int lw = 30 + leafRng.Next(50);
+                int lh = 20 + leafRng.Next(35);
+                float sway = MathF.Sin(_titleTime * 0.5f + lx * 0.02f) * 8;
+                var leafColor = new Color(15 + leafRng.Next(25), 50 + leafRng.Next(50), 10 + leafRng.Next(20));
+                _spriteBatch.Draw(_pixel, new Rectangle((int)(lx + sway), (int)screenY, lw, lh), leafColor * (canopyAlpha * 0.7f));
+            }
+            // Light shafts through canopy
+            float shaftAlpha = Math.Clamp((camY - TitleCanopyStart) / 400f, 0f, 0.15f);
+            for (int i = 0; i < 5; i++)
+            {
+                float sx = 100 + i * 160 + MathF.Sin(_titleTime * 0.2f + i) * 30;
+                _spriteBatch.Draw(_pixel, new Rectangle((int)sx, 0, 3, vh), new Color(255, 240, 200) * shaftAlpha);
+            }
+        }
+
+        // Ground + trees
+        if (camY > TitleGroundStart - vh)
+        {
+            float groundScreenY = TitleGroundLevel - camY * 0.85f;
+            // Ground
+            if (groundScreenY < vh)
+            {
+                int gy = Math.Max(0, (int)groundScreenY);
+                _spriteBatch.Draw(_pixel, new Rectangle(0, gy, vw, vh - gy), new Color(20, 35, 18));
+                // Grass texture lines
+                var grassRng = new Random(33);
+                for (int i = 0; i < 40; i++)
+                {
+                    int gx = grassRng.Next(vw);
+                    int gh = 3 + grassRng.Next(6);
+                    _spriteBatch.Draw(_pixel, new Rectangle(gx, gy - gh, 1, gh), new Color(30, 55, 25) * 0.6f);
+                }
+            }
+
+            // Trees
+            for (int i = 0; i < _titleTrees.Length; i++)
+            {
+                ref var tr = ref _titleTrees[i];
+                float treeBaseY = tr.BaseY - camY * 0.85f;
+                if (treeBaseY < -tr.Height - 20 || treeBaseY > vh + 20) continue;
+                // Trunk
+                int tw = Math.Max(2, (int)(tr.Width * 0.15f));
+                _spriteBatch.Draw(_pixel, new Rectangle((int)(tr.X - tw / 2), (int)(treeBaseY - tr.Height * 0.6f), tw, (int)(tr.Height * 0.6f)), tr.Trunk);
+                // Canopy blob
+                int cw = (int)tr.Width;
+                int ch = (int)(tr.Height * 0.5f);
+                float sway = MathF.Sin(_titleTime * 0.4f + tr.X * 0.01f) * 3;
+                _spriteBatch.Draw(_pixel, new Rectangle((int)(tr.X - cw / 2 + sway), (int)(treeBaseY - tr.Height), cw, ch), tr.Canopy);
+            }
+
+            // Crash site smoke (rising wisps near center)
+            if (groundScreenY < vh + 50)
+            {
+                for (int i = 0; i < 8; i++)
+                {
+                    float smokeAge = (_titleTime * 0.5f + i * 1.3f) % 4f;
+                    float sx = vw / 2f + MathF.Sin(smokeAge * 2f + i) * 15;
+                    float sy = groundScreenY - smokeAge * 30;
+                    float sa = (1f - smokeAge / 4f) * 0.25f;
+                    int ss = (int)(3 + smokeAge * 4);
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)sx, (int)sy, ss, ss), Color.Gray * sa);
+                }
+            }
+        }
+    }
+
     // === TITLE CARD ===
     private void UpdateTitleCard(float dt)
     {
@@ -9200,12 +9459,18 @@ public class Game1 : Game
         if (_gameState == GameState.Title)
         {
             _spriteBatch.Begin();
+            DrawTitleBackground();
 
-            // Title
+            // Title text with subtle glow
             string title = "GENESYS";
             var titleSize = _fontLarge.MeasureString(title);
             float cx = ViewW / 2f;
             float cy = ViewH / 2f;
+            // Shadow/glow
+            for (int ox = -1; ox <= 1; ox++)
+                for (int oy = -1; oy <= 1; oy++)
+                    if (ox != 0 || oy != 0)
+                        _spriteBatch.DrawString(_fontLarge, title, new Vector2(cx - titleSize.X / 2 + ox, cy - 130 + oy), new Color(80, 140, 200) * 0.3f);
             _spriteBatch.DrawString(_fontLarge, title, new Vector2(cx - titleSize.X / 2, cy - 130), Color.White);
 
             // Subtitle
@@ -9236,6 +9501,7 @@ public class Game1 : Game
             }
 
             _spriteBatch.End();
+            DrawFadeOverlay();
             DrawCRT();
             base.Draw(gameTime);
             return;
