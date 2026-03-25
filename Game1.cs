@@ -3036,26 +3036,9 @@ public class Game1 : Game
         // Dust on dash start
         if (_dustParticlesEnabled && _player.IsDashing && !_playerWasDashing)
             SpawnDustParticles(new Vector2(_player.Position.X + Player.Width / 2f, _player.Position.Y + Player.Height), 6);
-        // Battery drain on tech dash start + tech degradation fizzle
+        // Battery drain on tech dash start
         if (_player.IsDashing && !_playerWasDashing && _player.CurrentTier == Player.MoveTier.Tech)
-        {
             _player.Battery = MathF.Max(0, _player.Battery - TechDashBatteryCost);
-            // Below 15% suit integrity: 30% chance tech dash fizzles
-            if (_player.SuitIntegrity < 15f && _rng.NextDouble() < 0.3)
-            {
-                _player.CancelDash();
-                SetEditorStatus("Suit malfunction — dash failed!");
-                // Spark burst on fizzle
-                for (int s = 0; s < 5; s++)
-                    _particles.Add(new Particle
-                    {
-                        Position = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f),
-                        Velocity = new Vector2((_rng.NextSingle() - 0.5f) * 120f, -_rng.NextSingle() * 80f),
-                        Life = 0.3f, MaxLife = 0.3f, Size = 1,
-                        Color = Color.OrangeRed
-                    });
-            }
-        }
         // Movement actions fling off latched crawlers
         bool actionFling = (_player.IsDashing && !_playerWasDashing)
             || _player.IsSliding || _player.IsUppercutting
