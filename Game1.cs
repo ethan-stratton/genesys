@@ -976,7 +976,7 @@ public class Game1 : Game
         _fontLarge = _fontSystem.GetFont(22);  // titles, boss names
         try
         {
-            _bgm = Song.FromUri("overworld", new Uri(Path.GetFullPath("Content/audio/music/overworld.ogg")));
+            _bgm = Song.FromUri("overworld", new Uri(Path.GetFullPath("Content/audio/music/overworld.mp3")));
         }
         catch (Exception ex)
         {
