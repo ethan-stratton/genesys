@@ -1,24 +1,21 @@
 {
-  "currentLevel": "crashsite",
-  "spawnX": -98.00012,
-  "spawnY": 3026.9207,
+  "currentLevel": "the-summit",
+  "spawnX": 138.76431,
+  "spawnY": 344,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 67.83335,
+  "playTime": 187.01512,
   "meleeInventory": [
-    "Knife",
-    "Stick"
+    "Knife"
   ],
   "rangedInventory": [],
-  "meleeIndex": 1,
+  "meleeIndex": 0,
   "rangedIndex": -1,
   "collectedItems": [
     "grapple-2",
-    "knife-4",
-    "map-module-0",
-    "stick-1"
+    "knife-4"
   ],
   "windowSizeIndex": 0,
   "crtEnabled": false,

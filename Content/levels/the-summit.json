@@ -307,14 +307,39 @@
       "type": "bird",
       "x": 271,
       "y": 460,
-      "count": 1
+      "count": 1,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     }
   ],
-  "tileGrid": null,
+  "switches": [],
+  "labels": [],
+  "retractableSpikes": [],
+  "shelters": [],
   "neighbors": {
     "left": "the-descent",
     "right": "",
     "up": "",
-    "down": "the-gauntlet"
-  }
+    "down": "the-gauntlet",
+    "LeftZones": [
+      {
+        "target": "the-descent",
+        "from": 0,
+        "to": 1
+      }
+    ],
+    "RightZones": [],
+    "UpZones": [],
+    "DownZones": [
+      {
+        "target": "the-gauntlet",
+        "from": 0,
+        "to": 1
+      }
+    ]
+  },
+  "tileGrid": null
 }

@@ -66,6 +66,7 @@
   <button onclick="resetView()">Reset View</button>
   <button onclick="autoLayout()">Auto Layout</button>
   <button onclick="saveAll()">💾 Save All</button>
+  <button onclick="createRoomPrompt()">➕ New Room</button>
   <span class="status" id="status">Loading...</span>
 </div>
 
@@ -447,6 +448,25 @@ function selectRoom(id) {
       <div><label>Old Exits:</label><span class="val">${level.exits.length}</span></div>
     </div>
     
+    <h2>Resize</h2>
+    <div style="display:flex;gap:6px;align-items:center;margin:4px 0">
+      <label style="font-size:11px;color:#888">W:</label>
+      <input id="resize-w" type="number" value="${level.grid.width}" min="5" max="200" style="width:50px;background:#1a1a2e;color:#eee;border:1px solid #533483;padding:3px;font-size:11px">
+      <label style="font-size:11px;color:#888">H:</label>
+      <input id="resize-h" type="number" value="${level.grid.height}" min="5" max="200" style="width:50px;background:#1a1a2e;color:#eee;border:1px solid #533483;padding:3px;font-size:11px">
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;margin:4px 0">
+      <label style="font-size:11px;color:#888">Anchor:</label>
+      <select id="resize-anchor" style="background:#1a1a2e;color:#eee;border:1px solid #533483;padding:3px;font-size:11px">
+        <option value="top-left">Top-Left</option>
+        <option value="top-right">Top-Right</option>
+        <option value="bottom-left" selected>Bottom-Left</option>
+        <option value="bottom-right">Bottom-Right</option>
+        <option value="center">Center</option>
+      </select>
+      <button onclick="resizeRoom('${id}')" style="background:#0f3460;color:#eee;border:1px solid #533483;padding:4px 10px;font-size:11px;cursor:pointer">Resize</button>
+    </div>
+    
     <h2>Neighbors (edge transitions)</h2>
     <div class="neighbor-row"><label>↑ Up:</label>${sel('up')}</div>
     <div class="neighbor-row"><label>← Left:</label>${sel('left')}</div>
@@ -462,6 +482,9 @@ function selectRoom(id) {
     
     <h2>Old Exit Zones</h2>
     ${level.exits.map(e => `<div style="font-size:11px;color:#888">→ ${e.targetLevel} (${e.id || '?'})</div>`).join('')}
+    
+    <h2 style="margin-top:16px">Danger Zone</h2>
+    <button onclick="deleteRoom('${id}')" style="background:#3a0a0a;color:#e94560;border:1px solid #e94560;padding:6px 14px;font-size:12px;cursor:pointer;border-radius:3px">🗑 Delete Room</button>
   `;
   
   draw();
@@ -535,6 +558,64 @@ window.updateZone = function(roomId, dir, idx, field, value) {
   dirty = true;
   setStatus('Unsaved changes');
   draw();
+};
+
+window.deleteRoom = async function(id) {
+  if (!confirm(`Delete room "${id}"? (Moved to trash, neighbor references removed)`)) return;
+  const res = await fetch('/api/delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
+  });
+  const data = await res.json();
+  if (data.ok) {
+    setStatus(`Deleted ${id}`);
+    await loadLevels();
+    selectRoom(null);
+  } else {
+    setStatus(`Error: ${data.error}`);
+  }
+};
+
+window.createRoomPrompt = async function() {
+  const id = prompt('Room ID (lowercase, hyphens, e.g. "ship-interior"):');
+  if (!id) return;
+  const name = prompt('Display name:', id) || id;
+  const width = parseInt(prompt('Width in tiles:', '30') || '30');
+  const height = parseInt(prompt('Height in tiles:', '20') || '20');
+  const res = await fetch('/api/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, name, width, height }),
+  });
+  const data = await res.json();
+  if (data.ok) {
+    setStatus(`Created ${id}`);
+    await loadLevels();
+    selectRoom(id);
+  } else {
+    alert(`Error: ${data.error}`);
+  }
+};
+
+window.resizeRoom = async function(id) {
+  const w = parseInt(document.getElementById('resize-w').value);
+  const h = parseInt(document.getElementById('resize-h').value);
+  const anchor = document.getElementById('resize-anchor').value;
+  if (!confirm(`Resize "${id}" to ${w}×${h}? Anchor: ${anchor}. Tiles outside new bounds will be cropped.`)) return;
+  const res = await fetch('/api/resize', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, width: w, height: h, anchor }),
+  });
+  const data = await res.json();
+  if (data.ok) {
+    setStatus(`Resized ${id} to ${data.newWidth}×${data.newHeight}`);
+    await loadLevels();
+    selectRoom(id);
+  } else {
+    alert(`Error: ${data.error}`);
+  }
 };
 
 async function saveAll() {

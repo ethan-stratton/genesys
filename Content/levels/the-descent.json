@@ -556,6 +556,50 @@
   "labels": [],
   "retractableSpikes": [],
   "shelters": [],
+  "neighbors": {
+    "left": "test-arena",
+    "right": [
+      {
+        "target": "the-summit",
+        "from": 0,
+        "to": 0.5
+      },
+      {
+        "target": "the-gauntlet",
+        "from": 0.5,
+        "to": 1
+      }
+    ],
+    "up": "crashsite",
+    "down": "",
+    "LeftZones": [
+      {
+        "target": "test-arena",
+        "from": 0,
+        "to": 1
+      }
+    ],
+    "RightZones": [
+      {
+        "target": "the-summit",
+        "from": 0,
+        "to": 0.5
+      },
+      {
+        "target": "the-gauntlet",
+        "from": 0.5,
+        "to": 1
+      }
+    ],
+    "UpZones": [
+      {
+        "target": "crashsite",
+        "from": 0,
+        "to": 1
+      }
+    ],
+    "DownZones": []
+  },
   "tileGrid": {
     "width": 43,
     "height": 46,
@@ -2542,22 +2586,5 @@
       0,
       0
     ]
-  },
-  "neighbors": {
-    "left": "test-arena",
-    "right": [
-      {
-        "target": "the-summit",
-        "from": 0,
-        "to": 0.5
-      },
-      {
-        "target": "the-gauntlet",
-        "from": 0.5,
-        "to": 1
-      }
-    ],
-    "up": "crashsite",
-    "down": ""
   }
 }
