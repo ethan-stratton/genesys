@@ -153,6 +153,7 @@ public class Game1 : Game
     private bool _playerWasGrounded;
     private float _playerPrevVelY;
     private bool _playerWasDashing;
+    private bool _playerWasGrappleFiring;
     private Random _shakeRng = new();
 
     private List<Bullet> _bullets;
@@ -267,8 +268,15 @@ public class Game1 : Game
     // --- EVE orb ---
     private float _totalTime;
 
-    // Suit integrity (0-100, placeholder — decreases from tech suppression field)
-    private float _suitIntegrity = 30f; // starts heavily damaged from crash
+    // Suit/battery systems — values live on Player, constants here
+    private float _suitSparkTimer; // visual sparks when suit is low
+    private float _hudGlitchTimer; // HUD distortion when suit is low
+    private Random _hudGlitchRng = new();
+    private const float TechDashBatteryCost = 0.5f;
+    private const float GrappleBatteryCost = 0.5f;
+    private const float ShieldBatteryCost = 1.0f;
+    private const float EveScanL3BatteryCost = 5.0f;
+    private const float BatteryCellRestoreAmount = 20f;
 
     // EVE status
     private enum EveStatus { Ok, Scanning, Overheat, Offline }
@@ -577,11 +585,11 @@ public class Game1 : Game
     private bool _enemyVariantExpanded; // Right arrow expands variants
     private string SelectedEnemyType => EnemyCategories[_enemyCategoryCursor].variants[_enemyVariantCursor];
     private int _editorEnemyCursor; // legacy, unused now
-    private static readonly string[] ItemTypes = { "knife", "grapple", "stick", "dagger", "sword", "axe", "club", "hammer", "greatsword", "greatclub", "whip", "sling", "bow", "gun", "heart" };
+    private static readonly string[] ItemTypes = { "knife", "grapple", "stick", "dagger", "sword", "axe", "club", "hammer", "greatsword", "greatclub", "whip", "sling", "bow", "gun", "heart", "battery" };
     private int _editorItemCursor;
 
     // Item placement palette (P key in editor)
-    private static readonly string[] ItemPaletteTypes = { "knife", "grapple", "stick", "dagger", "sword", "axe", "club", "hammer", "greatsword", "greatclub", "whip", "sling", "bow", "gun", "heart", "shelter" };
+    private static readonly string[] ItemPaletteTypes = { "knife", "grapple", "stick", "dagger", "sword", "axe", "club", "hammer", "greatsword", "greatclub", "whip", "sling", "bow", "gun", "heart", "battery", "shelter" };
     private bool _itemPaletteOpen;
     private int _itemPaletteCursor;
     private bool _entityPaletteOpen;
@@ -1149,6 +1157,9 @@ public class Game1 : Game
                             // Load movement tier
                             _player.CurrentTier = (Player.MoveTier)Math.Clamp(_saveData.MoveTier, 0, 2);
                             _player.ApplyTierConstants();
+                            _player.SuitIntegrity = _saveData.SuitIntegrity;
+                            _player.Battery = _saveData.Battery;
+                            _player.Hp = _saveData.Hp;
                         }
                         break;
                     case "New Game":
@@ -1178,7 +1189,8 @@ public class Game1 : Game
                         _totalKills = 0;
                         _passiveCreatureKills = 0;
                         _areaKillCounts.Clear();
-                        _suitIntegrity = 30f;
+                        _player.SuitIntegrity = 31f;
+                        _player.Battery = 80f;
                         _hasMapModule = false;
                         _prologueSkipped = false;
                         _eveDialogueExhausted = false;
@@ -2783,7 +2795,7 @@ public class Game1 : Game
                 int br2 = ((int)b.Position.Y + Bullet.Size / 2 - oy) / ts;
                 if (bc >= 0 && bc < tgi.Width && br2 >= 0 && br2 < tgi.Height)
                 {
-                    if (tgi.GetTileAt(bc, br2) == TileType.Breakable || tgi.GetTileAt(bc, br2) == TileType.BreakableGlass)
+                    if (tgi.GetTileAt(bc, br2) == TileType.Breakable || tgi.GetTileAt(bc, br2) == TileType.BreakableGlass || tgi.GetTileAt(bc, br2) == TileType.BreakableBattery)
                     {
                         var origT = tgi.GetTileAt(bc, br2);
                         _destroyedBreakables.Add((bc, br2, origT));
@@ -2799,6 +2811,20 @@ public class Game1 : Game
                                 Y = twy,
                                 W = 16, H = 16,
                                 ItemType = "heart",
+                                Collected = false,
+                                HasGravity = true,
+                                VelY = -150f
+                            });
+                        }
+                        else if (origT == TileType.BreakableBattery)
+                        {
+                            _itemPickups.Add(new ItemPickup
+                            {
+                                Id = $"battery-break-{twx}-{twy}",
+                                X = twx + ts / 2f - 8,
+                                Y = twy,
+                                W = 16, H = 16,
+                                ItemType = "battery",
                                 Collected = false,
                                 HasGravity = true,
                                 VelY = -150f
@@ -3010,6 +3036,26 @@ public class Game1 : Game
         // Dust on dash start
         if (_dustParticlesEnabled && _player.IsDashing && !_playerWasDashing)
             SpawnDustParticles(new Vector2(_player.Position.X + Player.Width / 2f, _player.Position.Y + Player.Height), 6);
+        // Battery drain on tech dash start + tech degradation fizzle
+        if (_player.IsDashing && !_playerWasDashing && _player.CurrentTier == Player.MoveTier.Tech)
+        {
+            _player.Battery = MathF.Max(0, _player.Battery - TechDashBatteryCost);
+            // Below 15% suit integrity: 30% chance tech dash fizzles
+            if (_player.SuitIntegrity < 15f && _rng.NextDouble() < 0.3)
+            {
+                _player.CancelDash();
+                SetEditorStatus("Suit malfunction — dash failed!");
+                // Spark burst on fizzle
+                for (int s = 0; s < 5; s++)
+                    _particles.Add(new Particle
+                    {
+                        Position = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f),
+                        Velocity = new Vector2((_rng.NextSingle() - 0.5f) * 120f, -_rng.NextSingle() * 80f),
+                        Life = 0.3f, MaxLife = 0.3f, Size = 1,
+                        Color = Color.OrangeRed
+                    });
+            }
+        }
         // Movement actions fling off latched crawlers
         bool actionFling = (_player.IsDashing && !_playerWasDashing)
             || _player.IsSliding || _player.IsUppercutting
@@ -3025,6 +3071,39 @@ public class Game1 : Game
         }
         _playerWasGrounded = _player.IsGrounded;
         _playerWasDashing = _player.IsDashing;
+        // Battery drain on grapple fire
+        if (_player.IsGrappleFiring && !_playerWasGrappleFiring)
+            _player.Battery = MathF.Max(0, _player.Battery - GrappleBatteryCost);
+        _playerWasGrappleFiring = _player.IsGrappleFiring;
+
+        // Suit spark particles when integrity is low
+        if (_player.SuitIntegrity < 25f)
+        {
+            _suitSparkTimer -= dt;
+            float sparkFreq = 0.5f + (_player.SuitIntegrity / 25f) * 1.5f; // sparks every 0.5-2s
+            if (_suitSparkTimer <= 0)
+            {
+                _suitSparkTimer = sparkFreq;
+                var sparkPos = _player.Position + new Vector2(
+                    _rng.Next(0, Player.Width),
+                    _rng.Next(0, Player.Height));
+                // Spawn 2-4 tiny yellow-white spark particles
+                for (int s = 0; s < 2 + _rng.Next(3); s++)
+                {
+                    _particles.Add(new Particle
+                    {
+                        Position = sparkPos,
+                        Velocity = new Vector2(
+                            (_rng.NextSingle() - 0.5f) * 80f,
+                            -_rng.NextSingle() * 60f - 20f),
+                        Life = 0.2f + _rng.NextSingle() * 0.15f,
+                        MaxLife = 0.35f,
+                        Size = 1,
+                        Color = _rng.NextDouble() > 0.5 ? Color.Yellow : Color.White
+                    });
+                }
+            }
+        }
 
         // Update item physics (gravity for dropped items)
         foreach (var item in _itemPickups)
@@ -3077,7 +3156,7 @@ public class Game1 : Game
             }
         }
 
-        // Auto-collect hearts on touch
+        // Auto-collect hearts and battery cells on touch
         if (!_isDead)
         {
             var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
@@ -3088,6 +3167,12 @@ public class Game1 : Game
                 {
                     item.Collected = true;
                     _player.Hp = Math.Min(_player.Hp + 3, _player.MaxHp);
+                }
+                if (!item.Collected && item.ItemType == "battery" && pRect.Intersects(item.Rect))
+                {
+                    item.Collected = true;
+                    _player.Battery = MathF.Min(100f, _player.Battery + BatteryCellRestoreAmount);
+                    SetEditorStatus($"Battery +{(int)BatteryCellRestoreAmount}%");
                 }
             }
         }
@@ -3129,6 +3214,8 @@ public class Game1 : Game
                 save.SpawnX = _player.Position.X;
                 save.SpawnY = _player.Position.Y;
                 save.Hp = _player.Hp;
+                save.SuitIntegrity = _player.SuitIntegrity;
+                save.Battery = _player.Battery;
                 save.Save();
                 _saveData = save;
 
@@ -3477,7 +3564,7 @@ public class Game1 : Game
                     for (int col = startCol; col <= endCol; col++)
                     {
                         var bt = tgi.GetTileAt(col, row);
-                        if (bt == TileType.Breakable || bt == TileType.BreakableGlass)
+                        if (bt == TileType.Breakable || bt == TileType.BreakableGlass || bt == TileType.BreakableBattery)
                         {
                             _destroyedBreakables.Add((col, row, bt));
                             tgi.SetTileAt(col, row, TileType.Empty);
@@ -3495,6 +3582,20 @@ public class Game1 : Game
                                     Collected = false,
                                     HasGravity = true,
                                     VelY = -150f // pop upward then fall
+                                });
+                            }
+                            else if (bt == TileType.BreakableBattery)
+                            {
+                                _itemPickups.Add(new ItemPickup
+                                {
+                                    Id = $"battery-break-{twx}-{twy}",
+                                    X = twx + ts / 2f - 8,
+                                    Y = twy,
+                                    W = 16, H = 16,
+                                    ItemType = "battery",
+                                    Collected = false,
+                                    HasGravity = true,
+                                    VelY = -150f
                                 });
                             }
                             // BreakableGlass shatters with no drop
@@ -3522,7 +3623,7 @@ public class Game1 : Game
                     for (int col = startCol; col <= endCol; col++)
                     {
                         var bt = tgi.GetTileAt(col, row);
-                        if (bt == TileType.Breakable || bt == TileType.BreakableGlass)
+                        if (bt == TileType.Breakable || bt == TileType.BreakableGlass || bt == TileType.BreakableBattery)
                         {
                             _destroyedBreakables.Add((col, row, bt));
                             tgi.SetTileAt(col, row, TileType.Empty);
@@ -3537,6 +3638,20 @@ public class Game1 : Game
                                     Y = twy,
                                     W = 16, H = 16,
                                     ItemType = "heart",
+                                    Collected = false,
+                                    HasGravity = true,
+                                    VelY = -150f
+                                });
+                            }
+                            else if (bt == TileType.BreakableBattery)
+                            {
+                                _itemPickups.Add(new ItemPickup
+                                {
+                                    Id = $"battery-break-{twx}-{twy}",
+                                    X = twx + ts / 2f - 8,
+                                    Y = twy,
+                                    W = 16, H = 16,
+                                    ItemType = "battery",
                                     Collected = false,
                                     HasGravity = true,
                                     VelY = -150f
@@ -5986,6 +6101,18 @@ public class Game1 : Game
                             }
                             _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts / 2, ts, 1), glassLine);
                         }
+                        else if (tile == TileType.BreakableBattery)
+                        {
+                            // Yellow-tinted crate with lightning bolt symbol
+                            _spriteBatch.Draw(_pixel, rect, new Color(220, 200, 60) * 0.3f);
+                            // Lightning bolt: zigzag down the center
+                            var bolt = new Color(255, 230, 50);
+                            int bx = cx - 2;
+                            _spriteBatch.Draw(_pixel, new Rectangle(bx + 2, cy - 8, 4, 4), bolt);
+                            _spriteBatch.Draw(_pixel, new Rectangle(bx, cy - 4, 4, 4), bolt);
+                            _spriteBatch.Draw(_pixel, new Rectangle(bx + 2, cy, 4, 4), bolt);
+                            _spriteBatch.Draw(_pixel, new Rectangle(bx, cy + 4, 4, 4), bolt);
+                        }
                         
                         // Border
                         var border = bright * 0.7f;
@@ -7156,7 +7283,8 @@ public class Game1 : Game
                 _player.StandUpProgress = 0f;
                 _player.IsInjured = true;
                 _player.Hp = 2; // barely survived the crash
-                _suitIntegrity = 30f;
+                _player.SuitIntegrity = 31f;
+                _player.Battery = 80f;
                 _player.ApplyTierConstants(); // apply injured debuff
             }
         }
@@ -9224,6 +9352,7 @@ public class Game1 : Game
                     "bow" => new Color(160, 120, 60),
                     "gun" => Color.SlateGray,
                     "heart" => Color.Red,
+                    "battery" => Color.Yellow,
                     "map-module" => Color.Cyan,
                     _ => Color.White
                 };
@@ -9231,7 +9360,7 @@ public class Game1 : Game
                 _spriteBatch.Draw(_pixel, new Rectangle(item.Rect.X - 2, item.Rect.Y - 2, item.Rect.Width + 4, item.Rect.Height + 4), Color.White * 0.25f);
                 _spriteBatch.Draw(_pixel, item.Rect, itemColor);
                 // Heart items: no pickup prompt, auto-collect on touch
-                if (item.ItemType == "heart") continue;
+                if (item.ItemType == "heart" || item.ItemType == "battery") continue;
                 // Draw "[W]" prompt above when player is near (X and Y)
                 var pCenter = _player.Position.X + Player.Width / 2f;
                 var pCenterY = _player.Position.Y + Player.Height / 2f;
@@ -9789,15 +9918,45 @@ public class Game1 : Game
 
             // Suit Integrity bar (below HP)
             int siBarY = hpBarY + hpBarH + 6;
-            float siPct = _suitIntegrity / 100f;
+            float siPct = _player.SuitIntegrity / 100f;
             var siColor = siPct > 0.6f ? new Color(100, 180, 255) : (siPct > 0.3f ? Color.Orange : Color.Red);
             _spriteBatch.Draw(_pixel, new Rectangle(hpBarX, siBarY, hpBarW, hpBarH), new Color(20, 30, 50) * 0.6f);
             _spriteBatch.Draw(_pixel, new Rectangle(hpBarX, siBarY, (int)(hpBarW * siPct), hpBarH), siColor);
             DrawHollowRect(hpBarX, siBarY, hpBarW, hpBarH, Color.White * 0.3f);
-            DrawOutlinedString(_font, $"SUIT {(int)_suitIntegrity}%", new Vector2(hpBarX + hpBarW + 8, siBarY - 2), siColor * 0.9f);
+            DrawOutlinedString(_font, $"SUIT {(int)_player.SuitIntegrity}%", new Vector2(hpBarX + hpBarW + 8, siBarY - 2), siColor * 0.9f);
 
-            // EVE Status indicator (below suit) — only when EVE is active
-            int eveY = siBarY + hpBarH + 8;
+            // Battery bar (below suit)
+            int batBarY = siBarY + hpBarH + 4;
+            float batPct = _player.Battery / 100f;
+            var batColor = batPct > 0.5f ? new Color(220, 200, 60) : (batPct > 0.2f ? Color.Orange : Color.Red);
+            _spriteBatch.Draw(_pixel, new Rectangle(hpBarX, batBarY, hpBarW, hpBarH), new Color(40, 35, 10) * 0.6f);
+            _spriteBatch.Draw(_pixel, new Rectangle(hpBarX, batBarY, (int)(hpBarW * batPct), hpBarH), batColor);
+            DrawHollowRect(hpBarX, batBarY, hpBarW, hpBarH, Color.White * 0.3f);
+            DrawOutlinedString(_font, $"BAT {(int)_player.Battery}%", new Vector2(hpBarX + hpBarW + 8, batBarY - 2), batColor * 0.9f);
+
+            // HUD glitch effect at low suit integrity
+            if (_player.SuitIntegrity < 20f)
+            {
+                _hudGlitchTimer -= (float)gameTime.ElapsedGameTime.TotalSeconds;
+                if (_hudGlitchTimer <= 0)
+                {
+                    _hudGlitchTimer = 0.1f + (float)_hudGlitchRng.NextDouble() * 0.3f;
+                    // Random pixel displacement on HUD bars
+                    float glitchIntensity = 1f - _player.SuitIntegrity / 20f; // 0 at 20%, 1 at 0%
+                    if (_hudGlitchRng.NextDouble() < glitchIntensity * 0.4f)
+                    {
+                        int gx = _hudGlitchRng.Next(-3, 4);
+                        int gy = _hudGlitchRng.Next(-2, 3);
+                        int gw = _hudGlitchRng.Next(20, 80);
+                        int gh = _hudGlitchRng.Next(2, 6);
+                        _spriteBatch.Draw(_pixel, new Rectangle(hpBarX + gx, hpBarY + gy, gw, gh),
+                            new Color(_hudGlitchRng.Next(50, 255), _hudGlitchRng.Next(50, 255), _hudGlitchRng.Next(50, 255)) * 0.3f);
+                    }
+                }
+            }
+
+            // EVE Status indicator (below battery) — only when EVE is active
+            int eveY = batBarY + hpBarH + 8;
             if (_eveOrbActive)
             {
             Color eveStatusColor;

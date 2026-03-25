@@ -263,6 +263,7 @@ public class Player
 
     // Dash (double-tap A or D) — instant velocity burst, tier-flavored
     public bool IsDashing { get; private set; }
+    public void CancelDash() { IsDashing = false; }
     private float _dashTimer;
     // Burst impulse (applied once on dash start)
     private const float TechBurstImpulse = 450f;   // jet thruster — BIG kick
@@ -336,6 +337,9 @@ public class Player
     // Health
     public int MaxHp { get; set; } = 10;
     public int Hp { get; set; } = 10;
+    public float SuitIntegrity { get; set; } = 31f;  // 0-100, physical damage state
+    public float Battery { get; set; } = 80f;         // 0-100, power for tech systems
+    public bool TechDegraded { get; set; }             // set by Game1 when suit < 15%, tech may fizzle
     public float DamageCooldown { get; set; }
     private const float DamageCooldownTime = 1.0f;
     private const float KnockbackSpeed = 200f;
@@ -377,6 +381,21 @@ public class Player
         {
             amount = Math.Max(1, (int)(amount * BraceDamageReduction));
             kbMult = BraceKnockbackReduction;
+        }
+        
+        // Suit integrity damage absorption: integrity/200 = absorption %
+        // At 100% integrity → 50% absorbed, at 30% → 15%, at 0% → none
+        if (SuitIntegrity > 0)
+        {
+            float absorption = SuitIntegrity / 200f;
+            int absorbed = (int)(amount * absorption);
+            if (absorbed > 0)
+            {
+                amount -= absorbed;
+                if (amount < 1) amount = 1; // always take at least 1
+                // Suit takes wear from absorbing hits
+                SuitIntegrity = MathF.Max(0, SuitIntegrity - absorbed * 0.5f);
+            }
         }
         
         Hp -= amount;

@@ -30,6 +30,8 @@ public class SaveData
     [JsonPropertyName("shelterY")] public float ShelterY { get; set; }
     [JsonPropertyName("deathCount")] public int DeathCount { get; set; } = 0;
     [JsonPropertyName("hp")] public int Hp { get; set; } = 100;
+    [JsonPropertyName("suitIntegrity")] public float SuitIntegrity { get; set; } = 31f;
+    [JsonPropertyName("battery")] public float Battery { get; set; } = 80f;
 
     public void Save()
     {

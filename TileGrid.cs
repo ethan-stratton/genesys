@@ -96,6 +96,7 @@ public enum TileType : byte
     Lava = 91,
     Acid = 92,
     BreakableGlass = 93,   // solid until hit, shatters like Breakable but translucent
+    BreakableBattery = 94, // solid until attacked, drops battery cell
 
     // Platforms
     PlatformTop = 22,     // half platform spanning top half of tile
@@ -113,7 +114,7 @@ public enum TileType : byte
 
 public static class TileProperties
 {
-    public static bool IsSolid(TileType t) => (t >= TileType.Dirt && t <= TileType.Sand) || t == TileType.Breakable || t == TileType.DamageFloorTile || t == TileType.BreakableGlass;
+    public static bool IsSolid(TileType t) => (t >= TileType.Dirt && t <= TileType.Sand) || t == TileType.Breakable || t == TileType.DamageFloorTile || t == TileType.BreakableGlass || t == TileType.BreakableBattery;
     public static bool IsPlatform(TileType t) => t >= TileType.PlatformWood && t <= TileType.PlatformBottom;
     /// <summary>Standard thin platforms only (for merged rects). Half platforms use custom rects.</summary>
     public static bool IsStandardPlatform(TileType t) => t == TileType.PlatformWood || t == TileType.PlatformStone;
@@ -136,7 +137,7 @@ public static class TileProperties
         || t == TileType.ShavedCeilRight || t == TileType.ShavedCeilLeft
         || (t >= TileType.Gentle4CeilRightA && t <= TileType.Gentle4CeilLeftD);
     public static bool IsEffectTile(TileType t) => (t >= TileType.DamageTile && t <= TileType.FloatTile) || t == TileType.DamageNoKBTile || t == TileType.DamageFloorTile
-        || t == TileType.Fire || t == TileType.BrokenPipe || t == TileType.ElectricShock || t == TileType.Puddle || t == TileType.BreakableGlass;
+        || t == TileType.Fire || t == TileType.BrokenPipe || t == TileType.ElectricShock || t == TileType.Puddle || t == TileType.BreakableGlass || t == TileType.BreakableBattery;
     public static bool IsLiquid(TileType t) => t == TileType.Water || t == TileType.Lava || t == TileType.Acid;
 
     public static Color GetColor(TileType t) => t switch
@@ -214,6 +215,7 @@ public static class TileProperties
         TileType.ElectricShock => new Color(255, 255, 60),
         TileType.Puddle => new Color(60, 120, 160),
         TileType.BreakableGlass => new Color(180, 220, 240),
+        TileType.BreakableBattery => new Color(220, 200, 60),
         _ => Color.Transparent,
     };
 
@@ -365,6 +367,7 @@ public static class TileProperties
         TileType.ElectricShock,
         TileType.Puddle,
         TileType.BreakableGlass,
+        TileType.BreakableBattery,
     };
 }
 
