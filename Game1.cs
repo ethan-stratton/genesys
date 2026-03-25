@@ -535,6 +535,20 @@ public class Game1 : Game
     private WeaponType[] _rangedInventory = Array.Empty<WeaponType>();
     private int _rangedIndex = -1;
 
+    // --- Sidearm ammo system ---
+    private const int SidearmClipSize = 12;
+    private const float SidearmReloadTime = 1.2f; // seconds
+    private const float SidearmFireCooldown = 0.15f; // seconds between shots
+    private int _sidearmRounds = 12; // current rounds in clip
+    private int _sidearmClips = -1; // -1 = infinite
+    private float _sidearmReloadTimer;
+    private float _sidearmFireTimer;
+    private bool _sidearmReloading;
+    // Muzzle flash
+    private float _muzzleFlashTimer;
+    private Vector2 _muzzleFlashPos;
+    private Vector2 _muzzleFlashDir;
+
 
 
     private List<ItemPickup> _itemPickups = new();
@@ -619,6 +633,7 @@ public class Game1 : Game
         _graphics = new GraphicsDeviceManager(this);
         Content.RootDirectory = "Content";
         IsMouseVisible = false; // hidden in gameplay, shown in editor
+        Window.Title = "Genesys";
     }
 
     protected override void Initialize()
@@ -2270,10 +2285,61 @@ public class Game1 : Game
             }
         }
 
-        // Shoot bullets
-        if (_player.WantsToShoot)
+        // Sidearm reload + fire cooldown
+        if (_sidearmReloading)
         {
-            _bullets.Add(new Bullet(PlayerCenter, _player.ShootDirection));
+            _sidearmReloadTimer -= dt;
+            if (_sidearmReloadTimer <= 0)
+            {
+                _sidearmReloading = false;
+                _sidearmRounds = SidearmClipSize;
+            }
+        }
+        _sidearmFireTimer -= dt;
+        _muzzleFlashTimer -= dt;
+
+        // Manual reload (R key)
+        if (kb.IsKeyDown(Microsoft.Xna.Framework.Input.Keys.R) && !_prevKb.IsKeyDown(Microsoft.Xna.Framework.Input.Keys.R)
+            && !_sidearmReloading && _sidearmRounds < SidearmClipSize && CurrentRanged == WeaponType.Gun)
+        {
+            _sidearmReloading = true;
+            _sidearmReloadTimer = SidearmReloadTime;
+        }
+
+        // Shoot bullets (with ammo system for sidearm)
+        if (_player.WantsToShoot && _sidearmFireTimer <= 0)
+        {
+            bool isGun = CurrentRanged == WeaponType.Gun;
+            bool canFire = !isGun || (!_sidearmReloading && _sidearmRounds > 0);
+            if (canFire)
+            {
+                _bullets.Add(new Bullet(PlayerCenter, _player.ShootDirection));
+                _sidearmFireTimer = SidearmFireCooldown;
+                if (isGun)
+                {
+                    _sidearmRounds--;
+                    // Muzzle flash
+                    _muzzleFlashTimer = 0.06f;
+                    _muzzleFlashPos = PlayerCenter + _player.ShootDirection * 16f;
+                    _muzzleFlashDir = _player.ShootDirection;
+                    // Shell casing particle
+                    var casingDir = new Vector2(-_player.ShootDirection.Y, _player.ShootDirection.X);
+                    _particles.Add(new Particle
+                    {
+                        Position = PlayerCenter + casingDir * 4f,
+                        Velocity = casingDir * (80f + _rng.Next(40)) + new Vector2(0, -60f - _rng.Next(30)),
+                        Life = 0.5f, MaxLife = 0.5f,
+                        Color = new Color(200, 180, 80),
+                        Size = 2
+                    });
+                    // Auto-reload when empty
+                    if (_sidearmRounds <= 0)
+                    {
+                        _sidearmReloading = true;
+                        _sidearmReloadTimer = SidearmReloadTime;
+                    }
+                }
+            }
         }
 
         // Update bullets
@@ -10345,6 +10411,20 @@ public class Game1 : Game
         // Draw bullets
         _bullets.ForEach(b => b.Draw(_spriteBatch, _pixel));
 
+        // Muzzle flash
+        if (_muzzleFlashTimer > 0)
+        {
+            float flashSize = 8f + _muzzleFlashTimer * 80f;
+            var flashRect = new Rectangle(
+                (int)(_muzzleFlashPos.X - flashSize / 2f),
+                (int)(_muzzleFlashPos.Y - flashSize / 2f),
+                (int)flashSize, (int)flashSize);
+            _spriteBatch.Draw(_pixel, flashRect, Color.White * (_muzzleFlashTimer / 0.06f));
+            // Smaller yellow core
+            var coreRect = new Rectangle(flashRect.X + 2, flashRect.Y + 2, flashRect.Width - 4, flashRect.Height - 4);
+            _spriteBatch.Draw(_pixel, coreRect, Color.Yellow * (_muzzleFlashTimer / 0.06f * 0.8f));
+        }
+
         // === Cipher teleport visual — purple trail line ===
         if (_player.IsCipherTeleporting)
         {
@@ -10544,12 +10624,58 @@ public class Game1 : Game
             DrawOutlinedString(_font, $"EVE: {eveStatusText}", new Vector2(hpBarX + 14, eveY), eveStatusColor * 0.9f);
             } // end _eveOrbActive
 
-            // Weapon HUD
+            // Weapon HUD (bottom-right)
             {
-                string rangedName = CurrentRanged != WeaponType.None ? CurrentRanged.ToString() : "---";
-                string meleeName = CurrentMelee != WeaponType.None ? CurrentMelee.ToString() : "Fists";
-                _spriteBatch.DrawString(_font, SafeText($"[1] {rangedName}"), new Vector2(10, ViewH - 30), Color.White * 0.7f);
-                _spriteBatch.DrawString(_font, SafeText($"[2] {meleeName}"), new Vector2(130, ViewH - 30), Color.White * 0.7f);
+                int hudRight = ViewW - 10;
+                int hudBottom = ViewH - 10;
+
+                if (CurrentRanged == WeaponType.Gun)
+                {
+                    // Sidearm outline + ammo display
+                    int gunW = 48, gunH = 28;
+                    int gunX = hudRight - gunW - 60;
+                    int gunY = hudBottom - gunH - 4;
+
+                    // Gun silhouette (simple L-shape)
+                    var gunColor = _sidearmReloading ? Color.Gray * 0.5f : Color.White * 0.7f;
+                    _spriteBatch.Draw(_pixel, new Rectangle(gunX, gunY + 4, 36, 8), gunColor); // barrel
+                    _spriteBatch.Draw(_pixel, new Rectangle(gunX + 20, gunY + 4, 8, 20), gunColor); // grip
+                    _spriteBatch.Draw(_pixel, new Rectangle(gunX + 4, gunY + 8, 4, 4), gunColor); // trigger guard
+                    DrawHollowRect(gunX - 2, gunY, gunW, gunH, Color.White * 0.2f); // outline box
+
+                    // Rounds in clip (individual bullet dots)
+                    int dotX = gunX + gunW + 4;
+                    int dotY = gunY;
+                    for (int i = 0; i < SidearmClipSize; i++)
+                    {
+                        int row = i / 6;
+                        int col = i % 6;
+                        var dotColor = i < _sidearmRounds ? new Color(220, 200, 80) : Color.DarkGray * 0.4f;
+                        _spriteBatch.Draw(_pixel, new Rectangle(dotX + col * 8, dotY + row * 10, 5, 7), dotColor);
+                    }
+
+                    // Clip count + reload indicator
+                    string clipText = _sidearmClips < 0 ? "∞" : _sidearmClips.ToString();
+                    if (_sidearmReloading)
+                    {
+                        float reloadPct = 1f - _sidearmReloadTimer / SidearmReloadTime;
+                        DrawOutlinedString(_font, "RELOAD", new Vector2(gunX, gunY - 16), Color.Yellow * (0.5f + 0.5f * MathF.Sin(_totalTime * 10f)));
+                        // Reload progress bar
+                        _spriteBatch.Draw(_pixel, new Rectangle(gunX, gunY + gunH + 2, gunW + 60, 3), Color.DarkGray * 0.5f);
+                        _spriteBatch.Draw(_pixel, new Rectangle(gunX, gunY + gunH + 2, (int)((gunW + 60) * reloadPct), 3), Color.Yellow);
+                    }
+                    else
+                    {
+                        DrawOutlinedString(_font, $"{_sidearmRounds}/{SidearmClipSize}", new Vector2(gunX + gunW + 4, gunY + 20), Color.White * 0.7f);
+                    }
+                }
+                else
+                {
+                    string rangedName = CurrentRanged != WeaponType.None ? CurrentRanged.ToString() : "---";
+                    string meleeName = CurrentMelee != WeaponType.None ? CurrentMelee.ToString() : "Fists";
+                    _spriteBatch.DrawString(_font, SafeText($"[1] {rangedName}"), new Vector2(hudRight - 240, hudBottom - 20), Color.White * 0.7f);
+                    _spriteBatch.DrawString(_font, SafeText($"[2] {meleeName}"), new Vector2(hudRight - 120, hudBottom - 20), Color.White * 0.7f);
+                }
             }
 
             // Death log (bottom-left, above weapon HUD)
