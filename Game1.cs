@@ -199,7 +199,7 @@ public class Game1 : Game
 
     // Level data (loaded from JSON)
     private LevelData _level;
-    private const string DefaultLevel = "Content/levels/test-arena.json";
+    private const string DefaultLevel = "Content/levels/crashsite.json";
 
     // --- Settings menu ---
     private bool _menuOpen;
@@ -535,7 +535,7 @@ public class Game1 : Game
     private bool _editorMenuOpen;
     private int _editorMenuCursor;
     private MouseState _prevMouse;
-    private string _editorSaveFile = "Content/levels/test-arena.json";
+    private string _editorSaveFile = "Content/levels/crashsite.json";
     private string _editorStatusMsg = "";
     private float _editorStatusTimer;
     // Entity drag-move state

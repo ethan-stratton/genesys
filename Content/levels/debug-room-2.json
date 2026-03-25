@@ -362,7 +362,7 @@
   ],
   "neighbors": {
     "left": "crashsite",
-    "right": "the-descent",
+    "right": "",
     "up": "",
     "down": "",
     "LeftZones": [

@@ -320,10 +320,10 @@
   "retractableSpikes": [],
   "shelters": [],
   "neighbors": {
-    "left": "the-descent",
+    "left": "",
     "right": "",
     "up": "",
-    "down": "the-gauntlet",
+    "down": "",
     "LeftZones": [
       {
         "target": "the-descent",
