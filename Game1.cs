@@ -7969,149 +7969,212 @@ public class Game1 : Game
     private void DrawLiquidTile(int wx, int wy, int ts, TileType tile, TileGrid tg, int tx, int ty)
     {
         float t = _totalTime;
-        Color deepColor, brightColor, surfaceColor;
-        float speed, waveAmp;
-
+        
+        // --- Determine liquid colors ---
+        Color tintColor, surfaceColor, highlightColor, foamColor;
+        float speed;
+        
         switch (tile)
         {
             case TileType.Lava:
-                deepColor = new Color(50, 8, 2);
-                brightColor = new Color(255, 140, 30);
-                surfaceColor = new Color(255, 180, 40);
-                speed = 1.6f;
-                waveAmp = 4f;
+                tintColor = new Color(180, 40, 10) * 0.55f;
+                surfaceColor = new Color(255, 120, 20);
+                highlightColor = new Color(255, 200, 80);
+                foamColor = new Color(255, 160, 40);
+                speed = 1.4f;
                 break;
             case TileType.Acid:
-                deepColor = new Color(6, 30, 4);
-                brightColor = new Color(80, 200, 50);
-                surfaceColor = new Color(120, 255, 80);
-                speed = 1.0f;
-                waveAmp = 3f;
+                tintColor = new Color(30, 140, 20) * 0.5f;
+                surfaceColor = new Color(80, 220, 50);
+                highlightColor = new Color(160, 255, 120);
+                foamColor = new Color(100, 240, 70);
+                speed = 0.8f;
                 break;
             default: // Water
-                deepColor = new Color(10, 22, 40);
-                brightColor = new Color(50, 90, 120);
-                surfaceColor = new Color(100, 180, 240);
-                speed = 0.5f;
-                waveAmp = 3f;
+                tintColor = new Color(30, 70, 130) * 0.45f;
+                surfaceColor = new Color(60, 140, 200);
+                highlightColor = new Color(160, 210, 255);
+                foamColor = new Color(180, 220, 255);
+                speed = 0.6f;
                 break;
         }
-
-        bool isSurface = ty == 0 || !TileProperties.IsLiquid(tg.GetTileAt(tx, ty - 1));
+        
+        // --- Neighbor checks ---
+        bool aboveLiquid = ty > 0 && TileProperties.IsLiquid(tg.GetTileAt(tx, ty - 1));
+        bool belowLiquid = ty < tg.Height - 1 && TileProperties.IsLiquid(tg.GetTileAt(tx, ty + 1));
+        bool leftLiquid = tx > 0 && TileProperties.IsLiquid(tg.GetTileAt(tx - 1, ty));
+        bool rightLiquid = tx < tg.Width - 1 && TileProperties.IsLiquid(tg.GetTileAt(tx + 1, ty));
+        bool isSurface = !aboveLiquid;
+        
+        // Depth (how many liquid tiles above this one)
         int depth = 0;
         for (int checkY = ty - 1; checkY >= 0; checkY--)
         {
             if (TileProperties.IsLiquid(tg.GetTileAt(tx, checkY))) depth++;
             else break;
         }
-        float depthFactor = MathHelper.Clamp(1f - depth * 0.1f, 0.3f, 1f);
-
-        // Surface wave (1px column scan)
-        int bodyTop = wy;
+        
+        // --- 1) Semi-transparent color overlay (ground shows through) ---
+        float baseAlpha = 0.35f + depth * 0.08f;
+        if (baseAlpha > 0.7f) baseAlpha = 0.7f;
+        
+        int bodyTop = 0;
+        
+        if (isSurface)
+        {
+            // Surface tile: draw wavy top edge, body below
+            for (int px = 0; px < ts; px++)
+            {
+                float wX = wx + px;
+                float w1 = MathF.Sin(wX * 0.08f + t * speed) * 3f;
+                float w2 = MathF.Sin(wX * 0.15f + t * speed * 0.6f + 1.5f) * 1.5f;
+                int waveY = 4 + (int)(w1 + w2);
+                if (waveY < 1) waveY = 1;
+                if (waveY > ts - 2) waveY = ts - 2;
+                
+                int colH = ts - waveY;
+                if (colH > 0)
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx + px, wy + waveY, 1, colH), tintColor * baseAlpha);
+            }
+            bodyTop = 4;
+        }
+        else
+        {
+            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, ts), tintColor * baseAlpha);
+        }
+        
+        // --- 2) Animated ripple lines ---
+        {
+            float rippleSpeed = speed * 0.4f;
+            float spacing = 8f;
+            int startPy = isSurface ? bodyTop + 2 : 0;
+            
+            for (int py = startPy; py < ts; py++)
+            {
+                float worldY = wy + py;
+                float r1 = MathF.Sin(worldY * (MathF.PI * 2f / spacing) + t * rippleSpeed);
+                float r2 = MathF.Sin(worldY * (MathF.PI * 2f / (spacing * 1.3f)) + t * rippleSpeed * 0.7f + 2f);
+                float combined = (r1 + r2) * 0.5f;
+                
+                if (combined > 0.6f)
+                {
+                    float xOff = MathF.Sin(worldY * 0.1f + t * speed * 0.3f) * 4f;
+                    int lineX = (int)xOff;
+                    float intensity = (combined - 0.6f) * 2.5f;
+                    int lineW = (int)(ts * 0.4f + ts * 0.5f * intensity);
+                    int lx = wx + (ts - lineW) / 2 + lineX;
+                    
+                    float depthFade = 1f - depth * 0.12f;
+                    if (depthFade < 0.2f) depthFade = 0.2f;
+                    
+                    var rippleColor = Color.Lerp(surfaceColor, highlightColor, intensity * 0.5f);
+                    _spriteBatch.Draw(_pixel, new Rectangle(lx, wy + py, lineW, 1),
+                        rippleColor * (0.3f * intensity * depthFade));
+                }
+            }
+        }
+        
+        // --- 3) Surface detail: foam line + zigzag ripples ---
         if (isSurface)
         {
             for (int px = 0; px < ts; px++)
             {
-                float worldX = wx + px;
-                float w1 = MathF.Sin(worldX * 0.06f + t * speed) * waveAmp;
-                float w2 = MathF.Sin(worldX * 0.11f + t * speed * 0.7f + 2f) * (waveAmp * 0.6f);
-                int surfY = wy + 5 + (int)(w1 + w2);
-                if (surfY < wy) surfY = wy;
-
-                // Empty above surface
-                // Surface highlight
-                if (surfY >= wy && surfY < wy + ts)
-                {
-                    _spriteBatch.Draw(_pixel, new Rectangle(wx + px, surfY, 1, 2), surfaceColor * 0.9f);
-                    // Specular glint
-                    float g = MathF.Sin(worldX * 0.2f + t * speed * 2.5f);
-                    if (g > 0.65f)
-                        _spriteBatch.Draw(_pixel, new Rectangle(wx + px, surfY, 1, 1), Color.White * ((g - 0.5f) * 0.8f));
-                }
-
-                // Body column below surface
-                int colTop = Math.Max(surfY + 1, wy);
-                int colH = (wy + ts) - colTop;
-                if (colH > 0)
-                    _spriteBatch.Draw(_pixel, new Rectangle(wx + px, colTop, 1, colH), deepColor);
-            }
-            bodyTop = wy + 6; // caustics start below surface
-        }
-        else
-        {
-            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, ts, ts), deepColor);
-        }
-
-        // --- Sine wave interference caustics ---
-        // 4 sine waves at different angles/frequencies. Where they constructively
-        // interfere (all positive), we get bright spots like pool-bottom light.
-        // Total cost: 4 sin calls per pixel at 2px resolution = very cheap.
-        int step = 2;
-        float s = speed * 0.6f;
-
-        for (int py = bodyTop - wy; py < ts; py += step)
-        {
-            float wY = wy + py;
-            for (int px = 0; px < ts; px += step)
-            {
                 float wX = wx + px;
-
-                // 4 waves at different angles and speeds
-                float v1 = MathF.Sin(wX * 0.08f + wY * 0.04f + t * s * 1.0f);
-                float v2 = MathF.Sin(wX * -0.06f + wY * 0.07f + t * s * 0.8f + 1.3f);
-                float v3 = MathF.Sin(wX * 0.04f + wY * -0.09f + t * s * 1.2f + 2.7f);
-                float v4 = MathF.Sin(wX * -0.05f + wY * -0.05f + t * s * 0.6f + 4.1f);
-
-                // Sum ranges from -4 to +4. Normalize to 0..1
-                float sum = (v1 + v2 + v3 + v4 + 4f) * 0.125f; // 0..1
-
-                // Apply curve: push dark areas darker, bright areas brighter
-                // This creates the characteristic "bright spots with dark gaps" look
-                float caustic = sum * sum * sum; // cube for contrast
-                caustic *= depthFactor;
-
-                if (caustic > 0.05f)
+                float w1 = MathF.Sin(wX * 0.08f + t * speed) * 3f;
+                float w2 = MathF.Sin(wX * 0.15f + t * speed * 0.6f + 1.5f) * 1.5f;
+                int waveY = 4 + (int)(w1 + w2);
+                if (waveY < 1) waveY = 1;
+                if (waveY > ts - 2) waveY = ts - 2;
+                
+                // Bright surface line
+                _spriteBatch.Draw(_pixel, new Rectangle(wx + px, wy + waveY, 1, 2), surfaceColor * 0.8f);
+                
+                // Specular sparkle
+                float glint = MathF.Sin(wX * 0.25f + t * speed * 3f);
+                if (glint > 0.75f)
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx + px, wy + waveY, 1, 1),
+                        Color.White * ((glint - 0.75f) * 3f));
+                
+                // Foam dots below surface
+                if (px % 4 == ((int)(t * 8) % 4))
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx + px, wy + waveY + 3, 2, 1), foamColor * 0.35f);
+            }
+            
+            // Animated zigzag ripple lines below surface
+            for (int line = 0; line < 2; line++)
+            {
+                int lineBaseY = wy + 10 + line * 8;
+                if (lineBaseY >= wy + ts) break;
+                float linePhase = t * speed * 1.5f + line * 1.8f;
+                
+                for (int px = 0; px < ts; px += 2)
                 {
-                    int r = Math.Min((int)(brightColor.R * caustic * 2.5f), 255);
-                    int g = Math.Min((int)(brightColor.G * caustic * 2.5f), 255);
-                    int b = Math.Min((int)(brightColor.B * caustic * 2.5f), 255);
-                    _spriteBatch.Draw(_pixel, new Rectangle(wx + px, wy + py, step, step), new Color(r, g, b));
+                    float wX = wx + px;
+                    float zigzag = MathF.Sin(wX * 0.2f + linePhase) * 2f;
+                    int ly = lineBaseY + (int)zigzag;
+                    if (ly >= wy && ly < wy + ts)
+                    {
+                        float fade = 0.4f - line * 0.12f;
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx + px, ly, 2, 1), highlightColor * fade);
+                    }
                 }
             }
         }
-
-        // Bubbles for all liquids
+        
+        // --- 4) Subtle caustics (deep tiles only) ---
+        if (depth > 0 || !isSurface)
+        {
+            int step = 4;
+            float s = speed * 0.4f;
+            float depthFade = MathHelper.Clamp(1f - depth * 0.15f, 0.15f, 0.8f);
+            int startY = isSurface ? bodyTop : 0;
+            
+            for (int py = startY; py < ts; py += step)
+            {
+                for (int px = 0; px < ts; px += step)
+                {
+                    float wX = wx + px;
+                    float wY = wy + py;
+                    float v1 = MathF.Sin(wX * 0.07f + wY * 0.04f + t * s);
+                    float v2 = MathF.Sin(wX * -0.05f + wY * 0.08f + t * s * 0.7f + 1.3f);
+                    float sum = (v1 + v2 + 2f) * 0.25f;
+                    float caustic = sum * sum * sum * depthFade;
+                    
+                    if (caustic > 0.08f)
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx + px, wy + py, step, step),
+                            highlightColor * (caustic * 0.25f));
+                }
+            }
+        }
+        
+        // --- 5) Bubbles ---
         {
             int seed = tx * 7919 + ty * 104729;
-            var bubbleColor = tile == TileType.Water ? new Color(80, 140, 180) :
-                              tile == TileType.Acid ? new Color(120, 220, 80) : brightColor;
-            for (int b = 0; b < 3; b++)
+            for (int b = 0; b < 2; b++)
             {
                 int bseed = seed + b * 31337;
-                float bx = (bseed % ts);
-                float byOffset = ((t * speed * 15f + bseed * 0.01f) % (ts + 8)) - 4;
+                float bx = bseed % ts;
+                float byOffset = ((t * speed * 12f + bseed * 0.01f) % (ts + 8)) - 4;
                 float by = wy + ts - byOffset;
-                if (by >= wy && by < wy + ts - 2)
+                if (by >= wy + (isSurface ? bodyTop : 0) && by < wy + ts - 2)
                 {
-                    int bsize = 1 + (bseed % 3);
-                    float wobble = MathF.Sin(t * 3f + bseed) * 2f;
+                    int bsize = 1 + (bseed % 2);
+                    float wobble = MathF.Sin(t * 2.5f + bseed) * 1.5f;
                     _spriteBatch.Draw(_pixel, new Rectangle(wx + (int)(bx + wobble), (int)by, bsize, bsize),
-                        bubbleColor * (0.3f + (bseed % 4) * 0.1f));
+                        highlightColor * 0.25f);
                 }
             }
         }
-
-        // Edge darkening
-        bool leftLiquid = tx > 0 && TileProperties.IsLiquid(tg.GetTileAt(tx - 1, ty));
-        bool rightLiquid = tx < tg.Width - 1 && TileProperties.IsLiquid(tg.GetTileAt(tx + 1, ty));
+        
+        // --- 6) Edge darkening ---
         if (!leftLiquid)
-            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 2, ts), Color.Black * 0.4f);
+            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 1, ts), Color.Black * 0.2f);
         if (!rightLiquid)
-            _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 2, wy, 2, ts), Color.Black * 0.4f);
-        bool belowLiquid = ty < tg.Height - 1 && TileProperties.IsLiquid(tg.GetTileAt(tx, ty + 1));
+            _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 1, wy, 1, ts), Color.Black * 0.2f);
         if (!belowLiquid)
-            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 2, ts, 2), Color.Black * 0.5f);
+            _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 1, ts, 1), Color.Black * 0.25f);
     }
+
 
     private void DrawSlopeTile(int wx, int wy, int ts, TileType tile, Color color)
     {
