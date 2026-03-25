@@ -1,12 +1,12 @@
 {
   "currentLevel": "crashsite",
-  "spawnX": 358.61087,
-  "spawnY": 184,
+  "spawnX": 224,
+  "spawnY": 128,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 540.59546,
+  "playTime": 554.85864,
   "meleeInventory": [],
   "rangedInventory": [],
   "meleeIndex": -1,

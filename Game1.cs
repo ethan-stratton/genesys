@@ -976,16 +976,33 @@ public class Game1 : Game
         _fontLarge = _fontSystem.GetFont(22);  // titles, boss names
         try
         {
-            _bgm = Song.FromUri("overworld", new Uri(Path.GetFullPath("Content/audio/music/overworld.mp3")));
+            var musicPath = Path.GetFullPath("Content/audio/music/overworld.mp3");
+            Console.WriteLine($"[MUSIC] Loading: {musicPath}");
+            Console.WriteLine($"[MUSIC] File exists: {File.Exists(musicPath)}");
+            _bgm = Song.FromUri("overworld", new Uri(musicPath));
+            Console.WriteLine($"[MUSIC] Song loaded: {_bgm != null}");
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"Failed to load BGM: {ex.Message}");
+            Console.WriteLine($"[MUSIC] FAILED: {ex}");
         }
         if (_bgm != null && _enableMusic)
         {
-            MediaPlayer.IsRepeating = true;
-            MediaPlayer.Play(_bgm);
+            try
+            {
+                MediaPlayer.IsRepeating = true;
+                MediaPlayer.Volume = 0.5f;
+                MediaPlayer.Play(_bgm);
+                Console.WriteLine($"[MUSIC] Playing! State: {MediaPlayer.State}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[MUSIC] Play FAILED: {ex}");
+            }
+        }
+        else
+        {
+            Console.WriteLine($"[MUSIC] Not playing — bgm null: {_bgm == null}, music enabled: {_enableMusic}");
         }
     }
 
