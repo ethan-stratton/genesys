@@ -1,12 +1,12 @@
 {
   "currentLevel": "ship-interior",
-  "spawnX": 2323.9443,
-  "spawnY": 408,
+  "spawnX": 2432,
+  "spawnY": 416,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 994.51794,
+  "playTime": 1114.8368,
   "meleeInventory": [],
   "rangedInventory": [],
   "meleeIndex": -1,

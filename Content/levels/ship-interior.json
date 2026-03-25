@@ -3,16 +3,16 @@
   "author": "",
   "playerSpawn": {
     "x": 2432,
-    "y": 448
+    "y": 416
   },
   "bounds": {
-    "left": 0,
-    "right": 4800,
-    "top": 0,
-    "bottom": 6400
+    "left": 2144,
+    "right": 2752,
+    "top": 256,
+    "bottom": 640
   },
   "floor": {
-    "y": 550,
+    "y": 576,
     "height": 50
   },
   "platforms": [],
@@ -24,13 +24,13 @@
   "wallSpikes": [],
   "exits": [
     {
-      "x": 2400,
-      "y": 512,
-      "w": 128,
-      "h": 32,
+      "x": 2413,
+      "y": 508,
+      "w": 88,
+      "h": 12,
       "targetLevel": "crashsite",
-      "id": "exit-to-crashsite",
-      "targetExitId": "exit-top"
+      "id": "exit-top",
+      "targetExitId": ""
     }
   ],
   "npcs": [],
@@ -2382,7 +2382,7 @@
       0,
       0,
       1,
-      0,
+      22,
       22,
       22,
       22,
@@ -2683,10 +2683,10 @@
       1,
       1,
       1,
-      0,
-      0,
-      0,
-      0,
+      1,
+      1,
+      1,
+      1,
       1,
       1,
       1,

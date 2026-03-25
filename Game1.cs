@@ -4670,8 +4670,8 @@ public class Game1 : Game
             else
             {
                 _editorDragging = true;
-                // Exits don't snap to grid (sub-grid width)
-                _editorDragStart = (_editorTool == EditorTool.Exit) ? worldMouse : snapped;
+                // Exits snap to grid like everything else
+                _editorDragStart = snapped;
             }
         }
 
@@ -4679,7 +4679,7 @@ public class Game1 : Game
         if (mouse.LeftButton == ButtonState.Released && _prevMouse.LeftButton == ButtonState.Pressed && _editorDragging)
         {
             _editorDragging = false;
-            var dragEnd = (_editorTool == EditorTool.Exit) ? worldMouse : snapped;
+            var dragEnd = snapped;
             int x = (int)MathF.Min(_editorDragStart.X, dragEnd.X);
             int y = (int)MathF.Min(_editorDragStart.Y, dragEnd.Y);
             int w = (int)MathF.Abs(dragEnd.X - _editorDragStart.X);
@@ -5074,6 +5074,7 @@ public class Game1 : Game
             var e = _level.Exits[i];
             if (new Rectangle(e.X, e.Y, e.W, e.H).Contains(p))
             {
+                _entityUndoStack.Add(("exit", i, _level.Exits[i]));
                 var list = new List<ExitData>(_level.Exits);
                 list.RemoveAt(i);
                 _level.Exits = list.ToArray();
@@ -5536,6 +5537,11 @@ public class Game1 : Game
                     var iList = new List<ItemData>(_level.Items);
                     iList.Insert(Math.Min(index, iList.Count), (ItemData)data);
                     _level.Items = iList.ToArray();
+                    break;
+                case "exit":
+                    var exList = new List<ExitData>(_level.Exits);
+                    exList.Insert(Math.Min(index, exList.Count), (ExitData)data);
+                    _level.Exits = exList.ToArray();
                     break;
             }
             _level.Build();
