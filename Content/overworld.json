@@ -68,12 +68,12 @@
       "x": 50,
       "y": 350,
       "level": "debug-room",
-      "discovered": true,
-      "cleared": true,
+      "discovered": false,
+      "cleared": false,
       "connections": [
         "test-arena"
       ],
-      "ShownName": "Debug Room"
+      "ShownName": "???"
     },
     {
       "id": "crashsite",

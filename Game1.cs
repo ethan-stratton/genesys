@@ -1370,11 +1370,14 @@ public class Game1 : Game
             return; // game is paused while menu is open
         }
 
-        // Toggle inventory with Tab
-        if (kb.IsKeyDown(Keys.Tab) && _prevKb.IsKeyUp(Keys.Tab) && !_dialogueOpen)
+        // Toggle inventory with Tab or I
+        bool invToggle = (kb.IsKeyDown(Keys.Tab) && _prevKb.IsKeyUp(Keys.Tab)) ||
+                         (kb.IsKeyDown(Keys.I) && _prevKb.IsKeyUp(Keys.I));
+        if (invToggle && !_dialogueOpen)
         {
             _inventoryOpen = !_inventoryOpen;
             if (_inventoryOpen) { _inventoryCategory = 0; _inventoryIndex = 0; _inventoryRightFocused = false; }
+            Console.WriteLine($"[INV] Toggle pressed, inventoryOpen={_inventoryOpen}, state={_gameState}");
         }
 
         if (_inventoryOpen)
@@ -7375,7 +7378,6 @@ public class Game1 : Game
             if (_prologueSkipTimer >= 1.0f)
             {
                 _prologueSkipped = true;
-                _eveOrbActive = true; // EVE still available when skipping prologue
                 StartFadeTo(GameState.TitleCard, 2f);
                 return;
             }
