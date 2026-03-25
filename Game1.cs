@@ -256,6 +256,7 @@ public class Game1 : Game
     private bool _inventoryOpen;
     private int _inventoryCategory; // 0=Weapons, 1=Suit, 2=Tools, 3=Log
     private int _inventoryIndex; // index within current category's item list
+    private bool _inventoryRightFocused; // true = right panel focused, false = left categories
     private static readonly string[] InventoryCategories = { "Weapons", "Suit", "Tools", "Log" };
 
     // Spawn weapon menu (P key)
@@ -843,6 +844,9 @@ public class Game1 : Game
             _player.CurrentTier = (Player.MoveTier)Math.Clamp(_saveData.MoveTier, 0, 2);
             _player.ApplyTierConstants();
             _player.HasGrapple = _saveData.CollectedItems?.Any(id => id.StartsWith("grapple")) == true;
+            _player.SuitIntegrity = _saveData.SuitIntegrity;
+            _player.Battery = _saveData.Battery;
+            _player.Hp = Math.Clamp(_saveData.Hp, 1, _player.MaxHp);
             if (_saveData.MeleeInventory?.Count > 0)
             {
                 _meleeInventory = _saveData.MeleeInventory.ConvertAll(s => Enum.Parse<WeaponType>(s)).ToArray();
@@ -1003,11 +1007,14 @@ public class Game1 : Game
         catch (Exception ex) { Console.WriteLine($"[MUSIC] overworld FAILED: {ex}"); }
         try
         {
-            var menuMusicPath = Path.GetFullPath("Content/audio/music/Glitch - Prehistory (main menu).mp3");
-            if (File.Exists(menuMusicPath))
-                _menuBgm = Song.FromUri("menu", new Uri(menuMusicPath));
+            // MonoGame DesktopGL only supports OGG (NVorbis). Convert MP3→OGG if needed.
+            var menuOgg = Path.GetFullPath("Content/audio/music/menu.ogg");
+            var menuMp3 = Path.GetFullPath("Content/audio/music/Glitch - Prehistory (main menu).mp3");
+            var menuPath = File.Exists(menuOgg) ? menuOgg : (File.Exists(menuMp3) ? menuMp3 : null);
+            if (menuPath != null)
+                _menuBgm = Song.FromUri("menu", new Uri(menuPath));
         }
-        catch (Exception ex) { Console.WriteLine($"[MUSIC] menu FAILED: {ex}"); }
+        catch (Exception ex) { Console.WriteLine($"[MUSIC] menu FAILED: {ex.Message}. Convert to OGG: ffmpeg -i 'Glitch - Prehistory (main menu).mp3' menu.ogg"); }
         // Start with menu music
         PlaySong(_menuBgm);
     }
@@ -1367,7 +1374,7 @@ public class Game1 : Game
         if (kb.IsKeyDown(Keys.Tab) && _prevKb.IsKeyUp(Keys.Tab) && !_dialogueOpen)
         {
             _inventoryOpen = !_inventoryOpen;
-            if (_inventoryOpen) { _inventoryCategory = 0; _inventoryIndex = 0; }
+            if (_inventoryOpen) { _inventoryCategory = 0; _inventoryIndex = 0; _inventoryRightFocused = false; }
         }
 
         if (_inventoryOpen)
@@ -5554,6 +5561,9 @@ public class Game1 : Game
         _saveData.MeleeIndex = _meleeIndex;
         _saveData.RangedIndex = _rangedIndex;
         _saveData.MoveTier = (int)_player.CurrentTier;
+        _saveData.Hp = _player.Hp;
+        _saveData.SuitIntegrity = _player.SuitIntegrity;
+        _saveData.Battery = _player.Battery;
     }
 
     // --- Editor undo helpers ---
@@ -6821,7 +6831,6 @@ public class Game1 : Game
 
     private void UpdateInventory(KeyboardState kb)
     {
-        // A/D or Left/Right = switch category
         bool left = (kb.IsKeyDown(Keys.A) && _prevKb.IsKeyUp(Keys.A)) || (kb.IsKeyDown(Keys.Left) && _prevKb.IsKeyUp(Keys.Left));
         bool right = (kb.IsKeyDown(Keys.D) && _prevKb.IsKeyUp(Keys.D)) || (kb.IsKeyDown(Keys.Right) && _prevKb.IsKeyUp(Keys.Right));
         bool up = (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W)) || (kb.IsKeyDown(Keys.Up) && _prevKb.IsKeyUp(Keys.Up));
@@ -6829,51 +6838,65 @@ public class Game1 : Game
         bool confirm = (kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter)) || (kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space));
         bool discard = kb.IsKeyDown(Keys.X) && _prevKb.IsKeyUp(Keys.X);
 
-        if (left) { _inventoryCategory = (_inventoryCategory - 1 + InventoryCategories.Length) % InventoryCategories.Length; _inventoryIndex = 0; }
-        if (right) { _inventoryCategory = (_inventoryCategory + 1) % InventoryCategories.Length; _inventoryIndex = 0; }
-
-        int itemCount = GetInventoryCategoryItemCount(_inventoryCategory);
-        if (itemCount > 0)
+        // Up/Down navigates categories (left panel) AND items (right panel)
+        // Left/Right switches between left panel (categories) and right panel (items)
+        if (!_inventoryRightFocused)
         {
-            if (up) _inventoryIndex = (_inventoryIndex - 1 + itemCount) % itemCount;
-            if (down) _inventoryIndex = (_inventoryIndex + 1) % itemCount;
+            // Left panel focused: up/down = categories, right = enter right panel
+            if (up) { _inventoryCategory = (_inventoryCategory - 1 + InventoryCategories.Length) % InventoryCategories.Length; _inventoryIndex = 0; }
+            if (down) { _inventoryCategory = (_inventoryCategory + 1) % InventoryCategories.Length; _inventoryIndex = 0; }
+            if (right || confirm) { _inventoryRightFocused = true; _inventoryIndex = 0; }
+        }
+        else
+        {
+            // Right panel focused: up/down = items, left = back to categories
+            if (left) { _inventoryRightFocused = false; }
+            int itemCount = GetInventoryCategoryItemCount(_inventoryCategory);
+            if (itemCount > 0)
+            {
+                if (up) _inventoryIndex = (_inventoryIndex - 1 + itemCount) % itemCount;
+                if (down) _inventoryIndex = (_inventoryIndex + 1) % itemCount;
+            }
+
+            // Category-specific actions
+            if (_inventoryCategory == 0 && itemCount > 0) // Weapons
+            {
+                if (confirm)
+                {
+                    if (_inventoryIndex < _rangedInventory.Length)
+                        _rangedIndex = _inventoryIndex;
+                    else
+                        _meleeIndex = _inventoryIndex - _rangedInventory.Length;
+                }
+                if (discard)
+                {
+                    WeaponType w;
+                    if (_inventoryIndex < _rangedInventory.Length)
+                    {
+                        w = _rangedInventory[_inventoryIndex];
+                        UnequipRanged(w);
+                    }
+                    else
+                    {
+                        w = _meleeInventory[_inventoryIndex - _rangedInventory.Length];
+                        UnequipMelee(w);
+                    }
+                    _itemPickups.Add(new ItemPickup
+                    {
+                        X = _player.Position.X, Y = _player.Position.Y + Player.Height - 12,
+                        W = 24, H = 12, ItemType = w.ToString().ToLower()
+                    });
+                    itemCount = GetInventoryCategoryItemCount(0);
+                    if (_inventoryIndex >= itemCount) _inventoryIndex = Math.Max(0, itemCount - 1);
+                }
+            }
         }
 
-        // Category-specific actions
-        if (_inventoryCategory == 0 && itemCount > 0) // Weapons
-        {
-            // Weapons list: ranged first, then melee
-            if (confirm)
-            {
-                if (_inventoryIndex < _rangedInventory.Length)
-                    _rangedIndex = _inventoryIndex;
-                else
-                    _meleeIndex = _inventoryIndex - _rangedInventory.Length;
-            }
-            if (discard)
-            {
-                WeaponType w;
-                if (_inventoryIndex < _rangedInventory.Length)
-                {
-                    w = _rangedInventory[_inventoryIndex];
-                    UnequipRanged(w);
-                }
-                else
-                {
-                    w = _meleeInventory[_inventoryIndex - _rangedInventory.Length];
-                    UnequipMelee(w);
-                }
-                _itemPickups.Add(new ItemPickup
-                {
-                    X = _player.Position.X, Y = _player.Position.Y + Player.Height - 12,
-                    W = 24, H = 12, ItemType = w.ToString().ToLower()
-                });
-                itemCount = GetInventoryCategoryItemCount(0);
-                if (_inventoryIndex >= itemCount) _inventoryIndex = Math.Max(0, itemCount - 1);
-            }
-        }
-
+        // Escape closes inventory (goes to gameplay, NOT settings)
         if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape))
+            _inventoryOpen = false;
+        // Tab also closes
+        if (kb.IsKeyDown(Keys.Tab) && _prevKb.IsKeyUp(Keys.Tab))
             _inventoryOpen = false;
     }
 
@@ -6950,12 +6973,13 @@ public class Game1 : Game
             int tabY = contentY + 8 + i * 42;
             int tabH = 36;
             bool selected = i == _inventoryCategory;
+            bool focused = selected && !_inventoryRightFocused;
 
             if (selected)
             {
                 // Active tab: bright fill + left accent bar
-                _spriteBatch.Draw(_pixel, new Rectangle(leftX + 2, tabY, leftW - 4, tabH), new Color(30, 60, 90) * 0.8f);
-                _spriteBatch.Draw(_pixel, new Rectangle(leftX + 2, tabY, 3, tabH), new Color(80, 180, 255));
+                _spriteBatch.Draw(_pixel, new Rectangle(leftX + 2, tabY, leftW - 4, tabH), new Color(30, 60, 90) * (focused ? 1f : 0.5f));
+                _spriteBatch.Draw(_pixel, new Rectangle(leftX + 2, tabY, 3, tabH), focused ? new Color(80, 180, 255) : new Color(60, 100, 140));
             }
 
             // Category icon (text symbol for now)
@@ -6989,23 +7013,25 @@ public class Game1 : Game
         int readoutY = silY + silH + 20;
         var readoutColor = new Color(100, 180, 220);
         DrawOutlinedString(_font, $"HP: {_player.Hp}/{_player.MaxHp}", new Vector2(centerX + 20, readoutY), Color.Red * 0.9f);
-        readoutY += 20;
+        readoutY += 24;
 
         float siPct = _player.SuitIntegrity;
         var siColor2 = siPct > 60 ? new Color(100, 180, 255) : (siPct > 30 ? Color.Orange : Color.Red);
         DrawOutlinedString(_font, $"Suit: {(int)siPct}%", new Vector2(centerX + 20, readoutY), siColor2);
-        // Mini bar
-        int barX = centerX + 100, barW2 = centerW - 120;
-        _spriteBatch.Draw(_pixel, new Rectangle(barX, readoutY + 3, barW2, 10), new Color(20, 30, 50) * 0.8f);
-        _spriteBatch.Draw(_pixel, new Rectangle(barX, readoutY + 3, (int)(barW2 * siPct / 100f), 10), siColor2 * 0.8f);
-        readoutY += 20;
+        readoutY += 16;
+        // Mini bar below text
+        int barX = centerX + 20, barW2 = centerW - 40;
+        _spriteBatch.Draw(_pixel, new Rectangle(barX, readoutY, barW2, 8), new Color(20, 30, 50) * 0.8f);
+        _spriteBatch.Draw(_pixel, new Rectangle(barX, readoutY, (int)(barW2 * siPct / 100f), 8), siColor2 * 0.8f);
+        readoutY += 18;
 
         float batPct = _player.Battery;
         var batColor2 = batPct > 50 ? new Color(220, 200, 60) : (batPct > 20 ? Color.Orange : Color.Red);
         DrawOutlinedString(_font, $"Power: {(int)batPct}%", new Vector2(centerX + 20, readoutY), batColor2);
-        _spriteBatch.Draw(_pixel, new Rectangle(barX, readoutY + 3, barW2, 10), new Color(40, 35, 10) * 0.8f);
-        _spriteBatch.Draw(_pixel, new Rectangle(barX, readoutY + 3, (int)(barW2 * batPct / 100f), 10), batColor2 * 0.8f);
-        readoutY += 20;
+        readoutY += 16;
+        _spriteBatch.Draw(_pixel, new Rectangle(barX, readoutY, barW2, 8), new Color(40, 35, 10) * 0.8f);
+        _spriteBatch.Draw(_pixel, new Rectangle(barX, readoutY, (int)(barW2 * batPct / 100f), 8), batColor2 * 0.8f);
+        readoutY += 22;
 
         string tierName = _player.CurrentTier switch
         {
@@ -7132,8 +7158,8 @@ public class Game1 : Game
         int footerY = ViewH - pad - 30;
         _spriteBatch.Draw(_pixel, new Rectangle(pad + 4, footerY - 4, ViewW - pad * 2 - 8, 1), frameColor * 0.3f);
         string controls = _inventoryCategory == 0
-            ? "[A/D] Category  [W/S] Select  [Enter] Equip  [X] Drop  [Tab] Close"
-            : "[A/D] Category  [W/S] Select  [Tab] Close";
+            ? "[↑↓] Navigate  [→] Details  [Enter] Equip  [X] Drop  [Esc] Close"
+            : "[↑↓] Navigate  [→] Details  [Esc] Close";
         var ctrlSize = _font.MeasureString(controls);
         _spriteBatch.DrawString(_font, SafeText(controls), new Vector2(ViewW / 2f - ctrlSize.X / 2, footerY), Color.Gray * 0.5f);
     }

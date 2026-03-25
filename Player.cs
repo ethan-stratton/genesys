@@ -2059,7 +2059,9 @@ public class Player
                 if (inputX != 0) vel.X = ApproachF(vel.X, inputX * _speed * 1.2f, _airAccel * 1.5f * dt);
             }
             // Tech ground pound: press S in air — heavy stomp with afterimage
-            if (CurrentTier == MoveTier.Tech && !IsGrounded && inputY > 0 && !IsGroundPounding)
+            // Don't allow during grapple (down extends rope instead)
+            if (CurrentTier == MoveTier.Tech && !IsGrounded && inputY > 0 && !IsGroundPounding
+                && !IsGrappleFiring && !IsGrapplePulling && GrappleRopeLength <= 0)
             {
                 IsGroundPounding = true;
                 GroundPoundLanded = false;
