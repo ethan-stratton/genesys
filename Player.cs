@@ -139,6 +139,7 @@ public class Player
     private float _dropIgnoreTimer;
     private const float DropIgnoreTime = 0.2f;
     private float _lastSTapTime;
+    private int _prevInputY;
     private bool _sWasUp;
     private const float DoubleTapWindow = 0.3f;
 
@@ -2060,8 +2061,11 @@ public class Player
             }
             // Tech ground pound: press S in air — heavy stomp with afterimage
             // Don't allow during grapple (down extends rope instead)
-            if (CurrentTier == MoveTier.Tech && !IsGrounded && inputY > 0 && !IsGroundPounding
-                && !IsGrappleFiring && !IsGrapplePulling && GrappleRopeLength <= 0)
+            // Don't trigger if we just dropped through a platform
+            bool freshDownPress = inputY > 0 && _prevInputY <= 0;
+            if (CurrentTier == MoveTier.Tech && !IsGrounded && freshDownPress && !IsGroundPounding
+                && !IsGrappleFiring && !IsGrapplePulling && GrappleRopeLength <= 0
+                && _dropIgnoreTimer <= 0)
             {
                 IsGroundPounding = true;
                 GroundPoundLanded = false;
@@ -2634,6 +2638,7 @@ public class Player
         }
 
         _wasGrounded = IsGrounded;
+        _prevInputY = inputY;
         _wasOnSlope = _onSlope;
         _prevKb = kb;
     }

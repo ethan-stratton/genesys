@@ -1263,7 +1263,7 @@ public class Game1 : Game
         }
 
         // Toggle menu with Escape (only open — closing is handled inside UpdateMenu)
-        if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape) && !_menuOpen)
+        if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape) && !_menuOpen && !_inventoryOpen)
         {
             // Close any map state first
             _fullscreenMapOpen = false;
@@ -7375,6 +7375,7 @@ public class Game1 : Game
             if (_prologueSkipTimer >= 1.0f)
             {
                 _prologueSkipped = true;
+                _eveOrbActive = true; // EVE still available when skipping prologue
                 StartFadeTo(GameState.TitleCard, 2f);
                 return;
             }
