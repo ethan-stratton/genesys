@@ -114,6 +114,8 @@ public class Game1 : Game
     private SpriteFontBase _fontSmall;
     private SpriteFontBase _fontLarge;
     private Song _bgm;
+    private Song _menuBgm;
+    private Song _currentSong;
     private Player _player;
 
     // Hit feedback
@@ -521,8 +523,7 @@ public class Game1 : Game
     private WeaponType[] _rangedInventory = Array.Empty<WeaponType>();
     private int _rangedIndex = -1;
 
-    private bool _debugSword;
-    private bool _debugGun;
+
 
     private List<ItemPickup> _itemPickups = new();
     private HashSet<(int col, int row, TileType origType)> _destroyedBreakables = new();
@@ -616,7 +617,7 @@ public class Game1 : Game
 
         _audioSettings = new SettingEntry[]
         {
-            new() { Label = "Music", Get = () => _enableMusic, Toggle = () => { _enableMusic = !_enableMusic; if (_enableMusic && _bgm != null) { MediaPlayer.IsRepeating = true; MediaPlayer.Play(_bgm); } else { MediaPlayer.Stop(); } } },
+            new() { Label = "Music", Get = () => _enableMusic, Toggle = () => { _enableMusic = !_enableMusic; if (_enableMusic) { PlaySong(_gameState == GameState.Title ? _menuBgm : _bgm); } else { MediaPlayer.Stop(); _currentSong = null; } } },
         };
 
         _debugSettings = new SettingEntry[]
@@ -997,43 +998,53 @@ public class Game1 : Game
         try
         {
             var musicPath = Path.GetFullPath("Content/audio/music/overworld.ogg");
-            Console.WriteLine($"[MUSIC] Loading: {musicPath}");
-            Console.WriteLine($"[MUSIC] File exists: {File.Exists(musicPath)}");
             _bgm = Song.FromUri("overworld", new Uri(musicPath));
-            Console.WriteLine($"[MUSIC] Song loaded: {_bgm != null}");
         }
-        catch (Exception ex)
+        catch (Exception ex) { Console.WriteLine($"[MUSIC] overworld FAILED: {ex}"); }
+        try
         {
-            Console.WriteLine($"[MUSIC] FAILED: {ex}");
+            var menuMusicPath = Path.GetFullPath("Content/audio/music/Glitch - Prehistory (main menu).mp3");
+            if (File.Exists(menuMusicPath))
+                _menuBgm = Song.FromUri("menu", new Uri(menuMusicPath));
         }
-        if (_bgm != null && _enableMusic)
+        catch (Exception ex) { Console.WriteLine($"[MUSIC] menu FAILED: {ex}"); }
+        // Start with menu music
+        PlaySong(_menuBgm);
+    }
+
+    private void PlaySong(Song song)
+    {
+        if (song == null || !_enableMusic) return;
+        if (_currentSong == song && MediaPlayer.State == MediaState.Playing) return;
+        try
         {
-            try
-            {
-                MediaPlayer.IsRepeating = true;
-                MediaPlayer.Volume = 0.5f;
-                MediaPlayer.Play(_bgm);
-                Console.WriteLine($"[MUSIC] Playing! State: {MediaPlayer.State}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[MUSIC] Play FAILED: {ex}");
-            }
+            MediaPlayer.IsRepeating = true;
+            MediaPlayer.Volume = 0.5f;
+            MediaPlayer.Play(song);
+            _currentSong = song;
         }
-        else
-        {
-            Console.WriteLine($"[MUSIC] Not playing — bgm null: {_bgm == null}, music enabled: {_enableMusic}");
-        }
+        catch { }
     }
 
     private Vector2 PlayerCenter =>
         _player.Position + new Vector2(Player.Width / 2f, 
             _player.IsCrouching ? Player.Height - Player.CrouchHeight / 2f : Player.Height / 2f);
 
+    private GameState _prevGameState;
     protected override void Update(GameTime gameTime)
     {
         var kb = Keyboard.GetState();
         float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
+
+        // Music switching on state change
+        if (_gameState != _prevGameState)
+        {
+            if (_gameState == GameState.Title)
+                PlaySong(_menuBgm);
+            else if (_gameState == GameState.Playing || _gameState == GameState.Editing)
+                PlaySong(_bgm);
+            _prevGameState = _gameState;
+        }
 
         // === FADE TRANSITION UPDATE ===
         if (_fadingOut)
@@ -1199,8 +1210,6 @@ public class Game1 : Game
                         _meleeIndex = -1;
                         _rangedInventory = Array.Empty<WeaponType>();
                         _rangedIndex = -1;
-                        _debugSword = false;
-                        _debugGun = false;
                         StartPrologue();
                         break;
                     case "Settings":
@@ -6925,8 +6934,8 @@ public class Game1 : Game
         // Layout regions
         int contentY = headerY + 35;
         int contentH = ViewH - contentY - 60;
-        int leftW = 150; // category tabs
-        int rightW = 220; // detail panel
+        int leftW = 120; // category tabs
+        int rightW = 260; // detail panel
         int centerW = ViewW - pad * 2 - leftW - rightW - 24;
         int leftX = pad + 8;
         int centerX = leftX + leftW + 8;
@@ -10274,8 +10283,8 @@ public class Game1 : Game
             }
         }
 
-        // --- MOVEMENT TIER DEBUG SELECTOR (debug levels only) ---
-        if (true) // tier HUD
+        // --- MOVEMENT TIER DEBUG SELECTOR (editor only) ---
+        if (_gameState == GameState.Editing)
         {
             if (_tierSwitchFlash > 0) _tierSwitchFlash -= (float)gameTime.ElapsedGameTime.TotalSeconds * 2f;
             string[] tierNames = { "TECH", "BIO", "CIPHER" };

@@ -1,12 +1,12 @@
 {
-  "currentLevel": "ship-interior",
-  "spawnX": 2416,
-  "spawnY": 408,
+  "currentLevel": "crashsite",
+  "spawnX": 180,
+  "spawnY": 205,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 1244.378,
+  "playTime": 1307.2589,
   "meleeInventory": [],
   "rangedInventory": [],
   "meleeIndex": -1,
@@ -22,5 +22,7 @@
   "shelterX": 0,
   "shelterY": 0,
   "deathCount": 0,
-  "hp": 100
+  "hp": 100,
+  "suitIntegrity": 31,
+  "battery": 80
 }
