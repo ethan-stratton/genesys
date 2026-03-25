@@ -247,7 +247,7 @@ public class Game1 : Game
     private bool _enableSpinMelee = true;
     private bool _enableFlip = true;
     private bool _enableBladeDash = true;
-    private bool _enableMusic;
+    private bool _enableMusic = true;
 
     // --- Inventory state ---
     private bool _inventoryOpen;
@@ -981,6 +981,11 @@ public class Game1 : Game
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Failed to load BGM: {ex.Message}");
+        }
+        if (_bgm != null && _enableMusic)
+        {
+            MediaPlayer.IsRepeating = true;
+            MediaPlayer.Play(_bgm);
         }
     }
 
