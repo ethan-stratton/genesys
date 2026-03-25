@@ -3096,6 +3096,17 @@ public class Game1 : Game
             _player.Battery = MathF.Max(0, _player.Battery - GrappleBatteryCost);
         _playerWasGrappleFiring = _player.IsGrappleFiring;
 
+        // Segmented suit regen — slowly repairs to next 25% mark
+        if (_player.SuitIntegrity < 100f)
+        {
+            float nextMark = MathF.Ceiling(_player.SuitIntegrity / 25f) * 25f;
+            if (nextMark > _player.SuitIntegrity)
+            {
+                float regenRate = 1.5f; // % per second
+                _player.SuitIntegrity = MathF.Min(nextMark, _player.SuitIntegrity + regenRate * dt);
+            }
+        }
+
         // Suit spark particles when integrity is low
         if (_player.SuitIntegrity < 25f)
         {
