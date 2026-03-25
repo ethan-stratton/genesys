@@ -5832,18 +5832,27 @@ public class Game1 : Game
                         }
                         else if (tile == TileType.BrokenPipe)
                         {
-                            // Pipe shape: vertical rectangle with dashes for leaking air
-                            _spriteBatch.Draw(_pixel, new Rectangle(cx - 3, wy + 2, 7, ts - 4), bright);
-                            // Leak dashes to the right
+                            // Pipe body: thick vertical bar
+                            var pipeColor = new Color(100, 110, 120);
+                            _spriteBatch.Draw(_pixel, new Rectangle(cx - 5, wy, 11, ts), pipeColor);
+                            // Pipe highlight stripe
+                            _spriteBatch.Draw(_pixel, new Rectangle(cx - 2, wy, 2, ts), new Color(140, 150, 160));
+                            // Crack in the middle
+                            _spriteBatch.Draw(_pixel, new Rectangle(cx + 3, cy - 4, 3, 8), new Color(40, 40, 40));
+                            
+                            // Animated leak particles spraying right from the crack
                             float t = _totalTime;
-                            int drift = ((int)(t * 40f)) % 12;
-                            var leak = bright * 0.6f;
-                            for (int d = 0; d < 3; d++)
+                            var leakBright = new Color(200, 220, 255);
+                            for (int d = 0; d < 6; d++)
                             {
-                                int lx = cx + 5 + d * 5 + drift;
-                                int ly = cy - 1 + (d % 2 == 0 ? -2 : 2);
-                                if (lx < wx + ts)
-                                    _spriteBatch.Draw(_pixel, new Rectangle(lx, ly, 3, 1), leak);
+                                // Each particle loops across the right half of the tile
+                                float phase = (t * 2.5f + d * 0.4f) % 1.5f;
+                                if (phase > 1f) continue; // gap between bursts
+                                int lx = cx + 6 + (int)(phase * (ts / 2));
+                                int ly = cy - 3 + (int)(MathF.Sin(d * 1.7f + t * 5f) * 4f);
+                                float alpha = 1f - phase; // fade out as they travel
+                                int size = phase < 0.3f ? 3 : 2;
+                                _spriteBatch.Draw(_pixel, new Rectangle(lx, ly, size, size), leakBright * alpha);
                             }
                         }
                         else if (tile == TileType.ElectricShock)
