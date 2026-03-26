@@ -1,12 +1,12 @@
 {
-  "currentLevel": "debug-room",
-  "spawnX": 951.3771,
-  "spawnY": 174.85907,
+  "currentLevel": "ship-interior",
+  "spawnX": 2492.6487,
+  "spawnY": 408,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 1249.7129,
+  "playTime": 1282.7253,
   "meleeInventory": [
     "Knife",
     "WoodShield"
@@ -46,7 +46,7 @@
   "deathCount": 1,
   "hp": 10,
   "suitIntegrity": 50,
-  "battery": 68.990906,
+  "battery": 100,
   "bestiary": {
     "entries": {
       "Crawler (Forager)": {
@@ -185,5 +185,6 @@
       }
     }
   },
-  "worldTime": 0
+  "worldTime": 0.5483369,
+  "evolutionFlags": []
 }

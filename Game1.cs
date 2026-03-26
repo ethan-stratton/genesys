@@ -6261,6 +6261,23 @@ public class Game1 : Game
             _levelIsUnderground = _level.IsUnderground;
             _editorTimeBtnClicked = true;
         }
+        // Evolution wave toggle buttons
+        int evoY = ugY + btnSize + 6;
+        for (int w = 1; w <= 2; w++)
+        {
+            var evoRect = new Rectangle(btnX - 8, evoY, btnSize + 16, btnSize);
+            if (evoRect.Contains(ms.X, ms.Y) && ms.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released)
+            {
+                string flag = $"evolution_wave_{w}";
+                if (_evolutionFlags.Contains(flag))
+                    _evolutionFlags.Remove(flag);
+                else
+                    TriggerEvolutionWave(flag);
+                _editorTimeBtnClicked = true;
+                SetEditorStatus(_evolutionFlags.Contains(flag) ? $"Evolution Wave {w} ON" : $"Evolution Wave {w} OFF");
+            }
+            evoY += btnSize + 4;
+        }
         // Keyboard shortcuts: Ctrl+1-4 for time
         var kb = Keyboard.GetState();
         bool ctrlHeld = kb.IsKeyDown(Keys.LeftControl) || kb.IsKeyDown(Keys.RightControl);
@@ -7247,6 +7264,28 @@ public class Game1 : Game
                     var ugLabelSize = _fontSmall.MeasureString(ugLabel);
                     _spriteBatch.DrawString(_fontSmall, ugLabel, new Vector2(btnX - ugLabelSize.X - 8, btnY + btnSize / 2f - ugLabelSize.Y / 2f), Color.Cyan * 0.8f);
                 }
+            }
+            // Evolution wave toggle buttons
+            btnY += btnSize + 6;
+            for (int w = 1; w <= 2; w++)
+            {
+                var mouseState2 = Mouse.GetState();
+                var evoRect = new Rectangle(btnX - 2, btnY, btnSize + 4, btnSize);
+                string flag = $"evolution_wave_{w}";
+                bool evoActive = _evolutionFlags.Contains(flag);
+                bool evoHover = evoRect.Contains(mouseState2.X, mouseState2.Y);
+                var evoColor = evoActive ? new Color(200, 100, 255) : Color.Gray * 0.5f;
+                _spriteBatch.Draw(_pixel, evoRect, (evoHover ? Color.White * 0.2f : Color.Black * 0.5f));
+                var evoText = $"E{w}";
+                var evoSize = _fontSmall.MeasureString(evoText);
+                _spriteBatch.DrawString(_fontSmall, evoText, new Vector2(btnX + btnSize / 2f - evoSize.X / 2f, btnY + btnSize / 2f - evoSize.Y / 2f), evoColor);
+                if (evoActive)
+                {
+                    var evoLabel = $"WAVE {w}";
+                    var evoLabelSize = _fontSmall.MeasureString(evoLabel);
+                    _spriteBatch.DrawString(_fontSmall, evoLabel, new Vector2(btnX - evoLabelSize.X - 8, btnY + btnSize / 2f - evoLabelSize.Y / 2f), new Color(200, 100, 255) * 0.8f);
+                }
+                btnY += btnSize + 4;
             }
         }
         // Exit search overlay
