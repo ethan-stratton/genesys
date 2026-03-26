@@ -186,6 +186,8 @@ public class Player
     public int ComboStep => _comboStep;
     public bool IsComboFinisher => _comboStep == 2 && MeleeTimer > 0;
     public WeaponType CurrentWeapon { get; set; }
+    public WeaponType RightWeapon { get; set; } // ActiveRight from Game1
+    public WeaponType LeftWeapon { get; set; }  // ActiveLeft from Game1
     private float _prevMeleeTimer; // for detecting melee active→inactive transition
 
     // Spinning melee (hold K for 0.2s+ while grounded)
@@ -295,6 +297,14 @@ public class Player
     private const float BraceDamageReduction = 0.5f; // take 50% damage
     private const float BraceKnockbackReduction = 0.2f; // 80% less knockback
     private float _braceTimer;
+
+    // Shield blocking
+    public bool IsBlocking { get; set; }
+    public bool BlockFromRight { get; set; }
+    public float BlockAngle { get; set; } // radians, angle shield is facing toward cursor
+    public int ShieldDurability { get; set; } = 50;
+    public int ShieldMaxDurability { get; set; } = 50;
+    public bool ShieldKnockedAway { get; set; }
     
     // Tech: Sprint (hold direction to build speed — Wario style)
     public bool IsSprinting { get; private set; }
@@ -353,6 +363,7 @@ public class Player
     
     // Effect tile state
     public float SpeedBoostTimer { get; set; }
+    public float EnvSpeedMult { get; set; } = 1f;
     public float PuddleSlowTimer { get; set; }
     private const float SpeedBoostDuration = 3.0f;
     private const float SpeedBoostMultiplier = 1.8f;
@@ -371,16 +382,50 @@ public class Player
         _squashHoldTimer = 0.05f; // hold for 3 frames before lerping back
     }
 
-    public void TakeDamage(int amount, float knockbackDirX = 0f)
+    public void TakeDamage(int amount, float knockbackDirX = 0f, bool isProjectile = false)
     {
         if (DamageCooldown > 0) return;
         
-        // Tech Brace: reduce damage and knockback
+        // Tech Brace: reduce damage and knockback (costs battery)
         float kbMult = 1f;
-        if (IsBracing)
+        if (IsBracing && Battery > 0)
         {
+            float batteryCost = isProjectile ? 0.5f : Math.Max(1f, amount * 0.5f);
+            Battery = Math.Max(0, Battery - batteryCost);
             amount = Math.Max(1, (int)(amount * BraceDamageReduction));
             kbMult = BraceKnockbackReduction;
+        }
+
+        // Shield blocking: check if attack comes from the direction the shield faces
+        bool shieldBlocked = false;
+        if (IsBlocking)
+        {
+            // Determine attack angle (from player's perspective, direction attack comes FROM)
+            float attackAngle = knockbackDirX >= 0 ? 0f : MathF.PI; // 0 = from left, PI = from right
+            // Check if attack falls within ~60 degrees of either side of BlockAngle
+            float angleDiff = MathF.Abs(MathHelper.WrapAngle(attackAngle - BlockAngle));
+            bool shieldFacingAttack = angleDiff <= MathF.PI / 3f; // 60 degrees each side = 120 degree arc
+            if (shieldFacingAttack)
+            {
+                shieldBlocked = true;
+                int rawDamage = amount;
+                amount = Math.Max(1, (int)(amount * 0.5f)); // 50% damage reduction
+                kbMult *= 0.4f; // 60% knockback reduction
+                ShieldDurability -= rawDamage;
+                if (rawDamage >= 5)
+                {
+                    // Large hit knocks shield away
+                    ShieldKnockedAway = true;
+                    IsBlocking = false;
+                    kbMult *= 1.5f; // extra knockback
+                }
+                if (ShieldDurability <= 0)
+                {
+                    ShieldDurability = 0;
+                    ShieldKnockedAway = true;
+                    IsBlocking = false;
+                }
+            }
         }
         
         Hp -= amount;
@@ -450,6 +495,13 @@ public class Player
     // Weapon gating (set by Game1)
     public bool HasMeleeWeapon { get; set; }
     public bool HasRangedWeapon { get; set; }
+    // Per-hand weapon type flags (set by Game1)
+    public bool RightIsRanged { get; set; }
+    public bool RightIsMelee { get; set; }
+    public bool RightIsShield { get; set; }
+    public bool LeftIsRanged { get; set; }
+    public bool LeftIsMelee { get; set; }
+    public bool LeftIsShield { get; set; }
     public int MeleeRangeOverride { get; set; } = MeleeRange;
 
 
@@ -1535,7 +1587,7 @@ public class Player
 
             // Ranged/melee still available on rope
             bool jOnRope = kb.IsKeyDown(Keys.J);
-            if (HasRangedWeapon && jOnRope && !_shootHeld && _shootCooldown <= 0f)
+            if (RightIsRanged && jOnRope && !_shootHeld && _shootCooldown <= 0f)
             {
                 _shootCooldown = ShootRate;
                 WantsToShoot = true;
@@ -1544,7 +1596,7 @@ public class Player
             _shootHeld = jOnRope;
 
             bool kOnRope = kb.IsKeyDown(Keys.K);
-            if (HasMeleeWeapon && kOnRope && !_meleeHeld && _meleeCooldown <= 0f)
+            if (LeftIsMelee && kOnRope && !_meleeHeld && _meleeCooldown <= 0f)
             {
                 _meleeCooldown = CurrentMeleeRate;
                 WantsToMelee = true;
@@ -1739,7 +1791,7 @@ public class Player
 
             // Combat on wall
             bool jOnWall = kb.IsKeyDown(Keys.J);
-            if (HasRangedWeapon && jOnWall && !_shootHeld && _shootCooldown <= 0f)
+            if (RightIsRanged && jOnWall && !_shootHeld && _shootCooldown <= 0f)
             {
                 _shootCooldown = ShootRate;
                 WantsToShoot = true;
@@ -1748,7 +1800,7 @@ public class Player
             _shootHeld = jOnWall;
 
             bool kOnWall = kb.IsKeyDown(Keys.K);
-            if (HasMeleeWeapon && kOnWall && !_meleeHeld && _meleeCooldown <= 0f)
+            if (LeftIsMelee && kOnWall && !_meleeHeld && _meleeCooldown <= 0f)
             {
                 _meleeCooldown = CurrentMeleeRate;
                 WantsToMelee = true;
@@ -1934,6 +1986,8 @@ public class Player
             float moveSpeed = _speed;
             if (SpeedBoostTimer > 0) moveSpeed *= SpeedBoostMultiplier;
             if (PuddleSlowTimer > 0) moveSpeed *= 0.4f; // puddle slows to 40%
+            if (IsBlocking) moveSpeed *= 0.4f; // slow walk while blocking
+            if (EnvSpeedMult < 1f) moveSpeed *= EnvSpeedMult; // environmental region slow
 
             // Sprint: dash transitions into sprint (hold direction after dash ends)
             if (IsSprinting && IsGrounded && inputX == _sprintDir)
@@ -2091,21 +2145,89 @@ public class Player
         bool leftClick = mouseState.HasValue && mouseState.Value.LeftButton == ButtonState.Pressed;
         bool rightClick = mouseState.HasValue && mouseState.Value.RightButton == ButtonState.Pressed;
 
-        // --- Right hand / Ranged (J or Left Click) ---
+        // --- Right hand (J or Left Click) ---
         bool jPressed = kb.IsKeyDown(Keys.J) || leftClick;
-        if (HasRangedWeapon && jPressed && !_shootHeld && _shootCooldown <= 0f)
+        if (RightIsRanged && jPressed && !_shootHeld && _shootCooldown <= 0f)
         {
             _shootCooldown = ShootRate;
             WantsToShoot = true;
             ShootDirection = AimDir;
         }
+        if (RightIsMelee && !IsSpinningMelee && jPressed && !_shootHeld && _comboCooldown <= 0f)
+        {
+            CurrentWeapon = RightWeapon; // Use right hand's weapon (fists if None)
+            int maxCombo = CurrentWeapon == WeaponType.None ? 1 : 2; // Fists=2-hit, weapons=3-hit
+            if (_comboStep == 0 && _comboWindow <= 0 && MeleeTimer <= 0)
+            {
+                WantsToMelee = true;
+                MeleeDirection = new Vector2(FacingDir, 0);
+                MeleeTimer = CurrentMeleeActiveTime;
+                _comboWindow = 0;
+            }
+            else if (_comboStep == 0 && _comboWindow > 0)
+            {
+                _comboStep = 1;
+                WantsToMelee = true;
+                MeleeDirection = new Vector2(FacingDir, 0);
+                MeleeTimer = CurrentMeleeActiveTime;
+                _comboWindow = 0;
+            }
+            else if (_comboStep == 1 && _comboWindow > 0 && _comboHit[0] && _comboHit[1] && maxCombo >= 2)
+            {
+                _comboStep = 2;
+                WantsToMelee = true;
+                MeleeDirection = new Vector2(FacingDir, 0);
+                float finisherTime = CurrentWeapon switch
+                {
+                    WeaponType.None => 0.08f,
+                    WeaponType.Knife => 0.08f,
+                    WeaponType.Dagger => 0.12f,
+                    WeaponType.Stick => 0.14f,
+                    WeaponType.Whip => 0.14f,
+                    WeaponType.Sword => 0.16f,
+                    WeaponType.Axe => 0.18f,
+                    WeaponType.Club => 0.18f,
+                    WeaponType.Hammer => 0.2f,
+                    WeaponType.GreatSword => 0.2f,
+                    WeaponType.GreatClub => 0.2f,
+                    _ => 0.16f
+                };
+                MeleeTimer = finisherTime;
+                _comboWindow = 0;
+                float burst = CurrentWeapon switch
+                {
+                    WeaponType.Knife => 80f,
+                    WeaponType.Dagger => 100f,
+                    WeaponType.Stick => 150f,
+                    WeaponType.Sword => 180f,
+                    WeaponType.GreatSword => 200f,
+                    WeaponType.Club => 120f,
+                    WeaponType.GreatClub => 120f,
+                    WeaponType.Axe => 120f,
+                    WeaponType.Hammer => 120f,
+                    WeaponType.Whip => 100f,
+                    _ => 100f
+                };
+                var v = Velocity;
+                v.X += FacingDir * burst;
+                Velocity = v;
+                vel = Velocity;
+                _comboCooldown = CurrentComboCooldown;
+            }
+        }
         _shootHeld = jPressed;
 
-        // --- Left hand / Melee (K or Right Click) ---
+        // --- Left hand (K or Right Click) ---
         bool kPressed = kb.IsKeyDown(Keys.K) || rightClick;
+        if (LeftIsRanged && kPressed && !_meleeHeld && _shootCooldown <= 0f)
+        {
+            _shootCooldown = ShootRate;
+            WantsToShoot = true;
+            ShootDirection = AimDir;
+        }
 
         // Spinning melee: hold K while grounded
-        if (HasMeleeWeapon && EnableSpinMelee && kPressed && _wasGrounded)
+        if (LeftIsMelee && EnableSpinMelee && kPressed && _wasGrounded)
         {
             _meleeHoldTimer += dt;
             if (_meleeHoldTimer >= SpinMeleeActivateTime)
@@ -2137,8 +2259,9 @@ public class Player
             }
         }
 
-        if (HasMeleeWeapon && !IsSpinningMelee && kPressed && !_meleeHeld && _comboCooldown <= 0f)
+        if (LeftIsMelee && !IsSpinningMelee && kPressed && !_meleeHeld && _comboCooldown <= 0f)
         {
+            CurrentWeapon = LeftWeapon; // Use left hand's weapon (fists if None)
             int maxCombo = CurrentWeapon == WeaponType.None ? 1 : 2; // Fists=2-hit, weapons=3-hit
             if (_comboStep == 0 && _comboWindow <= 0 && MeleeTimer <= 0)
             {

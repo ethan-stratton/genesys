@@ -10,7 +10,7 @@ using FontStashSharp;
 
 namespace Genesis;
 
-public enum WeaponType { None, Knife, Stick, Whip, Dagger, Sword, GreatSword, Axe, Club, GreatClub, Hammer, Sling, Bow, Gun }
+public enum WeaponType { None, Knife, Stick, Whip, Dagger, Sword, GreatSword, Axe, Club, GreatClub, Hammer, Sling, Bow, Gun, WoodShield }
 
 public class ItemPickup
 {
@@ -102,6 +102,10 @@ public class Game1 : Game
     private bool _worldMapLegendVisible = false;
     private float _worldMapZoom = 1f;
     private string _worldMapBiomeMenuId; // non-null = showing biome level list
+
+    // Day-night cycle
+    private float _worldTime = 8f; // 0-24 hours, start at 8am
+    private const float WorldTimeScale = 1f / 60f; // 1 real second = 1 game minute (full cycle = 24 real minutes)
     private int _worldMapBiomeMenuCursor;
     private int _overworldCursor;
     private string _currentNodeId;
@@ -117,6 +121,30 @@ public class Game1 : Game
 
     // CRT effect
     private RenderTarget2D _crtTarget;
+    
+    // Lantern & lighting system
+    private bool _lanternActive;
+    private Texture2D _lightGradient;
+    private float _lanternFlicker = 1f;
+    private RenderTarget2D _darknessTarget;
+    private static readonly BlendState _multiplyBlend = new BlendState
+    {
+        ColorBlendFunction = BlendFunction.Add,
+        ColorSourceBlend = Blend.DestinationColor,
+        ColorDestinationBlend = Blend.Zero,
+        AlphaBlendFunction = BlendFunction.Add,
+        AlphaSourceBlend = Blend.One,
+        AlphaDestinationBlend = Blend.Zero,
+    };
+    private bool _levelIsUnderground;
+
+    // Noise-based water shader system
+    private bool _useShaderWater = true;
+    private Texture2D _noiseTexA;
+    private Texture2D _noiseTexB;
+    private byte[] _noiseDataA; // cached grayscale pixels (256x256) for CPU sampling
+    private byte[] _noiseDataB;
+    private RenderTarget2D _waterSceneTarget; // scene below water for refraction
     private Effect _crtShader;
     private bool _crtEnabled;
     private Texture2D _scanlineTex; // fallback scanline overlay
@@ -155,6 +183,11 @@ public class Game1 : Game
         public int Damage;         // damage per hit (0 = no damage)
     }
     private List<Particle> _particles = new();
+
+    // Ionized zone arc strikes
+    private struct ArcStrike { public Vector2 Start, End; public float Timer; public float MaxTimer; public float[] Offsets; }
+    private List<ArcStrike> _arcStrikes = new();
+    private float _arcSpawnTimer;
 
     private struct Splatter
     {
@@ -265,15 +298,18 @@ public class Game1 : Game
 
     // --- Inventory state ---
     private bool _inventoryOpen;
-    private int _inventoryCategory; // 0=Weapons, 1=Suit, 2=Tools, 3=Log
-    private int _inventoryIndex; // index within current category's item list
-    private bool _inventoryRightFocused; // true = right panel focused, false = left categories
-    private static readonly string[] InventoryCategories = { "Weapons", "Suit", "Tools", "Log" };
-
+    private int _equipCursorX; // 0=left hand slots, 1=center (armor), 2=right hand slots
+    private int _equipCursorY; // 0=slot1/helmet, 1=slot2/chest, 2=legs
+    private bool _equipPickerOpen; // weapon picker sub-list
+    private int _equipPickerIndex; // index in weapon picker list
+    private int _invCategory; // 0=Equipment, 1=Suit, 2=Tools, 3=Log
+    private int _invRightScroll; // scroll index for right panel in non-Equipment categories
+    private bool _invFocusSidebar; // true = focus on left sidebar category tabs
+    private static readonly string[] _invCategoryNames = { "Equipment", "Suit", "Tools", "Log" };
     // Spawn weapon menu (P key)
     private bool _spawnMenuOpen;
     private int _spawnMenuCursor;
-    private static readonly string[] SpawnMenuItems = { "Knife", "Grapple", "Stick", "Whip", "Dagger", "Sword", "GreatSword", "Axe", "Club", "GreatClub", "Hammer", "Gun", "Bow", "Sling" };
+    private static readonly string[] SpawnMenuItems = { "Knife", "Grapple", "Stick", "Whip", "Dagger", "Sword", "GreatSword", "Axe", "Club", "GreatClub", "Hammer", "Gun", "Bow", "Sling", "WoodShield", "Battery", "Heart" };
 
     // --- Dialogue state ---
     private bool _dialogueOpen;
@@ -335,6 +371,19 @@ public class Game1 : Game
     }
     private HashSet<string> _eveSaidLines = new();
 
+    /// <summary>Trigger an evolution wave. Unlocks gated species and queues EVE alerts.</summary>
+    private void TriggerEvolutionWave(string flag)
+    {
+        if (_evolutionFlags.Contains(flag)) return;
+        _evolutionFlags.Add(flag);
+        var newSpecies = CreatureDatabase.GetSpeciesForFlag(flag);
+        foreach (var sp in newSpecies)
+        {
+            if (sp.EvolutionEventText != null)
+                EveAlert(sp.EvolutionEventText, 5f, ignoresSilence: true);
+        }
+    }
+
     // EVE world position + movement system
     private Vector2 _evePos;           // actual world position
     private Vector2 _eveVel;           // velocity
@@ -368,6 +417,15 @@ public class Game1 : Game
     private List<ScannableObject> _scannables = new();
     private HashSet<string> _scanLog = new();  // persistent log of scanned IDs
     private float _passiveScanCooldown;         // global cooldown between auto-scans
+
+    // --- Bestiary ---
+    private Bestiary _bestiary = new();
+    private float _eveBestiaryTimer;
+    private float _eveScanPulseTimer;
+    private const float EveObservationInterval = 15f;
+    private HashSet<Guid> _recentlyObserved = new();
+    private float _recentlyObservedClearTimer;
+    private int _bestiarySelectedIndex;
     private const float PassiveScanRange = 192f; // ~6 tiles
     private const float PassiveScanInterval = 8f; // seconds between auto-scans
     private bool _scanL2Available;               // unlocked after EVE patches scanner
@@ -375,6 +433,9 @@ public class Game1 : Game
     // --- Kill Tracking + EVE Silence ---
     private Dictionary<string, int> _areaKillCounts = new(); // kills per area
     private int _totalKills;
+
+    // --- Evolution System ---
+    private HashSet<string> _evolutionFlags = new(); // tracks which evolution waves have triggered
     private int _passiveCreatureKills;    // specifically passive/fleeing creatures
     private float _eveSilenceTimer;       // EVE won't speak while > 0
     private const float EveSilencePerPassiveKill = 15f; // seconds of silence per passive kill
@@ -529,11 +590,17 @@ public class Game1 : Game
     // --- Weapon system ---
 
 
-    private WeaponType[] _meleeInventory = Array.Empty<WeaponType>();
-    private int _meleeIndex = -1;
+    // Left Hand / Right Hand weapon system
+    private List<WeaponType> _weaponInventory = new();
+    private WeaponType _rightHand1 = WeaponType.None; // R1 - active right
+    private WeaponType _rightHand2 = WeaponType.None; // R2 - backup right
+    private WeaponType _leftHand1 = WeaponType.None;  // L1 - active left
+    private WeaponType _leftHand2 = WeaponType.None;  // L2 - backup left
+    private bool _rightActiveSlot1 = true;  // true = R1 active, false = R2 active
+    private bool _leftActiveSlot1 = true;   // true = L1 active, false = L2 active
 
-    private WeaponType[] _rangedInventory = Array.Empty<WeaponType>();
-    private int _rangedIndex = -1;
+    private WeaponType ActiveRight => _rightActiveSlot1 ? _rightHand1 : _rightHand2;
+    private WeaponType ActiveLeft => _leftActiveSlot1 ? _leftHand1 : _leftHand2;
 
     // --- Sidearm ammo system ---
     private const int SidearmClipSize = 12;
@@ -558,7 +625,7 @@ public class Game1 : Game
     private const int MaxLatched = 4; // max crawlers latched at once
 
     // --- Editor state ---
-    private enum EditorTool { SolidFloor = 0, Platform = 1, Rope = 2, Wall = 3, Spike = 4, Exit = 5, Spawn = 6, WallSpike = 7, OverworldExit = 8, Ceiling = 9, TilePaint = 10, Enemy = 11, Item = 12 }
+    private enum EditorTool { SolidFloor = 0, Platform = 1, Rope = 2, Wall = 3, Spike = 4, Exit = 5, Spawn = 6, WallSpike = 7, OverworldExit = 8, Ceiling = 9, TilePaint = 10, Enemy = 11, Item = 12, EnvRegion = 13 }
     // Wall climbSide values: 0=both, 1=right face, -1=left face, 99=no climb (solid only)
     private EditorTool _editorTool = EditorTool.Platform;
     private bool _toolPaletteOpen;
@@ -571,6 +638,10 @@ public class Game1 : Game
     private bool _editorMenuOpen;
     private int _editorMenuCursor;
     private MouseState _prevMouse;
+
+    // Environmental region gameplay state
+    private float _envHpDrainAccum; // fractional HP damage accumulator
+    private string _currentEnvType = "neutral"; // current region type the player is in
     private string _editorSaveFile = "Content/levels/crashsite.json";
     private string _editorStatusMsg = "";
     private float _editorStatusTimer;
@@ -603,6 +674,7 @@ public class Game1 : Game
     // Enemy/item editor placement — accordion structure
     private static readonly (string category, string[] variants)[] EnemyCategories = {
         ("Crawler", new[] { "forager", "skitter", "leaper", "bombardier" }),
+        ("Evolved", new[] { "stalker", "spitter", "mimic", "resonant" }),
         ("Wingbeater", new[] { "wingbeater" }),
         ("Bird", new[] { "bird" }),
         ("Dummy", new[] { "dummy", "crit-dummy" }),
@@ -670,6 +742,7 @@ public class Game1 : Game
             new() { Label = "Death Particles", Get = () => _deathParticlesEnabled, Toggle = () => _deathParticlesEnabled = !_deathParticlesEnabled },
             new() { Label = "Dust Particles", Get = () => _dustParticlesEnabled, Toggle = () => _dustParticlesEnabled = !_dustParticlesEnabled },
             new() { Label = "Death Log", Get = () => _deathLogEnabled, Toggle = () => _deathLogEnabled = !_deathLogEnabled },
+            new() { Label = "Shader Water", Get = () => _useShaderWater, Toggle = () => _useShaderWater = !_useShaderWater },
         };
 
         _graphicsSettings = new SettingEntry[]
@@ -712,6 +785,7 @@ public class Game1 : Game
     private void LoadLevel(string path)
     {
         _level = LevelData.Load(path);
+        _levelIsUnderground = _level.IsUnderground;
         Player.WorldLeft = _level.Bounds.Left;
         Player.WorldRight = _level.Bounds.Right;
         Player.HasLeftNeighbor = _level.Neighbors?.HasNeighbor("left") == true;
@@ -819,7 +893,8 @@ public class Game1 : Game
             _camera = MakeCamera();
             _camera.SnapTo(_player.Position, Player.Width, _player.CurrentHeight);
         }
-        _crtTarget = new RenderTarget2D(GraphicsDevice, ViewW, ViewH);
+        _crtTarget = new RenderTarget2D(GraphicsDevice, ViewW, ViewH, false, SurfaceFormat.Color, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
+        _waterSceneTarget = new RenderTarget2D(GraphicsDevice, ViewW, ViewH);
         // Persist window size
         var saveForPersist = _saveData ?? SaveData.Load();
         if (saveForPersist != null) { saveForPersist.WindowSizeIndex = _windowSizeIndex; saveForPersist.Save(); }
@@ -873,16 +948,7 @@ public class Game1 : Game
             _player.SuitIntegrity = _saveData.SuitIntegrity;
             _player.Battery = _saveData.Battery;
             _player.Hp = Math.Clamp(_saveData.Hp, 1, _player.MaxHp);
-            if (_saveData.MeleeInventory?.Count > 0)
-            {
-                _meleeInventory = _saveData.MeleeInventory.ConvertAll(s => Enum.Parse<WeaponType>(s)).ToArray();
-                _meleeIndex = Math.Clamp(_saveData.MeleeIndex, 0, Math.Max(0, _meleeInventory.Length - 1));
-            }
-            if (_saveData.RangedInventory?.Count > 0)
-            {
-                _rangedInventory = _saveData.RangedInventory.ConvertAll(s => Enum.Parse<WeaponType>(s)).ToArray();
-                _rangedIndex = Math.Clamp(_saveData.RangedIndex, 0, Math.Max(0, _rangedInventory.Length - 1));
-            }
+            LoadInventoryFromSave();
         }
         
         SpawnEnemiesFromLevel();
@@ -909,6 +975,12 @@ public class Game1 : Game
 
         foreach (var e in _level.Enemies)
         {
+            // Evolution gate: skip species not yet unlocked
+            if (CreatureDatabase.Profiles.TryGetValue(e.Type, out var profile)
+                && profile.EvolutionGateFlag != null
+                && !_evolutionFlags.Contains(profile.EvolutionGateFlag))
+                continue;
+
             switch (e.Type)
             {
                 case "swarm":
@@ -919,14 +991,25 @@ public class Game1 : Game
                 case "skitter":
                 case "leaper":
                 case "bombardier":
+                case "stalker":
+                case "spitter":
+                case "mimic":
+                case "resonant":
                     float snapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Crawler.Width, Crawler.Height, tg, ts, plats, sFloors, walls, mainFloor);
                     var pushOut = EnemyPhysics.PushOutOfSolid(e.X, snapY, Crawler.Width, Crawler.Height, tg, ts);
                     var c = new Crawler(new Vector2(pushOut.X, pushOut.Y), bLeft, bRight, 0, 0, _rng);
                     c.Frozen = e.Frozen;
-                    if (e.Type == "leaper") c.Variant = CrawlerVariant.Leaper;
-                    else if (e.Type == "skitter") c.Variant = CrawlerVariant.Skitter;
-                    else if (e.Type == "bombardier") c.Variant = CrawlerVariant.Bombardier;
-                    else c.Variant = CrawlerVariant.Forager;
+                    c.Variant = e.Type switch
+                    {
+                        "leaper" => CrawlerVariant.Leaper,
+                        "skitter" => CrawlerVariant.Skitter,
+                        "bombardier" => CrawlerVariant.Bombardier,
+                        "stalker" => CrawlerVariant.Stalker,
+                        "spitter" => CrawlerVariant.Spitter,
+                        "mimic" => CrawlerVariant.Mimic,
+                        "resonant" => CrawlerVariant.Resonant,
+                        _ => CrawlerVariant.Forager,
+                    };
                     c.ApplyVariantRole();
                     c.UpdateSurfaceEdges(tg, ts, plats, sFloors, bLeft, bRight);
                     _crawlers.Add(c); _creatures.Add(c);
@@ -987,6 +1070,39 @@ public class Game1 : Game
         _camera = MakeCamera();
         _pixel = new Texture2D(GraphicsDevice, 1, 1);
         _pixel.SetData(new[] { Color.White });
+        
+        // Generate radial gradient for light system
+        {
+            int sz = 128;
+            _lightGradient = new Texture2D(GraphicsDevice, sz, sz);
+            var ld = new Color[sz * sz];
+            float half = sz / 2f;
+            for (int y = 0; y < sz; y++)
+                for (int x = 0; x < sz; x++)
+                {
+                    float dist = Vector2.Distance(new Vector2(x, y), new Vector2(half, half)) / half;
+                    float a = MathHelper.Clamp(1f - dist, 0f, 1f);
+                    // Linear falloff, premultiplied alpha for SpriteBatch compatibility
+                    int alpha = (int)(a * 255);
+                    int rgb = (int)(a * 255); // premultiplied: color channels = white * alpha
+                    ld[y * sz + x] = new Color(rgb, rgb, rgb, alpha);
+                }
+            _lightGradient.SetData(ld);
+        }
+
+        // Generate noise textures for water shader
+        _noiseTexA = GenerateNoiseTexture(256, 256, 42, 32f);
+        _noiseTexB = GenerateNoiseTexture(256, 256, 137, 48f);
+        // Cache noise pixel data for fast CPU-side sampling
+        var colorsA = new Color[256 * 256];
+        _noiseTexA.GetData(colorsA);
+        _noiseDataA = new byte[256 * 256];
+        for (int i = 0; i < colorsA.Length; i++) _noiseDataA[i] = colorsA[i].R;
+        var colorsB = new Color[256 * 256];
+        _noiseTexB.GetData(colorsB);
+        _noiseDataB = new byte[256 * 256];
+        for (int i = 0; i < colorsB.Length; i++) _noiseDataB[i] = colorsB[i].R;
+        _waterSceneTarget = new RenderTarget2D(GraphicsDevice, ViewW, ViewH);
 
         // Load parallax background layers (DISABLED — backgrounds too small)
         // var layers = new List<Texture2D>();
@@ -1011,7 +1127,7 @@ public class Game1 : Game
         }
 
         // CRT setup: render target + scanline overlay texture
-        _crtTarget = new RenderTarget2D(GraphicsDevice, ViewW, ViewH);
+        _crtTarget = new RenderTarget2D(GraphicsDevice, ViewW, ViewH, false, SurfaceFormat.Color, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
         // Try loading compiled CRT shader
         if (File.Exists("Content/shaders/CRT.xnb"))
         {
@@ -1069,6 +1185,25 @@ public class Game1 : Game
     {
         var kb = Keyboard.GetState();
         float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
+
+        // Advance world time (only during gameplay, not editor)
+        if (_gameState == GameState.Playing)
+        {
+            _worldTime += dt * WorldTimeScale;
+            if (_worldTime >= 24f) _worldTime -= 24f;
+            
+            // Lantern battery drain
+            if (_lanternActive)
+            {
+                _player.Battery -= 0.5f * dt;
+                if (_player.Battery <= 0f)
+                {
+                    _player.Battery = 0f;
+                    _lanternActive = false;
+                    EveAlert("Lantern offline. Battery depleted.");
+                }
+            }
+        }
 
         // Music switching on state change
         if (_gameState != _prevGameState)
@@ -1192,12 +1327,9 @@ public class Game1 : Game
                                     _prevInExit[k] = true;
                                 if (_saveData.Flags.ContainsKey("eveOrbActive"))
                                     _eveOrbActive = _saveData.Flags["eveOrbActive"];
-                                _meleeInventory = _saveData.MeleeInventory.ConvertAll(s => Enum.Parse<WeaponType>(s)).ToArray();
-                                _meleeIndex = _saveData.MeleeIndex;
-                                _rangedInventory = _saveData.RangedInventory.ConvertAll(s => Enum.Parse<WeaponType>(s)).ToArray();
-                                _rangedIndex = _saveData.RangedIndex;
-                                if (_meleeIndex >= _meleeInventory.Length) _meleeIndex = _meleeInventory.Length > 0 ? 0 : -1;
-                                if (_rangedIndex >= _rangedInventory.Length) _rangedIndex = _rangedInventory.Length > 0 ? 0 : -1;
+                                LoadInventoryFromSave();
+                                _bestiary = _saveData.Bestiary ?? new Bestiary();
+                                _evolutionFlags = _saveData.EvolutionFlags ?? new HashSet<string>();
                                 _wakeUpComplete = true;
                                 _player.IsLyingDown = false;
                                 _player.HasGrapple = _saveData?.CollectedItems?.Any(id => id.StartsWith("grapple")) == true;
@@ -1209,6 +1341,7 @@ public class Game1 : Game
                                 _player.SuitIntegrity = _saveData.SuitIntegrity;
                                 _player.Battery = _saveData.Battery;
                                 _player.Hp = _saveData.Hp;
+                                _worldTime = _saveData.WorldTime;
                             });
                         }
                         break;
@@ -1231,6 +1364,8 @@ public class Game1 : Game
                         _eveLogVisible = false;
                         _scannables.Clear();
                         _scanLog.Clear();
+                        _bestiary = new Bestiary();
+                        _evolutionFlags = new HashSet<string>();
                         _totalKills = 0;
                         _passiveCreatureKills = 0;
                         _areaKillCounts.Clear();
@@ -1239,10 +1374,7 @@ public class Game1 : Game
                         _hasMapModule = false;
                         _prologueSkipped = false;
                         _eveDialogueExhausted = false;
-                        _meleeInventory = Array.Empty<WeaponType>();
-                        _meleeIndex = -1;
-                        _rangedInventory = Array.Empty<WeaponType>();
-                        _rangedIndex = -1;
+                        ClearInventory();
                         StartFadeTo(GameState.Prologue, 1.0f, () =>
                         {
                             _prologuePhase = 0;
@@ -1402,13 +1534,25 @@ public class Game1 : Game
             return; // game is paused while menu is open
         }
 
+        // Lantern toggle with N
+        if (kb.IsKeyDown(Keys.N) && _prevKb.IsKeyUp(Keys.N) && !_menuOpen && !_dialogueOpen && !_inventoryOpen)
+        {
+            if (!_lanternActive && _player.Battery > 0)
+            {
+                _lanternActive = true;
+                EveAlertOnce("Lantern online. Battery drain minimal.");
+            }
+            else
+                _lanternActive = false;
+        }
+
         // Toggle inventory with Tab or I
         bool invToggle = (kb.IsKeyDown(Keys.Tab) && _prevKb.IsKeyUp(Keys.Tab)) ||
                          (kb.IsKeyDown(Keys.I) && _prevKb.IsKeyUp(Keys.I));
         if (invToggle && !_dialogueOpen)
         {
             _inventoryOpen = !_inventoryOpen;
-            if (_inventoryOpen) { _inventoryCategory = 0; _inventoryIndex = 0; _inventoryRightFocused = false; }
+            if (_inventoryOpen) { _equipCursorX = 2; _equipCursorY = 0; _equipPickerOpen = false; _equipPickerIndex = 0; _invCategory = 0; _invRightScroll = 0; _invFocusSidebar = false; }
         }
 
         if (_inventoryOpen)
@@ -1500,6 +1644,83 @@ public class Game1 : Game
                 EveAlert(nearest.ScanL1Text, 4f);
             }
         }
+
+        // --- EVE Bestiary Passive Observation ---
+        _eveBestiaryTimer -= dt;
+        if (_eveScanPulseTimer > 0) _eveScanPulseTimer -= dt;
+        _recentlyObservedClearTimer -= dt;
+        if (_recentlyObservedClearTimer <= 0) { _recentlyObserved.Clear(); _recentlyObservedClearTimer = 60f; }
+        if (_eveOrbActive && _eveBestiaryTimer <= 0 && _wakeUpComplete)
+        {
+            _eveBestiaryTimer = EveObservationInterval;
+            var scanCenter = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
+            string alertMsg = null;
+            foreach (var creature in _creatures)
+            {
+                if (!creature.Alive || _recentlyObserved.Contains(creature.Id)) continue;
+                float dist = Vector2.Distance(scanCenter, creature.Position);
+                if (dist > PassiveScanRange) continue;
+
+                _recentlyObserved.Add(creature.Id);
+
+                // Determine behavior
+                float speed = creature.Velocity.Length();
+                string behavior;
+                if (speed > 50 && Vector2.Dot(creature.Velocity, scanCenter - creature.Position) > 0)
+                    behavior = "aggressive";
+                else if (speed > 30)
+                    behavior = "fleeing";
+                else if (speed < 10 && creature.Needs.Hunger > 0.7f)
+                    behavior = "foraging";
+                else if (speed < 5)
+                    behavior = "idle";
+                else
+                    behavior = "moving";
+
+                string timeOfDay = GetTimeOfDay();
+                string weather = _currentEnvType switch
+                {
+                    "cold" => "cold",
+                    "hot" => "hot",
+                    "toxic" => "toxic",
+                    _ => "clear"
+                };
+                string biome = _level?.Name ?? "unknown";
+                string classification = creature.Role switch
+                {
+                    EcologicalRole.Herbivore => "herbivore",
+                    EcologicalRole.Predator => "predator",
+                    EcologicalRole.Scavenger => "scavenger",
+                    EcologicalRole.Decomposer => "decomposer",
+                    EcologicalRole.Prey => "prey species",
+                    EcologicalRole.Defensive => "defensive",
+                    EcologicalRole.Flighty => "skittish",
+                    _ => "unknown"
+                };
+
+                bool isNew = !_bestiary.Entries.ContainsKey(creature.SpeciesName);
+                bool added = _bestiary.LogSighting(creature.SpeciesName, classification, timeOfDay, weather, behavior, biome);
+
+                if (added && alertMsg == null) // one alert per interval
+                {
+                    var entry = _bestiary.Entries[creature.SpeciesName];
+                    // Check for progressive L1 reveal text from CreatureDatabase
+                    string revealText = CreatureDatabase.GetL1RevealText(creature.SpeciesName, entry.SightCount);
+                    if (revealText != null)
+                        alertMsg = revealText;
+                    else if (isNew && _bestiary.Entries.Count == 1)
+                        alertMsg = "Unknown species. Logging.";
+                    else if (isNew)
+                        alertMsg = $"New contact — {classification}. Documenting.";
+                    else if (entry.Observations.Count >= 7 && entry.Observations.Count <= 8)
+                        alertMsg = $"{creature.SpeciesName} — basic profile complete.";
+                    else
+                        alertMsg = $"Sighted {creature.SpeciesName} again. {behavior}.";
+                }
+            }
+            if (alertMsg != null) { EveAlert(alertMsg, 3f); _eveScanPulseTimer = 1.5f; }
+        }
+
         // Tick scannable cooldowns
         foreach (var sc in _scannables)
         {
@@ -1558,9 +1779,22 @@ public class Game1 : Game
         _player.EnableSpinMelee = _enableSpinMelee;
 
         // Weapon system: set weapon availability and melee range
-        _player.HasMeleeWeapon = true; // always have fists at minimum
-        _player.HasRangedWeapon = CurrentRanged != WeaponType.None;
-        _player.CurrentWeapon = CurrentMelee;
+        var rightWs = WeaponStats.Get(ActiveRight);
+        var leftWs = WeaponStats.Get(ActiveLeft);
+        _player.RightIsRanged = ActiveRight != WeaponType.None && rightWs.IsRanged;
+        _player.RightIsMelee = ActiveRight != WeaponType.None && !rightWs.IsRanged && !rightWs.IsShield;
+        _player.RightIsShield = ActiveRight != WeaponType.None && rightWs.IsShield;
+        _player.LeftIsRanged = ActiveLeft != WeaponType.None && leftWs.IsRanged;
+        _player.LeftIsMelee = (ActiveLeft == WeaponType.None) || (!leftWs.IsRanged && !leftWs.IsShield); // fists count as melee
+        _player.LeftIsShield = ActiveLeft != WeaponType.None && leftWs.IsShield;
+        _player.HasMeleeWeapon = _player.RightIsMelee || _player.LeftIsMelee;
+        _player.HasRangedWeapon = _player.RightIsRanged || _player.LeftIsRanged;
+        _player.RightWeapon = ActiveRight;
+        _player.LeftWeapon = ActiveLeft;
+        // CurrentWeapon is now set per-attack in Player.cs; default to CurrentMelee for range/rate calc
+        // Don't override CurrentWeapon here — it's set per-attack in Player.cs
+        // to match the hand that actually attacked (RightWeapon or LeftWeapon)
+        if (_player.MeleeTimer <= 0) _player.CurrentWeapon = CurrentMelee; // only set default when not attacking
         _player.MeleeRangeOverride = CurrentMelee switch
         {
             WeaponType.None => 28,
@@ -1581,6 +1815,34 @@ public class Game1 : Game
         _player.CurrentMeleeActiveTime = currentWs.ActiveTime;
         _player.CurrentComboWindow = currentWs.ComboWindow;
         _player.CurrentComboCooldown = currentWs.ComboCooldown;
+
+        // Shield blocking input
+        {
+            bool hasShieldRight = WeaponStats.Get(ActiveRight).IsShield;
+            bool hasShieldLeft = WeaponStats.Get(ActiveLeft).IsShield;
+            var kbShield = Keyboard.GetState();
+            // J = right hand, K = left hand
+            bool holdingShieldButton = (hasShieldRight && (kbShield.IsKeyDown(Keys.J) || Mouse.GetState().LeftButton == ButtonState.Pressed))
+                                    || (hasShieldLeft && (kbShield.IsKeyDown(Keys.K) || Mouse.GetState().RightButton == ButtonState.Pressed));
+            _player.IsBlocking = holdingShieldButton;
+            if (holdingShieldButton)
+            {
+                _player.BlockFromRight = _player.FacingDir == 1;
+                _player.BlockAngle = _player.FacingDir == 1 ? 0f : MathF.PI;
+            }
+
+            // Shield knocked away check
+            if (_player.ShieldKnockedAway)
+            {
+                _player.ShieldKnockedAway = false;
+                // Unequip shield from whichever hand has it
+                if (_rightActiveSlot1 && WeaponStats.Get(_rightHand1).IsShield) _rightHand1 = WeaponType.None;
+                else if (!_rightActiveSlot1 && WeaponStats.Get(_rightHand2).IsShield) _rightHand2 = WeaponType.None;
+                else if (_leftActiveSlot1 && WeaponStats.Get(_leftHand1).IsShield) _leftHand1 = WeaponType.None;
+                else if (!_leftActiveSlot1 && WeaponStats.Get(_leftHand2).IsShield) _leftHand2 = WeaponType.None;
+                _player.IsBlocking = false;
+            }
+        }
 
         // Weapon cycling (only during gameplay, not editor)
         if (!_menuOpen && !_dialogueOpen && _gameState == GameState.Playing)
@@ -1738,19 +2000,21 @@ public class Game1 : Game
 
             if (kb.IsKeyDown(Keys.D1) && _prevKb.IsKeyUp(Keys.D1))
             {
-                if (_rangedInventory.Length > 0)
-                {
-                    _rangedIndex++;
-                    if (_rangedIndex >= _rangedInventory.Length) _rangedIndex = -1; // cycle to unequipped
-                }
+                _rightActiveSlot1 = !_rightActiveSlot1;
             }
             if (kb.IsKeyDown(Keys.D2) && _prevKb.IsKeyUp(Keys.D2))
             {
-                if (_meleeInventory.Length > 0)
-                {
-                    _meleeIndex++;
-                    if (_meleeIndex >= _meleeInventory.Length) _meleeIndex = -1; // cycle to unequipped
-                }
+                _leftActiveSlot1 = !_leftActiveSlot1;
+            }
+
+            // --- Manual reload (R key) ---
+            if (kb.IsKeyDown(Keys.R) && _prevKb.IsKeyUp(Keys.R)
+                && CurrentRanged == WeaponType.Gun && !_sidearmReloading
+                && _sidearmRounds < SidearmClipSize
+                && (_sidearmClips == -1 || _sidearmClips > 0))
+            {
+                _sidearmReloading = true;
+                _sidearmReloadTimer = SidearmReloadTime;
             }
 
             // --- Spawn weapon menu (P key) ---
@@ -3170,8 +3434,8 @@ public class Game1 : Game
             _player.Battery = MathF.Max(0, _player.Battery - GrappleBatteryCost);
         _playerWasGrappleFiring = _player.IsGrappleFiring;
 
-        // Segmented suit regen — slowly repairs to next 25% mark
-        if (_player.SuitIntegrity < 100f)
+        // Segmented suit regen — slowly repairs to next 25% mark (disabled in hazard zones)
+        if (_player.SuitIntegrity < 100f && _currentEnvType == "neutral")
         {
             float nextMark = MathF.Ceiling(_player.SuitIntegrity / 25f) * 25f;
             if (nextMark > _player.SuitIntegrity)
@@ -3280,6 +3544,150 @@ public class Game1 : Game
                     SetEditorStatus($"Battery +{(int)BatteryCellRestoreAmount}%");
                 }
             }
+        }
+
+        // Environmental region effects
+        _player.EnvSpeedMult = 1f;
+        _currentEnvType = "neutral";
+        if (_level.EnvRegions.Length > 0)
+        {
+            var playerCenter = new Point((int)(_player.Position.X + 8), (int)(_player.Position.Y + 12));
+            for (int i = 0; i < _level.EnvRegionRects.Length; i++)
+            {
+                if (_level.EnvRegionRects[i].Contains(playerCenter))
+                {
+                    _currentEnvType = _level.EnvRegions[i].Type;
+                    break;
+                }
+            }
+
+            float suitDeg = 0f, hpDrain = 0f;
+            float speedMult = 1f;
+            float suit = _player.SuitIntegrity;
+
+            switch (_currentEnvType)
+            {
+                case "cold":
+                    suitDeg = 0.5f;
+                    if (suit < 25f) { hpDrain = 1.5f; speedMult = 0.85f; }
+                    else if (suit < 50f) hpDrain = 0.5f;
+                    break;
+                case "hot":
+                    suitDeg = 1.0f;
+                    if (suit < 25f) hpDrain = 1.5f;
+                    else if (suit < 50f) hpDrain = 0.5f;
+                    break;
+                case "extreme_cold":
+                    suitDeg = 1.5f;
+                    if (suit < 25f) { hpDrain = 3f; speedMult = 0.7f; }
+                    else if (suit < 50f) { hpDrain = 1.5f; speedMult = 0.8f; }
+                    else if (suit < 75f) hpDrain = 0.5f;
+                    break;
+                case "extreme_hot":
+                    suitDeg = 2.0f;
+                    if (suit < 50f) hpDrain = 2f;
+                    else if (suit < 75f) hpDrain = 0.5f;
+                    break;
+                case "ionized":
+                    float baseDrain = 1.0f;
+                    bool nearMetal = IsPlayerNearMetalTile();
+                    float metalMult = nearMetal ? 2.5f : 1f;
+                    _player.Battery = MathF.Max(0f, _player.Battery - baseDrain * metalMult * dt);
+                    suitDeg = 0.3f;
+                    break;
+            }
+
+            if (suitDeg > 0f)
+                _player.SuitIntegrity = MathF.Max(0f, _player.SuitIntegrity - suitDeg * dt);
+
+            if (hpDrain > 0f)
+            {
+                _envHpDrainAccum += hpDrain * dt;
+                if (_envHpDrainAccum >= 1f)
+                {
+                    int dmg = (int)_envHpDrainAccum;
+                    _envHpDrainAccum -= dmg;
+                    _player.Hp = Math.Max(0, _player.Hp - dmg);
+                }
+            }
+            else
+            {
+                _envHpDrainAccum = 0f;
+            }
+
+            _player.EnvSpeedMult = speedMult;
+        }
+
+        // Ionized zone visual effects
+        if (_currentEnvType == "ionized")
+        {
+            // Ambient static sparks (2-4 per second)
+            if (_rng.NextDouble() < 3.0 * dt)
+            {
+                _particles.Add(new Particle
+                {
+                    Position = _camera.Position + new Vector2(_rng.Next(0, ViewW), _rng.Next(0, ViewH)),
+                    Velocity = new Vector2(_rng.Next(-30, 30), _rng.Next(-30, 30)),
+                    Life = 0.1f + (float)_rng.NextDouble() * 0.1f,
+                    MaxLife = 0.2f,
+                    Color = _rng.NextDouble() > 0.5 ? new Color(200, 180, 255) : Color.White,
+                    Size = _rng.Next(1, 3)
+                });
+            }
+
+            // Metal tile sparks toward player
+            if (IsPlayerNearMetalTile() && _rng.NextDouble() < 4.0 * dt)
+            {
+                var metalPos = GetNearestMetalTilePos();
+                if (metalPos.HasValue)
+                {
+                    var dir = Vector2.Normalize(_player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f) - metalPos.Value);
+                    _particles.Add(new Particle
+                    {
+                        Position = metalPos.Value + new Vector2(_rng.Next(-12, 12), _rng.Next(-12, 12)),
+                        Velocity = dir * (60f + (float)_rng.NextDouble() * 40f) + new Vector2(_rng.Next(-20, 20), _rng.Next(-20, 20)),
+                        Life = 0.15f + (float)_rng.NextDouble() * 0.1f,
+                        MaxLife = 0.25f,
+                        Color = new Color(180, 220, 255),
+                        Size = 1
+                    });
+                }
+            }
+
+            // Arc strikes
+            _arcSpawnTimer -= dt;
+            if (_arcSpawnTimer <= 0f)
+            {
+                _arcSpawnTimer = 1f + (float)_rng.NextDouble() * 2f;
+                Vector2 arcStart, arcEnd;
+                var metalPos = GetNearestMetalTilePos();
+                if (metalPos.HasValue && _rng.NextDouble() > 0.3)
+                {
+                    arcStart = metalPos.Value;
+                    arcEnd = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f) + new Vector2(_rng.Next(-30, 30), _rng.Next(-30, 30));
+                }
+                else
+                {
+                    arcStart = _camera.Position + new Vector2(_rng.Next(20, ViewW - 20), _rng.Next(20, ViewH - 20));
+                    arcEnd = arcStart + new Vector2(_rng.Next(-80, 80), _rng.Next(-80, 80));
+                }
+                int segs = 6;
+                float[] offsets = new float[segs];
+                for (int i = 0; i < segs; i++) offsets[i] = (float)(_rng.NextDouble() * 16 - 8);
+                _arcStrikes.Add(new ArcStrike { Start = arcStart, End = arcEnd, Timer = 0.15f, MaxTimer = 0.15f, Offsets = offsets });
+            }
+
+            for (int i = _arcStrikes.Count - 1; i >= 0; i--)
+            {
+                var a = _arcStrikes[i];
+                a.Timer -= dt;
+                if (a.Timer <= 0f) { _arcStrikes.RemoveAt(i); continue; }
+                _arcStrikes[i] = a;
+            }
+        }
+        else
+        {
+            _arcStrikes.Clear();
         }
 
         // Switch interaction (W key near switch)
@@ -3438,6 +3846,7 @@ public class Game1 : Game
                         case "club": EquipMelee(WeaponType.Club); break;
                         case "greatclub": EquipMelee(WeaponType.GreatClub); break;
                         case "hammer": EquipMelee(WeaponType.Hammer); break;
+                        case "woodshield": EquipMelee(WeaponType.WoodShield); break;
                         case "sling": EquipRanged(WeaponType.Sling); break;
                         case "bow": EquipRanged(WeaponType.Bow); break;
                         case "gun": EquipRanged(WeaponType.Gun); break;
@@ -4017,16 +4426,7 @@ public class Game1 : Game
                             _wakeUpComplete = true;
                             _player.IsLyingDown = false;
                             // Restore inventory
-                            if (_saveData.MeleeInventory?.Count > 0)
-                            {
-                                _meleeInventory = _saveData.MeleeInventory.ConvertAll(s => Enum.Parse<WeaponType>(s)).ToArray();
-                                _meleeIndex = Math.Clamp(_saveData.MeleeIndex, 0, Math.Max(0, _meleeInventory.Length - 1));
-                            }
-                            if (_saveData.RangedInventory?.Count > 0)
-                            {
-                                _rangedInventory = _saveData.RangedInventory.ConvertAll(s => Enum.Parse<WeaponType>(s)).ToArray();
-                                _rangedIndex = Math.Clamp(_saveData.RangedIndex, 0, Math.Max(0, _rangedInventory.Length - 1));
-                            }
+                            LoadInventoryFromSave();
                             if (_saveData.Flags.ContainsKey("eveOrbActive"))
                                 _eveOrbActive = _saveData.Flags["eveOrbActive"];
                         }
@@ -4109,40 +4509,95 @@ public class Game1 : Game
     }
 
     // --- Weapon helpers ---
-    private void EquipMelee(WeaponType w)
+    // --- Left/Right hand weapon helpers ---
+    private void AddWeaponToInventory(WeaponType w)
     {
-        var list = new List<WeaponType>(_meleeInventory);
-        if (!list.Contains(w)) list.Add(w);
-        _meleeInventory = list.ToArray();
-        _meleeIndex = Array.IndexOf(_meleeInventory, w);
+        if (!_weaponInventory.Contains(w)) _weaponInventory.Add(w);
+        // Auto-equip to first empty hand slot
+        if ((_rightActiveSlot1 ? _rightHand1 : _rightHand2) == WeaponType.None)
+        {
+            if (_rightActiveSlot1) _rightHand1 = w;
+            else _rightHand2 = w;
+        }
+        else if ((_leftActiveSlot1 ? _leftHand1 : _leftHand2) == WeaponType.None)
+        {
+            if (_leftActiveSlot1) _leftHand1 = w;
+            else _leftHand2 = w;
+        }
+        else if ((!_rightActiveSlot1 ? _rightHand1 : _rightHand2) == WeaponType.None)
+        {
+            if (!_rightActiveSlot1) _rightHand1 = w;
+            else _rightHand2 = w;
+        }
+        else if ((!_leftActiveSlot1 ? _leftHand1 : _leftHand2) == WeaponType.None)
+        {
+            if (!_leftActiveSlot1) _leftHand1 = w;
+            else _leftHand2 = w;
+        }
+        // else just in inventory, player equips manually
     }
 
-    private void UnequipMelee(WeaponType w)
+    private void RemoveWeaponFromInventory(WeaponType w)
     {
-        var list = new List<WeaponType>(_meleeInventory);
-        list.Remove(w);
-        _meleeInventory = list.ToArray();
-        _meleeIndex = _meleeInventory.Length > 0 ? 0 : -1;
+        _weaponInventory.Remove(w);
+        if (_rightHand1 == w) _rightHand1 = WeaponType.None;
+        if (_rightHand2 == w) _rightHand2 = WeaponType.None;
+        if (_leftHand1 == w) _leftHand1 = WeaponType.None;
+        if (_leftHand2 == w) _leftHand2 = WeaponType.None;
     }
 
-    private void EquipRanged(WeaponType w)
+    // Legacy helpers — now route through unified inventory
+    private void EquipMelee(WeaponType w) => AddWeaponToInventory(w);
+    private void UnequipMelee(WeaponType w) => RemoveWeaponFromInventory(w);
+    private void EquipRanged(WeaponType w) => AddWeaponToInventory(w);
+    private void UnequipRanged(WeaponType w) => RemoveWeaponFromInventory(w);
+
+    private void LoadInventoryFromSave()
     {
-        var list = new List<WeaponType>(_rangedInventory);
-        if (!list.Contains(w)) list.Add(w);
-        _rangedInventory = list.ToArray();
-        _rangedIndex = Array.IndexOf(_rangedInventory, w);
+        if (_saveData == null) return;
+        _saveData.MigrateWeapons();
+        _weaponInventory = _saveData.WeaponInventory.ConvertAll(s => Enum.TryParse<WeaponType>(s, out var wt) ? wt : WeaponType.None);
+        _weaponInventory.RemoveAll(w => w == WeaponType.None);
+        _rightHand1 = Enum.TryParse<WeaponType>(_saveData.RightHand1, out var rh1) ? rh1 : WeaponType.None;
+        _rightHand2 = Enum.TryParse<WeaponType>(_saveData.RightHand2, out var rh2) ? rh2 : WeaponType.None;
+        _leftHand1 = Enum.TryParse<WeaponType>(_saveData.LeftHand1, out var lh1) ? lh1 : WeaponType.None;
+        _leftHand2 = Enum.TryParse<WeaponType>(_saveData.LeftHand2, out var lh2) ? lh2 : WeaponType.None;
+        _rightActiveSlot1 = _saveData.RightActiveSlot1;
+        _leftActiveSlot1 = _saveData.LeftActiveSlot1;
     }
 
-    private void UnequipRanged(WeaponType w)
+    private void ClearInventory()
     {
-        var list = new List<WeaponType>(_rangedInventory);
-        list.Remove(w);
-        _rangedInventory = list.ToArray();
-        _rangedIndex = _rangedInventory.Length > 0 ? 0 : -1;
+        _weaponInventory.Clear();
+        _rightHand1 = WeaponType.None;
+        _rightHand2 = WeaponType.None;
+        _leftHand1 = WeaponType.None;
+        _leftHand2 = WeaponType.None;
+        _rightActiveSlot1 = true;
+        _leftActiveSlot1 = true;
     }
 
-    private WeaponType CurrentMelee => _meleeIndex >= 0 && _meleeIndex < _meleeInventory.Length ? _meleeInventory[_meleeIndex] : WeaponType.None;
-    private WeaponType CurrentRanged => _rangedIndex >= 0 && _rangedIndex < _rangedInventory.Length ? _rangedInventory[_rangedIndex] : WeaponType.None;
+    // CurrentMelee = whichever active hand has a melee weapon (prefer left for melee)
+    private WeaponType CurrentMelee
+    {
+        get
+        {
+            if (ActiveLeft != WeaponType.None && !WeaponStats.Get(ActiveLeft).IsRanged && !WeaponStats.Get(ActiveLeft).IsShield) return ActiveLeft;
+            if (ActiveRight != WeaponType.None && !WeaponStats.Get(ActiveRight).IsRanged && !WeaponStats.Get(ActiveRight).IsShield) return ActiveRight;
+            return WeaponType.None;
+        }
+    }
+
+    // CurrentRanged = whichever active hand has a ranged weapon (prefer right for ranged)
+    private WeaponType CurrentRanged
+    {
+        get
+        {
+            if (ActiveRight != WeaponType.None && WeaponStats.Get(ActiveRight).IsRanged) return ActiveRight;
+            if (ActiveLeft != WeaponType.None && WeaponStats.Get(ActiveLeft).IsRanged) return ActiveLeft;
+            return WeaponType.None;
+        }
+    }
 
     private void SpawnItemAtPlayer(string itemType)
     {
@@ -4410,6 +4865,9 @@ public class Game1 : Game
         var dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
         var mouse = Mouse.GetState();
 
+        // Check time/underground buttons first (before tile placement consumes click)
+        _editorTimeBtnClicked = false;
+        UpdateEditorTimeButtons();
         // Ctrl+Z = undo
         if ((kb.IsKeyDown(Keys.LeftControl) || kb.IsKeyDown(Keys.RightControl)) && kb.IsKeyDown(Keys.Z) && _prevKb.IsKeyUp(Keys.Z))
             EditorUndo();
@@ -5033,6 +5491,13 @@ public class Game1 : Game
                     _level.Build();
                     SetEditorStatus("Ceiling added");
                     break;
+                case EditorTool.EnvRegion:
+                    var erList = new List<EnvironmentRegion>(_level.EnvRegions);
+                    erList.Add(new EnvironmentRegion { X = x, Y = y, W = w, H = h, Type = "cold" });
+                    _level.EnvRegions = erList.ToArray();
+                    _level.Build();
+                    SetEditorStatus("Env region added (cold) — [F] to cycle type");
+                    break;
             }
             } // end else (non-micro-drag)
         }
@@ -5151,7 +5616,7 @@ public class Game1 : Game
         }
 
         // F — cycle last wall's climb side: 0 (both) → 1 (right) → -1 (left)
-        if (kb.IsKeyDown(Keys.F) && _prevKb.IsKeyUp(Keys.F) && _level.Walls.Length > 0)
+        if (kb.IsKeyDown(Keys.F) && _prevKb.IsKeyUp(Keys.F) && _editorTool == EditorTool.Wall && _level.Walls.Length > 0)
         {
             var last = _level.Walls[_level.Walls.Length - 1];
             last.ClimbSide = last.ClimbSide switch { 0 => 1, 1 => -1, -1 => 99, _ => 0 };
@@ -5159,6 +5624,16 @@ public class Game1 : Game
             _level.Build();
             string sideStr = last.ClimbSide switch { 0 => "both", 1 => "right", -1 => "left", _ => "none (solid)" };
             SetEditorStatus($"Wall climb side: {sideStr}");
+        }
+
+        // F — cycle last env region type
+        if (kb.IsKeyDown(Keys.F) && _prevKb.IsKeyUp(Keys.F) && _editorTool == EditorTool.EnvRegion && _level.EnvRegions.Length > 0)
+        {
+            var last = _level.EnvRegions[_level.EnvRegions.Length - 1];
+            last.Type = last.Type switch { "neutral" => "cold", "cold" => "hot", "hot" => "extreme_cold", "extreme_cold" => "extreme_hot", "extreme_hot" => "ionized", _ => "neutral" };
+            _level.EnvRegions[_level.EnvRegions.Length - 1] = last;
+            _level.Build();
+            SetEditorStatus($"Env region type: {last.Type}");
         }
 
         // Tab — type-to-search exit target (hover mouse over an exit)
@@ -5320,7 +5795,8 @@ public class Game1 : Game
             var e = _level.Enemies[i];
             int size = e.Type == "thornback" ? 32 : (e.Type == "hopper" ? 20 : (e.Type == "swarm" ? 20 : 16));
             int h = e.Type == "thornback" ? 28 : (e.Type == "hopper" ? 16 : (e.Type == "swarm" ? 20 : 10));
-            if (new Rectangle((int)e.X, (int)e.Y, size, h).Contains(p))
+            var enemyRect = new Rectangle((int)e.X - tolerance, (int)e.Y - tolerance, size + tolerance * 2, h + tolerance * 2);
+            if (enemyRect.Contains(p))
             {
                 _entityUndoStack.Add(("enemy", i, _level.Enemies[i]));
                 var list = new List<EnemySpawnData>(_level.Enemies);
@@ -5367,6 +5843,19 @@ public class Game1 : Game
                 _level.Items = list.ToArray();
                 // Also remove from runtime pickups
                 _itemPickups.RemoveAll(ip => ip.Id == item.Id);
+                return true;
+            }
+        }
+        // Check env regions
+        for (int i = _level.EnvRegions.Length - 1; i >= 0; i--)
+        {
+            var er = _level.EnvRegions[i];
+            if (new Rectangle(er.X, er.Y, er.W, er.H).Contains(p))
+            {
+                var list = new List<EnvironmentRegion>(_level.EnvRegions);
+                list.RemoveAt(i);
+                _level.EnvRegions = list.ToArray();
+                _level.Build();
                 return true;
             }
         }
@@ -5661,14 +6150,139 @@ public class Game1 : Game
     private void SyncInventoryToSave()
     {
         if (_saveData == null) return;
-        _saveData.MeleeInventory = new List<string>(Array.ConvertAll(_meleeInventory, w => w.ToString()));
-        _saveData.RangedInventory = new List<string>(Array.ConvertAll(_rangedInventory, w => w.ToString()));
-        _saveData.MeleeIndex = _meleeIndex;
-        _saveData.RangedIndex = _rangedIndex;
+        _saveData.WeaponInventory = _weaponInventory.ConvertAll(w => w.ToString());
+        _saveData.LeftHand = ActiveLeft.ToString();
+        _saveData.RightHand = ActiveRight.ToString();
+        _saveData.RightHand1 = _rightHand1.ToString();
+        _saveData.RightHand2 = _rightHand2.ToString();
+        _saveData.LeftHand1 = _leftHand1.ToString();
+        _saveData.LeftHand2 = _leftHand2.ToString();
+        _saveData.RightActiveSlot1 = _rightActiveSlot1;
+        _saveData.LeftActiveSlot1 = _leftActiveSlot1;
+        // Keep legacy fields in sync for backward compat
+        _saveData.MeleeInventory = _weaponInventory.Where(w => !WeaponStats.Get(w).IsRanged).Select(w => w.ToString()).ToList();
+        _saveData.RangedInventory = _weaponInventory.Where(w => WeaponStats.Get(w).IsRanged).Select(w => w.ToString()).ToList();
+        _saveData.MeleeIndex = 0;
+        _saveData.RangedIndex = 0;
         _saveData.MoveTier = (int)_player.CurrentTier;
         _saveData.Hp = _player.Hp;
         _saveData.SuitIntegrity = _player.SuitIntegrity;
         _saveData.Battery = _player.Battery;
+        _saveData.Bestiary = _bestiary;
+        _saveData.EvolutionFlags = _evolutionFlags;
+        _saveData.WorldTime = _worldTime;
+    }
+
+    // --- Day-Night Cycle Helpers ---
+    private string GetTimeOfDay()
+    {
+        if (_worldTime >= 5f && _worldTime < 7f) return "dawn";
+        if (_worldTime >= 7f && _worldTime < 17f) return "day";
+        if (_worldTime >= 17f && _worldTime < 19f) return "dusk";
+        return "night";
+    }
+
+    private Color GetAmbientOverlay()
+    {
+        if (_levelIsUnderground)
+            return new Color(5, 5, 20) * 0.85f; // always dark underground
+        
+        if (_worldTime >= 5f && _worldTime < 6f)
+        {
+            float t = (_worldTime - 5f);
+            return Color.Lerp(new Color(5, 5, 20) * 0.85f, new Color(180, 100, 40) * 0.25f, t);
+        }
+        else if (_worldTime >= 6f && _worldTime < 7.5f)
+        {
+            float t = (_worldTime - 6f) / 1.5f;
+            return Color.Lerp(new Color(180, 100, 40) * 0.25f, Color.Transparent, t);
+        }
+        else if (_worldTime >= 7.5f && _worldTime < 11f)
+        {
+            return Color.Transparent;
+        }
+        else if (_worldTime >= 11f && _worldTime < 14f)
+        {
+            float t = 1f - MathF.Abs(_worldTime - 12.5f) / 1.5f;
+            return new Color(200, 160, 60) * (0.08f * t);
+        }
+        else if (_worldTime >= 14f && _worldTime < 17f)
+        {
+            float t = (_worldTime - 14f) / 3f;
+            return new Color(160, 80, 40) * (0.06f * t);
+        }
+        else if (_worldTime >= 17f && _worldTime < 18.5f)
+        {
+            float t = (_worldTime - 17f) / 1.5f;
+            return Color.Lerp(new Color(160, 80, 40) * 0.1f, new Color(80, 40, 120) * 0.35f, t);
+        }
+        else if (_worldTime >= 18.5f && _worldTime < 20f)
+        {
+            float t = (_worldTime - 18.5f) / 1.5f;
+            return Color.Lerp(new Color(80, 40, 120) * 0.35f, new Color(5, 5, 20) * 0.75f, t);
+        }
+        else if (_worldTime >= 20f && _worldTime < 22f)
+        {
+            float t = (_worldTime - 20f) / 2f;
+            return Color.Lerp(new Color(5, 5, 20) * 0.75f, new Color(5, 5, 20) * 0.88f, t);
+        }
+        else
+        {
+            return new Color(5, 5, 20) * 0.88f;
+        }
+    }
+
+    private bool _editorTimeBtnClicked;
+    private float _editorTimeBtnTarget;
+
+    private void UpdateEditorTimeButtons()
+    {
+        var ms = Mouse.GetState();
+        int btnSize = 24;
+        int btnX = ViewW - btnSize - 8;
+        int btnY = 60;
+        float[] times = { 6f, 12f, 18f, 0f };
+        for (int i = 0; i < times.Length; i++)
+        {
+            var r = new Rectangle(btnX, btnY + i * (btnSize + 4), btnSize, btnSize);
+            if (r.Contains(ms.X, ms.Y) && ms.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released)
+            {
+                _worldTime = times[i];
+                _editorTimeBtnClicked = true;
+                SetEditorStatus($"Time → {(int)times[i]:00}:00");
+            }
+        }
+        // Underground toggle
+        int ugY = btnY + 4 * (btnSize + 4) + 4;
+        var ugRect = new Rectangle(btnX - 8, ugY, btnSize + 16, btnSize);
+        if (ugRect.Contains(ms.X, ms.Y) && ms.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released)
+        {
+            _level.IsUnderground = !_level.IsUnderground;
+            _levelIsUnderground = _level.IsUnderground;
+            _editorTimeBtnClicked = true;
+        }
+        // Keyboard shortcuts: Ctrl+1-4 for time
+        var kb = Keyboard.GetState();
+        bool ctrlHeld = kb.IsKeyDown(Keys.LeftControl) || kb.IsKeyDown(Keys.RightControl);
+        if (ctrlHeld && kb.IsKeyDown(Keys.D1) && _prevKb.IsKeyUp(Keys.D1)) { _worldTime = 6f; SetEditorStatus("Time -> 06:00 dawn"); }
+        if (ctrlHeld && kb.IsKeyDown(Keys.D2) && _prevKb.IsKeyUp(Keys.D2)) { _worldTime = 12f; SetEditorStatus("Time -> 12:00 noon"); }
+        if (ctrlHeld && kb.IsKeyDown(Keys.D3) && _prevKb.IsKeyUp(Keys.D3)) { _worldTime = 18f; SetEditorStatus("Time -> 18:00 dusk"); }
+        if (ctrlHeld && kb.IsKeyDown(Keys.D4) && _prevKb.IsKeyUp(Keys.D4)) { _worldTime = 0f; SetEditorStatus("Time -> 00:00 midnight"); }
+        // Ctrl+5/6 trigger evolution waves for testing
+        if (ctrlHeld && kb.IsKeyDown(Keys.D5) && _prevKb.IsKeyUp(Keys.D5)) { TriggerEvolutionWave("evolution_wave_1"); SetEditorStatus("Evolution Wave 1 triggered"); }
+        if (ctrlHeld && kb.IsKeyDown(Keys.D6) && _prevKb.IsKeyUp(Keys.D6)) { TriggerEvolutionWave("evolution_wave_2"); SetEditorStatus("Evolution Wave 2 triggered"); }
+    }
+
+    private void DrawEditorTimeButton(int x, int y, int size, string label, float targetTime, Color color)
+    {
+        var mouseState = Mouse.GetState();
+        var btnRect = new Rectangle(x, y, size, size);
+        bool hover = btnRect.Contains(mouseState.X, mouseState.Y);
+
+        _spriteBatch.Draw(_pixel, btnRect, (hover ? Color.White * 0.2f : Color.Black * 0.5f));
+        DrawHollowRect(x, y, size, size, hover ? color : color * 0.5f);
+        var labelSize = _fontSmall.MeasureString(label);
+        _spriteBatch.DrawString(_fontSmall, label, new Vector2(x + size / 2f - labelSize.X / 2f, y + size / 2f - labelSize.Y / 2f), hover ? color : color * 0.7f);
     }
 
     // --- Editor undo helpers ---
@@ -6044,7 +6658,8 @@ public class Game1 : Game
                     }
                     else if (TileProperties.IsLiquid(tile))
                     {
-                        DrawLiquidTile(wx, wy, tg.TileSize, tile, tg, tx, ty);
+                        if (!(_useShaderWater && tile == TileType.Water))
+                            DrawLiquidTile(wx, wy, tg.TileSize, tile, tg, tx, ty);
                     }
                     else if (TileProperties.IsEffectTile(tile) || tile == TileType.Breakable)
                     {
@@ -6284,6 +6899,10 @@ public class Game1 : Game
             _spriteBatch.Draw(_pixel, new Rectangle(c.X, c.Y + c.H - 2, c.W, 2), new Color(90, 90, 90));
         }
 
+        // Noise-based water shader pass (editor)
+        if (_useShaderWater && _level.TileGridInstance != null)
+            DrawWaterShaderPass(_level.TileGridInstance, _camera.TransformMatrix);
+
         // Draw ropes
         foreach (var r in _level.Ropes)
             _spriteBatch.Draw(_pixel, new Rectangle((int)r.X - 1, (int)r.Top, 3, (int)(r.Bottom - r.Top)), new Color(120, 80, 40));
@@ -6511,6 +7130,7 @@ public class Game1 : Game
                 EditorTool.WallSpike => Color.Red * 0.3f,
                 EditorTool.SolidFloor => new Color(70, 50, 30) * 0.3f,
                 EditorTool.Ceiling => Color.Gray * 0.3f,
+                EditorTool.EnvRegion => Color.CornflowerBlue * 0.2f,
                 _ => Color.White * 0.2f
             };
 
@@ -6520,6 +7140,32 @@ public class Game1 : Game
                 _spriteBatch.Draw(_pixel, new Rectangle(px, py, pw, 12), previewColor);
             else
                 _spriteBatch.Draw(_pixel, new Rectangle(px, py, pw, ph), previewColor);
+        }
+
+        // Draw env regions
+        for (int i = 0; i < _level.EnvRegions.Length; i++)
+        {
+            var er = _level.EnvRegions[i];
+            var rect = new Rectangle(er.X, er.Y, er.W, er.H);
+            Color regionColor = er.Type switch
+            {
+                "cold" => Color.CornflowerBlue * 0.15f,
+                "hot" => Color.OrangeRed * 0.15f,
+                "extreme_cold" => Color.Blue * 0.2f,
+                "extreme_hot" => Color.Red * 0.2f,
+                "ionized" => new Color(100, 60, 180) * 0.15f,
+                _ => Color.White * 0.05f
+            };
+            _spriteBatch.Draw(_pixel, rect, regionColor);
+            // Border
+            _spriteBatch.Draw(_pixel, new Rectangle(er.X, er.Y, er.W, 1), regionColor * 3f);
+            _spriteBatch.Draw(_pixel, new Rectangle(er.X, er.Y + er.H, er.W, 1), regionColor * 3f);
+            _spriteBatch.Draw(_pixel, new Rectangle(er.X, er.Y, 1, er.H), regionColor * 3f);
+            _spriteBatch.Draw(_pixel, new Rectangle(er.X + er.W, er.Y, 1, er.H), regionColor * 3f);
+            // Label
+            string label = er.Type;
+            var labelSize = _fontSmall.MeasureString(label);
+            _spriteBatch.DrawString(_fontSmall, label, new Vector2(er.X + er.W / 2f - labelSize.X / 2f, er.Y + er.H / 2f - labelSize.Y / 2f), Color.White * 0.5f);
         }
 
         // Draw world bounds outline
@@ -6533,8 +7179,15 @@ public class Game1 : Game
         // Screen-space UI
         _spriteBatch.Begin();
 
+        // Day-night ambient overlay (over world, under editor UI)
+        {
+            var editorAmbient = GetAmbientOverlay();
+            if (editorAmbient.A > 0)
+                _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), editorAmbient);
+        }
+
         // Toolbar
-        string[] toolNames = { "0:Flr", "1:Plt", "2:Rop", "3:Wal", "4:Spk", "5:Ext", "6:Spn", "7:WS", "8:OW", "9:Ceil", "Q:Tile" };
+        string[] toolNames = { "0:Flr", "1:Plt", "2:Rop", "3:Wal", "4:Spk", "5:Ext", "6:Spn", "7:WS", "8:OW", "9:Ceil", "Q:Tile", "", "", "Env" };
         float toolX = 10;
         for (int i = 0; i < toolNames.Length; i++)
         {
@@ -6560,6 +7213,42 @@ public class Game1 : Game
         if (_editorStatusTimer > 0)
             _spriteBatch.DrawString(_fontSmall, SafeText(_editorStatusMsg), new Vector2(10, ViewH - 30), Color.Yellow);
 
+        // --- Editor time-of-day controls ---
+        {
+            int btnSize = 24;
+            int btnX = ViewW - btnSize - 8;
+            int btnY = 60;
+            string timeStr = $"{(int)_worldTime:00}:{(int)((_worldTime % 1) * 60):00}";
+            var timeSize = _fontSmall.MeasureString(timeStr);
+            _spriteBatch.DrawString(_fontSmall, timeStr, new Vector2(btnX + btnSize / 2f - timeSize.X / 2f, btnY - 16), Color.White * 0.7f);
+
+            DrawEditorTimeButton(btnX, btnY, btnSize, "6", 6f, new Color(255, 160, 60));
+            btnY += btnSize + 4;
+            DrawEditorTimeButton(btnX, btnY, btnSize, "12", 12f, new Color(255, 220, 100));
+            btnY += btnSize + 4;
+            DrawEditorTimeButton(btnX, btnY, btnSize, "18", 18f, new Color(160, 100, 200));
+            btnY += btnSize + 4;
+            DrawEditorTimeButton(btnX, btnY, btnSize, "0", 0f, new Color(140, 140, 200));
+            btnY += btnSize + 8;
+
+            // Underground toggle (click handled in UpdateEditorTimeButtons)
+            {
+                var mouseState = Mouse.GetState();
+                var ugRect = new Rectangle(btnX - 2, btnY, btnSize + 4, btnSize);
+                bool ugHover = ugRect.Contains(mouseState.X, mouseState.Y);
+                var ugColor = _levelIsUnderground ? Color.Cyan : Color.Gray * 0.5f;
+                _spriteBatch.Draw(_pixel, ugRect, (ugHover ? Color.White * 0.2f : Color.Black * 0.5f));
+                var ugText = "UG";
+                var ugSize2 = _fontSmall.MeasureString(ugText);
+                _spriteBatch.DrawString(_fontSmall, ugText, new Vector2(btnX + btnSize / 2f - ugSize2.X / 2f, btnY + btnSize / 2f - ugSize2.Y / 2f), ugColor);
+                if (_levelIsUnderground)
+                {
+                    var ugLabel = "UNDERGROUND";
+                    var ugLabelSize = _fontSmall.MeasureString(ugLabel);
+                    _spriteBatch.DrawString(_fontSmall, ugLabel, new Vector2(btnX - ugLabelSize.X - 8, btnY + btnSize / 2f - ugLabelSize.Y / 2f), Color.Cyan * 0.8f);
+                }
+            }
+        }
         // Exit search overlay
         if (_exitSearchOpen)
         {
@@ -6601,7 +7290,8 @@ public class Game1 : Game
             EditorTool.TilePaint => "[=]Play [Q]Tools [Click]Paint [Ctrl+Drag]Fill [RClick]Erase [[ ]]Tile [Ctrl+Z]Undo",
             EditorTool.Enemy => $"[=]Play [Q]Tools [Click]Place [[ ]]Type: {SelectedEnemyType}",
             EditorTool.Item => $"[=]Play [Q]Tools [Click]Place [[ ]]Type: {ItemTypes[_editorItemCursor]}",
-            _ => "[=]Play [Esc]Menu [Q]Tile [E]Enemy [P]Item [Drag]Place [RClick]Del [Tab]Target",
+            EditorTool.EnvRegion => "[=]Play [Q]Tools [Drag]Place [RClick]Del [F]Cycle Type",
+            _ => "[=]Play [Esc]Menu [Q]Tile [E]Enemy [P]Item [Drag]Place [RClick]Del [Tab]Target [Ctrl+1-4]Time",
         };
         _spriteBatch.DrawString(_fontSmall, controlsHint, new Vector2(10, ViewH - 16), Color.Gray * 0.45f);
 
@@ -6636,7 +7326,7 @@ public class Game1 : Game
             // Semi-transparent background
             _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), Color.Black * 0.7f);
 
-            string[] paletteNames = { "Solid Floor", "Platform", "Rope", "Wall", "Spike", "Exit", "Spawn", "Wall Spike", "Overworld Exit", "Ceiling", "Tile Paint", "Enemy (E)", "Item (P)" };
+            string[] paletteNames = { "Solid Floor", "Platform", "Rope", "Wall", "Spike", "Exit", "Spawn", "Wall Spike", "Overworld Exit", "Ceiling", "Tile Paint", "Enemy (E)", "Item (P)", "Env Region" };
             int paletteCount = paletteNames.Length;
             float palW = 260f;
             float palLineH = 24f;
@@ -6941,78 +7631,96 @@ public class Game1 : Game
         bool up = (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W)) || (kb.IsKeyDown(Keys.Up) && _prevKb.IsKeyUp(Keys.Up));
         bool down = (kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S)) || (kb.IsKeyDown(Keys.Down) && _prevKb.IsKeyUp(Keys.Down));
         bool confirm = (kb.IsKeyDown(Keys.Enter) && _prevKb.IsKeyUp(Keys.Enter)) || (kb.IsKeyDown(Keys.Space) && _prevKb.IsKeyUp(Keys.Space));
-        bool discard = kb.IsKeyDown(Keys.X) && _prevKb.IsKeyUp(Keys.X);
-
-        // Up/Down navigates categories (left panel) AND items (right panel)
-        // Left/Right switches between left panel (categories) and right panel (items)
-        if (!_inventoryRightFocused)
+        bool esc = kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape);
+        if (_equipPickerOpen)
         {
-            // Left panel focused: up/down = categories, right = enter right panel
-            if (up) { _inventoryCategory = (_inventoryCategory - 1 + InventoryCategories.Length) % InventoryCategories.Length; _inventoryIndex = 0; }
-            if (down) { _inventoryCategory = (_inventoryCategory + 1) % InventoryCategories.Length; _inventoryIndex = 0; }
-            if (right || confirm) { _inventoryRightFocused = true; _inventoryIndex = 0; }
+            // Weapon picker sub-list
+            if (esc)
+            {
+                _equipPickerOpen = false;
+                return;
+            }
+            int count = _weaponInventory.Count + 1; // +1 for "None" option
+            if (up) _equipPickerIndex = (_equipPickerIndex - 1 + count) % count;
+            if (down) _equipPickerIndex = (_equipPickerIndex + 1) % count;
+            if (confirm)
+            {
+                WeaponType chosen = _equipPickerIndex == 0 ? WeaponType.None : _weaponInventory[_equipPickerIndex - 1];
+                // Equip chosen weapon to current slot
+                // If weapon is already in another slot, unequip from there
+                if (chosen != WeaponType.None)
+                {
+                    if (_rightHand1 == chosen) _rightHand1 = WeaponType.None;
+                    if (_rightHand2 == chosen) _rightHand2 = WeaponType.None;
+                    if (_leftHand1 == chosen) _leftHand1 = WeaponType.None;
+                    if (_leftHand2 == chosen) _leftHand2 = WeaponType.None;
+                }
+                // Assign to current slot
+                if (_equipCursorX == 0 && _equipCursorY == 0) _leftHand1 = chosen;
+                else if (_equipCursorX == 0 && _equipCursorY == 1) _leftHand2 = chosen;
+                else if (_equipCursorX == 2 && _equipCursorY == 0) _rightHand1 = chosen;
+                else if (_equipCursorX == 2 && _equipCursorY == 1) _rightHand2 = chosen;
+                _equipPickerOpen = false;
+            }
+            return;
+        }
+
+        // Body view navigation
+        if (esc)
+        {
+            _inventoryOpen = false;
+            return;
+        }
+        // Tab also closes
+        if (kb.IsKeyDown(Keys.Tab) && _prevKb.IsKeyUp(Keys.Tab))
+        {
+            _inventoryOpen = false;
+            return;
+        }
+
+        if (_invFocusSidebar)
+        {
+            // Sidebar focused: W/S switch categories, D goes back to center
+            if (up) { _invCategory = (_invCategory - 1 + 4) % 4; _invRightScroll = 0; }
+            if (down) { _invCategory = (_invCategory + 1) % 4; _invRightScroll = 0; }
+            if (right) { _invFocusSidebar = false; }
+        }
+        else if (_invCategory == 0)
+        {
+            // Equipment category: WASD navigates slots, A from leftmost goes to sidebar
+            if (left)
+            {
+                if (_equipCursorX == 0) _invFocusSidebar = true;
+                else _equipCursorX--;
+            }
+            if (right) _equipCursorX = Math.Min(2, _equipCursorX + 1);
+            if (up) _equipCursorY = Math.Max(0, _equipCursorY - 1);
+            if (down) _equipCursorY = Math.Min(2, _equipCursorY + 1);
+
+            // Confirm on hand slots opens picker
+            bool isHandSlot = (_equipCursorX == 0 || _equipCursorX == 2) && _equipCursorY <= 1;
+            if (confirm && isHandSlot)
+            {
+                _equipPickerOpen = true;
+                _equipPickerIndex = 0;
+            }
+        }
+        else if (_invCategory == 3)
+        {
+            // Log/Bestiary: W/S navigates species list, A goes to sidebar
+            if (left) { _invFocusSidebar = true; }
+            int entryCount = _bestiary.Entries.Count;
+            if (up && entryCount > 0) _bestiarySelectedIndex = Math.Max(0, _bestiarySelectedIndex - 1);
+            if (down && entryCount > 0) _bestiarySelectedIndex = Math.Min(entryCount - 1, _bestiarySelectedIndex + 1);
         }
         else
         {
-            // Right panel focused: up/down = items, left = back to categories
-            if (left) { _inventoryRightFocused = false; }
-            int itemCount = GetInventoryCategoryItemCount(_inventoryCategory);
-            if (itemCount > 0)
-            {
-                if (up) _inventoryIndex = (_inventoryIndex - 1 + itemCount) % itemCount;
-                if (down) _inventoryIndex = (_inventoryIndex + 1) % itemCount;
-            }
-
-            // Category-specific actions
-            if (_inventoryCategory == 0 && itemCount > 0) // Weapons
-            {
-                if (confirm)
-                {
-                    if (_inventoryIndex < _rangedInventory.Length)
-                        _rangedIndex = _inventoryIndex;
-                    else
-                        _meleeIndex = _inventoryIndex - _rangedInventory.Length;
-                }
-                if (discard)
-                {
-                    WeaponType w;
-                    if (_inventoryIndex < _rangedInventory.Length)
-                    {
-                        w = _rangedInventory[_inventoryIndex];
-                        UnequipRanged(w);
-                    }
-                    else
-                    {
-                        w = _meleeInventory[_inventoryIndex - _rangedInventory.Length];
-                        UnequipMelee(w);
-                    }
-                    _itemPickups.Add(new ItemPickup
-                    {
-                        X = _player.Position.X, Y = _player.Position.Y + Player.Height - 12,
-                        W = 24, H = 12, ItemType = w.ToString().ToLower()
-                    });
-                    itemCount = GetInventoryCategoryItemCount(0);
-                    if (_inventoryIndex >= itemCount) _inventoryIndex = Math.Max(0, itemCount - 1);
-                }
-            }
+            // Other categories: W/S scrolls right panel, A goes to sidebar
+            if (left) { _invFocusSidebar = true; }
+            if (up) _invRightScroll = Math.Max(0, _invRightScroll - 1);
+            if (down) _invRightScroll++;
         }
-
-        // Escape closes inventory (goes to gameplay, NOT settings)
-        if (kb.IsKeyDown(Keys.Escape) && _prevKb.IsKeyUp(Keys.Escape))
-            _inventoryOpen = false;
-        // Tab also closes
-        if (kb.IsKeyDown(Keys.Tab) && _prevKb.IsKeyUp(Keys.Tab))
-            _inventoryOpen = false;
     }
-
-    private int GetInventoryCategoryItemCount(int cat) => cat switch
-    {
-        0 => _rangedInventory.Length + _meleeInventory.Length, // Weapons
-        1 => 3, // Suit: integrity, battery, movement tier
-        2 => (_player.HasGrapple ? 1 : 0) + (_hasMapModule ? 1 : 0), // Tools
-        3 => 0, // Log: placeholder for future
-        _ => 0
-    };
 
     private void DrawSpawnMenu()
     {
@@ -7034,317 +7742,578 @@ public class Game1 : Game
 
     private void DrawInventory()
     {
-        // === Metroid Prime-style inventory screen ===
-        // Full-screen dark overlay with sci-fi frame
+        // === Equipment Screen with Sidebars ===
+        // Full-screen dark overlay
         _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), new Color(5, 8, 15) * 0.92f);
 
-        // Outer frame — double border with glow
+        // Frame
         var frameColor = new Color(40, 80, 120);
-        var frameGlow = new Color(60, 130, 180) * 0.3f;
+        var accentColor = new Color(80, 180, 255);
         int pad = 16;
-        // Outer glow
-        _spriteBatch.Draw(_pixel, new Rectangle(pad - 2, pad - 2, ViewW - pad * 2 + 4, ViewH - pad * 2 + 4), frameGlow);
-        // Outer border
         DrawHollowRect(pad, pad, ViewW - pad * 2, ViewH - pad * 2, frameColor);
-        DrawHollowRect(pad + 2, pad + 2, ViewW - pad * 2 - 4, ViewH - pad * 2 - 4, frameColor * 0.5f);
 
-        // Header bar
-        int headerY = pad + 8;
-        _spriteBatch.Draw(_pixel, new Rectangle(pad + 4, headerY, ViewW - pad * 2 - 8, 2), frameColor);
-        string title = "INVENTORY";
+        // Title
+        string title = _invCategoryNames[_invCategory].ToUpper();
         var titleSize = _fontLarge.MeasureString(title);
-        // Title background pill
-        int titleBgW = (int)titleSize.X + 40;
-        _spriteBatch.Draw(_pixel, new Rectangle(ViewW / 2 - titleBgW / 2, headerY - 12, titleBgW, 26), new Color(10, 20, 35));
-        DrawOutlinedString(_fontLarge, title, new Vector2(ViewW / 2f - titleSize.X / 2, headerY - 10), new Color(120, 200, 255));
-        _spriteBatch.Draw(_pixel, new Rectangle(pad + 4, headerY + 20, ViewW - pad * 2 - 8, 1), frameColor * 0.3f);
+        DrawOutlinedString(_fontLarge, title, new Vector2(ViewW / 2f - titleSize.X / 2, pad + 8), new Color(120, 200, 255));
+        _spriteBatch.Draw(_pixel, new Rectangle(pad + 4, pad + 30, ViewW - pad * 2 - 8, 1), frameColor * 0.4f);
 
-        // Layout regions
-        int contentY = headerY + 35;
-        int contentH = ViewH - contentY - 60;
-        int leftW = 120; // category tabs
-        int rightW = 260; // detail panel
-        int centerW = ViewW - pad * 2 - leftW - rightW - 24;
-        int leftX = pad + 8;
+        // Layout dimensions
+        int contentY = pad + 36;
+        int contentH = ViewH - pad * 2 - 70;
+        int leftW = 150;
+        int rightW = 220;
+        int leftX = pad + 4;
+        int rightX = ViewW - pad - rightW - 4;
         int centerX = leftX + leftW + 8;
-        int rightX = centerX + centerW + 8;
+        int centerW = rightX - centerX - 8;
 
-        // === LEFT PANEL: Category tabs ===
+        // === LEFT PANEL - Category Tabs ===
         _spriteBatch.Draw(_pixel, new Rectangle(leftX, contentY, leftW, contentH), new Color(15, 25, 40) * 0.6f);
         DrawHollowRect(leftX, contentY, leftW, contentH, frameColor * 0.4f);
 
-        for (int i = 0; i < InventoryCategories.Length; i++)
+        int tabH = 30;
+        for (int i = 0; i < 4; i++)
         {
-            int tabY = contentY + 8 + i * 42;
-            int tabH = 36;
-            bool selected = i == _inventoryCategory;
-            bool focused = selected && !_inventoryRightFocused;
-
+            int tabY = contentY + 8 + i * (tabH + 4);
+            bool selected = i == _invCategory;
             if (selected)
             {
-                // Active tab: bright fill + left accent bar
-                _spriteBatch.Draw(_pixel, new Rectangle(leftX + 2, tabY, leftW - 4, tabH), new Color(30, 60, 90) * (focused ? 1f : 0.5f));
-                _spriteBatch.Draw(_pixel, new Rectangle(leftX + 2, tabY, 3, tabH), focused ? new Color(80, 180, 255) : new Color(60, 100, 140));
+                Color bgColor = _invFocusSidebar ? new Color(40, 80, 120) * 0.9f : new Color(30, 60, 90) * 0.8f;
+                _spriteBatch.Draw(_pixel, new Rectangle(leftX + 2, tabY, leftW - 4, tabH), bgColor);
+                Color barColor = _invFocusSidebar ? Color.Yellow : accentColor;
+                _spriteBatch.Draw(_pixel, new Rectangle(leftX + 2, tabY, 3, tabH), barColor);
             }
-
-            // Category icon (text symbol for now)
-            string icon = i switch { 0 => "⚔", 1 => "◈", 2 => "⚙", 3 => "◉", _ => "?" };
-            Color tabColor = selected ? Color.White : Color.Gray * 0.6f;
-            _spriteBatch.DrawString(_font, SafeText(icon), new Vector2(leftX + 12, tabY + 10), tabColor);
-            _spriteBatch.DrawString(_font, SafeText(InventoryCategories[i]), new Vector2(leftX + 30, tabY + 10), tabColor);
+            Color tabColor = selected ? (_invFocusSidebar ? Color.Yellow : Color.White) : Color.Gray * 0.6f;
+            _spriteBatch.DrawString(_font, SafeText(_invCategoryNames[i]), new Vector2(leftX + 14, tabY + 8), tabColor);
         }
 
-        // === CENTER PANEL: Character / suit status display ===
-        _spriteBatch.Draw(_pixel, new Rectangle(centerX, contentY, centerW, contentH), new Color(10, 18, 30) * 0.5f);
-        DrawHollowRect(centerX, contentY, centerW, contentH, frameColor * 0.3f);
-
-        // Character silhouette area (simple placeholder — standing figure outline)
-        int silW = 60, silH = 120;
-        int silX = centerX + centerW / 2 - silW / 2;
-        int silY = contentY + 30;
-        var silColor = new Color(60, 120, 180) * 0.4f;
-        // Head
-        _spriteBatch.Draw(_pixel, new Rectangle(silX + silW / 2 - 8, silY, 16, 16), silColor);
-        // Torso
-        _spriteBatch.Draw(_pixel, new Rectangle(silX + silW / 2 - 12, silY + 18, 24, 40), silColor);
-        // Arms
-        _spriteBatch.Draw(_pixel, new Rectangle(silX + silW / 2 - 20, silY + 20, 8, 30), silColor * 0.7f);
-        _spriteBatch.Draw(_pixel, new Rectangle(silX + silW / 2 + 12, silY + 20, 8, 30), silColor * 0.7f);
-        // Legs
-        _spriteBatch.Draw(_pixel, new Rectangle(silX + silW / 2 - 10, silY + 60, 8, 50), silColor * 0.8f);
-        _spriteBatch.Draw(_pixel, new Rectangle(silX + silW / 2 + 2, silY + 60, 8, 50), silColor * 0.8f);
-
-        // Suit status readout below silhouette
-        int readoutY = silY + silH + 20;
-        var readoutColor = new Color(100, 180, 220);
-        DrawOutlinedString(_font, $"HP: {_player.Hp}/{_player.MaxHp}", new Vector2(centerX + 20, readoutY), Color.Red * 0.9f);
-        readoutY += 24;
-
-        float siPct = _player.SuitIntegrity;
-        var siColor2 = siPct > 60 ? new Color(100, 180, 255) : (siPct > 30 ? Color.Orange : Color.Red);
-        DrawOutlinedString(_font, $"Suit: {(int)siPct}%", new Vector2(centerX + 20, readoutY), siColor2);
-        readoutY += 16;
-        // Mini bar below text
-        int barX = centerX + 20, barW2 = centerW - 40;
-        _spriteBatch.Draw(_pixel, new Rectangle(barX, readoutY, barW2, 8), new Color(20, 30, 50) * 0.8f);
-        _spriteBatch.Draw(_pixel, new Rectangle(barX, readoutY, (int)(barW2 * siPct / 100f), 8), siColor2 * 0.8f);
-        readoutY += 18;
-
-        float batPct = _player.Battery;
-        var batColor2 = batPct > 50 ? new Color(220, 200, 60) : (batPct > 20 ? Color.Orange : Color.Red);
-        DrawOutlinedString(_font, $"Power: {(int)batPct}%", new Vector2(centerX + 20, readoutY), batColor2);
-        readoutY += 16;
-        _spriteBatch.Draw(_pixel, new Rectangle(barX, readoutY, barW2, 8), new Color(40, 35, 10) * 0.8f);
-        _spriteBatch.Draw(_pixel, new Rectangle(barX, readoutY, (int)(barW2 * batPct / 100f), 8), batColor2 * 0.8f);
-        readoutY += 22;
-
-        string tierName = _player.CurrentTier switch
-        {
-            Player.MoveTier.Tech => "TECH",
-            Player.MoveTier.Bio => "BIO",
-            Player.MoveTier.Cipher => "CIPHER",
-            _ => "???"
-        };
-        var tierColor = _player.CurrentTier switch
-        {
-            Player.MoveTier.Tech => new Color(100, 180, 255),
-            Player.MoveTier.Bio => new Color(80, 200, 80),
-            Player.MoveTier.Cipher => new Color(200, 120, 255),
-            _ => Color.Gray
-        };
-        DrawOutlinedString(_font, $"Tier: {tierName}", new Vector2(centerX + 20, readoutY), tierColor);
-        readoutY += 28;
-
-        // Collection stats
-        int collected = _saveData?.CollectedItems?.Count ?? 0;
-        DrawOutlinedString(_font, $"Items: {collected}", new Vector2(centerX + 20, readoutY), readoutColor * 0.6f);
-        readoutY += 18;
-        int deaths = _saveData?.DeathCount ?? 0;
-        DrawOutlinedString(_font, $"Deaths: {deaths}", new Vector2(centerX + 20, readoutY), readoutColor * 0.6f);
-
-        // === RIGHT PANEL: Category-specific item list ===
+        // === RIGHT PANEL ===
         _spriteBatch.Draw(_pixel, new Rectangle(rightX, contentY, rightW, contentH), new Color(15, 25, 40) * 0.6f);
         DrawHollowRect(rightX, contentY, rightW, contentH, frameColor * 0.4f);
 
-        string catLabel = InventoryCategories[_inventoryCategory];
-        DrawOutlinedString(_font, catLabel, new Vector2(rightX + 10, contentY + 8), new Color(120, 200, 255));
-        _spriteBatch.Draw(_pixel, new Rectangle(rightX + 8, contentY + 26, rightW - 16, 1), frameColor * 0.4f);
-
-        int listY = contentY + 34;
-
-        switch (_inventoryCategory)
+        // === CENTER + RIGHT CONTENT based on category ===
+        if (_invCategory == 0)
         {
-            case 0: // Weapons
-                // Ranged header
-                DrawOutlinedString(_font, "RANGED", new Vector2(rightX + 10, listY), new Color(180, 140, 80) * 0.8f);
-                listY += 20;
-                if (_rangedInventory.Length == 0)
-                {
-                    _spriteBatch.DrawString(_font, SafeText("(none)"), new Vector2(rightX + 16, listY), Color.Gray * 0.4f);
-                    listY += 20;
-                }
-                for (int i = 0; i < _rangedInventory.Length; i++)
-                {
-                    bool equipped = i == _rangedIndex;
-                    bool hover = _inventoryIndex == i;
-                    if (hover)
-                        _spriteBatch.Draw(_pixel, new Rectangle(rightX + 4, listY - 1, rightW - 8, 18), new Color(40, 80, 120) * 0.5f);
-                    string prefix = equipped ? "► " : "  ";
-                    Color wc = hover ? Color.White : (equipped ? new Color(120, 200, 255) : Color.Gray * 0.7f);
-                    _spriteBatch.DrawString(_font, SafeText($"{prefix}{_rangedInventory[i]}"), new Vector2(rightX + 12, listY), wc);
-                    listY += 20;
-                }
-                listY += 8;
-                // Melee header
-                DrawOutlinedString(_font, "MELEE", new Vector2(rightX + 10, listY), new Color(180, 80, 80) * 0.8f);
-                listY += 20;
-                if (_meleeInventory.Length == 0)
-                {
-                    _spriteBatch.DrawString(_font, SafeText("(none)"), new Vector2(rightX + 16, listY), Color.Gray * 0.4f);
-                    listY += 20;
-                }
-                for (int i = 0; i < _meleeInventory.Length; i++)
-                {
-                    bool equipped = i == _meleeIndex;
-                    int globalIdx = _rangedInventory.Length + i;
-                    bool hover = _inventoryIndex == globalIdx;
-                    if (hover)
-                        _spriteBatch.Draw(_pixel, new Rectangle(rightX + 4, listY - 1, rightW - 8, 18), new Color(40, 80, 120) * 0.5f);
-                    string prefix = equipped ? "► " : "  ";
-                    Color wc = hover ? Color.White : (equipped ? new Color(120, 200, 255) : Color.Gray * 0.7f);
-                    _spriteBatch.DrawString(_font, SafeText($"{prefix}{_meleeInventory[i]}"), new Vector2(rightX + 12, listY), wc);
-                    listY += 20;
-                }
-                break;
-
-            case 1: // Suit
-                DrawInventorySuitPanel(rightX, rightW, listY);
-                break;
-
-            case 2: // Tools
-                if (_player.HasGrapple)
-                {
-                    bool hover = _inventoryIndex == 0;
-                    if (hover)
-                        _spriteBatch.Draw(_pixel, new Rectangle(rightX + 4, listY - 1, rightW - 8, 18), new Color(40, 80, 120) * 0.5f);
-                    _spriteBatch.DrawString(_font, SafeText("Grapple Gun"), new Vector2(rightX + 12, listY), hover ? Color.White : Color.Gray * 0.8f);
-                    listY += 20;
-                    if (hover)
-                    {
-                        _spriteBatch.DrawString(_font, SafeText("[E] to fire"), new Vector2(rightX + 16, listY), Color.Gray * 0.5f);
-                        listY += 16;
-                        _spriteBatch.DrawString(_font, SafeText($"Cost: {GrappleBatteryCost}% battery"), new Vector2(rightX + 16, listY), new Color(220, 200, 60) * 0.5f);
-                    }
-                    listY += 24;
-                }
-                if (_hasMapModule)
-                {
-                    int toolIdx = _player.HasGrapple ? 1 : 0;
-                    bool hover = _inventoryIndex == toolIdx;
-                    if (hover)
-                        _spriteBatch.Draw(_pixel, new Rectangle(rightX + 4, listY - 1, rightW - 8, 18), new Color(40, 80, 120) * 0.5f);
-                    _spriteBatch.DrawString(_font, SafeText("Map Module"), new Vector2(rightX + 12, listY), hover ? Color.White : Color.Gray * 0.8f);
-                    listY += 20;
-                }
-                if (!_player.HasGrapple && !_hasMapModule)
-                    _spriteBatch.DrawString(_font, SafeText("(no tools found)"), new Vector2(rightX + 16, listY), Color.Gray * 0.4f);
-                break;
-
-            case 3: // Log
-                _spriteBatch.DrawString(_font, SafeText("No entries yet."), new Vector2(rightX + 16, listY), Color.Gray * 0.4f);
-                listY += 20;
-                _spriteBatch.DrawString(_font, SafeText("Scan objects with"), new Vector2(rightX + 16, listY), Color.Gray * 0.3f);
-                listY += 16;
-                _spriteBatch.DrawString(_font, SafeText("EVE to add entries."), new Vector2(rightX + 16, listY), Color.Gray * 0.3f);
-                break;
+            // Equipment: body silhouette + slots (center) + weapon stats (right)
+            DrawEquipmentCenter(centerX, contentY, centerW, contentH);
+            DrawEquipmentRight(rightX, contentY, rightW, contentH);
+        }
+        else if (_invCategory == 1)
+        {
+            // Suit: stats readout center + detail right
+            DrawSuitCenter(centerX, contentY, centerW, contentH);
+            DrawSuitRight(rightX, contentY, rightW, contentH);
+        }
+        else if (_invCategory == 2)
+        {
+            // Tools
+            DrawToolsCenter(centerX, contentY, centerW, contentH);
+            DrawToolsRight(rightX, contentY, rightW, contentH);
+        }
+        else
+        {
+            // Log: placeholder
+            DrawLogCenter(centerX, contentY, centerW, contentH);
+            DrawLogRight(rightX, contentY, rightW, contentH);
         }
 
-        // Footer controls
-        int footerY = ViewH - pad - 30;
+        // Footer
+        int footerY = ViewH - pad - 26;
         _spriteBatch.Draw(_pixel, new Rectangle(pad + 4, footerY - 4, ViewW - pad * 2 - 8, 1), frameColor * 0.3f);
-        string controls = _inventoryCategory == 0
-            ? "[↑↓] Navigate  [→] Details  [Enter] Equip  [X] Drop  [Esc] Close"
-            : "[↑↓] Navigate  [→] Details  [Esc] Close";
+        string controls;
+        if (_equipPickerOpen)
+            controls = "[W/S] Select  [Enter] Equip  [Esc] Back";
+        else if (_invCategory == 0)
+            controls = "[WASD] Navigate  [Enter] Open Slot  [Tab/Esc] Close";
+        else if (_invCategory == 3)
+            controls = "[W/S] Navigate  [A] Sidebar  [Tab/Esc] Close";
+        else
+            controls = "[WASD] Navigate/Category  [Tab/Esc] Close";
         var ctrlSize = _font.MeasureString(controls);
         _spriteBatch.DrawString(_font, SafeText(controls), new Vector2(ViewW / 2f - ctrlSize.X / 2, footerY), Color.Gray * 0.5f);
     }
 
-    private void DrawInventorySuitPanel(int rx, int rw, int y)
+    private void DrawEquipmentCenter(int cx, int cy, int cw, int ch)
     {
-        // Suit integrity detail
-        float si = _player.SuitIntegrity;
-        string siStatus = si > 75 ? "Operational" : si > 50 ? "Worn" : si > 25 ? "Damaged" : si > 10 ? "Critical" : "Failing";
-        var siCol = si > 60 ? new Color(100, 180, 255) : (si > 30 ? Color.Orange : Color.Red);
-        bool h0 = _inventoryIndex == 0;
-        if (h0) _spriteBatch.Draw(_pixel, new Rectangle(rx + 4, y - 1, rw - 8, 18), new Color(40, 80, 120) * 0.5f);
-        _spriteBatch.DrawString(_font, SafeText($"Integrity: {(int)si}%"), new Vector2(rx + 12, y), h0 ? Color.White : siCol);
-        y += 20;
-        if (h0)
-        {
-            _spriteBatch.DrawString(_font, SafeText($"Status: {siStatus}"), new Vector2(rx + 16, y), siCol * 0.7f);
-            y += 16;
-            _spriteBatch.DrawString(_font, SafeText("Protects against"), new Vector2(rx + 16, y), Color.Gray * 0.4f);
-            y += 14;
-            _spriteBatch.DrawString(_font, SafeText("environmental hazards."), new Vector2(rx + 16, y), Color.Gray * 0.4f);
-            y += 14;
-            _spriteBatch.DrawString(_font, SafeText("Repair at shelters."), new Vector2(rx + 16, y), Color.Gray * 0.4f);
-        }
-        y += 24;
+        // Body silhouette
+        int bodyX = cx + cw / 2;
+        int bodyY = cy + ch / 2 - 30;
+        var silColor = new Color(60, 120, 180) * 0.4f;
+        _spriteBatch.Draw(_pixel, new Rectangle(bodyX - 8, bodyY - 70, 16, 16), silColor);
+        _spriteBatch.Draw(_pixel, new Rectangle(bodyX - 14, bodyY - 52, 28, 44), silColor);
+        _spriteBatch.Draw(_pixel, new Rectangle(bodyX - 24, bodyY - 48, 10, 34), silColor * 0.7f);
+        _spriteBatch.Draw(_pixel, new Rectangle(bodyX + 14, bodyY - 48, 10, 34), silColor * 0.7f);
+        _spriteBatch.Draw(_pixel, new Rectangle(bodyX - 10, bodyY - 6, 8, 50), silColor * 0.8f);
+        _spriteBatch.Draw(_pixel, new Rectangle(bodyX + 2, bodyY - 6, 8, 50), silColor * 0.8f);
 
-        // Battery detail
-        float bat = _player.Battery;
-        string batStatus = bat > 75 ? "Full" : bat > 50 ? "Good" : bat > 25 ? "Low" : bat > 10 ? "Critical" : "Depleted";
-        var batCol = bat > 50 ? new Color(220, 200, 60) : (bat > 20 ? Color.Orange : Color.Red);
-        bool h1 = _inventoryIndex == 1;
-        if (h1) _spriteBatch.Draw(_pixel, new Rectangle(rx + 4, y - 1, rw - 8, 18), new Color(40, 80, 120) * 0.5f);
-        _spriteBatch.DrawString(_font, SafeText($"Battery: {(int)bat}%"), new Vector2(rx + 12, y), h1 ? Color.White : batCol);
-        y += 20;
-        if (h1)
-        {
-            _spriteBatch.DrawString(_font, SafeText($"Status: {batStatus}"), new Vector2(rx + 16, y), batCol * 0.7f);
-            y += 16;
-            _spriteBatch.DrawString(_font, SafeText("Powers tech abilities."), new Vector2(rx + 16, y), Color.Gray * 0.4f);
-            y += 14;
-            _spriteBatch.DrawString(_font, SafeText($"Dash: -{TechDashBatteryCost}%"), new Vector2(rx + 16, y), Color.Gray * 0.4f);
-            y += 14;
-            _spriteBatch.DrawString(_font, SafeText($"Grapple: -{GrappleBatteryCost}%"), new Vector2(rx + 16, y), Color.Gray * 0.4f);
-        }
-        y += 24;
+        int slotW = 100, slotH = 28, gap = 8;
+        int lx = bodyX - 30 - slotW - 20;
+        int ly1 = bodyY - 40;
+        int ly2 = ly1 + slotH + gap;
+        int rx = bodyX + 30 + 20;
+        int ry1 = bodyY - 40;
+        int ry2 = ry1 + slotH + gap;
+        int helmetY = bodyY - 95;
+        int chestY = bodyY - 35;
+        int legsY = bodyY + 20;
+        int armorX = bodyX - slotW / 2;
 
-        // Movement tier
-        string tierName = _player.CurrentTier switch
+        DrawEquipSlot(lx, ly1, slotW, slotH, "L1", _leftHand1, _equipCursorX == 0 && _equipCursorY == 0, _leftActiveSlot1);
+        DrawEquipSlot(lx, ly2, slotW, slotH, "L2", _leftHand2, _equipCursorX == 0 && _equipCursorY == 1, !_leftActiveSlot1);
+        DrawEquipSlot(rx, ry1, slotW, slotH, "R1", _rightHand1, _equipCursorX == 2 && _equipCursorY == 0, _rightActiveSlot1);
+        DrawEquipSlot(rx, ry2, slotW, slotH, "R2", _rightHand2, _equipCursorX == 2 && _equipCursorY == 1, !_rightActiveSlot1);
+        DrawLockedSlot(armorX, helmetY, slotW, slotH, "Helmet", _equipCursorX == 1 && _equipCursorY == 0);
+        DrawLockedSlot(armorX, chestY, slotW, slotH, "Chest", _equipCursorX == 1 && _equipCursorY == 1);
+        DrawLockedSlot(armorX, legsY, slotW, slotH, "Legs", _equipCursorX == 1 && _equipCursorY == 2);
+
+        // Weapon picker overlay
+        if (_equipPickerOpen)
         {
-            Player.MoveTier.Tech => "TECH",
-            Player.MoveTier.Bio => "BIO",
-            Player.MoveTier.Cipher => "CIPHER",
-            _ => "???"
-        };
-        var tierColor = _player.CurrentTier switch
-        {
-            Player.MoveTier.Tech => new Color(100, 180, 255),
-            Player.MoveTier.Bio => new Color(80, 200, 80),
-            Player.MoveTier.Cipher => new Color(200, 120, 255),
-            _ => Color.Gray
-        };
-        bool h2 = _inventoryIndex == 2;
-        if (h2) _spriteBatch.Draw(_pixel, new Rectangle(rx + 4, y - 1, rw - 8, 18), new Color(40, 80, 120) * 0.5f);
-        _spriteBatch.DrawString(_font, SafeText($"Tier: {tierName}"), new Vector2(rx + 12, y), h2 ? Color.White : tierColor);
-        y += 20;
-        if (h2)
-        {
-            string desc = _player.CurrentTier switch
+            int pickerW = 140, pickerH = 24 + (_weaponInventory.Count + 1) * 20;
+            int pickerX, pickerY;
+            if (_equipCursorX == 0) { pickerX = lx - pickerW - 8; pickerY = ly1; }
+            else { pickerX = rx + slotW + 8; pickerY = ry1; }
+            pickerX = Math.Clamp(pickerX, cx + 4, cx + cw - pickerW - 4);
+            pickerY = Math.Clamp(pickerY, cy + 4, cy + ch - pickerH - 4);
+
+            _spriteBatch.Draw(_pixel, new Rectangle(pickerX - 2, pickerY - 2, pickerW + 4, pickerH + 4), Color.White * 0.15f);
+            _spriteBatch.Draw(_pixel, new Rectangle(pickerX, pickerY, pickerW, pickerH), new Color(10, 15, 25) * 0.95f);
+            DrawHollowRect(pickerX, pickerY, pickerW, pickerH, new Color(80, 160, 220));
+
+            _spriteBatch.DrawString(_font, "SELECT WEAPON", new Vector2(pickerX + 6, pickerY + 4), new Color(120, 200, 255));
+            int py = pickerY + 24;
+            bool noneSelected = _equipPickerIndex == 0;
+            if (noneSelected)
+                _spriteBatch.Draw(_pixel, new Rectangle(pickerX + 2, py - 1, pickerW - 4, 18), new Color(40, 80, 120) * 0.5f);
+            _spriteBatch.DrawString(_font, SafeText(noneSelected ? "> (Empty)" : "  (Empty)"), new Vector2(pickerX + 6, py), noneSelected ? Color.Yellow : Color.Gray * 0.6f);
+            py += 20;
+            for (int i = 0; i < _weaponInventory.Count; i++)
             {
-                Player.MoveTier.Tech => "Federation suit systems.\nRocket dash, grapple.",
-                Player.MoveTier.Bio => "Organic adaptation.\nGlide, wall cling.",
-                Player.MoveTier.Cipher => "Unknown energy.\nTeleport, phase.",
-                _ => ""
-            };
-            foreach (var line in desc.Split('\n'))
-            {
-                _spriteBatch.DrawString(_font, SafeText(line), new Vector2(rx + 16, y), Color.Gray * 0.4f);
-                y += 14;
+                bool sel = _equipPickerIndex == i + 1;
+                if (sel)
+                    _spriteBatch.Draw(_pixel, new Rectangle(pickerX + 2, py - 1, pickerW - 4, 18), new Color(40, 80, 120) * 0.5f);
+                string wName = _weaponInventory[i].ToString();
+                string slotTag = "";
+                if (_weaponInventory[i] == _rightHand1) slotTag = " [R1]";
+                else if (_weaponInventory[i] == _rightHand2) slotTag = " [R2]";
+                else if (_weaponInventory[i] == _leftHand1) slotTag = " [L1]";
+                else if (_weaponInventory[i] == _leftHand2) slotTag = " [L2]";
+                Color wc = sel ? Color.Yellow : Color.White * 0.7f;
+                _spriteBatch.DrawString(_font, SafeText($"{(sel ? "> " : "  ")}{wName}{slotTag}"), new Vector2(pickerX + 6, py), wc);
+                py += 20;
             }
         }
+    }
+
+    private void DrawEquipmentRight(int rx, int ry, int rw, int rh)
+    {
+        // Show stats of selected weapon
+        int tx = rx + 10;
+        int ty = ry + 10;
+        var labelColor = new Color(80, 180, 255) * 0.8f;
+        var valColor = Color.White * 0.8f;
+
+        // Determine which weapon is selected by cursor
+        WeaponType selWeapon = WeaponType.None;
+        if (_equipCursorX == 0 && _equipCursorY == 0) selWeapon = _leftHand1;
+        else if (_equipCursorX == 0 && _equipCursorY == 1) selWeapon = _leftHand2;
+        else if (_equipCursorX == 2 && _equipCursorY == 0) selWeapon = _rightHand1;
+        else if (_equipCursorX == 2 && _equipCursorY == 1) selWeapon = _rightHand2;
+
+        if (selWeapon == WeaponType.None)
+        {
+            _spriteBatch.DrawString(_font, "No weapon selected", new Vector2(tx, ty), Color.Gray * 0.5f);
+            return;
+        }
+
+        var ws = WeaponStats.Get(selWeapon);
+        DrawOutlinedString(_font, ws.DisplayName, new Vector2(tx, ty), new Color(120, 200, 255));
+        ty += 22;
+        _spriteBatch.Draw(_pixel, new Rectangle(tx, ty, rw - 20, 1), new Color(40, 80, 120) * 0.4f);
+        ty += 6;
+
+        void StatLine(string label, string val) {
+            _spriteBatch.DrawString(_font, SafeText(label), new Vector2(tx, ty), labelColor);
+            _spriteBatch.DrawString(_font, SafeText(val), new Vector2(tx + 100, ty), valColor);
+            ty += 16;
+        }
+
+        StatLine("Damage:", ws.Damage.ToString());
+        StatLine("Finisher:", ws.FinisherDamage.ToString());
+        StatLine("Speed:", $"{ws.AttackSpeed:F2}s");
+        StatLine("Knockback:", $"{ws.KnockbackForce:F0}");
+        StatLine("Weight:", $"{ws.Weight:P0}");
+        StatLine("Type:", ws.IsRanged ? "Ranged" : "Melee");
+        if (ws.IsRanged && selWeapon == WeaponType.Gun)
+        {
+            ty += 4;
+            StatLine("Ammo:", $"{_sidearmRounds}/{SidearmClipSize}");
+        }
+    }
+
+    private void DrawSuitCenter(int cx, int cy, int cw, int ch)
+    {
+        // Character silhouette + stat readouts
+        int bodyX = cx + cw / 2;
+        int bodyY = cy + ch / 2 - 40;
+        var silColor = new Color(60, 120, 180) * 0.3f;
+        _spriteBatch.Draw(_pixel, new Rectangle(bodyX - 8, bodyY - 70, 16, 16), silColor);
+        _spriteBatch.Draw(_pixel, new Rectangle(bodyX - 14, bodyY - 52, 28, 44), silColor);
+        _spriteBatch.Draw(_pixel, new Rectangle(bodyX - 24, bodyY - 48, 10, 34), silColor * 0.7f);
+        _spriteBatch.Draw(_pixel, new Rectangle(bodyX + 14, bodyY - 48, 10, 34), silColor * 0.7f);
+        _spriteBatch.Draw(_pixel, new Rectangle(bodyX - 10, bodyY - 6, 8, 50), silColor * 0.8f);
+        _spriteBatch.Draw(_pixel, new Rectangle(bodyX + 2, bodyY - 6, 8, 50), silColor * 0.8f);
+
+        // Stat readouts around silhouette
+        int statX = cx + 16;
+        int statY = cy + 20;
+        var labelColor = new Color(80, 180, 255) * 0.9f;
+        var valColor = Color.White * 0.85f;
+        int lineH = 22;
+
+        void DrawStat(string label, string val, Color vc) {
+            _spriteBatch.DrawString(_font, SafeText(label), new Vector2(statX, statY), labelColor);
+            _spriteBatch.DrawString(_font, SafeText(val), new Vector2(statX + 90, statY), vc);
+            statY += lineH;
+        }
+
+        DrawStat("HP:", $"{_player.Hp}/{_player.MaxHp}", _player.Hp > _player.MaxHp / 2 ? Color.LimeGreen : Color.Red);
+        DrawStat("Suit:", $"{(int)_player.SuitIntegrity}%", _player.SuitIntegrity > 50 ? valColor : Color.Yellow);
+        DrawStat("Battery:", $"{(int)_player.Battery}%", _player.Battery > 25 ? valColor : Color.Red);
+        DrawStat("Tier:", _player.CurrentTier.ToString(), new Color(120, 200, 255));
+        var save = _saveData;
+        if (save != null)
+        {
+            DrawStat("Deaths:", save.DeathCount.ToString(), Color.Gray * 0.7f);
+        }
+    }
+
+    private void DrawSuitRight(int rx, int ry, int rw, int rh)
+    {
+        int tx = rx + 10;
+        int ty = ry + 10;
+        DrawOutlinedString(_font, "SUIT DETAILS", new Vector2(tx, ty), new Color(120, 200, 255));
+        ty += 22;
+        _spriteBatch.Draw(_pixel, new Rectangle(tx, ty, rw - 20, 1), new Color(40, 80, 120) * 0.4f);
+        ty += 8;
+
+        string[] details = {
+            "Suit integrity protects",
+            "against environmental",
+            "hazards and impacts.",
+            "",
+            "Battery powers tech",
+            "abilities: dash, grapple,",
+            "shield, and EVE scans.",
+            "",
+            "Tier affects movement",
+            "physics and abilities.",
+            "  Tech: precision, dash",
+            "  Bio: agility, regen",
+            "  Cipher: power, speed"
+        };
+        foreach (var line in details)
+        {
+            _spriteBatch.DrawString(_font, SafeText(line), new Vector2(tx, ty), Color.Gray * 0.6f);
+            ty += 14;
+        }
+    }
+
+    private void DrawToolsCenter(int cx, int cy, int cw, int ch)
+    {
+        int tx = cx + 16;
+        int ty = cy + 16;
+        var labelColor = new Color(80, 180, 255) * 0.9f;
+        int lineH = 28;
+
+        DrawOutlinedString(_font, "TOOLS", new Vector2(tx, ty), new Color(120, 200, 255));
+        ty += 24;
+
+        // Grapple Gun
+        bool hasGrapple = _player.HasGrapple;
+        Color gc = hasGrapple ? Color.White * 0.8f : Color.Gray * 0.4f;
+        bool grappleSel = _invRightScroll == 0;
+        if (grappleSel)
+            _spriteBatch.Draw(_pixel, new Rectangle(tx - 4, ty - 2, cw - 24, lineH), new Color(30, 60, 90) * 0.5f);
+        _spriteBatch.DrawString(_font, SafeText(grappleSel ? "> Grapple Gun" : "  Grapple Gun"), new Vector2(tx, ty), gc);
+        _spriteBatch.DrawString(_font, SafeText(hasGrapple ? "[ACQUIRED]" : "[LOCKED]"), new Vector2(tx + cw - 120, ty), hasGrapple ? Color.LimeGreen * 0.7f : Color.Gray * 0.4f);
+        ty += lineH;
+
+        // Map Module (placeholder)
+        bool mapSel = _invRightScroll == 1;
+        if (mapSel)
+            _spriteBatch.Draw(_pixel, new Rectangle(tx - 4, ty - 2, cw - 24, lineH), new Color(30, 60, 90) * 0.5f);
+        _spriteBatch.DrawString(_font, SafeText(mapSel ? "> Map Module" : "  Map Module"), new Vector2(tx, ty), Color.Gray * 0.4f);
+        _spriteBatch.DrawString(_font, "[LOCKED]", new Vector2(tx + cw - 120, ty), Color.Gray * 0.4f);
+    }
+
+    private void DrawToolsRight(int rx, int ry, int rw, int rh)
+    {
+        int tx = rx + 10;
+        int ty = ry + 10;
+        DrawOutlinedString(_font, "DETAILS", new Vector2(tx, ty), new Color(120, 200, 255));
+        ty += 22;
+        _spriteBatch.Draw(_pixel, new Rectangle(tx, ty, rw - 20, 1), new Color(40, 80, 120) * 0.4f);
+        ty += 8;
+
+        string[] desc;
+        if (_invRightScroll == 0)
+        {
+            desc = _player.HasGrapple
+                ? new[] { "Grapple Gun", "", "Partially functional.", "Fires a magnetic tether", "that pulls you to anchor", "points. Drains battery.", "", "Cost: 0.5 battery/use" }
+                : new[] { "Grapple Gun", "", "Not yet acquired.", "Keep exploring." };
+        }
+        else
+        {
+            desc = new[] { "Map Module", "", "Not yet acquired.", "Keep exploring." };
+        }
+        foreach (var line in desc)
+        {
+            _spriteBatch.DrawString(_font, SafeText(line), new Vector2(tx, ty), Color.Gray * 0.6f);
+            ty += 14;
+        }
+    }
+
+    private void DrawLogCenter(int cx, int cy, int cw, int ch)
+    {
+        var cyan = new Color(80, 220, 200);
+        var dimCyan = new Color(40, 120, 100);
+        int tx = cx + 10;
+        int ty = cy + 8;
+        DrawOutlinedString(_font, "BESTIARY", new Vector2(tx, ty), cyan);
+        ty += 22;
+        _spriteBatch.Draw(_pixel, new Rectangle(tx, ty, cw - 20, 1), dimCyan * 0.4f);
+        ty += 6;
+
+        var entries = new List<BestiaryEntry>(_bestiary.Entries.Values);
+        if (entries.Count == 0)
+        {
+            _spriteBatch.DrawString(_font, SafeText("No species documented yet."), new Vector2(tx, ty), Color.Gray * 0.5f);
+            return;
+        }
+
+        if (_bestiarySelectedIndex >= entries.Count) _bestiarySelectedIndex = entries.Count - 1;
+        int lineH = 20;
+        int maxVisible = (ch - 40) / lineH;
+        int scrollStart = Math.Max(0, _bestiarySelectedIndex - maxVisible + 1);
+
+        for (int i = scrollStart; i < entries.Count && i < scrollStart + maxVisible; i++)
+        {
+            var e = entries[i];
+            bool sel = i == _bestiarySelectedIndex;
+            Color c = sel ? Color.White : Color.Gray * 0.6f;
+            if (sel) _spriteBatch.Draw(_pixel, new Rectangle(tx - 2, ty, cw - 16, lineH), new Color(30, 60, 50) * 0.5f);
+
+            string listName = e.SpeciesName;
+            if (e.SightCount >= 5 && CreatureDatabase.Profiles.TryGetValue(e.SpeciesName, out var lp))
+                listName = lp.DisplayName;
+            string status = e.L1Progress >= 1f ? "[OK]" : $"[{(int)(e.L1Progress * 100)}%]";
+            _spriteBatch.DrawString(_font, SafeText($"{listName}  {status}"), new Vector2(tx + 2, ty + 2), c);
+
+            // Progress bar
+            int barX = tx + cw - 70;
+            int barW = 50;
+            int barH = 6;
+            int barY2 = ty + 7;
+            _spriteBatch.Draw(_pixel, new Rectangle(barX, barY2, barW, barH), new Color(20, 40, 35));
+            int fill = (int)(barW * e.L1Progress);
+            if (fill > 0) _spriteBatch.Draw(_pixel, new Rectangle(barX, barY2, fill, barH), cyan * 0.7f);
+
+            ty += lineH;
+        }
+
+        // Hint
+        ty = cy + ch - 18;
+        _spriteBatch.DrawString(_font, SafeText("[W/S] Navigate"), new Vector2(tx, ty), Color.Gray * 0.4f);
+    }
+
+    private List<string> WrapText(SpriteFontBase font, string text, float maxWidth)
+    {
+        var lines = new List<string>();
+        if (string.IsNullOrEmpty(text)) return lines;
+        var words = text.Split(' ');
+        string current = "";
+        foreach (var word in words)
+        {
+            string test = current.Length == 0 ? word : current + " " + word;
+            if (font.MeasureString(test).X > maxWidth)
+            {
+                if (current.Length > 0) lines.Add(current);
+                current = word;
+            }
+            else current = test;
+        }
+        if (current.Length > 0) lines.Add(current);
+        return lines;
+    }
+
+    private int DrawWrappedString(SpriteFontBase font, string text, int x, int y, float maxWidth, Color color, int lineHeight = 16)
+    {
+        var lines = WrapText(font, text, maxWidth);
+        foreach (var line in lines)
+        {
+            _spriteBatch.DrawString(font, SafeText(line), new Vector2(x, y), color);
+            y += lineHeight;
+        }
+        return y;
+    }
+
+    private void DrawLogRight(int rx, int ry, int rw, int rh)
+    {
+        var cyan = new Color(80, 220, 200);
+        int tx = rx + 10;
+        int ty = ry + 10;
+
+        var entries = new List<BestiaryEntry>(_bestiary.Entries.Values);
+        if (entries.Count == 0 || _bestiarySelectedIndex >= entries.Count)
+        {
+            DrawOutlinedString(_font, "LOG ENTRY", new Vector2(tx, ty), cyan);
+            ty += 22;
+            _spriteBatch.Draw(_pixel, new Rectangle(tx, ty, rw - 20, 1), new Color(40, 80, 60) * 0.4f);
+            ty += 8;
+            _spriteBatch.DrawString(_font, "Select an entry to view.", new Vector2(tx, ty), Color.Gray * 0.4f);
+            return;
+        }
+
+        var entry = entries[_bestiarySelectedIndex];
+        
+        // Use CreatureDatabase for display name if available
+        string displayName = entry.SpeciesName;
+        CreatureProfile profile = null;
+        if (CreatureDatabase.Profiles.TryGetValue(entry.SpeciesName, out var p))
+        {
+            profile = p;
+            if (entry.SightCount >= 5) displayName = p.DisplayName;
+        }
+
+        DrawOutlinedString(_font, displayName.ToUpper(), new Vector2(tx, ty), cyan);
+        ty += 22;
+        _spriteBatch.Draw(_pixel, new Rectangle(tx, ty, rw - 20, 1), new Color(40, 80, 60) * 0.4f);
+        ty += 8;
+
+        float maxW = rw - 20;
+
+        // Classification — evolves with sightings
+        ty = DrawWrappedString(_font, $"Class: {entry.DisplayClassification}", tx, ty, maxW, Color.White * 0.8f, 18);
+        ty = DrawWrappedString(_font, $"Sightings: {entry.SightCount}", tx, ty, maxW, Color.Gray * 0.7f, 18);
+
+        // Status line
+        string status = entry.L1Progress >= 1f ? "Well-documented" :
+                         entry.SightCount <= 1 ? "Barely known" :
+                         entry.SightCount <= 3 ? "Tentative data" : "Building profile";
+        ty = DrawWrappedString(_font, $"Status: {status}", tx, ty, maxW, cyan * 0.7f, 18);
+        ty += 8;
+
+        // EVE's current assessment — progressive reveal text
+        string eveText = CreatureDatabase.GetCurrentL1Summary(entry.SpeciesName, entry.SightCount);
+        if (eveText != "No data.")
+        {
+            _spriteBatch.Draw(_pixel, new Rectangle(tx, ty, rw - 20, 1), new Color(40, 80, 60) * 0.3f);
+            ty += 6;
+            ty = DrawWrappedString(_font, "EVE:", tx, ty, maxW, cyan * 0.8f, 16);
+            ty = DrawWrappedString(_font, $"\"{eveText}\"", tx, ty, maxW, new Color(180, 220, 200) * 0.8f, 16);
+            ty += 6;
+        }
+
+        // Observation summary (condensed environmental data)
+        if (entry.Observations.Count > 0)
+        {
+            _spriteBatch.Draw(_pixel, new Rectangle(tx, ty, rw - 20, 1), new Color(40, 80, 60) * 0.3f);
+            ty += 6;
+            ty = DrawWrappedString(_font, "OBSERVATIONS", tx, ty, maxW, Color.White * 0.6f, 16);
+            ty += 2;
+
+            var biomes = new HashSet<string>();
+            var weathers = new HashSet<string>();
+            var behaviors = new HashSet<string>();
+            var times = new HashSet<string>();
+            foreach (var obs in entry.Observations)
+            {
+                if (obs.Biome != null) biomes.Add(obs.Biome);
+                if (obs.Weather != null) weathers.Add(obs.Weather);
+                if (obs.Behavior != null) behaviors.Add(obs.Behavior);
+                if (obs.TimeOfDay != null) times.Add(obs.TimeOfDay);
+            }
+            
+            if (biomes.Count > 0)
+                ty = DrawWrappedString(_font, $"  Habitat: {string.Join(", ", biomes)}", tx, ty, maxW, Color.Gray * 0.6f, 14);
+            if (times.Count > 0)
+                ty = DrawWrappedString(_font, $"  Active: {string.Join(", ", times)}", tx, ty, maxW, Color.Gray * 0.6f, 14);
+            if (entry.SightCount >= 3 && behaviors.Count > 0)
+                ty = DrawWrappedString(_font, $"  Behavior: {string.Join(", ", behaviors)}", tx, ty, maxW, Color.Gray * 0.6f, 14);
+            if (entry.SightCount >= 4 && weathers.Count > 0)
+                ty = DrawWrappedString(_font, $"  Conditions: {string.Join(", ", weathers)}", tx, ty, maxW, Color.Gray * 0.6f, 14);
+        }
+
+        // L2 data (if active-scanned)
+        if (entry.L2Scanned && profile != null)
+        {
+            ty += 6;
+            _spriteBatch.Draw(_pixel, new Rectangle(tx, ty, rw - 20, 1), new Color(40, 80, 60) * 0.3f);
+            ty += 6;
+            ty = DrawWrappedString(_font, "SCAN DATA", tx, ty, maxW, new Color(255, 200, 80) * 0.9f, 16);
+            ty += 2;
+            ty = DrawWrappedString(_font, $"  Temperament: {profile.Temperament}", tx, ty, maxW, Color.White * 0.7f, 14);
+            ty = DrawWrappedString(_font, $"  Weaknesses: {profile.Weaknesses}", tx, ty, maxW, new Color(255, 120, 120) * 0.7f, 14);
+            ty = DrawWrappedString(_font, $"  Resistances: {profile.Resistances}", tx, ty, maxW, new Color(120, 180, 255) * 0.7f, 14);
+            ty += 4;
+            ty = DrawWrappedString(_font, $"\"{profile.L2ScanText}\"", tx, ty, maxW, new Color(255, 220, 150) * 0.7f, 16);
+        }
+
+        // L3 data (if deep-scanned) — cipher empathy
+        if (entry.L3Scanned && profile != null)
+        {
+            ty += 6;
+            _spriteBatch.Draw(_pixel, new Rectangle(tx, ty, rw - 20, 1), new Color(80, 40, 80) * 0.3f);
+            ty += 6;
+            ty = DrawWrappedString(_font, "CIPHER SCAN", tx, ty, maxW, new Color(200, 120, 255) * 0.9f, 16);
+            ty += 2;
+            ty = DrawWrappedString(_font, $"\"{profile.L3ScanText}\"", tx, ty, maxW, new Color(200, 160, 255) * 0.7f, 16);
+            if (profile.CreatureFeeling != null)
+            {
+                ty += 4;
+                ty = DrawWrappedString(_font, $"  Feels: {profile.CreatureFeeling}", tx, ty, maxW, new Color(220, 180, 255) * 0.6f, 14);
+            }
+            if (profile.EvolutionaryHistory != null)
+            {
+                ty += 4;
+                ty = DrawWrappedString(_font, $"  Lineage: {profile.EvolutionaryHistory}", tx, ty, maxW, new Color(180, 140, 220) * 0.5f, 14);
+            }
+        }
+
+        if (entry.L1Progress >= 1f)
+        {
+            ty += 8;
+            _spriteBatch.DrawString(_font, SafeText(">> L1 PROFILE COMPLETE <<"), new Vector2(tx, ty), cyan);
+        }
+    }
+
+    private void DrawEquipSlot(int x, int y, int w, int h, string label, WeaponType weapon, bool selected, bool isActive)
+    {
+        var bgColor = isActive ? new Color(20, 40, 60) : new Color(12, 20, 30);
+        var borderColor = selected ? new Color(120, 220, 255) : (isActive ? new Color(60, 120, 180) : new Color(30, 50, 70));
+        _spriteBatch.Draw(_pixel, new Rectangle(x, y, w, h), bgColor * 0.8f);
+        DrawHollowRect(x, y, w, h, borderColor);
+        if (isActive)
+            _spriteBatch.Draw(_pixel, new Rectangle(x, y, 3, h), new Color(80, 200, 255)); // active indicator bar
+
+        // Label
+        _spriteBatch.DrawString(_font, label, new Vector2(x + 4, y + 2), isActive ? new Color(80, 200, 255) * 0.7f : Color.Gray * 0.4f);
+
+        // Weapon name
+        string wName = weapon != WeaponType.None ? weapon.ToString() : "---";
+        Color nameColor = weapon != WeaponType.None ? (isActive ? Color.White : Color.Gray * 0.7f) : Color.Gray * 0.4f;
+        _spriteBatch.DrawString(_font, SafeText(wName), new Vector2(x + 28, y + 7), nameColor);
+    }
+
+    private void DrawLockedSlot(int x, int y, int w, int h, string label, bool selected)
+    {
+        _spriteBatch.Draw(_pixel, new Rectangle(x, y, w, h), new Color(15, 15, 20) * 0.6f);
+        var borderColor = selected ? new Color(80, 80, 100) : new Color(30, 30, 40);
+        DrawHollowRect(x, y, w, h, borderColor);
+        _spriteBatch.DrawString(_font, SafeText(label), new Vector2(x + 4, y + 2), Color.Gray * 0.3f);
+        _spriteBatch.DrawString(_font, "LOCKED", new Vector2(x + 28, y + 7), Color.Gray * 0.35f);
     }
 
     private void UpdateMenu(KeyboardState kb)
@@ -8720,6 +9689,299 @@ public class Game1 : Game
     }
 
     /// <summary>Draw an animated liquid tile (water, lava, acid). Uses Voronoi cellular noise for caustic light patterns.</summary>
+    // === NOISE-BASED WATER SHADER SYSTEM ===
+
+    private Texture2D GenerateNoiseTexture(int w, int h, int seed, float scale)
+    {
+        var rng = new Random(seed);
+        // Generate a grid of random values for value noise
+        int gridW = (int)(w / scale) + 2;
+        int gridH = (int)(h / scale) + 2;
+        float[,] grid = new float[gridW + 1, gridH + 1];
+        for (int gy = 0; gy <= gridH; gy++)
+            for (int gx = 0; gx <= gridW; gx++)
+                grid[gx, gy] = (float)rng.NextDouble();
+
+        var pixels = new Color[w * h];
+        for (int y = 0; y < h; y++)
+        {
+            for (int x = 0; x < w; x++)
+            {
+                float fx = x / scale;
+                float fy = y / scale;
+                int ix = (int)fx;
+                int iy = (int)fy;
+                float tx = fx - ix;
+                float ty = fy - iy;
+                // Smoothstep
+                tx = tx * tx * (3f - 2f * tx);
+                ty = ty * ty * (3f - 2f * ty);
+                // Bilinear interpolation
+                float v00 = grid[ix, iy];
+                float v10 = grid[ix + 1, iy];
+                float v01 = grid[ix, iy + 1];
+                float v11 = grid[ix + 1, iy + 1];
+                float v0 = v00 + (v10 - v00) * tx;
+                float v1 = v01 + (v11 - v01) * tx;
+                float v = v0 + (v1 - v0) * ty;
+
+                // Add a second octave for detail
+                float fx2 = x / (scale * 0.5f);
+                float fy2 = y / (scale * 0.5f);
+                int ix2 = (int)fx2 % gridW;
+                int iy2 = (int)fy2 % gridH;
+                float tx2 = fx2 - (int)fx2;
+                float ty2 = fy2 - (int)fy2;
+                tx2 = tx2 * tx2 * (3f - 2f * tx2);
+                ty2 = ty2 * ty2 * (3f - 2f * ty2);
+                float w00 = grid[ix2, iy2];
+                float w10 = grid[Math.Min(ix2 + 1, gridW), iy2];
+                float w01 = grid[ix2, Math.Min(iy2 + 1, gridH)];
+                float w11 = grid[Math.Min(ix2 + 1, gridW), Math.Min(iy2 + 1, gridH)];
+                float w0 = w00 + (w10 - w00) * tx2;
+                float w1 = w01 + (w11 - w01) * tx2;
+                float v2 = w0 + (w1 - w0) * ty2;
+
+                float combined = v * 0.7f + v2 * 0.3f;
+                byte b = (byte)(combined * 255);
+                pixels[y * w + x] = new Color(b, b, b, (byte)255);
+            }
+        }
+
+        var tex = new Texture2D(GraphicsDevice, w, h);
+        tex.SetData(pixels);
+        return tex;
+    }
+
+    /// <summary>
+    /// Draws noise-based water for all visible water tiles in one pass.
+    /// Uses two scrolling noise textures overlaid with water tinting + transparency variation.
+    /// Also applies sinusoidal refraction distortion to the scene beneath water.
+    /// </summary>
+    private void DrawWaterShaderPass(TileGrid tg, Matrix cameraTransform)
+    {
+        // Collect visible water tiles
+        var camInv = Matrix.Invert(cameraTransform);
+        var tl = Vector2.Transform(Vector2.Zero, camInv);
+        var br = Vector2.Transform(new Vector2(ViewW, ViewH), camInv);
+        int stx = Math.Max(0, ((int)tl.X - tg.OriginX) / tg.TileSize - 1);
+        int sty = Math.Max(0, ((int)tl.Y - tg.OriginY) / tg.TileSize - 1);
+        int etx = Math.Min(tg.Width, ((int)br.X - tg.OriginX) / tg.TileSize + 2);
+        int ety = Math.Min(tg.Height, ((int)br.Y - tg.OriginY) / tg.TileSize + 2);
+
+        var waterTiles = new List<(int wx, int wy, int tx, int ty)>();
+        for (int ty = sty; ty < ety; ty++)
+            for (int tx = stx; tx < etx; tx++)
+                if (tg.GetTileAt(tx, ty) == TileType.Water)
+                    waterTiles.Add((tg.OriginX + tx * tg.TileSize, tg.OriginY + ty * tg.TileSize, tx, ty));
+
+        if (waterTiles.Count == 0) return;
+
+        float t = _totalTime;
+        int ts = tg.TileSize; // 32
+
+        // End current sprite batch to do our water pass
+        _spriteBatch.End();
+        _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.NonPremultiplied, SamplerState.PointClamp, transformMatrix: cameraTransform);
+
+        // Noise scrolling parameters — two layers moving in different directions
+        float scrollAx = t * 12f;
+        float scrollAy = t * 4f;
+        float scrollBx = -t * 7f;
+        float scrollBy = t * 9f;
+
+        // Noise UV scale — controls how zoomed-in the noise appears
+        // Lower = larger blobs (more visible noise pattern)
+        float uvScaleA = 0.4f;  // large blobs
+        float uvScaleB = 1.3f;  // finer detail
+
+        foreach (var (wx, wy, tx, ty) in waterTiles)
+        {
+            bool aboveLiquid = ty > 0 && TileProperties.IsLiquid(tg.GetTileAt(tx, ty - 1));
+            bool isSurface = !aboveLiquid;
+
+            // Calculate depth (how many water tiles above)
+            int depth = 0;
+            for (int cy = ty - 1; cy >= 0; cy--)
+            {
+                if (TileProperties.IsLiquid(tg.GetTileAt(tx, cy))) depth++;
+                else break;
+            }
+
+            // Depth factor for darkening (deeper = darker, more opaque)
+            float depthFactor = MathHelper.Clamp(depth * 0.12f, 0f, 0.6f);
+
+            int surfaceWaveTop = isSurface ? 6 : 0; // leave room for wavy surface edge
+
+            // --- Surface wavy edge ---
+            if (isSurface)
+            {
+                for (int px = 0; px < ts; px++)
+                {
+                    float wX = wx + px;
+                    // Organic wave from combined sin + noise
+                    float w1 = MathF.Sin(wX * 0.05f + t * 0.5f) * 3.0f;
+                    float w2 = MathF.Sin(wX * 0.11f + t * 0.3f + 2f) * 1.8f;
+                    float w3_raw = MathF.Sin(wX * 0.03f + t * 0.2f) * 1.5f;
+                    int waveY = 5 + (int)(w1 + w2 + w3_raw);
+                    waveY = Math.Clamp(waveY, 2, ts - 2);
+
+                    // Bright surface highlight line (2px)
+                    float glint = 0.5f + 0.5f * MathF.Sin(wX * 0.3f + t * 2.2f);
+                    var surfColor = Color.Lerp(new Color(80, 170, 235), new Color(200, 240, 255), glint * glint);
+                    _spriteBatch.Draw(_pixel, new Rectangle(wx + px, wy + waveY, 1, 2), surfColor * (0.7f + glint * 0.3f));
+
+                    // Fill from waveY+2 to bottom of tile with noise water (1px per pixel)
+                    for (int py = waveY + 2; py < ts; py++)
+                    {
+                        float wY = wy + py;
+                        float nA = SampleNoise(_noiseDataA, (wX + scrollAx) * uvScaleA, (wY + scrollAy) * uvScaleA);
+                        float nB = SampleNoise(_noiseDataB, (wX + scrollBx) * uvScaleB, (wY + scrollBy) * uvScaleB);
+                        float combined = (nA + nB) * 0.5f;
+
+                        float r = MathHelper.Lerp(120f, 10f, combined) / 255f;
+                        float g = MathHelper.Lerp(210f, 30f, combined) / 255f;
+                        float b2 = MathHelper.Lerp(245f, 130f, combined) / 255f;
+                        var waterColor = new Color(r, g, b2);
+
+                        float alpha = MathHelper.Lerp(0.15f, 0.85f, combined);
+                        alpha = MathHelper.Clamp(alpha + depthFactor, 0f, 0.92f);
+
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx + px, wy + py, 1, 1), waterColor * alpha);
+                    }
+                }
+            }
+            else
+            {
+                // --- Fully submerged tile: noise-driven water (1px per pixel) ---
+                for (int px = 0; px < ts; px++)
+                {
+                    for (int py = 0; py < ts; py++)
+                    {
+                        float wX = wx + px;
+                        float wY = wy + py;
+
+                        float nA = SampleNoise(_noiseDataA, (wX + scrollAx) * uvScaleA, (wY + scrollAy) * uvScaleA);
+                        float nB = SampleNoise(_noiseDataB, (wX + scrollBx) * uvScaleB, (wY + scrollBy) * uvScaleB);
+                        float combined = (nA + nB) * 0.5f;
+
+                        float dd = MathHelper.Clamp(1f - depth * 0.06f, 0.35f, 1f);
+
+                        float r = MathHelper.Lerp(100f, 8f, combined) * dd / 255f;
+                        float g = MathHelper.Lerp(190f, 25f, combined) * dd / 255f;
+                        float b2 = MathHelper.Lerp(240f, 120f, combined) * dd / 255f;
+                        var waterColor = new Color(r, g, b2);
+
+                        float alpha = MathHelper.Lerp(0.1f, 0.9f, combined);
+                        alpha = MathHelper.Clamp(alpha + depthFactor, 0f, 0.95f);
+
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx + px, wy + py, 1, 1), waterColor * alpha);
+                    }
+                }
+
+                // --- Refraction: sinusoidal distortion light/dark bands ---
+                for (int py = 0; py < ts; py += 2)
+                {
+                    float wY = wy + py;
+                    float sinOff = MathF.Sin(wY * 0.12f + t * 0.9f + wx * 0.01f);
+                    float nR = SampleNoise(_noiseDataB, (wx + t * 3f) * 0.5f, (wY + t * 2f) * 0.5f);
+                    float band = sinOff * nR;
+                    if (band > 0.25f)
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + py, ts, 2), Color.White * ((band - 0.25f) * 0.2f));
+                    else if (band < -0.25f)
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + py, ts, 2), Color.Black * ((-band - 0.25f) * 0.15f));
+                }
+            }
+
+            // --- Caustic sparkles (sparse, bright) ---
+            if (depth >= 0)
+            {
+                float sparkleScale = 0.6f;
+                int cStep = 4;
+                for (int py = (isSurface ? 10 : 0); py < ts; py += cStep)
+                {
+                    for (int px = 0; px < ts; px += cStep)
+                    {
+                        float wX = wx + px;
+                        float wY = wy + py;
+                        float nA = SampleNoise(_noiseDataA, (wX + t * 6f) * sparkleScale, (wY + t * 3f) * sparkleScale);
+                        float nB = SampleNoise(_noiseDataB, (wX - t * 4f) * sparkleScale, (wY + t * 7f) * sparkleScale);
+                        float sparkle = nA * nB;
+                        if (sparkle > 0.4f)
+                        {
+                            float intensity = (sparkle - 0.4f) / 0.6f;
+                            float depthFade = MathHelper.Clamp(1f - depth * 0.12f, 0.1f, 0.7f);
+                            _spriteBatch.Draw(_pixel, new Rectangle(wx + px, wy + py, cStep, cStep),
+                                new Color(180, 230, 255) * (intensity * depthFade * 0.5f));
+                        }
+                    }
+                }
+            }
+
+            // --- Bubbles ---
+            {
+                int bseed = tx * 7919 + ty * 104729;
+                for (int b = 0; b < 3; b++)
+                {
+                    int bs = bseed + b * 31337;
+                    float bx = bs % ts;
+                    float byOffset = ((t * 0.6f * 12f + bs * 0.01f) % (ts + 8)) - 4;
+                    float by = wy + ts - byOffset;
+                    int topY = wy + (isSurface ? 8 : 0);
+                    if (by >= topY && by < wy + ts - 2)
+                    {
+                        int bsize = 1 + (bs % 2);
+                        float wobble = MathF.Sin(t * 2.5f + bs) * 1.5f;
+                        _spriteBatch.Draw(_pixel, new Rectangle(wx + (int)(bx + wobble), (int)by, bsize, bsize),
+                            new Color(180, 220, 255) * 0.35f);
+                    }
+                }
+            }
+
+            // --- Edge darkening ---
+            bool leftLiquid = tx > 0 && TileProperties.IsLiquid(tg.GetTileAt(tx - 1, ty));
+            bool rightLiquid = tx < tg.Width - 1 && TileProperties.IsLiquid(tg.GetTileAt(tx + 1, ty));
+            bool belowLiquid = ty < tg.Height - 1 && TileProperties.IsLiquid(tg.GetTileAt(tx, ty + 1));
+            if (!leftLiquid)
+                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy, 2, ts), Color.Black * 0.15f);
+            if (!rightLiquid)
+                _spriteBatch.Draw(_pixel, new Rectangle(wx + ts - 2, wy, 2, ts), Color.Black * 0.15f);
+            if (!belowLiquid)
+                _spriteBatch.Draw(_pixel, new Rectangle(wx, wy + ts - 2, ts, 2), Color.Black * 0.2f);
+        }
+    }
+
+    /// <summary>Sample cached noise texture data with bilinear interpolation. Returns 0-1.</summary>
+    private float SampleNoise(byte[] data, float u, float v)
+    {
+        // Wrap to 0-255
+        u = ((u % 256f) + 256f) % 256f;
+        v = ((v % 256f) + 256f) % 256f;
+        int x0 = (int)u;
+        int y0 = (int)v;
+        int x1 = (x0 + 1) & 255;
+        int y1 = (y0 + 1) & 255;
+        float fx = u - x0;
+        float fy = v - y0;
+        x0 &= 255;
+        y0 &= 255;
+        float v00 = data[y0 * 256 + x0];
+        float v10 = data[y0 * 256 + x1];
+        float v01 = data[y1 * 256 + x0];
+        float v11 = data[y1 * 256 + x1];
+        float top = v00 + (v10 - v00) * fx;
+        float bot = v01 + (v11 - v01) * fx;
+        return (top + (bot - top) * fy) / 255f;
+    }
+
+    /// <summary>Fast noise texture sampling — delegates to cached texture data.</summary>
+    private float SampleNoiseTexFast(float worldX, float worldY, float noiseScale)
+    {
+        float u = worldX * noiseScale * 256f / 32f; // scale relative to tile size
+        float v = worldY * noiseScale * 256f / 32f;
+        return SampleNoise(_noiseDataA, u, v);
+    }
+
     private void DrawLiquidTile(int wx, int wy, int ts, TileType tile, TileGrid tg, int tx, int ty)
     {
         float t = _totalTime;
@@ -9784,7 +11046,8 @@ public class Game1 : Game
                     }
                     else if (TileProperties.IsLiquid(tile))
                     {
-                        DrawLiquidTile(wx, wy, tg.TileSize, tile, tg, tx, ty);
+                        if (!(_useShaderWater && tile == TileType.Water))
+                            DrawLiquidTile(wx, wy, tg.TileSize, tile, tg, tx, ty);
                     }
                     else if (TileProperties.IsEffectTile(tile) || tile == TileType.Breakable)
                     {
@@ -9841,6 +11104,19 @@ public class Game1 : Game
                     }
                 }
             }
+        }
+
+        // Noise-based water shader pass (draws all Water tiles with noise overlay)
+        if (_useShaderWater && _level.TileGridInstance != null)
+        {
+            var shakeOff2 = Matrix.Identity;
+            if (_shakeTimer > 0)
+            {
+                float sx2 = (float)(_shakeRng.NextDouble() * 2 - 1) * _shakeIntensity;
+                float sy2 = (float)(_shakeRng.NextDouble() * 2 - 1) * _shakeIntensity;
+                shakeOff2 = Matrix.CreateTranslation(sx2, sy2, 0);
+            }
+            DrawWaterShaderPass(_level.TileGridInstance, _camera.TransformMatrix * shakeOff2);
         }
 
         // Draw ropes (always visible — disabling rope climb only prevents grabbing)
@@ -10213,6 +11489,34 @@ public class Game1 : Game
             _spriteBatch.Draw(_pixel, new Rectangle((int)p.Position.X, (int)p.Position.Y, p.Size, p.Size), p.Color * alpha);
         }
 
+        // Draw arc strikes (ionized zones)
+        foreach (var arc in _arcStrikes)
+        {
+            float alpha = arc.Timer / arc.MaxTimer;
+            int segs = arc.Offsets.Length;
+            Vector2 dir = arc.End - arc.Start;
+            Vector2 perp = Vector2.Normalize(new Vector2(-dir.Y, dir.X));
+            for (int i = 0; i < segs; i++)
+            {
+                float t0 = i / (float)segs;
+                float t1 = (i + 1) / (float)segs;
+                float off0 = i == 0 ? 0 : arc.Offsets[i];
+                float off1 = i == segs - 1 ? 0 : arc.Offsets[Math.Min(i + 1, segs - 1)];
+                Vector2 p0 = Vector2.Lerp(arc.Start, arc.End, t0) + perp * off0;
+                Vector2 p1 = Vector2.Lerp(arc.Start, arc.End, t1) + perp * off1;
+                // Draw line as series of pixels
+                int steps = Math.Max(1, (int)Vector2.Distance(p0, p1) / 2);
+                for (int s = 0; s <= steps; s++)
+                {
+                    float lt = s / (float)steps;
+                    int px = (int)MathHelper.Lerp(p0.X, p1.X, lt);
+                    int py = (int)MathHelper.Lerp(p0.Y, p1.Y, lt);
+                    _spriteBatch.Draw(_pixel, new Rectangle(px, py, 2, 2), Color.White * alpha);
+                    _spriteBatch.Draw(_pixel, new Rectangle(px - 1, py - 1, 4, 4), Color.Cyan * (alpha * 0.3f));
+                }
+            }
+        }
+
         // Draw player
         if (!_isDead)
         {
@@ -10253,6 +11557,18 @@ public class Game1 : Game
                     int barY = (int)_player.Position.Y + Player.Height + 3;
                     _spriteBatch.Draw(_pixel, new Rectangle(barX, barY, barW, 2), Color.Lerp(Color.Gray, Color.Cyan, charge));
                 }
+
+                // Shield visual when blocking
+                if (_player.IsBlocking)
+                {
+                    int shieldW = 6, shieldH = 20;
+                    bool facingRight = _player.FacingDir == 1;
+                    int shieldX = facingRight
+                        ? (int)_player.Position.X + Player.Width + 1
+                        : (int)_player.Position.X - shieldW - 1;
+                    int shieldY = (int)_player.Position.Y + (_player.CurrentHeight - shieldH) / 2;
+                    _spriteBatch.Draw(_pixel, new Rectangle(shieldX, shieldY, shieldW, shieldH), new Color(139, 90, 43));
+                }
         }
 
         // Draw EVE orbiting companion
@@ -10286,6 +11602,36 @@ public class Game1 : Game
             if (!_wakeUpComplete)
                 coreAlpha = 0.4f + 0.6f * (0.5f + 0.5f * MathF.Sin(_totalTime * 3.5f));
             _spriteBatch.Draw(_pixel, new Rectangle((int)(orbX - 4), (int)(orbY - 4), 8, 8), Color.Cyan * coreAlpha);
+            // EVE scan pulse rings
+            if (_eveScanPulseTimer > 0)
+            {
+                float t = 1f - _eveScanPulseTimer / 1.5f;
+                float radius1 = 8f + t * 40f;
+                float alpha = (1f - t) * 0.5f;
+                int segments = 24;
+                for (int i = 0; i < segments; i++)
+                {
+                    float a1 = MathF.PI * 2f * i / segments;
+                    float a2 = MathF.PI * 2f * (i + 1) / segments;
+                    int px1 = (int)(orbX + MathF.Cos(a1) * radius1);
+                    int py1 = (int)(orbY + MathF.Sin(a1) * radius1);
+                    int px2 = (int)(orbX + MathF.Cos(a2) * radius1);
+                    int py2 = (int)(orbY + MathF.Sin(a2) * radius1);
+                    DrawLine(px1, py1, px2, py2, Color.Cyan * alpha);
+                }
+                float radius2 = 4f + t * 25f;
+                float alpha2 = (1f - t) * 0.3f;
+                for (int i = 0; i < segments; i++)
+                {
+                    float a1 = MathF.PI * 2f * i / segments;
+                    float a2 = MathF.PI * 2f * (i + 1) / segments;
+                    int px1 = (int)(orbX + MathF.Cos(a1) * radius2);
+                    int py1 = (int)(orbY + MathF.Sin(a1) * radius2);
+                    int px2 = (int)(orbX + MathF.Cos(a2) * radius2);
+                    int py2 = (int)(orbY + MathF.Sin(a2) * radius2);
+                    DrawLine(px1, py1, px2, py2, Color.Cyan * alpha2);
+                }
+            }
             // EVE speech bubble
             if (_eveMessageTimer > 0 && !string.IsNullOrEmpty(_eveMessage))
             {
@@ -10505,28 +11851,154 @@ public class Game1 : Game
             _spriteBatch.Draw(_pixel, new Rectangle(handX - 1, handY - 1, 3, 3), new Color(80, 80, 90));
         }
         
-        // Draw crosshair reticle at mouse position (world space) — hidden during wake-up
-        if (_wakeUpComplete)
-        {
-            var ms = Mouse.GetState();
-            var mScreen = new Vector2(ms.X, ms.Y);
-            var mWorld = Vector2.Transform(mScreen, Matrix.Invert(_camera.TransformMatrix));
-            int mx = (int)mWorld.X, my = (int)mWorld.Y;
-            var rc = Color.White * 0.7f;
-            // 4 pixels: N, S, E, W with 2px gap from center
-            _spriteBatch.Draw(_pixel, new Rectangle(mx, my - 4, 1, 2), rc); // N
-            _spriteBatch.Draw(_pixel, new Rectangle(mx, my + 3, 1, 2), rc); // S
-            _spriteBatch.Draw(_pixel, new Rectangle(mx + 3, my, 2, 1), rc); // E
-            _spriteBatch.Draw(_pixel, new Rectangle(mx - 4, my, 2, 1), rc); // W
-        }
+        // (Crosshair drawn after lighting overlay — see below)
 
         _spriteBatch.End();
 
         // --- UI rendering (no camera transform, screen-space) ---
+
+        // Day-night: simple overlay (same as editor) + additive light punch-through
+        var ambientColor = GetAmbientOverlay();
+        if (ambientColor.A > 2)
+        {
+            // Dark overlay over entire scene
+            _spriteBatch.Begin();
+            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), ambientColor);
+            _spriteBatch.End();
+
+            // Additive lights punch through the darkness
+            _spriteBatch.Begin(blendState: BlendState.Additive);
+
+            if (_lanternActive && _player.Battery > 0)
+            {
+                if (_currentEnvType == "ionized")
+                    _lanternFlicker = 1f + (float)(_rng.NextDouble() * 0.25 - 0.12);
+                else
+                    _lanternFlicker = 1f + (float)(_rng.NextDouble() * 0.06 - 0.03);
+
+                float radius = 200f * _lanternFlicker;
+                var pc = _player.Position + new Vector2(Player.Width / 2f, _player.CurrentHeight / 2f);
+                var sp = Vector2.Transform(pc, _camera.TransformMatrix);
+                int ls = (int)(radius * 2);
+                // Scale light intensity with darkness so it counters the overlay
+                float nightStr = ambientColor.A / 255f;
+                byte lc = (byte)(nightStr * 220);
+                _spriteBatch.Draw(_lightGradient, new Rectangle((int)sp.X - ls / 2, (int)sp.Y - ls / 2, ls, ls), new Color(lc, (int)(lc * 0.9f), (int)(lc * 0.65f)));
+            }
+
+            // Tech dash rocket glow
+            if (_player.IsDashing && _player.CurrentTier == Player.MoveTier.Tech)
+            {
+                var pc = _player.Position + new Vector2(Player.Width / 2f, _player.CurrentHeight / 2f);
+                var sp = Vector2.Transform(pc, _camera.TransformMatrix);
+                int ds = 300;
+                float nightStr = ambientColor.A / 255f;
+                byte rc = (byte)(nightStr * 255);
+                _spriteBatch.Draw(_lightGradient, new Rectangle((int)sp.X - ds / 2, (int)sp.Y - ds / 2, ds, ds), new Color(rc, (int)(rc * 0.7f), (int)(rc * 0.3f)));
+            }
+
+            // Arc strike light
+            if (_arcStrikes != null)
+            {
+                foreach (var arc in _arcStrikes)
+                {
+                    if (arc.Timer > 0)
+                    {
+                        float arcAlpha = arc.Timer / 0.15f;
+                        var arcCenter = (arc.Start + arc.End) / 2f;
+                        var sp = Vector2.Transform(arcCenter, _camera.TransformMatrix);
+                        int arcSize = 140;
+                        _spriteBatch.Draw(_lightGradient, new Rectangle((int)sp.X - arcSize / 2, (int)sp.Y - arcSize / 2, arcSize, arcSize), 
+                            new Color((int)(180 * arcAlpha), (int)(180 * arcAlpha), (int)(255 * arcAlpha)));
+                    }
+                }
+            }
+
+            // Metal tile sparks in ionized zones
+            if (_currentEnvType == "ionized" && _level?.TileGridInstance != null)
+            {
+                var tg = _level.TileGridInstance;
+                float camL = _camera.Position.X;
+                float camT = _camera.Position.Y;
+                float camR = camL + _camera.EffectiveViewW;
+                float camB = camT + _camera.EffectiveViewH;
+                int startCol = Math.Max(0, (int)((camL - tg.OriginX) / tg.TileSize) - 1);
+                int endCol = Math.Min(tg.Width - 1, (int)((camR - tg.OriginX) / tg.TileSize) + 1);
+                int startRow = Math.Max(0, (int)((camT - tg.OriginY) / tg.TileSize) - 1);
+                int endRow = Math.Min(tg.Height - 1, (int)((camB - tg.OriginY) / tg.TileSize) + 1);
+                for (int row = startRow; row <= endRow; row++)
+                    for (int col = startCol; col <= endCol; col++)
+                    {
+                        var tt = tg.Tiles[col, row];
+                        if ((tt == TileType.MetalFloor || tt == TileType.MetalWall) && _rng.NextDouble() < 0.05)
+                        {
+                            float wx = tg.OriginX + col * tg.TileSize + tg.TileSize / 2f;
+                            float wy = tg.OriginY + row * tg.TileSize + tg.TileSize / 2f;
+                            var sp = Vector2.Transform(new Vector2(wx, wy), _camera.TransformMatrix);
+                            _spriteBatch.Draw(_lightGradient, new Rectangle((int)sp.X - 30, (int)sp.Y - 30, 60, 60), new Color(140, 140, 255));
+                        }
+                    }
+            }
+
+            _spriteBatch.End();
+        }
+        // Small lantern glow (always, even during day — subtle warm spot)
+        if (_lanternActive && _player.Battery > 0)
+        {
+            var pc = _player.Position + new Vector2(Player.Width / 2f, _player.CurrentHeight / 2f);
+            var sp = Vector2.Transform(pc, _camera.TransformMatrix);
+            _spriteBatch.Begin(blendState: BlendState.Additive);
+            int gs = 80;
+            _spriteBatch.Draw(_lightGradient, new Rectangle((int)sp.X - gs / 2, (int)sp.Y - gs / 2, gs, gs), new Color(60, 55, 20));
+            _spriteBatch.End();
+        }
+        
+        // Draw crosshair reticle AFTER lighting so it's always visible
+        // Also redraw player on top of lighting so they're not covered by darkness
+        if (_wakeUpComplete && _gameState == GameState.Playing)
+        {
+            _spriteBatch.Begin(transformMatrix: _camera.TransformMatrix);
+            // Redraw player above lighting
+            if (!_isDead)
+            {
+                bool visible = _spawnInvincibility <= 0f || MathF.Sin(_spawnInvincibility * 20f) > 0;
+                if (visible)
+                    _player.Draw(_spriteBatch, _pixel, _adamSheet);
+            }
+            // Crosshair
+            var ms = Mouse.GetState();
+            var mScreen = new Vector2(ms.X, ms.Y);
+            var mWorld = Vector2.Transform(mScreen, Matrix.Invert(_camera.TransformMatrix));
+            int mx = (int)mWorld.X, my = (int)mWorld.Y;
+            var rc = Color.White;
+            _spriteBatch.Draw(_pixel, new Rectangle(mx, my - 4, 1, 2), rc); // N
+            _spriteBatch.Draw(_pixel, new Rectangle(mx, my + 3, 1, 2), rc); // S
+            _spriteBatch.Draw(_pixel, new Rectangle(mx + 3, my, 2, 1), rc); // E
+            _spriteBatch.Draw(_pixel, new Rectangle(mx - 4, my, 2, 1), rc); // W
+            _spriteBatch.End();
+        }
+
         _spriteBatch.Begin();
 
         // Weather overlay (lightning flash, ambient darkening)
         DrawWeatherOverlay();
+
+        // Environmental region screen tint
+        if (_currentEnvType != "neutral" && _gameState == GameState.Playing)
+        {
+            float pulse = 1f + 0.15f * MathF.Sin(_totalTime * 2.5f);
+            float suitFactor = 1f + (1f - _player.SuitIntegrity / 100f) * 0.5f; // more intense at lower suit
+            Color tintColor = _currentEnvType switch
+            {
+                "cold" => Color.CornflowerBlue * (0.08f * pulse * suitFactor),
+                "hot" => Color.OrangeRed * (0.08f * pulse * suitFactor),
+                "extreme_cold" => Color.Blue * (0.12f * pulse * suitFactor),
+                "extreme_hot" => Color.Red * (0.12f * pulse * suitFactor),
+                "ionized" => new Color(100, 60, 180) * (0.06f * (0.8f + 0.2f * MathF.Sin((float)gameTime.TotalGameTime.TotalSeconds * 3f))),
+                _ => Color.Transparent
+            };
+            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), tintColor);
+        }
 
         // Death overlay
         if (_isDead)
@@ -10580,6 +12052,8 @@ public class Game1 : Game
             _spriteBatch.Draw(_pixel, new Rectangle(hpBarX, batBarY, (int)(hpBarW * batPct), hpBarH), batColor);
             DrawHollowRect(hpBarX, batBarY, hpBarW, hpBarH, Color.White * 0.3f);
             DrawOutlinedString(_font, $"BAT {(int)_player.Battery}%", new Vector2(hpBarX + hpBarW + 8, batBarY - 2), batColor * 0.9f);
+            if (_lanternActive)
+                DrawOutlinedString(_fontSmall, "LANTERN", new Vector2(hpBarX + hpBarW + 8 + 80, batBarY), Color.Yellow * (0.8f + 0.2f * MathF.Sin(_totalTime * 4f)));
 
             // HUD glitch effect at low suit integrity
             if (_player.SuitIntegrity < 20f)
@@ -10630,16 +12104,23 @@ public class Game1 : Game
             // EVE dot + label
             _spriteBatch.Draw(_pixel, new Rectangle(hpBarX, eveY + 2, 8, 8), eveStatusColor);
             DrawOutlinedString(_font, $"EVE: {eveStatusText}", new Vector2(hpBarX + 14, eveY), eveStatusColor * 0.9f);
+            // Debug: world time
+            DrawOutlinedString(_fontSmall, $"{(int)_worldTime:00}:{(int)((_worldTime % 1) * 60):00} {GetTimeOfDay()}", new Vector2(hpBarX, eveY + 18), Color.Gray * 0.5f);
             } // end _eveOrbActive
 
             // Weapon hand indicators (bottom-left, always visible)
             {
-                string rangedName = CurrentRanged != WeaponType.None ? CurrentRanged.ToString() : "---";
-                string meleeName = CurrentMelee != WeaponType.None ? CurrentMelee.ToString() : "Fists";
-                var r1Color = CurrentRanged != WeaponType.None ? Color.White * 0.8f : Color.Gray * 0.5f;
-                var r2Color = CurrentMelee != WeaponType.None ? Color.White * 0.8f : Color.Gray * 0.5f;
-                DrawOutlinedString(_font, $"[1] R: {rangedName}", new Vector2(10, ViewH - 36), r1Color);
-                DrawOutlinedString(_font, $"[2] L: {meleeName}", new Vector2(10, ViewH - 18), r2Color);
+                string rName = ActiveRight != WeaponType.None ? WeaponStats.Get(ActiveRight).DisplayName : "---";
+                string lName = ActiveLeft != WeaponType.None ? WeaponStats.Get(ActiveLeft).DisplayName : "Fists";
+                var rColor = ActiveRight != WeaponType.None ? Color.White * 0.8f : Color.Gray * 0.5f;
+                var lColor = ActiveLeft != WeaponType.None ? Color.White * 0.8f : Color.Gray * 0.5f;
+
+                // Ammo display for gun in either hand
+                string rAmmo = (ActiveRight == WeaponType.Gun) ? $"  [{_sidearmRounds}/{SidearmClipSize}]" : "";
+                string lAmmo = (ActiveLeft == WeaponType.Gun) ? $"  [{_sidearmRounds}/{SidearmClipSize}]" : "";
+
+                DrawOutlinedString(_font, $"R: {rName}{rAmmo}", new Vector2(10, ViewH - 36), rColor);
+                DrawOutlinedString(_font, $"L: {lName}{lAmmo}", new Vector2(10, ViewH - 18), lColor);
             }
 
             // Sidearm detail HUD (bottom-right, only when gun equipped)
@@ -11017,5 +12498,56 @@ public class Game1 : Game
             _spriteBatch.Draw(_pixel, new Rectangle(0, ViewH - vigSize, ViewW, vigSize), Color.Black * 0.2f);
             _spriteBatch.End();
         }
+    }
+
+    private bool IsPlayerNearMetalTile()
+    {
+        if (_level?.TileGridInstance == null) return false;
+        var tg = _level.TileGridInstance;
+        int ts = tg.TileSize;
+        int cx = (int)((_player.Position.X + Player.Width / 2f - tg.OriginX) / ts);
+        int cy = (int)((_player.Position.Y + Player.Height / 2f - tg.OriginY) / ts);
+        int radius = 2;
+        for (int dy = -radius; dy <= radius; dy++)
+            for (int dx = -radius; dx <= radius; dx++)
+            {
+                int tx = cx + dx, ty = cy + dy;
+                if (tx >= 0 && tx < tg.Width && ty >= 0 && ty < tg.Height)
+                {
+                    var t = tg.Tiles[tx, ty];
+                    if (t == TileType.MetalFloor || t == TileType.MetalWall)
+                        return true;
+                }
+            }
+        return false;
+    }
+
+    private Vector2? GetNearestMetalTilePos()
+    {
+        if (_level?.TileGridInstance == null) return null;
+        var tg = _level.TileGridInstance;
+        int ts = tg.TileSize;
+        float px = _player.Position.X + Player.Width / 2f;
+        float py = _player.Position.Y + Player.Height / 2f;
+        int cx = (int)((px - tg.OriginX) / ts);
+        int cy = (int)((py - tg.OriginY) / ts);
+        float bestDist = float.MaxValue;
+        Vector2? best = null;
+        for (int dy = -3; dy <= 3; dy++)
+            for (int dx = -3; dx <= 3; dx++)
+            {
+                int tx = cx + dx, ty = cy + dy;
+                if (tx >= 0 && tx < tg.Width && ty >= 0 && ty < tg.Height)
+                {
+                    var t = tg.Tiles[tx, ty];
+                    if (t == TileType.MetalFloor || t == TileType.MetalWall)
+                    {
+                        var pos = new Vector2(tg.OriginX + tx * ts + ts / 2f, tg.OriginY + ty * ts + ts / 2f);
+                        float d = Vector2.DistanceSquared(new Vector2(px, py), pos);
+                        if (d < bestDist) { bestDist = d; best = pos; }
+                    }
+                }
+            }
+        return best;
     }
 }

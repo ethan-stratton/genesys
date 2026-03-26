@@ -51,6 +51,12 @@
       "y": 800,
       "w": 32,
       "h": 12
+    },
+    {
+      "x": 1312,
+      "y": 976,
+      "w": 704,
+      "h": 12
     }
   ],
   "ropes": [
@@ -318,15 +324,6 @@
   "wallSpikes": [],
   "exits": [
     {
-      "x": 2500,
-      "y": 81,
-      "w": 30,
-      "h": 90,
-      "targetLevel": "test-arena",
-      "id": "exit-right",
-      "targetExitId": ""
-    },
-    {
       "x": 10600,
       "y": 736,
       "w": 30,
@@ -360,6 +357,14 @@
       "id": "grapple-0",
       "type": "grapple",
       "x": 1728,
+      "y": 592,
+      "w": 20,
+      "h": 20
+    },
+    {
+      "id": "grapple-1",
+      "type": "grapple",
+      "x": 1376,
       "y": 592,
       "w": 20,
       "h": 20
@@ -1412,6 +1417,7 @@
     "UpZones": [],
     "DownZones": []
   },
+  "envRegions": [],
   "tileGrid": {
     "width": 351,
     "height": 38,
@@ -13044,9 +13050,9 @@
       90,
       90,
       2,
+      89,
       2,
-      2,
-      2,
+      90,
       2,
       2,
       2,
@@ -14758,5 +14764,6 @@
       1,
       1
     ]
-  }
+  },
+  "isUnderground": false
 }

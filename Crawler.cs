@@ -4,7 +4,7 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace Genesis;
 
-public enum CrawlerVariant { Forager, Skitter, Leaper, Bombardier }
+public enum CrawlerVariant { Forager, Skitter, Leaper, Bombardier, Stalker, Spitter, Mimic, Resonant }
 
 /// <summary>
 /// A procedural leg with 2-segment inverse kinematics.
@@ -86,9 +86,20 @@ public class Crawler : Creature
             CrawlerVariant.Skitter => EcologicalRole.Flighty,
             CrawlerVariant.Leaper => EcologicalRole.Predator,
             CrawlerVariant.Bombardier => EcologicalRole.Defensive,
+            CrawlerVariant.Stalker => EcologicalRole.Predator,
+            CrawlerVariant.Spitter => EcologicalRole.Predator,
+            CrawlerVariant.Mimic => EcologicalRole.Predator,
+            CrawlerVariant.Resonant => EcologicalRole.Defensive,
             _ => EcologicalRole.Herbivore,
         };
-        SpeciesName = $"Crawler ({Variant})";
+        SpeciesName = Variant switch
+        {
+            CrawlerVariant.Stalker => "stalker",
+            CrawlerVariant.Spitter => "spitter",
+            CrawlerVariant.Mimic => "mimic",
+            CrawlerVariant.Resonant => "resonant",
+            _ => Variant.ToString().ToLower(),
+        };
         
         // Personality through animation — variant-specific spring parameters
         // f=frequency(speed), z=damping(bounce), r=response(anticipation)
@@ -98,6 +109,10 @@ public class Crawler : Creature
             CrawlerVariant.Skitter => (6f, 0.3f, -1.5f),    // nervous, jittery, strong anticipation
             CrawlerVariant.Leaper => (5f, 0.4f, -2f),       // explosive, springy, big anticipation
             CrawlerVariant.Bombardier => (2f, 0.9f, 0f),    // sluggish, heavy, critically damped
+            CrawlerVariant.Stalker => (4f, 0.5f, -1.5f),    // measured, deliberate, patient
+            CrawlerVariant.Spitter => (3.5f, 0.4f, -0.5f),  // cautious, keeps distance
+            CrawlerVariant.Mimic => (3f, 0.6f, 0f),         // identical to Forager until attack
+            CrawlerVariant.Resonant => (1.5f, 0.95f, 0f),   // slow, heavy, electromagnetic hum
             _ => (4f, 0.5f, -1f),
         };
         _bodyBobSpring?.SetParams(f, z, r);
@@ -895,6 +910,10 @@ public class Crawler : Creature
             : Variant == CrawlerVariant.Leaper ? (Aggroed ? new Color(140, 80, 20) : new Color(100, 70, 30))
             : Variant == CrawlerVariant.Skitter ? new Color(60, 80, 50)
             : Variant == CrawlerVariant.Bombardier ? (BombardierCharging ? new Color(255, 120, 30) : new Color(120, 60, 20))
+            : Variant == CrawlerVariant.Stalker ? (Aggroed ? new Color(60, 40, 60) : new Color(45, 30, 50))       // dark purple — shadowy
+            : Variant == CrawlerVariant.Spitter ? new Color(80, 120, 40)                                           // sickly green
+            : Variant == CrawlerVariant.Mimic ? new Color(80, 50, 20)                                              // identical to Forager
+            : Variant == CrawlerVariant.Resonant ? new Color(60, 60, 100)                                          // steel blue, electromagnetic
             : new Color(80, 50, 20);
         int scaledW = (int)(ew * VisualScale.X);
         int scaledH = (int)(eh * VisualScale.Y);

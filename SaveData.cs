@@ -20,6 +20,15 @@ public class SaveData
     [JsonPropertyName("rangedInventory")] public List<string> RangedInventory { get; set; } = new();
     [JsonPropertyName("meleeIndex")] public int MeleeIndex { get; set; } = 0;
     [JsonPropertyName("rangedIndex")] public int RangedIndex { get; set; } = 0;
+    [JsonPropertyName("weaponInventory")] public List<string> WeaponInventory { get; set; } = new();
+    [JsonPropertyName("leftHand")] public string LeftHand { get; set; } = "None";
+    [JsonPropertyName("rightHand")] public string RightHand { get; set; } = "None";
+    [JsonPropertyName("rightHand1")] public string RightHand1 { get; set; } = "None";
+    [JsonPropertyName("rightHand2")] public string RightHand2 { get; set; } = "None";
+    [JsonPropertyName("leftHand1")] public string LeftHand1 { get; set; } = "None";
+    [JsonPropertyName("leftHand2")] public string LeftHand2 { get; set; } = "None";
+    [JsonPropertyName("rightActiveSlot1")] public bool RightActiveSlot1 { get; set; } = true;
+    [JsonPropertyName("leftActiveSlot1")] public bool LeftActiveSlot1 { get; set; } = true;
     [JsonPropertyName("collectedItems")] public HashSet<string> CollectedItems { get; set; } = new(); // item IDs picked up
     [JsonPropertyName("windowSizeIndex")] public int WindowSizeIndex { get; set; } = 0;
     [JsonPropertyName("crtEnabled")] public bool CrtEnabled { get; set; } = false;
@@ -32,6 +41,9 @@ public class SaveData
     [JsonPropertyName("hp")] public int Hp { get; set; } = 10;
     [JsonPropertyName("suitIntegrity")] public float SuitIntegrity { get; set; } = 31f;
     [JsonPropertyName("battery")] public float Battery { get; set; } = 80f;
+    [JsonPropertyName("bestiary")] public Bestiary Bestiary { get; set; } = new();
+    [JsonPropertyName("worldTime")] public float WorldTime { get; set; } = 8f;
+    [JsonPropertyName("evolutionFlags")] public HashSet<string> EvolutionFlags { get; set; } = new();
 
     public void Save()
     {
@@ -51,6 +63,27 @@ public class SaveData
     }
 
     public static bool Exists() => File.Exists(SavePath);
+
+    /// <summary>Migrate old melee/ranged split into unified weapon inventory if needed.</summary>
+    public void MigrateWeapons()
+    {
+        if (WeaponInventory.Count == 0)
+        {
+            var all = new HashSet<string>();
+            if (MeleeInventory != null) foreach (var w in MeleeInventory) all.Add(w);
+            if (RangedInventory != null) foreach (var w in RangedInventory) all.Add(w);
+            WeaponInventory = new List<string>(all);
+            if (MeleeInventory?.Count > 0 && MeleeIndex >= 0 && MeleeIndex < MeleeInventory.Count)
+                RightHand = MeleeInventory[MeleeIndex];
+            if (RangedInventory?.Count > 0 && RangedIndex >= 0 && RangedIndex < RangedInventory.Count)
+                LeftHand = RangedInventory[RangedIndex];
+        }
+        // Migrate old single LeftHand/RightHand into dual-slot system
+        if (RightHand1 == "None" && RightHand != "None")
+            RightHand1 = RightHand;
+        if (LeftHand1 == "None" && LeftHand != "None")
+            LeftHand1 = LeftHand;
+    }
 
     public static void Delete()
     {

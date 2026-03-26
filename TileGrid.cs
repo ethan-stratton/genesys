@@ -97,6 +97,8 @@ public enum TileType : byte
     Acid = 92,
     BreakableGlass = 93,   // solid until hit, shatters like Breakable but translucent
     BreakableBattery = 94, // solid until attacked, drops battery cell
+    MetalFloor = 95,       // solid floor, metal tag (amplifies ionized drain)
+    MetalWall = 96,        // solid wall, metal tag (amplifies ionized drain)
 
     // Platforms
     PlatformTop = 22,     // half platform spanning top half of tile
@@ -114,7 +116,7 @@ public enum TileType : byte
 
 public static class TileProperties
 {
-    public static bool IsSolid(TileType t) => (t >= TileType.Dirt && t <= TileType.Sand) || t == TileType.Breakable || t == TileType.DamageFloorTile || t == TileType.BreakableGlass || t == TileType.BreakableBattery;
+    public static bool IsSolid(TileType t) => (t >= TileType.Dirt && t <= TileType.Sand) || t == TileType.Breakable || t == TileType.DamageFloorTile || t == TileType.BreakableGlass || t == TileType.BreakableBattery || t == TileType.MetalFloor || t == TileType.MetalWall;
     public static bool IsPlatform(TileType t) => t >= TileType.PlatformWood && t <= TileType.PlatformBottom;
     /// <summary>Standard thin platforms only (for merged rects). Half platforms use custom rects.</summary>
     public static bool IsStandardPlatform(TileType t) => t == TileType.PlatformWood || t == TileType.PlatformStone;
@@ -216,6 +218,8 @@ public static class TileProperties
         TileType.Puddle => new Color(60, 120, 160),
         TileType.BreakableGlass => new Color(180, 220, 240),
         TileType.BreakableBattery => new Color(220, 200, 60),
+        TileType.MetalFloor => new Color(140, 150, 165),
+        TileType.MetalWall => new Color(100, 110, 125),
         _ => Color.Transparent,
     };
 
@@ -368,6 +372,8 @@ public static class TileProperties
         TileType.Puddle,
         TileType.BreakableGlass,
         TileType.BreakableBattery,
+        TileType.MetalFloor,
+        TileType.MetalWall,
     };
 }
 

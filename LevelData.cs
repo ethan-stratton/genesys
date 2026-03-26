@@ -31,7 +31,9 @@ public class LevelData
     [JsonPropertyName("retractableSpikes")] public RetractableSpikeData[] RetractableSpikes { get; set; } = Array.Empty<RetractableSpikeData>();
     [JsonPropertyName("shelters")] public ShelterData[] Shelters { get; set; } = Array.Empty<ShelterData>();
     [JsonPropertyName("neighbors")] public NeighborData Neighbors { get; set; } = new();
+    [JsonPropertyName("envRegions")] public EnvironmentRegion[] EnvRegions { get; set; } = Array.Empty<EnvironmentRegion>();
     [JsonPropertyName("tileGrid")] public TileGridData TileGrid { get; set; }
+    [JsonPropertyName("isUnderground")] public bool IsUnderground { get; set; }
 
     [JsonIgnore] public TileGrid TileGridInstance { get; set; }
 
@@ -56,6 +58,7 @@ public class LevelData
     [JsonIgnore] public float[] RopeTops { get; private set; } = Array.Empty<float>();
     [JsonIgnore] public float[] RopeBottoms { get; private set; } = Array.Empty<float>();
     [JsonIgnore] public Rectangle[] SlopeRects { get; private set; } = Array.Empty<Rectangle>();
+    [JsonIgnore] public Rectangle[] EnvRegionRects { get; private set; } = Array.Empty<Rectangle>();
 
     public void Build()
     {
@@ -160,6 +163,14 @@ public class LevelData
         {
             var item = Items[i];
             ItemRects[i] = new Rectangle((int)item.X, (int)item.Y, item.W, item.H);
+        }
+
+        // Env regions
+        EnvRegionRects = new Rectangle[EnvRegions.Length];
+        for (int i = 0; i < EnvRegions.Length; i++)
+        {
+            var er = EnvRegions[i];
+            EnvRegionRects[i] = new Rectangle(er.X, er.Y, er.W, er.H);
         }
 
         // Tile grid collision integration
@@ -471,3 +482,13 @@ public class NeighborData
         return zones.Count > 0;
     }
 }
+
+public class EnvironmentRegion
+{
+    [JsonPropertyName("x")] public int X { get; set; }
+    [JsonPropertyName("y")] public int Y { get; set; }
+    [JsonPropertyName("w")] public int W { get; set; }
+    [JsonPropertyName("h")] public int H { get; set; }
+    [JsonPropertyName("type")] public string Type { get; set; } = "neutral";
+}
+
