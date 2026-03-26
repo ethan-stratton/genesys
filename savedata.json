@@ -1,12 +1,12 @@
 {
   "currentLevel": "ship-interior",
-  "spawnX": 2492.6487,
+  "spawnX": 2442.2986,
   "spawnY": 408,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 1282.7253,
+  "playTime": 1353.3158,
   "meleeInventory": [
     "Knife",
     "WoodShield"
@@ -22,12 +22,12 @@
     "WoodShield"
   ],
   "leftHand": "Gun",
-  "rightHand": "WoodShield",
+  "rightHand": "Knife",
   "rightHand1": "Knife",
-  "rightHand2": "WoodShield",
+  "rightHand2": "None",
   "leftHand1": "Gun",
-  "leftHand2": "None",
-  "rightActiveSlot1": false,
+  "leftHand2": "WoodShield",
+  "rightActiveSlot1": true,
   "leftActiveSlot1": true,
   "collectedItems": [
     "knife-0",
@@ -38,7 +38,7 @@
   ],
   "windowSizeIndex": 0,
   "crtEnabled": false,
-  "moveTier": 2,
+  "moveTier": 0,
   "upgrades": [],
   "shelterLevel": "",
   "shelterX": 0,
@@ -185,6 +185,9 @@
       }
     }
   },
-  "worldTime": 0.5483369,
-  "evolutionFlags": []
+  "worldTime": 6.5281925,
+  "evolutionFlags": [
+    "evolution_wave_1",
+    "evolution_wave_2"
+  ]
 }

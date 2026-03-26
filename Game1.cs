@@ -1707,7 +1707,18 @@ public class Game1 : Game
                     // Check for progressive L1 reveal text from CreatureDatabase
                     string revealText = CreatureDatabase.GetL1RevealText(creature.SpeciesName, entry.SightCount);
                     if (revealText != null)
-                        alertMsg = revealText;
+                    {
+                        // Short spoken alert — full text in bestiary
+                        alertMsg = entry.SightCount switch
+                        {
+                            1 => $"New contact. Logging.",
+                            2 => $"Same species. Observing.",
+                            3 => $"Pattern forming. Updating profile.",
+                            5 => $"Classification updated.",
+                            7 => $"Full profile logged.",
+                            _ => $"Noted."
+                        };
+                    }
                     else if (isNew && _bestiary.Entries.Count == 1)
                         alertMsg = "Unknown species. Logging.";
                     else if (isNew)
@@ -11671,15 +11682,25 @@ public class Game1 : Game
                     DrawLine(px1, py1, px2, py2, Color.Cyan * alpha2);
                 }
             }
-            // EVE speech bubble
+            // EVE speech bubble (word-wrapped)
             if (_eveMessageTimer > 0 && !string.IsNullOrEmpty(_eveMessage))
             {
                 float alpha = MathHelper.Clamp(_eveMessageTimer, 0, 1);
-                var msgSize = _fontSmall.MeasureString(_eveMessage);
-                float bubbleX = orbX - msgSize.X / 2f;
-                float bubbleY = orbY - 24 - msgSize.Y;
-                _spriteBatch.Draw(_pixel, new Rectangle((int)bubbleX - 4, (int)bubbleY - 2, (int)msgSize.X + 8, (int)msgSize.Y + 4), Color.Black * (0.7f * alpha));
-                DrawOutlinedString(_fontSmall, _eveMessage, new Vector2(bubbleX, bubbleY), Color.Cyan * alpha);
+                float maxBubbleW = 180f;
+                var lines = WrapText(_fontSmall, _eveMessage, maxBubbleW);
+                float lineH = _fontSmall.MeasureString("A").Y;
+                float totalH = lines.Count * lineH;
+                float widest = 0f;
+                foreach (var ln in lines)
+                {
+                    float lw = _fontSmall.MeasureString(ln).X;
+                    if (lw > widest) widest = lw;
+                }
+                float bubbleX = orbX - widest / 2f;
+                float bubbleY = orbY - 24 - totalH;
+                _spriteBatch.Draw(_pixel, new Rectangle((int)bubbleX - 4, (int)bubbleY - 2, (int)widest + 8, (int)totalH + 4), Color.Black * (0.7f * alpha));
+                for (int li = 0; li < lines.Count; li++)
+                    DrawOutlinedString(_fontSmall, lines[li], new Vector2(bubbleX, bubbleY + li * lineH), Color.Cyan * alpha);
             }
 
             // --- EVE Mini-Map Projection (7 area hexagons) ---
