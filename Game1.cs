@@ -327,6 +327,13 @@ public class Game1 : Game
     private const float GrappleBatteryCost = 0.5f;
     private const float ShieldBatteryCost = 1.0f;
     private const float EveScanL3BatteryCost = 5.0f;
+    private const float L3ScanDuration = 4.0f;
+    private bool _cipherScanUnlocked;            // story gate — post-Dragon EVE revival
+    private bool _isL3Scanning;
+    private float _l3ScanTimer;
+    private string _l3ScanTarget;
+    private Creature _l3ScanTargetCreature;
+    private float _l3GlitchIntensity;            // 0-1, drives visual overlay
     private const float BatteryCellRestoreAmount = 20f;
 
     // EVE status
@@ -1335,6 +1342,7 @@ public class Game1 : Game
                                 LoadInventoryFromSave();
                                 _bestiary = _saveData.Bestiary ?? new Bestiary();
                                 _evolutionFlags = _saveData.EvolutionFlags ?? new HashSet<string>();
+                                _cipherScanUnlocked = _saveData.CipherScanUnlocked;
                                 _wakeUpComplete = true;
                                 _player.IsLyingDown = false;
                                 _player.HasGrapple = _saveData?.CollectedItems?.Any(id => id.StartsWith("grapple")) == true;
@@ -1371,6 +1379,7 @@ public class Game1 : Game
                         _scanLog.Clear();
                         _bestiary = new Bestiary();
                         _evolutionFlags = new HashSet<string>();
+                        _cipherScanUnlocked = false;
                         _totalKills = 0;
                         _passiveCreatureKills = 0;
                         _areaKillCounts.Clear();
@@ -2087,7 +2096,36 @@ public class Game1 : Game
                             // Check if already L2 scanned
                             if (_bestiary.Entries.TryGetValue(speciesId, out var existing) && existing.L2Scanned)
                             {
-                                EveAlert("Already have full scan data on this one.", 2f);
+                                // L2 done — try L3 if cipher unlocked
+                                if (_cipherScanUnlocked && !existing.L3Scanned)
+                                {
+                                    if (_player.Battery < EveScanL3BatteryCost)
+                                    {
+                                        EveAlert("Not enough battery for deep scan.", 2f);
+                                    }
+                                    else
+                                    {
+                                        // Start L3 cipher scan
+                                        _player.Battery = Math.Max(0, _player.Battery - EveScanL3BatteryCost);
+                                        _isL3Scanning = true;
+                                        _l3ScanTimer = L3ScanDuration;
+                                        _l3ScanTarget = speciesId;
+                                        _l3ScanTargetCreature = bestCreature;
+                                        _l3GlitchIntensity = 0f;
+                                        _scanTargetPos = bestCreature.Position + new Vector2(bestCreature.Rect.Width / 2f, bestCreature.Rect.Height / 2f);
+                                        _eveMode = EveMovementMode.FlyTo;
+                                        _eveFlyTarget = _scanTargetPos + new Vector2(0, -20);
+                                        EveAlert("Deep scan... opening cipher link.", 2f);
+                                    }
+                                }
+                                else if (_cipherScanUnlocked && existing.L3Scanned)
+                                {
+                                    EveAlert("Nothing more to learn here.", 2f);
+                                }
+                                else
+                                {
+                                    EveAlert("Already have full scan data on this one.", 2f);
+                                }
                             }
                             else
                             {
@@ -2240,7 +2278,95 @@ public class Game1 : Game
                 _eveMode = EveMovementMode.Orbit;
                 EveAlert("Scan aborted.", 2f);
             }
+            else if (_isL3Scanning)
+            {
+                // Released Q — L3 scan interrupted
+                _isL3Scanning = false;
+                _l3GlitchIntensity = 0f;
+                _eveMode = EveMovementMode.Orbit;
+                EveAlert("Cipher link severed.", 2f);
+            }
         }
+
+        // L3 scan update (runs independently of Q held — once started, it continues while Q held)
+        if (_isL3Scanning)
+        {
+            if (_l3ScanTargetCreature == null || !_l3ScanTargetCreature.Alive)
+            {
+                _isL3Scanning = false;
+                _l3GlitchIntensity = 0f;
+                _eveMode = EveMovementMode.Orbit;
+                EveAlert("Connection lost. Subject expired.", 3f);
+            }
+            else
+            {
+                _scanTargetPos = _l3ScanTargetCreature.Position + new Vector2(_l3ScanTargetCreature.Rect.Width / 2f, _l3ScanTargetCreature.Rect.Height / 2f);
+                _eveFlyTarget = _scanTargetPos + new Vector2(0, -20);
+                _l3ScanTimer -= dt;
+                _scanPulseTimer += dt;
+
+                // Glitch intensity ramps up over the scan duration
+                float progress = 1f - _l3ScanTimer / L3ScanDuration;
+                _l3GlitchIntensity = MathHelper.Clamp(progress * 1.2f, 0f, 1f);
+
+                // EVE vulnerability — same as L2
+                float eveHitRadius = 12f;
+                foreach (var cr in _creatures)
+                {
+                    if (!cr.Alive || cr == _l3ScanTargetCreature) continue;
+                    var crCenter = cr.Position + new Vector2(cr.Rect.Width / 2f, cr.Rect.Height / 2f);
+                    if (Vector2.Distance(_evePos, crCenter) < eveHitRadius + cr.Rect.Width / 2f)
+                    {
+                        _isL3Scanning = false;
+                        _l3GlitchIntensity = 0f;
+                        _eveMode = EveMovementMode.Orbit;
+                        EveAlert("Cipher link disrupted!", 3f);
+                        break;
+                    }
+                }
+
+                // Scan complete
+                if (_isL3Scanning && _l3ScanTimer <= 0)
+                {
+                    _isL3Scanning = false;
+                    _eveMode = EveMovementMode.Orbit;
+
+                    // Set L3 scanned
+                    if (_bestiary.Entries.TryGetValue(_l3ScanTarget, out var l3entry))
+                        l3entry.L3Scanned = true;
+
+                    // Get biome-specific feeling if available
+                    string feeling = null;
+                    if (CreatureDatabase.Profiles.TryGetValue(_l3ScanTarget, out var l3profile))
+                    {
+                        // Check biome variant
+                        string currentBiome = _level?.Name ?? "unknown";
+                        if (l3profile.BiomeFeelingVariants != null && l3profile.BiomeFeelingVariants.TryGetValue(currentBiome, out var biomeFeeling))
+                            feeling = biomeFeeling;
+                        else
+                            feeling = l3profile.CreatureFeeling;
+
+                        EveAlert($"I felt it. {feeling}", 5f);
+                    }
+                    else
+                    {
+                        EveAlert("Deep scan complete.", 3f);
+                    }
+
+                    _scanRevealText = $"[ Cipher Scan Complete — {_l3ScanTarget} ]";
+                    _scanRevealTimer = 3f;
+                    _bestiaryNotifyTimer = 3f;
+                    _bestiaryNotifySpecies = _l3ScanTarget;
+
+                    // Fade glitch out over next second
+                    _l3GlitchIntensity = 0.8f; // will be faded by drawing code
+                }
+            }
+        }
+        // Fade L3 glitch when not scanning
+        if (!_isL3Scanning && _l3GlitchIntensity > 0)
+            _l3GlitchIntensity = Math.Max(0, _l3GlitchIntensity - dt * 2f);
+
         // Update scan reveal timer
         if (_scanRevealTimer > 0) _scanRevealTimer -= dt;
 
@@ -6273,6 +6399,7 @@ public class Game1 : Game
         _saveData.Battery = _player.Battery;
         _saveData.Bestiary = _bestiary;
         _saveData.EvolutionFlags = _evolutionFlags;
+        _saveData.CipherScanUnlocked = _cipherScanUnlocked;
         _saveData.WorldTime = _worldTime;
     }
 
@@ -6380,6 +6507,17 @@ public class Game1 : Game
                 SetEditorStatus(_evolutionFlags.Contains(flag) ? $"Evolution Wave {w} ON" : $"Evolution Wave {w} OFF");
             }
             evoY += btnSize + 4;
+        }
+        // Cipher scan toggle button
+        {
+            var cipherRect = new Rectangle(btnX - 8, evoY, btnSize + 16, btnSize);
+            if (cipherRect.Contains(ms.X, ms.Y) && ms.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released)
+            {
+                _cipherScanUnlocked = !_cipherScanUnlocked;
+                _scanL2Available = true; // also enable L2 for testing
+                _editorTimeBtnClicked = true;
+                SetEditorStatus(_cipherScanUnlocked ? "Cipher Scan ON" : "Cipher Scan OFF");
+            }
         }
         // Keyboard shortcuts: Ctrl+1-4 for time
         var kb = Keyboard.GetState();
@@ -7389,6 +7527,24 @@ public class Game1 : Game
                     _spriteBatch.DrawString(_fontSmall, evoLabel, new Vector2(btnX - evoLabelSize.X - 8, btnY + btnSize / 2f - evoLabelSize.Y / 2f), new Color(200, 100, 255) * 0.8f);
                 }
                 btnY += btnSize + 4;
+            }
+            // Cipher scan toggle button
+            {
+                var mouseState3 = Mouse.GetState();
+                var cRect = new Rectangle(btnX - 2, btnY, btnSize + 4, btnSize);
+                bool cActive = _cipherScanUnlocked;
+                bool cHover = cRect.Contains(mouseState3.X, mouseState3.Y);
+                var cColor = cActive ? new Color(180, 100, 255) : Color.Gray * 0.5f;
+                _spriteBatch.Draw(_pixel, cRect, (cHover ? Color.White * 0.2f : Color.Black * 0.5f));
+                var cText = "C3";
+                var cSize = _fontSmall.MeasureString(cText);
+                _spriteBatch.DrawString(_fontSmall, cText, new Vector2(btnX + btnSize / 2f - cSize.X / 2f, btnY + btnSize / 2f - cSize.Y / 2f), cColor);
+                if (cActive)
+                {
+                    var cLabel = "CIPHER";
+                    var cLabelSize = _fontSmall.MeasureString(cLabel);
+                    _spriteBatch.DrawString(_fontSmall, cLabel, new Vector2(btnX - cLabelSize.X - 8, btnY + btnSize / 2f - cLabelSize.Y / 2f), new Color(180, 100, 255) * 0.8f);
+                }
             }
         }
         // Exit search overlay
@@ -12137,6 +12293,79 @@ public class Game1 : Game
             _spriteBatch.Draw(_pixel, new Rectangle(mx + 3, my, 2, 1), rc); // E
             _spriteBatch.Draw(_pixel, new Rectangle(mx - 4, my, 2, 1), rc); // W
             _spriteBatch.End();
+        }
+
+        // --- L3 Cipher Scan Glitch Overlay ---
+        if (_l3GlitchIntensity > 0.01f)
+        {
+            _spriteBatch.Begin(blendState: BlendState.Additive);
+            float gi = _l3GlitchIntensity;
+
+            // Purple vignette
+            for (int edge = 0; edge < 4; edge++)
+            {
+                Rectangle r = edge switch
+                {
+                    0 => new Rectangle(0, 0, ViewW, (int)(30 * gi)),                    // top
+                    1 => new Rectangle(0, ViewH - (int)(30 * gi), ViewW, (int)(30 * gi)), // bottom
+                    2 => new Rectangle(0, 0, (int)(20 * gi), ViewH),                    // left
+                    _ => new Rectangle(ViewW - (int)(20 * gi), 0, (int)(20 * gi), ViewH) // right
+                };
+                _spriteBatch.Draw(_pixel, r, new Color(80, 20, 120) * (gi * 0.4f));
+            }
+
+            // Horizontal scan lines (static noise)
+            int lineCount = (int)(8 * gi);
+            for (int i = 0; i < lineCount; i++)
+            {
+                int ly = _rng.Next(0, ViewH);
+                int lh = _rng.Next(1, 3);
+                float la = (float)_rng.NextDouble() * gi * 0.3f;
+                _spriteBatch.Draw(_pixel, new Rectangle(0, ly, ViewW, lh), new Color(160, 80, 255) * la);
+            }
+
+            // Chromatic offset — draw thin colored strips to simulate RGB shift
+            if (gi > 0.3f)
+            {
+                int offsetX = (int)(3 * gi * (_rng.NextDouble() * 2 - 1));
+                int offsetY = (int)(2 * gi * (_rng.NextDouble() * 2 - 1));
+                // Red channel shift (thin overlay strip)
+                _spriteBatch.Draw(_pixel, new Rectangle(offsetX, ViewH / 2 + offsetY - 1, ViewW, 2), new Color(255, 0, 0) * (gi * 0.15f));
+                // Blue channel shift (opposite direction)
+                _spriteBatch.Draw(_pixel, new Rectangle(-offsetX, ViewH / 2 - offsetY - 1, ViewW, 2), new Color(0, 0, 255) * (gi * 0.15f));
+            }
+
+            // Random glitch blocks at high intensity
+            if (gi > 0.6f)
+            {
+                int blockCount = (int)(4 * (gi - 0.6f) / 0.4f);
+                for (int i = 0; i < blockCount; i++)
+                {
+                    int bx = _rng.Next(0, ViewW);
+                    int by = _rng.Next(0, ViewH);
+                    int bw = _rng.Next(8, 40);
+                    int bh = _rng.Next(2, 6);
+                    _spriteBatch.Draw(_pixel, new Rectangle(bx, by, bw, bh), new Color(120, 40, 180) * (gi * 0.2f));
+                }
+            }
+
+            _spriteBatch.End();
+
+            // L3 scan progress bar (screen-space, center bottom)
+            if (_isL3Scanning)
+            {
+                float progress = 1f - _l3ScanTimer / L3ScanDuration;
+                int barW = 60, barH = 4;
+                int barX = ViewW / 2 - barW / 2;
+                int barY = ViewH / 2 + 40;
+                _spriteBatch.Begin();
+                _spriteBatch.Draw(_pixel, new Rectangle(barX - 1, barY - 1, barW + 2, barH + 2), Color.Black * 0.6f);
+                _spriteBatch.Draw(_pixel, new Rectangle(barX, barY, (int)(barW * progress), barH), new Color(180, 100, 255));
+                var cipherLabel = "CIPHER LINK";
+                var clSize = _fontSmall.MeasureString(cipherLabel);
+                _spriteBatch.DrawString(_fontSmall, cipherLabel, new Vector2(ViewW / 2f - clSize.X / 2f, barY - clSize.Y - 2), new Color(200, 120, 255) * gi);
+                _spriteBatch.End();
+            }
         }
 
         _spriteBatch.Begin();

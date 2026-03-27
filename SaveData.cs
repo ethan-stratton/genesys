@@ -44,6 +44,7 @@ public class SaveData
     [JsonPropertyName("bestiary")] public Bestiary Bestiary { get; set; } = new();
     [JsonPropertyName("worldTime")] public float WorldTime { get; set; } = 8f;
     [JsonPropertyName("evolutionFlags")] public HashSet<string> EvolutionFlags { get; set; } = new();
+    [JsonPropertyName("cipherScanUnlocked")] public bool CipherScanUnlocked { get; set; } = false;
 
     public void Save()
     {

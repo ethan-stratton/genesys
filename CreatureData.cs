@@ -89,6 +89,12 @@ public static class CreatureDatabase
             L3ScanText = "Contentment. A deep, warm satisfaction when it finds a good patch. Fear is there too, but distant — background noise. Mostly it just feels... full. Or wants to be.",
             CreatureFeeling = "contentment / hunger-satisfaction loop",
             EvolutionaryHistory = "You see it compressed — something simpler, softer, splitting and changing. Dozens of generations in seconds. It wasn't always an arthropod. It adapted to the ground because that's where the food was.",
+            BiomeFeelingVariants = new Dictionary<string, string>
+            {
+                ["forest"] = "Contentment, tinged with damp warmth. The ground here is rich.",
+                ["bone-reef"] = "Unease. The food is here but something is wrong. It eats fast and moves on.",
+                ["deep-ruins"] = "Hunger. Sharp, desperate. There's almost nothing to eat down here.",
+            },
         });
 
         Register(new CreatureProfile
@@ -262,6 +268,12 @@ public static class CreatureDatabase
             L3ScanText = "Focus. An almost meditative stillness, then a spike of pure predatory clarity. It doesn't hate you. It doesn't feel anything about you. You're a vibration pattern that means food. When it misses, there's frustration — brief, sharp, then back to stillness.",
             CreatureFeeling = "patience-spike-patience / detached precision",
             EvolutionaryHistory = "A ground predator that couldn't catch the fast prey. Some climbed. Some waited. The ones that climbed and waited ate. Now they all climb and wait.",
+            BiomeFeelingVariants = new Dictionary<string, string>
+            {
+                ["forest"] = "Patient hunger. The canopy is home. Everything below is food.",
+                ["deep-ruins"] = "Claustrophobia inverted — the tight spaces comfort it. More walls to cling to.",
+                ["bone-reef"] = "Agitation. Too open. It doesn't like being seen.",
+            },
         });
 
         Register(new CreatureProfile
