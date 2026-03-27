@@ -435,6 +435,8 @@ public class Game1 : Game
     private HashSet<Guid> _recentlyObserved = new();
     private float _recentlyObservedClearTimer;
     private int _bestiarySelectedIndex;
+    private int _bestiaryRightScroll;  // pixel scroll offset for right panel text
+    private bool _bestiaryFocusRight;  // true = D pressed, scrolling right panel
     private const float PassiveScanRange = 192f; // ~6 tiles
     private const float PassiveScanInterval = 8f; // seconds between auto-scans
     private bool _scanL2Available;               // unlocked after EVE patches scanner
@@ -8005,11 +8007,22 @@ public class Game1 : Game
         }
         else if (_invCategory == 3)
         {
-            // Log/Bestiary: W/S navigates species list, A goes to sidebar
-            if (left) { _invFocusSidebar = true; }
-            int entryCount = _bestiary.Entries.Count;
-            if (up && entryCount > 0) _bestiarySelectedIndex = Math.Max(0, _bestiarySelectedIndex - 1);
-            if (down && entryCount > 0) _bestiarySelectedIndex = Math.Min(entryCount - 1, _bestiarySelectedIndex + 1);
+            // Log/Bestiary: W/S navigates species list or scrolls right panel
+            if (_bestiaryFocusRight)
+            {
+                // Right panel scrolling mode
+                if (left) { _bestiaryFocusRight = false; }
+                if (up) _bestiaryRightScroll = Math.Max(0, _bestiaryRightScroll - 16);
+                if (down) _bestiaryRightScroll += 16;
+            }
+            else
+            {
+                if (left) { _invFocusSidebar = true; }
+                if (right) { _bestiaryFocusRight = true; _bestiaryRightScroll = 0; }
+                int entryCount = _bestiary.Entries.Count;
+                if (up && entryCount > 0) { _bestiarySelectedIndex = Math.Max(0, _bestiarySelectedIndex - 1); _bestiaryRightScroll = 0; }
+                if (down && entryCount > 0) { _bestiarySelectedIndex = Math.Min(entryCount - 1, _bestiarySelectedIndex + 1); _bestiaryRightScroll = 0; }
+            }
         }
         else
         {
@@ -8134,44 +8147,87 @@ public class Game1 : Game
 
     private void DrawEquipmentCenter(int cx, int cy, int cw, int ch)
     {
-        // Body silhouette
+        // Body silhouette (centered, taller and more prominent — Super Metroid inspired)
         int bodyX = cx + cw / 2;
-        int bodyY = cy + ch / 2 - 30;
+        int bodyY = cy + ch / 2 - 10;
         var silColor = new Color(60, 120, 180) * 0.4f;
-        _spriteBatch.Draw(_pixel, new Rectangle(bodyX - 8, bodyY - 70, 16, 16), silColor);
-        _spriteBatch.Draw(_pixel, new Rectangle(bodyX - 14, bodyY - 52, 28, 44), silColor);
-        _spriteBatch.Draw(_pixel, new Rectangle(bodyX - 24, bodyY - 48, 10, 34), silColor * 0.7f);
-        _spriteBatch.Draw(_pixel, new Rectangle(bodyX + 14, bodyY - 48, 10, 34), silColor * 0.7f);
-        _spriteBatch.Draw(_pixel, new Rectangle(bodyX - 10, bodyY - 6, 8, 50), silColor * 0.8f);
-        _spriteBatch.Draw(_pixel, new Rectangle(bodyX + 2, bodyY - 6, 8, 50), silColor * 0.8f);
+        // Head
+        _spriteBatch.Draw(_pixel, new Rectangle(bodyX - 8, bodyY - 80, 16, 16), silColor);
+        // Neck
+        _spriteBatch.Draw(_pixel, new Rectangle(bodyX - 3, bodyY - 64, 6, 4), silColor * 0.5f);
+        // Torso
+        _spriteBatch.Draw(_pixel, new Rectangle(bodyX - 14, bodyY - 60, 28, 48), silColor);
+        // Left arm
+        _spriteBatch.Draw(_pixel, new Rectangle(bodyX - 26, bodyY - 56, 10, 38), silColor * 0.7f);
+        // Right arm
+        _spriteBatch.Draw(_pixel, new Rectangle(bodyX + 16, bodyY - 56, 10, 38), silColor * 0.7f);
+        // Left leg
+        _spriteBatch.Draw(_pixel, new Rectangle(bodyX - 12, bodyY - 10, 10, 52), silColor * 0.8f);
+        // Right leg
+        _spriteBatch.Draw(_pixel, new Rectangle(bodyX + 2, bodyY - 10, 10, 52), silColor * 0.8f);
 
-        int slotW = 100, slotH = 28, gap = 8;
-        int lx = bodyX - 30 - slotW - 20;
-        int ly1 = bodyY - 40;
-        int ly2 = ly1 + slotH + gap;
-        int rx = bodyX + 30 + 20;
-        int ry1 = bodyY - 40;
-        int ry2 = ry1 + slotH + gap;
-        int helmetY = bodyY - 95;
-        int chestY = bodyY - 35;
-        int legsY = bodyY + 20;
-        int armorX = bodyX - slotW / 2;
+        // Connection lines from body to slots (drawn before slots so they appear behind)
+        var lineColor = new Color(40, 80, 120) * 0.3f;
 
+        int slotW = 110, slotH = 26;
+
+        // Armor slots — spread out around body, connected by lines
+        // Helmet: above head, centered
+        int helmetX = bodyX - slotW / 2;
+        int helmetY = bodyY - 115;
+        // Line from head top to helmet
+        for (int lny = helmetY + slotH; lny < bodyY - 80; lny += 2)
+            _spriteBatch.Draw(_pixel, new Rectangle(bodyX, lny, 1, 1), lineColor);
+
+        // Chest: right side, aligned with torso
+        int chestX = bodyX + 50;
+        int chestY = bodyY - 50;
+        // Line from torso to chest slot
+        for (int lnx = bodyX + 14; lnx < chestX; lnx += 2)
+            _spriteBatch.Draw(_pixel, new Rectangle(lnx, chestY + slotH / 2, 1, 1), lineColor);
+
+        // Legs/Feet: below body, centered
+        int legsX = bodyX - slotW / 2;
+        int legsY = bodyY + 52;
+        // Line from legs to slot
+        for (int lny = bodyY + 42; lny < legsY; lny += 2)
+            _spriteBatch.Draw(_pixel, new Rectangle(bodyX, lny, 1, 1), lineColor);
+
+        // Hand slots — spread far from body
+        // Left hands: far left
+        int lx = cx + 8;
+        int ly1 = bodyY - 44;
+        int ly2 = ly1 + slotH + 10;
+        // Lines from left arm to left slots
+        for (int lnx = lx + slotW; lnx < bodyX - 26; lnx += 2)
+            _spriteBatch.Draw(_pixel, new Rectangle(lnx, bodyY - 40, 1, 1), lineColor);
+
+        // Right hands: far right
+        int rsx = cx + cw - slotW - 8;
+        int ry1 = bodyY - 44;
+        int ry2 = ry1 + slotH + 10;
+        // Lines from right arm to right slots
+        for (int lnx = bodyX + 26; lnx < rsx; lnx += 2)
+            _spriteBatch.Draw(_pixel, new Rectangle(lnx, bodyY - 40, 1, 1), lineColor);
+
+        // Draw hand slots
         DrawEquipSlot(lx, ly1, slotW, slotH, "L1", _leftHand1, _equipCursorX == 0 && _equipCursorY == 0, _leftActiveSlot1);
         DrawEquipSlot(lx, ly2, slotW, slotH, "L2", _leftHand2, _equipCursorX == 0 && _equipCursorY == 1, !_leftActiveSlot1);
-        DrawEquipSlot(rx, ry1, slotW, slotH, "R1", _rightHand1, _equipCursorX == 2 && _equipCursorY == 0, _rightActiveSlot1);
-        DrawEquipSlot(rx, ry2, slotW, slotH, "R2", _rightHand2, _equipCursorX == 2 && _equipCursorY == 1, !_rightActiveSlot1);
-        DrawLockedSlot(armorX, helmetY, slotW, slotH, "Helmet", _equipCursorX == 1 && _equipCursorY == 0);
-        DrawLockedSlot(armorX, chestY, slotW, slotH, "Chest", _equipCursorX == 1 && _equipCursorY == 1);
-        DrawLockedSlot(armorX, legsY, slotW, slotH, "Legs", _equipCursorX == 1 && _equipCursorY == 2);
+        DrawEquipSlot(rsx, ry1, slotW, slotH, "R1", _rightHand1, _equipCursorX == 2 && _equipCursorY == 0, _rightActiveSlot1);
+        DrawEquipSlot(rsx, ry2, slotW, slotH, "R2", _rightHand2, _equipCursorX == 2 && _equipCursorY == 1, !_rightActiveSlot1);
+
+        // Draw armor slots
+        DrawLockedSlot(helmetX, helmetY, slotW, slotH, "Helmet", _equipCursorX == 1 && _equipCursorY == 0);
+        DrawLockedSlot(chestX, chestY, slotW, slotH, "Chest", _equipCursorX == 1 && _equipCursorY == 1);
+        DrawLockedSlot(legsX, legsY, slotW, slotH, "Legs", _equipCursorX == 1 && _equipCursorY == 2);
 
         // Weapon picker overlay
         if (_equipPickerOpen)
         {
             int pickerW = 140, pickerH = 24 + (_weaponInventory.Count + 1) * 20;
             int pickerX, pickerY;
-            if (_equipCursorX == 0) { pickerX = lx - pickerW - 8; pickerY = ly1; }
-            else { pickerX = rx + slotW + 8; pickerY = ry1; }
+            if (_equipCursorX == 0) { pickerX = lx + slotW + 8; pickerY = ly1; }
+            else { pickerX = rsx - pickerW - 8; pickerY = ry1; }
             pickerX = Math.Clamp(pickerX, cx + 4, cx + cw - pickerW - 4);
             pickerY = Math.Clamp(pickerY, cy + 4, cy + ch - pickerH - 4);
 
@@ -8233,7 +8289,8 @@ public class Game1 : Game
 
         void StatLine(string label, string val) {
             _spriteBatch.DrawString(_font, SafeText(label), new Vector2(tx, ty), labelColor);
-            _spriteBatch.DrawString(_font, SafeText(val), new Vector2(tx + 100, ty), valColor);
+            float labelW = _font.MeasureString(label).X;
+            _spriteBatch.DrawString(_font, SafeText(val), new Vector2(tx + Math.Max(labelW + 8, 100), ty), valColor);
             ty += 16;
         }
 
@@ -8429,7 +8486,7 @@ public class Game1 : Game
 
         // Hint
         ty = cy + ch - 18;
-        _spriteBatch.DrawString(_font, SafeText("[W/S] Navigate"), new Vector2(tx, ty), Color.Gray * 0.4f);
+        _spriteBatch.DrawString(_font, SafeText("[W/S] Navigate  [D] Details"), new Vector2(tx, ty), Color.Gray * 0.4f);
     }
 
     private List<string> WrapText(SpriteFontBase font, string text, float maxWidth)
@@ -8491,7 +8548,7 @@ public class Game1 : Game
             if (entry.SightCount >= 5) displayName = p.DisplayName;
         }
 
-        // Truncate title to fit panel
+        // Title (always visible, not scrolled)
         string title = displayName.ToUpper();
         while (_font.MeasureString(title).X > rw - 24 && title.Length > 3)
             title = title[..^1];
@@ -8500,6 +8557,20 @@ public class Game1 : Game
         _spriteBatch.Draw(_pixel, new Rectangle(tx, ty, rw - 20, 1), new Color(40, 80, 60) * 0.4f);
         ty += 8;
 
+        // --- Scrollable content area ---
+        int contentTop = ty;
+        int contentBottom = ry + rh - 18; // leave room for scroll hint
+
+        // End current batch, set scissor, restart
+        _spriteBatch.End();
+        var prevScissor = _spriteBatch.GraphicsDevice.ScissorRectangle;
+        var prevRasterizer = _spriteBatch.GraphicsDevice.RasterizerState;
+        var scissorRaster = new RasterizerState { ScissorTestEnable = true };
+        _spriteBatch.GraphicsDevice.ScissorRectangle = new Rectangle(rx, contentTop, rw, contentBottom - contentTop);
+        _spriteBatch.Begin(rasterizerState: scissorRaster);
+
+        // Apply scroll offset
+        ty -= _bestiaryRightScroll;
         float maxW = rw - 20;
 
         // Classification — evolves with sightings
@@ -8595,6 +8666,27 @@ public class Game1 : Game
             ty += 8;
             _spriteBatch.DrawString(_font, SafeText(">> L1 PROFILE COMPLETE <<"), new Vector2(tx, ty), cyan);
         }
+
+        // Track total content height for scroll clamping
+        int totalContentH = ty + _bestiaryRightScroll - contentTop;
+        int maxScroll = Math.Max(0, totalContentH - (contentBottom - contentTop));
+        _bestiaryRightScroll = Math.Clamp(_bestiaryRightScroll, 0, maxScroll);
+
+        // End scissor batch, restore
+        _spriteBatch.End();
+        _spriteBatch.GraphicsDevice.ScissorRectangle = prevScissor;
+        _spriteBatch.GraphicsDevice.RasterizerState = prevRasterizer;
+        _spriteBatch.Begin();
+
+        // Scroll indicators
+        if (_bestiaryRightScroll > 0)
+            _spriteBatch.DrawString(_font, "▲", new Vector2(rx + rw - 16, contentTop - 2), cyan * 0.5f);
+        if (_bestiaryRightScroll < maxScroll && maxScroll > 0)
+            _spriteBatch.DrawString(_font, "▼", new Vector2(rx + rw - 16, contentBottom - 12), cyan * 0.5f);
+
+        // Focus hint
+        if (_bestiaryFocusRight)
+            _spriteBatch.DrawString(_font, SafeText("[W/S] Scroll  [A] Back"), new Vector2(rx + 10, ry + rh - 16), Color.Gray * 0.4f);
     }
 
     private void DrawEquipSlot(int x, int y, int w, int h, string label, WeaponType weapon, bool selected, bool isActive)

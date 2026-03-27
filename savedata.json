@@ -1,15 +1,12 @@
 {
   "currentLevel": "ship-interior",
-  "spawnX": 2987,
-  "spawnY": 504,
+  "spawnX": 2432,
+  "spawnY": 416,
   "unlockedAbilities": [],
-  "flags": {
-    "eveOrbActive": true
-  },
-  "playTime": 1393.2853,
+  "flags": {},
+  "playTime": 23.799812,
   "meleeInventory": [
-    "Knife",
-    "WoodShield"
+    "Knife"
   ],
   "rangedInventory": [
     "Gun"
@@ -17,198 +14,36 @@
   "meleeIndex": 0,
   "rangedIndex": 0,
   "weaponInventory": [
-    "Knife",
     "Gun",
-    "WoodShield"
+    "Knife"
   ],
-  "leftHand": "Gun",
-  "rightHand": "Knife",
-  "rightHand1": "Knife",
+  "leftHand": "Knife",
+  "rightHand": "Gun",
+  "rightHand1": "Gun",
   "rightHand2": "None",
-  "leftHand1": "Gun",
-  "leftHand2": "WoodShield",
+  "leftHand1": "Knife",
+  "leftHand2": "Knife",
   "rightActiveSlot1": true,
-  "leftActiveSlot1": true,
+  "leftActiveSlot1": false,
   "collectedItems": [
-    "knife-0",
     "gun-1",
-    "grapple-1",
-    "debug_woodshield_639101280096653180",
-    "grapple-0"
+    "knife-0"
   ],
   "windowSizeIndex": 0,
   "crtEnabled": false,
-  "moveTier": 2,
+  "moveTier": 0,
   "upgrades": [],
   "shelterLevel": "",
   "shelterX": 0,
   "shelterY": 0,
-  "deathCount": 1,
+  "deathCount": 0,
   "hp": 10,
   "suitIntegrity": 50,
-  "battery": 92,
+  "battery": 100,
   "bestiary": {
-    "entries": {
-      "Crawler (Forager)": {
-        "speciesName": "Crawler (Forager)",
-        "classification": "herbivore",
-        "observations": [
-          {
-            "time": "day",
-            "weather": "clear",
-            "behavior": "idle",
-            "biome": "debug-room"
-          },
-          {
-            "time": "dusk",
-            "weather": "clear",
-            "behavior": "fleeing",
-            "biome": "debug-room"
-          },
-          {
-            "time": "night",
-            "weather": "clear",
-            "behavior": "idle",
-            "biome": "debug-room"
-          },
-          {
-            "time": "day",
-            "weather": "clear",
-            "behavior": "idle",
-            "biome": "Ship Interior"
-          },
-          {
-            "time": "dawn",
-            "weather": "clear",
-            "behavior": "idle",
-            "biome": "Ship Interior"
-          }
-        ],
-        "sightCount": 13,
-        "scanTier": 0,
-        "l2Scanned": false,
-        "detailedRole": null,
-        "temperament": null,
-        "weaknesses": null,
-        "resistances": null,
-        "l3Scanned": false,
-        "loreText": null,
-        "thoughts": null,
-        "originalNature": null
-      },
-      "Crawler (Leaper)": {
-        "speciesName": "Crawler (Leaper)",
-        "classification": "predator",
-        "observations": [
-          {
-            "time": "day",
-            "weather": "clear",
-            "behavior": "aggressive",
-            "biome": "debug-room"
-          },
-          {
-            "time": "day",
-            "weather": "clear",
-            "behavior": "idle",
-            "biome": "debug-room"
-          }
-        ],
-        "sightCount": 3,
-        "scanTier": 0,
-        "l2Scanned": false,
-        "detailedRole": null,
-        "temperament": null,
-        "weaknesses": null,
-        "resistances": null,
-        "l3Scanned": false,
-        "loreText": null,
-        "thoughts": null,
-        "originalNature": null
-      },
-      "Crawler (Bombardier)": {
-        "speciesName": "Crawler (Bombardier)",
-        "classification": "defensive",
-        "observations": [
-          {
-            "time": "day",
-            "weather": "clear",
-            "behavior": "idle",
-            "biome": "debug-room"
-          }
-        ],
-        "sightCount": 1,
-        "scanTier": 0,
-        "l2Scanned": false,
-        "detailedRole": null,
-        "temperament": null,
-        "weaknesses": null,
-        "resistances": null,
-        "l3Scanned": false,
-        "loreText": null,
-        "thoughts": null,
-        "originalNature": null
-      },
-      "Crawler (Skitter)": {
-        "speciesName": "Crawler (Skitter)",
-        "classification": "skittish",
-        "observations": [
-          {
-            "time": "day",
-            "weather": "clear",
-            "behavior": "fleeing",
-            "biome": "debug-room"
-          },
-          {
-            "time": "day",
-            "weather": "clear",
-            "behavior": "idle",
-            "biome": "debug-room"
-          },
-          {
-            "time": "night",
-            "weather": "clear",
-            "behavior": "idle",
-            "biome": "debug-room"
-          }
-        ],
-        "sightCount": 5,
-        "scanTier": 0,
-        "l2Scanned": false,
-        "detailedRole": null,
-        "temperament": null,
-        "weaknesses": null,
-        "resistances": null,
-        "l3Scanned": false,
-        "loreText": null,
-        "thoughts": null,
-        "originalNature": null
-      },
-      "forager": {
-        "speciesName": "forager",
-        "classification": "herbivore",
-        "observations": [
-          {
-            "time": "dawn",
-            "weather": "clear",
-            "behavior": "idle",
-            "biome": "Ship Interior"
-          }
-        ],
-        "sightCount": 2,
-        "scanTier": 0,
-        "l2Scanned": true,
-        "detailedRole": null,
-        "temperament": null,
-        "weaknesses": null,
-        "resistances": null,
-        "l3Scanned": true,
-        "loreText": null,
-        "thoughts": null,
-        "originalNature": null
-      }
-    }
+    "entries": {}
   },
-  "worldTime": 7.192881,
+  "worldTime": 11.130321,
   "evolutionFlags": [],
   "cipherScanUnlocked": false
 }
