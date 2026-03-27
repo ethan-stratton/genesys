@@ -1568,7 +1568,7 @@ public class Game1 : Game
         if (invToggle && !_dialogueOpen)
         {
             _inventoryOpen = !_inventoryOpen;
-            if (_inventoryOpen) { _equipCursorX = 2; _equipCursorY = 0; _equipPickerOpen = false; _equipPickerIndex = 0; _invCategory = 0; _invRightScroll = 0; _invFocusSidebar = false; }
+            if (_inventoryOpen) { _equipCursorX = 0; _equipCursorY = 0; _equipPickerOpen = false; _equipPickerIndex = 0; _invCategory = 0; _invRightScroll = 0; _invFocusSidebar = true; }
         }
 
         if (_inventoryOpen)
@@ -8018,10 +8018,13 @@ public class Game1 : Game
             else
             {
                 if (left) { _invFocusSidebar = true; }
-                if (right) { _bestiaryFocusRight = true; _bestiaryRightScroll = 0; }
                 int entryCount = _bestiary.Entries.Count;
-                if (up && entryCount > 0) { _bestiarySelectedIndex = Math.Max(0, _bestiarySelectedIndex - 1); _bestiaryRightScroll = 0; }
-                if (down && entryCount > 0) { _bestiarySelectedIndex = Math.Min(entryCount - 1, _bestiarySelectedIndex + 1); _bestiaryRightScroll = 0; }
+                if (entryCount > 0)
+                {
+                    if (right) { _bestiaryFocusRight = true; _bestiaryRightScroll = 0; }
+                    if (up) { _bestiarySelectedIndex = Math.Max(0, _bestiarySelectedIndex - 1); _bestiaryRightScroll = 0; }
+                    if (down) { _bestiarySelectedIndex = Math.Min(entryCount - 1, _bestiarySelectedIndex + 1); _bestiaryRightScroll = 0; }
+                }
             }
         }
         else
@@ -8371,28 +8374,35 @@ public class Game1 : Game
     {
         int tx = cx + 16;
         int ty = cy + 16;
-        var labelColor = new Color(80, 180, 255) * 0.9f;
         int lineH = 28;
 
         DrawOutlinedString(_font, "TOOLS", new Vector2(tx, ty), new Color(120, 200, 255));
         ty += 24;
 
-        // Grapple Gun
-        bool hasGrapple = _player.HasGrapple;
-        Color gc = hasGrapple ? Color.White * 0.8f : Color.Gray * 0.4f;
-        bool grappleSel = _invRightScroll == 0;
-        if (grappleSel)
-            _spriteBatch.Draw(_pixel, new Rectangle(tx - 4, ty - 2, cw - 24, lineH), new Color(30, 60, 90) * 0.5f);
-        _spriteBatch.DrawString(_font, SafeText(grappleSel ? "> Grapple Gun" : "  Grapple Gun"), new Vector2(tx, ty), gc);
-        _spriteBatch.DrawString(_font, SafeText(hasGrapple ? "[ACQUIRED]" : "[LOCKED]"), new Vector2(tx + cw - 120, ty), hasGrapple ? Color.LimeGreen * 0.7f : Color.Gray * 0.4f);
-        ty += lineH;
+        // Build list of acquired tools
+        var tools = new List<(string name, string desc)>();
+        if (_player.HasGrapple) tools.Add(("Grapple Gun", "Magnetic tether. Drains battery."));
+        // Add more tools here as they're acquired:
+        // if (_player.HasMap) tools.Add(("Map Module", "Area mapping system."));
 
-        // Map Module (placeholder)
-        bool mapSel = _invRightScroll == 1;
-        if (mapSel)
-            _spriteBatch.Draw(_pixel, new Rectangle(tx - 4, ty - 2, cw - 24, lineH), new Color(30, 60, 90) * 0.5f);
-        _spriteBatch.DrawString(_font, SafeText(mapSel ? "> Map Module" : "  Map Module"), new Vector2(tx, ty), Color.Gray * 0.4f);
-        _spriteBatch.DrawString(_font, "[LOCKED]", new Vector2(tx + cw - 120, ty), Color.Gray * 0.4f);
+        if (tools.Count == 0)
+        {
+            _spriteBatch.DrawString(_font, SafeText("No tools acquired yet."), new Vector2(tx, ty), Color.Gray * 0.5f);
+            _spriteBatch.DrawString(_font, SafeText("Keep exploring."), new Vector2(tx, ty + 16), Color.Gray * 0.4f);
+            return;
+        }
+
+        // Clamp scroll
+        _invRightScroll = Math.Clamp(_invRightScroll, 0, tools.Count - 1);
+
+        for (int i = 0; i < tools.Count; i++)
+        {
+            bool sel = _invRightScroll == i;
+            if (sel)
+                _spriteBatch.Draw(_pixel, new Rectangle(tx - 4, ty - 2, cw - 24, lineH), new Color(30, 60, 90) * 0.5f);
+            _spriteBatch.DrawString(_font, SafeText(sel ? $"> {tools[i].name}" : $"  {tools[i].name}"), new Vector2(tx, ty), Color.White * 0.8f);
+            ty += lineH;
+        }
     }
 
     private void DrawToolsRight(int rx, int ry, int rw, int rh)
@@ -8405,27 +8415,21 @@ public class Game1 : Game
         _spriteBatch.Draw(_pixel, new Rectangle(tx, ty, maxW, 1), new Color(40, 80, 120) * 0.4f);
         ty += 8;
 
+        // Build same tool list as center
+        var tools = new List<string>();
+        if (_player.HasGrapple) tools.Add("grapple");
+
+        if (tools.Count == 0) return;
+        int idx = Math.Clamp(_invRightScroll, 0, tools.Count - 1);
+
         var detailColor = Color.Gray * 0.6f;
-        if (_invRightScroll == 0)
+        if (tools[idx] == "grapple")
         {
             ty = DrawWrappedString(_font, "Grapple Gun", tx, ty, maxW, Color.White * 0.7f, 16);
             ty += 4;
-            if (_player.HasGrapple)
-            {
-                ty = DrawWrappedString(_font, "Fires a magnetic tether that pulls you to anchor points. Drains battery.", tx, ty, maxW, detailColor, 14);
-                ty += 4;
-                ty = DrawWrappedString(_font, "Cost: 0.5 battery/use", tx, ty, maxW, detailColor, 14);
-            }
-            else
-            {
-                ty = DrawWrappedString(_font, "Not yet acquired. Keep exploring.", tx, ty, maxW, detailColor, 14);
-            }
-        }
-        else
-        {
-            ty = DrawWrappedString(_font, "Map Module", tx, ty, maxW, Color.White * 0.7f, 16);
+            ty = DrawWrappedString(_font, "Fires a magnetic tether that pulls you to anchor points. Drains battery.", tx, ty, maxW, detailColor, 14);
             ty += 4;
-            ty = DrawWrappedString(_font, "Not yet acquired. Keep exploring.", tx, ty, maxW, detailColor, 14);
+            ty = DrawWrappedString(_font, "Cost: 0.5 battery/use", tx, ty, maxW, detailColor, 14);
         }
     }
 
