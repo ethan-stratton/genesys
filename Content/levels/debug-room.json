@@ -349,6 +349,15 @@
       "targetLevel": "crashsite",
       "id": "exit-left",
       "targetExitId": ""
+    },
+    {
+      "x": 1312,
+      "y": 656,
+      "w": 320,
+      "h": 12,
+      "targetLevel": "__overworld__",
+      "id": "exit-left-2",
+      "targetExitId": ""
     }
   ],
   "npcs": [],

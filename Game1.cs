@@ -7404,12 +7404,24 @@ public class Game1 : Game
             var npc = _level.Npcs[i];
             if (npc.Id == "eve")
             {
+                if (_eveOrbActive) continue; // already orbiting, don't draw NPC
                 float cx = npc.X + npc.W / 2f;
                 float cy = npc.Y + npc.H / 2f;
-                _spriteBatch.Draw(_pixel, new Rectangle((int)(cx - 11), (int)(cy - 11), 22, 22), Color.Cyan * 0.1f);
-                _spriteBatch.Draw(_pixel, new Rectangle((int)(cx - 8), (int)(cy - 8), 16, 16), Color.Cyan * 0.25f);
-                _spriteBatch.Draw(_pixel, new Rectangle((int)(cx - 6), (int)(cy - 6), 12, 12), Color.Cyan * 0.7f);
-                _spriteBatch.DrawString(_font, SafeText(npc.Name), new Vector2(npc.X, npc.Y - 16), Color.Cyan * 0.8f);
+                // Dormant EVE — flickering, damaged look
+                float flicker = 0.3f + 0.2f * MathF.Sin(_totalTime * 1.5f) + 0.1f * MathF.Sin(_totalTime * 7f);
+                _spriteBatch.Draw(_pixel, new Rectangle((int)(cx - 8), (int)(cy - 8), 16, 16), Color.Cyan * (0.15f * flicker));
+                _spriteBatch.Draw(_pixel, new Rectangle((int)(cx - 5), (int)(cy - 5), 10, 10), Color.Cyan * (0.4f * flicker));
+                // Occasional spark
+                if (MathF.Sin(_totalTime * 11f) > 0.9f)
+                {
+                    int sx = (int)(cx + MathF.Sin(_totalTime * 17f) * 6);
+                    int sy = (int)(cy + MathF.Cos(_totalTime * 13f) * 6);
+                    _spriteBatch.Draw(_pixel, new Rectangle(sx, sy, 1, 1), Color.Yellow * 0.8f);
+                }
+                // Interact prompt when close
+                float dist = Vector2.Distance(_player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f), new Vector2(cx, cy));
+                if (dist < 48f)
+                    DrawOutlinedString(_fontSmall, "[E]", new Vector2(cx - 8, cy - 24), Color.Cyan * (0.5f + 0.3f * MathF.Sin(_totalTime * 3f)));
             }
             else
             {

@@ -1,10 +1,10 @@
 {
-  "currentLevel": "ship-interior",
-  "spawnX": 2432,
-  "spawnY": 416,
+  "currentLevel": "debug-room",
+  "spawnX": 1304.1537,
+  "spawnY": 264,
   "unlockedAbilities": [],
   "flags": {},
-  "playTime": 23.799812,
+  "playTime": 97.539696,
   "meleeInventory": [
     "Knife"
   ],
@@ -27,7 +27,8 @@
   "leftActiveSlot1": false,
   "collectedItems": [
     "gun-1",
-    "knife-0"
+    "knife-0",
+    "grapple-6"
   ],
   "windowSizeIndex": 0,
   "crtEnabled": false,
@@ -39,11 +40,11 @@
   "deathCount": 0,
   "hp": 10,
   "suitIntegrity": 50,
-  "battery": 100,
+  "battery": 99,
   "bestiary": {
     "entries": {}
   },
-  "worldTime": 11.130321,
+  "worldTime": 12.449092,
   "evolutionFlags": [],
   "cipherScanUnlocked": false
 }

@@ -55,7 +55,35 @@
       "targetExitId": ""
     }
   ],
-  "npcs": [],
+  "npcs": [
+    {
+      "id": "eve",
+      "name": "EVE",
+      "x": 240,
+      "y": 195,
+      "w": 16,
+      "h": 16,
+      "color": "Cyan",
+      "dialogue": [
+        "...",
+        "*static* ...sys...tems... *crackle*",
+        "R-rebooting. Core intact. Barely.",
+        "Adam? Is that... you made it.",
+        "I lost telemetry during the descent. How long was I offline?",
+        "Never mind. Diagnostics later. We need to move.",
+        "Syncing to your suit transponder. I'll stay close."
+      ],
+      "dialogueSpeakers": [
+        "EVE",
+        "EVE",
+        "EVE",
+        "EVE",
+        "EVE",
+        "EVE",
+        "EVE"
+      ]
+    }
+  ],
   "items": [
     {
       "id": "grapple-0",
