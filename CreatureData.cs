@@ -14,8 +14,11 @@ public class CreatureProfile
     public string Classification;     // ecological classification
     public EcologicalRole Role;
 
-    // Progressive L1 reveal text — keyed by observation count threshold
+    // Progressive L1 reveal text — keyed by observation count threshold (full text for bestiary)
     public (int threshold, string text)[] L1Reveals;
+
+    // Short spoken quips EVE says aloud — keyed by same thresholds (personality, not data dumps)
+    public (int threshold, string text)[] SpokenQuips;
 
     // L2 active scan data — physiology, the "something is wrong with the timeline"
     public string Temperament;
@@ -70,6 +73,14 @@ public static class CreatureDatabase
                 (5, "Classifying as Forager. Docile grazer. Patrols a fixed territory and feeds."),
                 (7, "Full behavioral profile logged. Harmless unless cornered. Avoids predators instinctively."),
             },
+            SpokenQuips = new[]
+            {
+                (1, "Something alive. Doesn't seem interested in us."),
+                (2, "Same little guy. Just... eating."),
+                (3, "Definitely herbivore. Harmless."),
+                (5, "Calling it a Forager. Bottom of the food chain."),
+                (7, "Profile complete. I almost feel bad for it."),
+            },
             Temperament = "Docile — flees when threatened, never initiates combat",
             Weaknesses = "Slow, no armor, easily flanked",
             Resistances = "None",
@@ -94,6 +105,14 @@ public static class CreatureDatabase
                 (3, "It's avoiding us specifically now. Some kind of threat memory."),
                 (5, "Skitter. Harmless. Fastest thing on six legs down here."),
                 (7, "Full profile. The Skitter exists to be chased. Every predator here hunts them."),
+            },
+            SpokenQuips = new[]
+            {
+                (1, "Something just bolted. Fast."),
+                (2, "There it goes again. Terrified of us."),
+                (3, "It remembers us now. Smart."),
+                (5, "Skitter. Born to run. Nothing else."),
+                (7, "Profile done. Everything eats these."),
             },
             Temperament = "Extremely flighty — bolts at the slightest disturbance",
             Weaknesses = "Fragile, panics into walls, predictable flee direction",
@@ -120,6 +139,14 @@ public static class CreatureDatabase
                 (5, "Hopper. Scavenger, feeds on scraps. More nuisance than threat."),
                 (7, "Full profile. Hoppers fill the gap between grazers and decomposers. Population spikes after kills."),
             },
+            SpokenQuips = new[]
+            {
+                (1, "Erratic. Bouncing everywhere."),
+                (2, "Scavenger. Picking at scraps."),
+                (3, "Annoying, but not dangerous."),
+                (5, "Hopper. Nature's janitor."),
+                (7, "Profile done. More show up after kills."),
+            },
             Temperament = "Skittish — erratic movement, low aggression, flees unpredictably",
             Weaknesses = "Low HP, predictable jump arc, easy to bait",
             Resistances = "Hard to hit due to constant movement",
@@ -144,6 +171,14 @@ public static class CreatureDatabase
                 (3, "Attracted to light and warmth. Consider the lantern near swarms."),
                 (5, "Insect Swarm. Collective scavenger. Individually harmless, en masse they strip carcasses fast."),
                 (7, "Full profile. Swarms are the cleanup crew. They process anything dead or dying."),
+            },
+            SpokenQuips = new[]
+            {
+                (1, "Cloud of... something. Watching us."),
+                (2, "A swarm. Moving as one."),
+                (3, "They like the lantern. Be careful."),
+                (5, "Cleanup crew. Don't be the cleanup."),
+                (7, "Profile done. They eat the dead."),
             },
             Temperament = "Opportunistic — ignores healthy targets, swarms the injured",
             Weaknesses = "Dispersed by concussive force or loud sounds",
@@ -174,6 +209,14 @@ public static class CreatureDatabase
                 (5, "Thornback. Armored grazer. Leave it alone and it returns the favor. The spines are no joke."),
                 (7, "Full profile. Gentle giant. Other creatures shelter near it — the spines deter predators."),
             },
+            SpokenQuips = new[]
+            {
+                (1, "Big one. Armored. Not hostile... yet."),
+                (2, "Those spines are a warning. Noted."),
+                (3, "Gentle, actually. Just huge."),
+                (5, "Thornback. Don't pick a fight with it."),
+                (7, "Profile done. Others hide behind it."),
+            },
             Temperament = "Passive — attacks only when directly threatened",
             Weaknesses = "Extremely slow, can't turn quickly, underbelly is unarmored",
             Resistances = "Dorsal spines deflect most attacks, high HP, knockback-resistant",
@@ -203,6 +246,14 @@ public static class CreatureDatabase
                 (5, "Leaper. Ambush predator, uses vertical surfaces. Attacks anything in its kill zone."),
                 (7, "Full profile. Solitary and territorial. Two won't share the same hunting ground."),
             },
+            SpokenQuips = new[]
+            {
+                (1, "Hostile! It jumped at us!"),
+                (2, "An ambusher. Waits on walls."),
+                (3, "Check ceilings. Always."),
+                (5, "Leaper. Territorial ambush hunter."),
+                (7, "Profile done. They don't share turf."),
+            },
             Temperament = "Aggressive — ambush predator, attacks on detection",
             Weaknesses = "Vulnerable mid-leap, slow recovery after missing a pounce",
             Resistances = "Hard carapace on top — attack from below",
@@ -228,6 +279,14 @@ public static class CreatureDatabase
                 (5, "Bombardier. Stationary defender. Won't chase, but its range is significant."),
                 (7, "Full profile. Bombardiers anchor to resource-rich spots. Where there's one, there's something worth guarding."),
             },
+            SpokenQuips = new[]
+            {
+                (1, "It's shooting at us!"),
+                (2, "Territorial. Won't chase, at least."),
+                (3, "Chemical rounds. Bad for the suit."),
+                (5, "Bombardier. Guards the good stuff."),
+                (7, "Profile done. Where it sits matters."),
+            },
             Temperament = "Territorial — attacks anything in range but won't pursue",
             Weaknesses = "Immobile during firing, slow turn rate, blind spot behind",
             Resistances = "Heavy frontal armor, resistant to blunt damage",
@@ -252,6 +311,14 @@ public static class CreatureDatabase
                 (3, "Dive-bombed us. Aerial predator. Wings generate concussive downdraft."),
                 (5, "Wingbeater. Aerial predator, dive attacks and wind pressure. Dangerous in open areas."),
                 (7, "Full profile. Nests high, hunts low. Won't enter tight spaces — use corridors."),
+            },
+            SpokenQuips = new[]
+            {
+                (1, "Airborne. Circling us."),
+                (2, "Those wings hit hard. Not for flying."),
+                (3, "Dive attack! Stay in tight spaces."),
+                (5, "Wingbeater. Owns the open air."),
+                (7, "Profile done. Corridors are safe from it."),
             },
             Temperament = "Aggressive — patrols and attacks from above",
             Weaknesses = "Can't maneuver in tight spaces, vulnerable during dive recovery",
@@ -286,6 +353,14 @@ public static class CreatureDatabase
                 (5, "Stalker. Pursuit predator. It doesn't pounce — it follows until you make a mistake."),
                 (7, "Full profile. Stalkers are patient, intelligent hunters. They test defenses before committing."),
             },
+            SpokenQuips = new[]
+            {
+                (1, "It's... following us."),
+                (2, "Still following. It's patient."),
+                (3, "It learned our route. Careful."),
+                (5, "Stalker. Waits for mistakes."),
+                (7, "Profile done. Respect this one."),
+            },
             Temperament = "Calculating — follows prey, probes for weakness before attacking",
             Weaknesses = "Won't attack head-on if you face it, fragile compared to Leapers",
             Resistances = "Fast, hard to corner, disengages when outmatched",
@@ -312,6 +387,14 @@ public static class CreatureDatabase
                 (3, "The acid is similar to Bombardier chemistry but weaker. Diluted."),
                 (5, "Acid Spitter. Mobile ranged predator. Bombardier chemistry in a hunter's body."),
                 (7, "Full profile. Spitters kite — maintain distance, wear prey down. Don't let them dictate range."),
+            },
+            SpokenQuips = new[]
+            {
+                (1, "Acid! It's shooting acid!"),
+                (2, "Mobile shooter. Moves after firing."),
+                (3, "Same chemicals as the Bombardier..."),
+                (5, "Spitter. Close the gap fast."),
+                (7, "Profile done. Don't let it kite you."),
             },
             Temperament = "Aggressive but cautious — maintains range, retreats if closed on",
             Weaknesses = "Low HP, acid runs out (limited shots before recharge), slow in melee",
@@ -346,6 +429,14 @@ public static class CreatureDatabase
                 (5, "Mimic Crawler. Disguises itself as a Forager. Watch for the pre-attack twitch."),
                 (7, "Full profile. Mimics are rare — one per several Forager groups. Ecosystem regulates the ratio."),
             },
+            SpokenQuips = new[]
+            {
+                (1, "That Forager just... that's NOT a Forager."),
+                (2, "It copies their walk. Perfectly."),
+                (3, "Watch for the twitch. Only tell."),
+                (5, "Mimic. Trust nothing that grazes."),
+                (7, "Profile done. Nature learned to lie."),
+            },
             Temperament = "Deceptive — passive until ambush range, then extremely aggressive",
             Weaknesses = "Identical stats to Forager once exposed, fragile",
             Resistances = "Surprise factor — first hit is often free",
@@ -373,6 +464,14 @@ public static class CreatureDatabase
                 (5, "Resonant. Field-adapted organism. Tech bane. Keep your distance or lose battery fast."),
                 (7, "Full profile. Resonants are the ionized zone's apex. Everything else avoids them. So should we."),
             },
+            SpokenQuips = new[]
+            {
+                (1, "Interference. Something's draining us."),
+                (2, "It's generating an EM field. Stay back."),
+                (3, "It eats electricity. Our electricity."),
+                (5, "Resonant. Death sentence for tech."),
+                (7, "Profile done. Avoid. Just... avoid."),
+            },
             Temperament = "Passive unless tech is used nearby — then attracted to the energy source",
             Weaknesses = "Bio weapons unaffected by its field, slow-moving, vulnerable to blunt force",
             Resistances = "Tech weapons malfunction near it, absorbs electrical damage, drains battery on contact",
@@ -399,6 +498,23 @@ public static class CreatureDatabase
         if (profile.L1Reveals == null) return null;
 
         foreach (var (threshold, text) in profile.L1Reveals)
+        {
+            if (threshold == sightCount)
+                return text;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Get the short spoken quip EVE says aloud for a given sighting count.
+    /// Returns null if no quip at this count (EVE stays quiet on repeat sightings).
+    /// </summary>
+    public static string GetSpokenQuip(string speciesId, int sightCount)
+    {
+        if (!Profiles.TryGetValue(speciesId, out var profile)) return null;
+        if (profile.SpokenQuips == null) return null;
+
+        foreach (var (threshold, text) in profile.SpokenQuips)
         {
             if (threshold == sightCount)
                 return text;

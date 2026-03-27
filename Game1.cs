@@ -420,6 +420,8 @@ public class Game1 : Game
 
     // --- Bestiary ---
     private Bestiary _bestiary = new();
+    private float _bestiaryNotifyTimer;
+    private string _bestiaryNotifySpecies;
     private float _eveBestiaryTimer;
     private float _eveScanPulseTimer;
     private const float EveObservationInterval = 15f;
@@ -1615,6 +1617,7 @@ public class Game1 : Game
 
         _totalTime += dt;
         if (_eveMessageTimer > 0) _eveMessageTimer -= dt;
+        if (_bestiaryNotifyTimer > 0) _bestiaryNotifyTimer -= dt;
         if (_eveSilenceTimer > 0) _eveSilenceTimer -= dt;
         if (_passiveScanCooldown > 0) _passiveScanCooldown -= dt;
         
@@ -1708,16 +1711,12 @@ public class Game1 : Game
                     string revealText = CreatureDatabase.GetL1RevealText(creature.SpeciesName, entry.SightCount);
                     if (revealText != null)
                     {
-                        // Short spoken alert — full text in bestiary
-                        alertMsg = entry.SightCount switch
-                        {
-                            1 => $"New contact. Logging.",
-                            2 => $"Same species. Observing.",
-                            3 => $"Pattern forming. Updating profile.",
-                            5 => $"Classification updated.",
-                            7 => $"Full profile logged.",
-                            _ => $"Noted."
-                        };
+                        // Short spoken quip with personality — full text in bestiary
+                        string quip = CreatureDatabase.GetSpokenQuip(creature.SpeciesName, entry.SightCount);
+                        alertMsg = quip ?? "Noted.";
+                        // Trigger bestiary notification
+                        _bestiaryNotifyTimer = 3f;
+                        _bestiaryNotifySpecies = creature.SpeciesName;
                     }
                     else if (isNew && _bestiary.Entries.Count == 1)
                         alertMsg = "Unknown species. Logging.";
@@ -12227,6 +12226,26 @@ public class Game1 : Game
                         DrawOutlinedString(_font, $"{_sidearmRounds}/{SidearmClipSize}", new Vector2(gunX + gunW + 4, gunY + 20), Color.White * 0.7f);
                     }
                 }
+            }
+
+            // Bestiary update notification (bottom center, slides up and fades)
+            if (_bestiaryNotifyTimer > 0 && _bestiaryNotifySpecies != null)
+            {
+                float alpha = MathHelper.Clamp(_bestiaryNotifyTimer, 0f, 1f);
+                float slideUp = (1f - MathHelper.Clamp(_bestiaryNotifyTimer / 0.5f, 0f, 1f)) * 0f; // instant appear
+                // Get display name if available
+                string displayName = _bestiaryNotifySpecies;
+                if (CreatureDatabase.Profiles.TryGetValue(_bestiaryNotifySpecies, out var np))
+                {
+                    if (_bestiary.Entries.TryGetValue(_bestiaryNotifySpecies, out var ne) && ne.SightCount >= 5)
+                        displayName = np.DisplayName;
+                }
+                string notifyText = $"[ Bestiary Updated — {displayName} ]";
+                var notifySize = _fontSmall.MeasureString(notifyText);
+                float nx = ViewW / 2f - notifySize.X / 2f;
+                float ny = ViewH - 28 - slideUp;
+                _spriteBatch.Draw(_pixel, new Rectangle((int)nx - 6, (int)ny - 2, (int)notifySize.X + 12, (int)notifySize.Y + 4), Color.Black * (0.5f * alpha));
+                DrawOutlinedString(_fontSmall, notifyText, new Vector2(nx, ny), new Color(100, 200, 255) * alpha);
             }
 
             // Death log (bottom-left, above weapon HUD)
