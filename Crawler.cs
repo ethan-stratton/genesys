@@ -222,7 +222,7 @@ public class Crawler : Creature
         SurfaceRight = surfaceRight;
         Hp = 3;
         MaxHp = 3;
-        SpeciesName = "Crawler";
+        SpeciesName = "crawler";
         Needs = CreatureNeeds.Default;
         _rng = rng ?? new Random();
         _bodyBobSpring = new SecondOrderDynamics(4f, 0.4f, -1f, 0f); // underdamped + anticipation

@@ -44,7 +44,7 @@ public class Hopper : Creature
         Position = pos;
         Velocity = Vector2.Zero;
         Hp = 4; MaxHp = 4;
-        SpeciesName = "Hopper";
+        SpeciesName = "hopper";
         Role = EcologicalRole.Herbivore;
         Needs = CreatureNeeds.Default;
         _state = State.Grounded;

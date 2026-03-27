@@ -72,7 +72,7 @@ public class Bird : Creature
         SurfaceRight = surfaceRight;
         Hp = 1;
         MaxHp = 1;
-        SpeciesName = "Bird";
+        SpeciesName = "bird";
         Role = EcologicalRole.Prey;
         Needs = CreatureNeeds.Default;
         _rng = rng;

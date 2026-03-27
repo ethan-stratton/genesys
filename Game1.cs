@@ -575,12 +575,15 @@ public class Game1 : Game
     private List<Cloud> _clouds = new();
 
     // EVE Scan System
-    private Dictionary<string, int> _scanProgress = new(); // "crawler" -> scan count (0-3)
+    private Dictionary<string, int> _scanProgress = new(); // legacy — kept for save compat
     private float _scanTimer;
-    private const float ScanDuration = 1.0f;
+    private const float L2ScanDuration = 2.5f;
+    private const float L2ScanBatteryCost = 3f;
+    private const float L2ScanRange = 200f;
     private bool _isScanning;
-    private string _scanTarget;
+    private string _scanTarget;           // species ID of scan target
     private Vector2 _scanTargetPos;
+    private Creature _scanTargetCreature; // actual creature ref for tracking + interrupt
     private float _scanPulseTimer;
     private float _scanRevealTimer;
     private string _scanRevealText;
@@ -2049,7 +2052,7 @@ public class Game1 : Game
             }
         }
 
-        // --- EVE Scan System input ---
+        // --- EVE L2 Active Scan System (Q key) ---
         if (_gameState == GameState.Playing && !_isDead && !_menuOpen && !_dialogueOpen && !_spawnMenuOpen)
         {
             if (kb.IsKeyDown(Keys.Q))
@@ -2057,95 +2060,185 @@ public class Game1 : Game
                 var pc = PlayerCenter;
                 if (!_isScanning && _prevKb.IsKeyUp(Keys.Q))
                 {
-                    // Find nearest alive enemy within 200px
-                    float bestDist = 200f;
-                    string bestType = null;
-                    Vector2 bestPos = Vector2.Zero;
-                    foreach (var cr in _creatures)
+                    if (!_scanL2Available)
                     {
-                        if (!cr.Alive) continue;
-                        if (cr is Crawler crl && crl.IsDummy) continue;
-                        var ep = cr.Position + new Vector2(cr.Rect.Width / 2f, cr.Rect.Height / 2f);
-                        float d2 = Vector2.Distance(pc, ep);
-                        if (d2 < bestDist)
-                        {
-                            bestDist = d2;
-                            bestPos = ep;
-                            bestType = cr switch { Crawler cw => cw.Variant.ToString().ToLower(), Bird => "bird", Wingbeater => "wingbeater", Hopper => "hopper", Thornback => "thornback", _ => "creature" };
-                        }
+                        EveAlert("Scanner not online yet.", 2f);
                     }
-                    if (bestType != null)
+                    else if (_player.Battery < L2ScanBatteryCost)
                     {
-                        _isScanning = true;
-                        _scanTimer = ScanDuration;
-                        _scanTarget = bestType;
-                        _scanTargetPos = bestPos;
+                        EveAlert("Not enough battery to scan.", 2f);
                     }
                     else
                     {
-                        // Check scannables for L2 scan
-                        ScannableObject bestScannable = null;
-                        float bestScDist = PassiveScanRange;
-                        foreach (var sc in _scannables)
+                        // Find nearest alive creature within range
+                        float bestDist = L2ScanRange;
+                        Creature bestCreature = null;
+                        foreach (var cr in _creatures)
                         {
-                            if (string.IsNullOrEmpty(sc.ScanL2Text)) continue;
-                            float d = Vector2.Distance(pc, sc.Position);
-                            if (d < bestScDist) { bestScDist = d; bestScannable = sc; }
+                            if (!cr.Alive) continue;
+                            if (cr is Crawler crl && crl.IsDummy) continue;
+                            var ep = cr.Position + new Vector2(cr.Rect.Width / 2f, cr.Rect.Height / 2f);
+                            float d2 = Vector2.Distance(pc, ep);
+                            if (d2 < bestDist) { bestDist = d2; bestCreature = cr; }
                         }
-                        if (bestScannable != null)
+                        if (bestCreature != null)
                         {
-                            bestScannable.GlowTimer = 2f;
-                            EveAlert(bestScannable.ScanL2Text, 6f);
-                            _scanLog.Add(bestScannable.Id + "-L2");
+                            string speciesId = bestCreature.SpeciesName;
+                            // Check if already L2 scanned
+                            if (_bestiary.Entries.TryGetValue(speciesId, out var existing) && existing.L2Scanned)
+                            {
+                                EveAlert("Already have full scan data on this one.", 2f);
+                            }
+                            else
+                            {
+                                // Start L2 scan — battery cost upfront
+                                _player.Battery = Math.Max(0, _player.Battery - L2ScanBatteryCost);
+                                _isScanning = true;
+                                _scanTimer = L2ScanDuration;
+                                _scanPulseTimer = 0f;
+                                _scanTarget = speciesId;
+                                _scanTargetCreature = bestCreature;
+                                _scanTargetPos = bestCreature.Position + new Vector2(bestCreature.Rect.Width / 2f, bestCreature.Rect.Height / 2f);
+                                // EVE flies to the creature
+                                _eveMode = EveMovementMode.FlyTo;
+                                _eveFlyTarget = _scanTargetPos + new Vector2(0, -20); // hover above
+                                EveAlert("Scanning...", 1.5f);
+                            }
+                        }
+                        else
+                        {
+                            // Check scannables (static objects) for L2 scan
+                            ScannableObject bestScannable = null;
+                            float bestScDist = L2ScanRange;
+                            foreach (var sc in _scannables)
+                            {
+                                if (string.IsNullOrEmpty(sc.ScanL2Text)) continue;
+                                if (_scanLog.Contains(sc.Id + "-L2")) continue;
+                                float d = Vector2.Distance(pc, sc.Position);
+                                if (d < bestScDist) { bestScDist = d; bestScannable = sc; }
+                            }
+                            if (bestScannable != null)
+                            {
+                                _player.Battery = Math.Max(0, _player.Battery - L2ScanBatteryCost);
+                                bestScannable.GlowTimer = 2f;
+                                EveAlert(bestScannable.ScanL2Text, 6f);
+                                _scanLog.Add(bestScannable.Id + "-L2");
+                            }
+                            else
+                            {
+                                EveAlert("Nothing to scan nearby.", 2f);
+                            }
                         }
                     }
                 }
                 else if (_isScanning)
                 {
-                    // Update target position and check distance
-                    float bestDist = 250f;
-                    Vector2 bestPos = _scanTargetPos;
-                    bool found = false;
-                    foreach (var cr in _creatures)
+                    // Track target creature position
+                    if (_scanTargetCreature == null || !_scanTargetCreature.Alive)
                     {
-                        if (!cr.Alive) continue;
-                        var ep = cr.Position + new Vector2(cr.Rect.Width / 2f, cr.Rect.Height / 2f);
-                        float d2 = Vector2.Distance(pc, ep);
-                        if (d2 < bestDist) { bestDist = d2; bestPos = ep; found = true; }
+                        // Target died — scan interrupted
+                        _isScanning = false;
+                        _eveMode = EveMovementMode.Orbit;
+                        EveAlert("Target lost.", 2f);
                     }
-                    if (!found) _isScanning = false;
                     else
                     {
-                        _scanTargetPos = bestPos;
+                        _scanTargetPos = _scanTargetCreature.Position + new Vector2(_scanTargetCreature.Rect.Width / 2f, _scanTargetCreature.Rect.Height / 2f);
+                        _eveFlyTarget = _scanTargetPos + new Vector2(0, -20);
                         _scanTimer -= dt;
                         _scanPulseTimer += dt;
-                        // Spawn green scan particles
-                        if (_rng.NextDouble() < 0.3)
-                            _particles.Add(new Particle { Position = bestPos + new Vector2(_rng.Next(-10, 10), _rng.Next(-10, 10)), Velocity = new Vector2(0, -20), Life = 0.5f, MaxLife = 0.5f, Color = Color.LimeGreen, Size = 2 });
-                        if (_scanTimer <= 0)
+
+                        // EVE vulnerability — check if any creature hits near EVE
+                        float eveHitRadius = 12f;
+                        foreach (var cr in _creatures)
+                        {
+                            if (!cr.Alive || cr == _scanTargetCreature) continue;
+                            var crCenter = cr.Position + new Vector2(cr.Rect.Width / 2f, cr.Rect.Height / 2f);
+                            if (Vector2.Distance(_evePos, crCenter) < eveHitRadius + cr.Rect.Width / 2f)
+                            {
+                                // Scan interrupted!
+                                _isScanning = false;
+                                _eveMode = EveMovementMode.Orbit;
+                                EveAlert("Scan interrupted! Too dangerous.", 3f);
+                                _eveScanPulseTimer = 0f;
+                                break;
+                            }
+                        }
+
+                        // Also check if target creature attacks (aggressive creatures near EVE)
+                        if (_isScanning && Vector2.Distance(_evePos, _scanTargetPos) < 16f)
+                        {
+                            // Close enough — scan particles
+                            if (_rng.NextDouble() < 0.5)
+                            {
+                                float angle = (float)(_rng.NextDouble() * Math.PI * 2);
+                                float r = 8f + (float)_rng.NextDouble() * 12f;
+                                _particles.Add(new Particle
+                                {
+                                    Position = _scanTargetPos + new Vector2(MathF.Cos(angle) * r, MathF.Sin(angle) * r),
+                                    Velocity = new Vector2(MathF.Cos(angle) * -15f, MathF.Sin(angle) * -15f),
+                                    Life = 0.6f, MaxLife = 0.6f,
+                                    Color = new Color(100, 255, 200), Size = 2
+                                });
+                            }
+                            // Scan beam particles (EVE to target)
+                            if (_rng.NextDouble() < 0.3)
+                            {
+                                float t = (float)_rng.NextDouble();
+                                var beamPos = Vector2.Lerp(_evePos, _scanTargetPos, t);
+                                _particles.Add(new Particle
+                                {
+                                    Position = beamPos + new Vector2(_rng.Next(-3, 3), _rng.Next(-3, 3)),
+                                    Velocity = Vector2.Zero,
+                                    Life = 0.3f, MaxLife = 0.3f,
+                                    Color = Color.Cyan * 0.7f, Size = 1
+                                });
+                            }
+                        }
+
+                        // Scan complete
+                        if (_isScanning && _scanTimer <= 0)
                         {
                             _isScanning = false;
-                            if (!_scanProgress.ContainsKey(_scanTarget)) _scanProgress[_scanTarget] = 0;
-                            if (_scanProgress[_scanTarget] < 3) _scanProgress[_scanTarget]++;
-                            int lvl = _scanProgress[_scanTarget];
-                            string scanLabel = _scanTarget;
-                            // Use proper scan names for crawler variants
-                            if (_scanTarget == "forager" || _scanTarget == "skitter" || _scanTarget == "leaper" || _scanTarget == "bombardier")
+                            _eveMode = EveMovementMode.Orbit;
+
+                            // Set L2 scanned on bestiary entry
+                            if (!_bestiary.Entries.ContainsKey(_scanTarget))
+                                _bestiary.LogSighting(_scanTarget, "Unknown", GetTimeOfDay().ToString(), _weatherRain ? "rain" : "clear", "scanned", "unknown");
+                            _bestiary.Entries[_scanTarget].L2Scanned = true;
+
+                            // EVE speaks L2 result
+                            string displayName = _scanTarget;
+                            if (CreatureDatabase.Profiles.TryGetValue(_scanTarget, out var profile))
                             {
-                                var nearest = _crawlers.Where(c => c.Alive && c.Variant.ToString().ToLower() == _scanTarget)
-                                    .OrderBy(c => Vector2.Distance(pc, c.Position)).FirstOrDefault();
-                                if (nearest != null) scanLabel = nearest.ScanName;
+                                displayName = profile.DisplayName;
+                                // Short spoken L2 summary
+                                string l2Quip = profile.Temperament != null
+                                    ? $"{displayName}: {profile.Temperament.Split('—')[0].Trim()}"
+                                    : $"Full scan: {displayName}";
+                                if (l2Quip.Length > 50) l2Quip = l2Quip[..47] + "...";
+                                EveAlert(l2Quip, 4f);
                             }
-                            string reveal = lvl switch { 1 => $"Identified: {scanLabel}", 2 => $"Vitals scanned: {scanLabel}", 3 => $"Weak point found: {scanLabel} (+25% DMG)", _ => "" };
-                            _scanRevealText = reveal;
-                            _scanRevealTimer = 2f;
+                            else
+                            {
+                                EveAlert($"Scan complete: {displayName}", 3f);
+                            }
+
+                            _scanRevealText = $"[ L2 Scan Complete — {displayName} ]";
+                            _scanRevealTimer = 3f;
+                            _eveScanPulseTimer = 1.5f;
+                            _bestiaryNotifyTimer = 3f;
+                            _bestiaryNotifySpecies = _scanTarget;
                         }
                     }
                 }
             }
-            else
+            else if (_isScanning)
             {
+                // Released Q — scan interrupted
                 _isScanning = false;
+                _eveMode = EveMovementMode.Orbit;
+                EveAlert("Scan aborted.", 2f);
             }
         }
         // Update scan reveal timer
@@ -11473,12 +11566,21 @@ public class Game1 : Game
             float beamAlpha = 0.4f + 0.3f * MathF.Sin(_scanPulseTimer * 8f);
             DrawTriangulationScan(_eveOrbActive ? _evePos : PlayerCenter, _scanTargetPos, _totalTime, beamAlpha);
             // Scan progress bar above target
-            float progress = 1f - _scanTimer / ScanDuration;
+            float progress = 1f - _scanTimer / L2ScanDuration;
             int barW = 24, barH = 3;
             int barX = (int)(_scanTargetPos.X - barW / 2f);
             int barY = (int)(_scanTargetPos.Y - 16);
+            // Bar color: green safe, yellow if enemies near EVE, red if very close
+            float nearestThreat = float.MaxValue;
+            foreach (var cr in _creatures)
+            {
+                if (!cr.Alive || cr == _scanTargetCreature) continue;
+                float td = Vector2.Distance(_evePos, cr.Position + new Vector2(cr.Rect.Width / 2f, cr.Rect.Height / 2f));
+                if (td < nearestThreat) nearestThreat = td;
+            }
+            Color barColor = nearestThreat < 30f ? Color.Red : nearestThreat < 60f ? Color.Yellow : Color.LimeGreen;
             _spriteBatch.Draw(_pixel, new Rectangle(barX, barY, barW, barH), Color.Black * 0.5f);
-            _spriteBatch.Draw(_pixel, new Rectangle(barX, barY, (int)(barW * progress), barH), Color.LimeGreen);
+            _spriteBatch.Draw(_pixel, new Rectangle(barX, barY, (int)(barW * progress), barH), barColor);
         }
         // EVE wake-up scan (uses same triangulation)
         if (_eveOrbActive && _eveMode == EveMovementMode.Scan)

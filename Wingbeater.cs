@@ -57,7 +57,7 @@ public class Wingbeater : Creature
         SpawnPos = pos;
         Hp = 3;
         MaxHp = 3;
-        SpeciesName = "Wingbeater";
+        SpeciesName = "wingbeater";
         Role = EcologicalRole.Predator;
         Needs = CreatureNeeds.Default;
         _stateTimer = 1f;

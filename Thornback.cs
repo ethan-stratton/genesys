@@ -16,7 +16,7 @@ public class Thornback : Creature
     {
         Position = pos;
         Hp = 20; MaxHp = 20;
-        SpeciesName = "Thornback";
+        SpeciesName = "thornback";
         Role = EcologicalRole.Defensive;
         Needs = CreatureNeeds.Default;
     }
