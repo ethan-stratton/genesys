@@ -69,11 +69,17 @@
         "*static* ...sys...tems... *crackle*",
         "R-rebooting. Core intact. Barely.",
         "Adam? Is that... you made it.",
-        "I lost telemetry during the descent. How long was I offline?",
-        "Never mind. Diagnostics later. We need to move.",
-        "Syncing to your suit transponder. I'll stay close."
+        "I ran the numbers during descent. 11% survival probability. We beat that.",
+        "I lost telemetry when we hit atmosphere. How long was I offline?",
+        "Never mind. Diagnostics later.",
+        "Suit's holding but I'm reading micro-fractures. We need to find shelter and patch up.",
+        "The ship should be nearby \u2014 if anything survived the impact, that's where we start.",
+        "Syncing to your suit transponder. Stay close. I'll keep scanning."
       ],
       "dialogueSpeakers": [
+        "EVE",
+        "EVE",
+        "EVE",
         "EVE",
         "EVE",
         "EVE",

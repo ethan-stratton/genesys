@@ -1,10 +1,12 @@
 {
-  "currentLevel": "debug-room",
-  "spawnX": 1304.1537,
-  "spawnY": 264,
+  "currentLevel": "crashsite",
+  "spawnX": 295.04205,
+  "spawnY": 230.66681,
   "unlockedAbilities": [],
-  "flags": {},
-  "playTime": 97.539696,
+  "flags": {
+    "eveOrbActive": true
+  },
+  "playTime": 117.11054,
   "meleeInventory": [
     "Knife"
   ],
@@ -40,11 +42,11 @@
   "deathCount": 0,
   "hp": 10,
   "suitIntegrity": 50,
-  "battery": 99,
+  "battery": 97,
   "bestiary": {
     "entries": {}
   },
-  "worldTime": 12.449092,
+  "worldTime": 12.7748995,
   "evolutionFlags": [],
   "cipherScanUnlocked": false
 }

@@ -7421,7 +7421,7 @@ public class Game1 : Game
                 // Interact prompt when close
                 float dist = Vector2.Distance(_player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f), new Vector2(cx, cy));
                 if (dist < 48f)
-                    DrawOutlinedString(_fontSmall, "[E]", new Vector2(cx - 8, cy - 24), Color.Cyan * (0.5f + 0.3f * MathF.Sin(_totalTime * 3f)));
+                    DrawOutlinedString(_fontSmall, "[W]", new Vector2(cx - 8, cy - 24), Color.Cyan * (0.5f + 0.3f * MathF.Sin(_totalTime * 3f)));
             }
             else
             {
