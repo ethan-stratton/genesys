@@ -409,6 +409,25 @@ public class Game1 : Game
     private const float EveOrbitAccel = 800f;
     private const float EveScanAccel = 500f;
 
+    // EVE visual states
+    private enum EveVisualState { Normal, Scared, LowBattery, Damaged, Scanning }
+    private EveVisualState _eveVisualState = EveVisualState.Normal;
+    private float _eveTraumaTimer;  // shaky orbit after big hits nearby
+    private int _evePrevHp;         // track HP changes for trauma detection
+
+    // EVE water droplets
+    private struct EveDroplet
+    {
+        public Vector2 Offset;     // relative to EVE pos
+        public Vector2 Velocity;
+        public float Life;
+        public float Size;
+        public bool Dripping;      // true = falling off
+    }
+    private List<EveDroplet> _eveDroplets = new();
+    private bool _eveWasInWater;
+    private float _eveDropletCooldown;
+
     // --- Passive Scan System ---
     private class ScannableObject
     {
@@ -463,9 +482,41 @@ public class Game1 : Game
     /// <summary>Get EVE's current orbit target position (clockwise).</summary>
     private Vector2 EveOrbitPos(Vector2 playerCenter, float time)
     {
-        // Negative sin for clockwise to match scan direction
         float angle = time * 2f;
-        return playerCenter + new Vector2(MathF.Cos(angle) * 30f, -MathF.Sin(angle) * 30f);
+        float radius = 30f;
+        float xOff = 0f, yOff = 0f;
+
+        switch (_eveVisualState)
+        {
+            case EveVisualState.Scared:
+                // Tighter orbit, hugs close, moves faster, slight tremble
+                radius = 16f;
+                angle = time * 3.5f;
+                xOff = MathF.Sin(time * 17f) * 2f;
+                yOff = MathF.Cos(time * 13f) * 2f;
+                break;
+            case EveVisualState.Damaged:
+                // Erratic, jittery — bigger offsets, uneven orbit
+                radius = 28f;
+                angle = time * 2.2f;
+                xOff = MathF.Sin(time * 23f) * 4f + MathF.Sin(time * 7f) * 2f;
+                yOff = MathF.Cos(time * 19f) * 3f;
+                break;
+            case EveVisualState.LowBattery:
+                // Slow, droopy — sinks lower, sluggish orbit
+                radius = 26f;
+                angle = time * 1.2f;
+                yOff = 8f + MathF.Sin(time * 0.7f) * 3f; // sags downward
+                break;
+            case EveVisualState.Scanning:
+                // Handled by FlyTo mode, but if orbiting during scan prep
+                radius = 30f;
+                break;
+            default:
+                break;
+        }
+
+        return playerCenter + new Vector2(MathF.Cos(angle) * radius + xOff, -MathF.Sin(angle) * radius + yOff);
     }
     
     /// <summary>Lissajous health scan — EVE traces a full figure-8 beside Adam (clockwise).</summary>
@@ -1757,6 +1808,99 @@ public class Game1 : Game
         {
             var pc = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
             UpdateEvePosition(dt, pc);
+
+            // EVE visual state determination
+            if (_eveTraumaTimer > 0) _eveTraumaTimer -= dt;
+            // Detect HP drop → trauma
+            if (_player.Hp < _evePrevHp && _evePrevHp > 0)
+                _eveTraumaTimer = Math.Max(_eveTraumaTimer, 1.5f + (_evePrevHp - _player.Hp) * 0.5f);
+            _evePrevHp = _player.Hp;
+            if (_isScanning || _isL3Scanning)
+                _eveVisualState = EveVisualState.Scanning;
+            else if (_player.Hp <= 3)
+                _eveVisualState = EveVisualState.Scared;
+            else if (_player.Battery < 10)
+                _eveVisualState = EveVisualState.LowBattery;
+            else if (_eveTraumaTimer > 0)
+                _eveVisualState = EveVisualState.Damaged;
+            else
+                _eveVisualState = EveVisualState.Normal;
+
+            // EVE water droplets
+            // Check if EVE is in water (use tile at her position)
+            var evGrid = _level?.TileGridInstance;
+            bool eveInWater = false;
+            if (evGrid != null)
+            {
+                int eveTileX = (int)((_evePos.X - evGrid.OriginX) / evGrid.TileSize);
+                int eveTileY = (int)((_evePos.Y - evGrid.OriginY) / evGrid.TileSize);
+                if (eveTileX >= 0 && eveTileX < evGrid.Width && eveTileY >= 0 && eveTileY < evGrid.Height)
+                {
+                    var tile = evGrid.Tiles[eveTileX, eveTileY];
+                    eveInWater = TileProperties.IsLiquid(tile);
+                }
+            }
+
+            if (eveInWater && !_eveWasInWater)
+            {
+                // Just entered water — add droplets all over
+                for (int di = 0; di < 8; di++)
+                    _eveDroplets.Add(new EveDroplet {
+                        Offset = new Vector2(_rng.Next(-5, 6), _rng.Next(-5, 6)),
+                        Velocity = Vector2.Zero,
+                        Life = 2f + (float)_rng.NextDouble() * 2f,
+                        Size = 1f + (float)_rng.NextDouble(),
+                        Dripping = false
+                    });
+            }
+            else if (eveInWater)
+            {
+                // Sustained water — add droplets periodically
+                _eveDropletCooldown -= dt;
+                if (_eveDropletCooldown <= 0)
+                {
+                    _eveDropletCooldown = 0.3f;
+                    _eveDroplets.Add(new EveDroplet {
+                        Offset = new Vector2(_rng.Next(-4, 5), _rng.Next(-4, 5)),
+                        Velocity = Vector2.Zero,
+                        Life = 1.5f + (float)_rng.NextDouble() * 1.5f,
+                        Size = 1f + (float)_rng.NextDouble() * 0.5f,
+                        Dripping = false
+                    });
+                }
+            }
+            _eveWasInWater = eveInWater;
+
+            // Update droplets — they cling, then drip off with gravity + EVE momentum
+            for (int di = _eveDroplets.Count - 1; di >= 0; di--)
+            {
+                var d = _eveDroplets[di];
+                d.Life -= dt;
+                if (d.Life <= 0) { _eveDroplets.RemoveAt(di); continue; }
+
+                if (!d.Dripping)
+                {
+                    // Cling to EVE — start dripping when life gets low or EVE moves fast
+                    float eveSpeed = _eveVel.Length();
+                    bool shouldDrip = d.Life < 1.2f || eveSpeed > 120f || (float)_rng.NextDouble() < 0.01f;
+                    if (shouldDrip)
+                    {
+                        d.Dripping = true;
+                        // Initial velocity = EVE's velocity * small factor + downward
+                        d.Velocity = _eveVel * 0.15f + new Vector2(0, 20f);
+                        // Convert from relative offset to world offset that will be gravity-affected
+                    }
+                }
+
+                if (d.Dripping)
+                {
+                    d.Velocity += new Vector2(0, 180f * dt); // gravity
+                    d.Offset += d.Velocity * dt;
+                    d.Size = Math.Max(0.5f, d.Size - dt * 0.3f); // shrink as they fall
+                }
+
+                _eveDroplets[di] = d;
+            }
             
             // Auto-cancel map projection if player walks too far
             if (_eveProjectingMap && _eveMode == EveMovementMode.MapProject)
@@ -8461,6 +8605,13 @@ public class Game1 : Game
             var e = entries[i];
             bool sel = i == _bestiarySelectedIndex;
             Color c = sel ? Color.White : Color.Gray * 0.6f;
+
+            // Scan-level color border: blue L1, green L2, crimson-purple L3
+            Color borderColor = e.L3Scanned ? new Color(160, 40, 180) :
+                                e.L2Scanned ? new Color(60, 200, 80) :
+                                new Color(60, 120, 200);
+            _spriteBatch.Draw(_pixel, new Rectangle(tx - 4, ty, 2, lineH), borderColor * (sel ? 0.9f : 0.4f));
+
             if (sel) _spriteBatch.Draw(_pixel, new Rectangle(tx - 2, ty, cw - 16, lineH), new Color(30, 60, 50) * 0.5f);
 
             string listName = e.SpeciesName;
@@ -12005,16 +12156,69 @@ public class Game1 : Game
                 }
             }
             
-            // Outer glow (flickers during boot)
+            // Outer glow (flickers during boot, changes color by state)
             float glowAlpha = 0.4f;
+            Color glowColor = Color.CornflowerBlue;
+            Color coreColor = Color.Cyan;
             if (!_wakeUpComplete)
+            {
                 glowAlpha *= 0.3f + 0.7f * (0.5f + 0.5f * MathF.Sin(_totalTime * 2.5f));
-            _spriteBatch.Draw(_pixel, new Rectangle((int)(orbX - 6), (int)(orbY - 6), 12, 12), Color.CornflowerBlue * glowAlpha);
+            }
+            else
+            {
+                switch (_eveVisualState)
+                {
+                    case EveVisualState.Scared:
+                        // Rapid flicker, warm tint
+                        glowColor = new Color(100, 180, 255);
+                        coreColor = new Color(150, 220, 255);
+                        glowAlpha = 0.3f + 0.3f * MathF.Abs(MathF.Sin(_totalTime * 12f));
+                        break;
+                    case EveVisualState.Damaged:
+                        // Spark flicker, orange tinge
+                        glowColor = new Color(200, 160, 100);
+                        coreColor = (_totalTime * 8f % 1f < 0.1f) ? Color.Orange : Color.Cyan;
+                        glowAlpha = 0.2f + 0.4f * (float)_rng.NextDouble();
+                        break;
+                    case EveVisualState.LowBattery:
+                        // Dim, slow pulse
+                        glowColor = new Color(60, 100, 140);
+                        coreColor = new Color(80, 160, 200);
+                        glowAlpha = 0.15f + 0.15f * MathF.Sin(_totalTime * 1.5f);
+                        break;
+                    case EveVisualState.Scanning:
+                        // Bright, focused
+                        glowColor = Color.Cyan;
+                        coreColor = Color.White;
+                        glowAlpha = 0.5f + 0.2f * MathF.Sin(_totalTime * 4f);
+                        break;
+                    default:
+                        break;
+                }
+            }
+            _spriteBatch.Draw(_pixel, new Rectangle((int)(orbX - 6), (int)(orbY - 6), 12, 12), glowColor * glowAlpha);
             // Core (flickers during boot)
             float coreAlpha = 1f;
             if (!_wakeUpComplete)
                 coreAlpha = 0.4f + 0.6f * (0.5f + 0.5f * MathF.Sin(_totalTime * 3.5f));
-            _spriteBatch.Draw(_pixel, new Rectangle((int)(orbX - 4), (int)(orbY - 4), 8, 8), Color.Cyan * coreAlpha);
+            else if (_eveVisualState == EveVisualState.LowBattery)
+                coreAlpha = 0.5f + 0.3f * MathF.Sin(_totalTime * 1.5f);
+            _spriteBatch.Draw(_pixel, new Rectangle((int)(orbX - 4), (int)(orbY - 4), 8, 8), coreColor * coreAlpha);
+
+            // Water droplets on EVE
+            foreach (var drop in _eveDroplets)
+            {
+                float da = MathHelper.Clamp(drop.Life, 0, 1);
+                Vector2 dropPos = drop.Dripping
+                    ? _evePos + drop.Offset  // world-relative offset for falling drops
+                    : new Vector2(orbX + drop.Offset.X, orbY + drop.Offset.Y); // follows EVE
+                int ds = Math.Max(1, (int)drop.Size);
+                Color dropColor = new Color(100, 160, 220) * (da * 0.8f);
+                _spriteBatch.Draw(_pixel, new Rectangle((int)dropPos.X, (int)dropPos.Y, ds, ds), dropColor);
+                // Elongate dripping drops
+                if (drop.Dripping && drop.Velocity.Y > 30f)
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)dropPos.X, (int)dropPos.Y - 1, 1, ds + 1), dropColor * 0.5f);
+            }
             // EVE scan pulse rings
             if (_eveScanPulseTimer > 0)
             {
