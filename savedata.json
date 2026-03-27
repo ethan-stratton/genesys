@@ -1,12 +1,12 @@
 {
-  "currentLevel": "crashsite",
-  "spawnX": 295.04205,
-  "spawnY": 230.66681,
+  "currentLevel": "ship-interior",
+  "spawnX": 2590.0972,
+  "spawnY": 472,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 117.11054,
+  "playTime": 133.4282,
   "meleeInventory": [
     "Knife"
   ],
@@ -42,11 +42,11 @@
   "deathCount": 0,
   "hp": 10,
   "suitIntegrity": 50,
-  "battery": 97,
+  "battery": 100,
   "bestiary": {
     "entries": {}
   },
-  "worldTime": 12.7748995,
+  "worldTime": 13.047146,
   "evolutionFlags": [],
   "cipherScanUnlocked": false
 }

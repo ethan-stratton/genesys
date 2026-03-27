@@ -727,6 +727,9 @@ public class Game1 : Game
     private bool _dragFilling;
     private int _dragFillStartCol, _dragFillStartRow;
     private int _dragFillEndCol, _dragFillEndRow;
+    private bool _dragErasing; // Ctrl+right-drag mass erase
+    private int _dragEraseStartCol, _dragEraseStartRow;
+    private int _dragEraseEndCol, _dragEraseEndRow;
 
     // Undo system (tile changes)
     private readonly List<List<(int col, int row, TileType oldTile, TileType newTile)>> _undoStack = new();
@@ -5618,15 +5621,45 @@ public class Game1 : Game
             if (!ctrlHeld && mouse.LeftButton == ButtonState.Released && _prevMouse.LeftButton == ButtonState.Pressed && !_dragFilling)
                 CommitUndoBatch();
 
-            // Right click/hold = erase with undo
+            // Right click/hold = erase with undo (Ctrl+right-drag = rectangle erase)
             if (mouse.RightButton == ButtonState.Pressed)
             {
-                if (_prevMouse.RightButton == ButtonState.Released) BeginUndoBatch();
                 var (tx, ty) = tg.WorldToTile(tileSnappedX, tileSnappedY);
-                if (tx >= 0 && ty >= 0)
-                    EditorSetTile(tg, tx, ty, TileType.Empty);
+                if (ctrlHeld)
+                {
+                    if (!_dragErasing)
+                    {
+                        _dragErasing = true;
+                        _dragEraseStartCol = tx;
+                        _dragEraseStartRow = ty;
+                    }
+                    _dragEraseEndCol = tx;
+                    _dragEraseEndRow = ty;
+                }
+                else
+                {
+                    if (_prevMouse.RightButton == ButtonState.Released) BeginUndoBatch();
+                    if (tx >= 0 && ty >= 0)
+                        EditorSetTile(tg, tx, ty, TileType.Empty);
+                }
             }
-            if (mouse.RightButton == ButtonState.Released && _prevMouse.RightButton == ButtonState.Pressed)
+            // Release after Ctrl+right drag = commit rectangle erase
+            if (_dragErasing && (mouse.RightButton == ButtonState.Released || !ctrlHeld))
+            {
+                BeginUndoBatch();
+                int minC = Math.Min(_dragEraseStartCol, _dragEraseEndCol);
+                int maxC = Math.Max(_dragEraseStartCol, _dragEraseEndCol);
+                int minR = Math.Min(_dragEraseStartRow, _dragEraseEndRow);
+                int maxR = Math.Max(_dragEraseStartRow, _dragEraseEndRow);
+                for (int r = minR; r <= maxR; r++)
+                    for (int c = minC; c <= maxC; c++)
+                        EditorSetTile(tg, c, r, TileType.Empty);
+                CommitUndoBatch();
+                int count = (maxC - minC + 1) * (maxR - minR + 1);
+                SetEditorStatus($"Erased {count} tiles");
+                _dragErasing = false;
+            }
+            if (!ctrlHeld && mouse.RightButton == ButtonState.Released && _prevMouse.RightButton == ButtonState.Pressed && !_dragErasing)
                 CommitUndoBatch();
 
             // Cycle tile type with [ and ]
@@ -7292,6 +7325,22 @@ public class Game1 : Game
                     DrawHollowRect(rx, ry, rw, rh, Color.Yellow * 0.7f);
                     int count = (maxC - minC + 1) * (maxR - minR + 1);
                     _spriteBatch.DrawString(_fontSmall, $"{count} tiles", new Vector2(rx, ry - 16), Color.Yellow * 0.8f);
+                }
+                // Drag-erase preview
+                if (_dragErasing && _level.TileGridInstance != null)
+                {
+                    int ox = _level.TileGridInstance.OriginX;
+                    int oy = _level.TileGridInstance.OriginY;
+                    int minC = Math.Min(_dragEraseStartCol, _dragEraseEndCol);
+                    int maxC = Math.Max(_dragEraseStartCol, _dragEraseEndCol);
+                    int minR = Math.Min(_dragEraseStartRow, _dragEraseEndRow);
+                    int maxR = Math.Max(_dragEraseStartRow, _dragEraseEndRow);
+                    int rx = ox + minC * 32, ry = oy + minR * 32;
+                    int rw = (maxC - minC + 1) * 32, rh = (maxR - minR + 1) * 32;
+                    _spriteBatch.Draw(_pixel, new Rectangle(rx, ry, rw, rh), Color.Red * 0.15f);
+                    DrawHollowRect(rx, ry, rw, rh, Color.Red * 0.7f);
+                    int count = (maxC - minC + 1) * (maxR - minR + 1);
+                    _spriteBatch.DrawString(_fontSmall, $"{count} erase", new Vector2(rx, ry - 16), Color.Red * 0.8f);
                 }
             }
         }
