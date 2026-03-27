@@ -690,9 +690,9 @@ public class Game1 : Game
     private const int MaxLatched = 4; // max crawlers latched at once
 
     // --- Editor state ---
-    private enum EditorTool { SolidFloor = 0, Platform = 1, Rope = 2, Wall = 3, Spike = 4, Exit = 5, Spawn = 6, WallSpike = 7, OverworldExit = 8, Ceiling = 9, TilePaint = 10, Enemy = 11, Item = 12, EnvRegion = 13 }
+    private enum EditorTool { Rope = 0, Wall = 1, Spike = 2, Exit = 3, Spawn = 4, WallSpike = 5, OverworldExit = 6, TilePaint = 7, Enemy = 8, Item = 9, EnvRegion = 10 }
     // Wall climbSide values: 0=both, 1=right face, -1=left face, 99=no climb (solid only)
-    private EditorTool _editorTool = EditorTool.Platform;
+    private EditorTool _editorTool = EditorTool.TilePaint;
     private bool _toolPaletteOpen;
     private Vector2 _editorCursor; // world position
     private bool _editorGridSnap = true;
@@ -1034,10 +1034,7 @@ public class Game1 : Game
 
         var tg = _level.TileGridInstance;
         int ts = _level.TileGrid?.TileSize ?? 32;
-        var plats = _level.AllPlatforms;
-        var sFloors = _level.SolidFloorRects;
         var walls = _level.WallRects;
-        float mainFloor = _level.Floor.Y;
         float bLeft = _level.Bounds.Left;
         float bRight = _level.Bounds.Right;
 
@@ -1063,7 +1060,7 @@ public class Game1 : Game
                 case "spitter":
                 case "mimic":
                 case "resonant":
-                    float snapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Crawler.Width, Crawler.Height, tg, ts, plats, sFloors, walls, mainFloor);
+                    float snapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Crawler.Width, Crawler.Height, tg, ts, walls, _level.Bounds.Bottom);
                     var pushOut = EnemyPhysics.PushOutOfSolid(e.X, snapY, Crawler.Width, Crawler.Height, tg, ts);
                     var c = new Crawler(new Vector2(pushOut.X, pushOut.Y), bLeft, bRight, 0, 0, _rng);
                     c.Frozen = e.Frozen;
@@ -1079,23 +1076,23 @@ public class Game1 : Game
                         _ => CrawlerVariant.Forager,
                     };
                     c.ApplyVariantRole();
-                    c.UpdateSurfaceEdges(tg, ts, plats, sFloors, bLeft, bRight);
+                    c.UpdateSurfaceEdges(tg, ts, bLeft, bRight);
                     _crawlers.Add(c); _creatures.Add(c);
                     break;
                 case "thornback":
-                    float tSnapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Thornback.Width, Thornback.Height, tg, ts, plats, sFloors, walls, mainFloor);
+                    float tSnapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Thornback.Width, Thornback.Height, tg, ts, walls, _level.Bounds.Bottom);
                     var tb = new Thornback(new Vector2(e.X, tSnapY));
                     _thornbacks.Add(tb); _creatures.Add(tb);
                     break;
                 case "hopper":
-                    float hSnapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Hopper.Width, Hopper.Height, tg, ts, plats, sFloors, walls, mainFloor);
+                    float hSnapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Hopper.Width, Hopper.Height, tg, ts, walls, _level.Bounds.Bottom);
                     var hop = new Hopper(new Vector2(e.X, hSnapY), hSnapY + Hopper.Height);
                     _hoppers.Add(hop); _creatures.Add(hop);
                     break;
                 case "bird":
-                    float bSnapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Bird.Width, Bird.Height, tg, ts, plats, sFloors, walls, mainFloor);
+                    float bSnapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Bird.Width, Bird.Height, tg, ts, walls, _level.Bounds.Bottom);
                     var bird = new Bird(new Vector2(e.X, bSnapY), 0, 0, _rng);
-                    bird.UpdateSurfaceEdges(tg, ts, plats, sFloors, bLeft, bRight);
+                    bird.UpdateSurfaceEdges(tg, ts, bLeft, bRight);
                     _birds.Add(bird); _creatures.Add(bird);
                     break;
                 case "wingbeater":
@@ -1104,7 +1101,7 @@ public class Game1 : Game
                     _wingbeaters.Add(wb); _creatures.Add(wb);
                     break;
                 case "dummy":
-                    float dSnapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Crawler.Width, Crawler.Height, tg, ts, plats, sFloors, walls, mainFloor);
+                    float dSnapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Crawler.Width, Crawler.Height, tg, ts, walls, _level.Bounds.Bottom);
                     var dummy = new Crawler(new Vector2(e.X, dSnapY), e.X - 10, e.X + 10, 0, 0);
                     dummy.IsDummy = true;
                     dummy.Hp = 9999;
@@ -1113,11 +1110,11 @@ public class Game1 : Game
                     dummy.DummyScaleY = e.ScaleY;
                     dummy.Position.Y -= (dummy.EffectiveHeight - Crawler.Height);
                     dummy.SetSpawnPos(dummy.Position);
-                    dummy.UpdateSurfaceEdges(tg, ts, plats, sFloors, bLeft, bRight);
+                    dummy.UpdateSurfaceEdges(tg, ts, bLeft, bRight);
                     _crawlers.Add(dummy); _creatures.Add(dummy);
                     break;
                 case "crit-dummy":
-                    float cdSnapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Crawler.Width, Crawler.Height, tg, ts, plats, sFloors, walls, mainFloor);
+                    float cdSnapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Crawler.Width, Crawler.Height, tg, ts, walls, _level.Bounds.Bottom);
                     var critDummy = new Crawler(new Vector2(e.X, cdSnapY), e.X - 10, e.X + 10, 0, 0);
                     critDummy.IsDummy = true;
                     critDummy.AlwaysCrit = true;
@@ -1125,7 +1122,7 @@ public class Game1 : Game
                     critDummy.DummyScale = e.Scale;
                     critDummy.Position.Y -= (critDummy.EffectiveHeight - Crawler.Height);
                     critDummy.SetSpawnPos(critDummy.Position);
-                    critDummy.UpdateSurfaceEdges(tg, ts, plats, sFloors, bLeft, bRight);
+                    critDummy.UpdateSurfaceEdges(tg, ts, bLeft, bRight);
                     _crawlers.Add(critDummy); _creatures.Add(critDummy);
                     break;
             }
@@ -2538,7 +2535,7 @@ public class Game1 : Game
         var mouseState = Mouse.GetState();
         var mouseScreen = new Vector2(mouseState.X, mouseState.Y);
         var mouseWorld = Vector2.Transform(mouseScreen, Matrix.Invert(_camera.TransformMatrix));
-        _player.Update(dt, kb, _level.Floor.Y, _level.AllPlatforms, ropesToPass, ropeTopsToPass, ropeBottomsToPass, wallsToPass, wallSidesToPass, _level.WallRects, _level.CeilingRects, _level.SolidFloorRects, _level.TileGridInstance, mouseWorld, mouseState);
+        _player.Update(dt, kb, _level.Bounds.Bottom, ropesToPass, ropeTopsToPass, ropeBottomsToPass, wallsToPass, wallSidesToPass, _level.WallRects, _level.TileGridInstance, mouseWorld, mouseState);
         _player.UpdateRegen(dt);
         
         // Tech Ground Pound landing — camera shake, dust, damage nearby enemies
@@ -2718,11 +2715,9 @@ public class Game1 : Game
                 foreach (var r in _level.WallRects)
                     if (r.Contains(pt)) { _player.AttachGrapple(sp); hit = true; break; }
                 if (hit) break;
-                foreach (var r in _level.SolidFloorRects)
-                    if (r.Contains(pt)) { _player.AttachGrapple(sp); hit = true; break; }
-                if (hit) break;
-                foreach (var r in _level.CeilingRects)
-                    if (r.Contains(pt)) { _player.AttachGrapple(sp); hit = true; break; }
+                if (_level.TileGridInstance != null)
+                    foreach (var r in _level.TileGridInstance.GetSolidRects())
+                        if (r.Contains(pt)) { _player.AttachGrapple(sp); hit = true; break; }
                 if (hit) break;
             }
             if (!hit)
@@ -2840,7 +2835,8 @@ public class Game1 : Game
                 _player.GrappleNudgeVel(new Vector2(-_player.Velocity.X * 0.5f, 0));
                 pRect = _player.CollisionRect;
             }
-            foreach (var r in _level.CeilingRects)
+            if (_level.TileGridInstance != null)
+            foreach (var r in _level.TileGridInstance.GetSolidRects())
             {
                 var overlap = Rectangle.Intersect(pRect, r);
                 if (overlap.Width <= 0 || overlap.Height <= 0) continue;
@@ -3052,7 +3048,7 @@ public class Game1 : Game
 
             c.Update(dt, playerCenter2,
                 _level.TileGridInstance, _level.TileGrid?.TileSize ?? 32,
-                _level.AllPlatforms, _level.SolidFloorRects, _level.Floor.Y);
+                _level.Bounds.Bottom);
             
             // Bombardier spray: spawn hot particles when spray fires
             if (c.BombardierSprayed)
@@ -3213,7 +3209,7 @@ public class Game1 : Game
         {
             h.Update(dt, playerCenter2,
                 _level.TileGridInstance, _level.TileGrid?.TileSize ?? 32,
-                _level.AllPlatforms, _level.SolidFloorRects, _level.Floor.Y);
+                _level.Bounds.Bottom);
             if (_spawnInvincibility <= 0 && !_isDead)
             {
                 int dmg = h.CheckPlayerDamage(playerRect2);
@@ -3264,7 +3260,7 @@ public class Game1 : Game
         foreach (var bird in _birds)
             bird.Update(dt, playerCenter2,
                 _level.TileGridInstance, _level.TileGrid?.TileSize ?? 32,
-                _level.AllPlatforms, _level.SolidFloorRects, _level.Floor.Y);
+                _level.Bounds.Bottom);
 
         // Melee hit detection for birds
         if (_player.MeleeTimer > 0)
@@ -3319,7 +3315,7 @@ public class Game1 : Game
 
         // --- Wingbeater update ---
         foreach (var wb in _wingbeaters)
-            wb.Update(dt, playerCenter2, _level.Floor.Y);
+            wb.Update(dt, playerCenter2, _level.Bounds.Bottom);
 
         // Melee hit detection for wingbeaters
         if (_player.MeleeTimer > 0)
@@ -3707,7 +3703,7 @@ public class Game1 : Game
 
             // Hit floor — leave splatter and remove (check solid floors first)
             bool splatted = false;
-            foreach (var sf in _level.SolidFloorRects)
+            foreach (var sf in (_level.TileGridInstance?.GetSolidRects() ?? Array.Empty<Rectangle>()))
             {
                 // Particle must be within X bounds, crossing the top surface downward (within 8px tolerance)
                 if (p.Position.X >= sf.Left && p.Position.X <= sf.Right
@@ -3737,10 +3733,10 @@ public class Game1 : Game
                     continue;
                 }
             }
-            if (p.Position.Y >= _level.Floor.Y)
+            if (p.Position.Y >= _level.Bounds.Bottom)
             {
                 if (_splatters.Count < 200)
-                    _splatters.Add(new Splatter { Position = new Vector2(p.Position.X, _level.Floor.Y - 1), Life = 3.5f, Color = p.Color });
+                    _splatters.Add(new Splatter { Position = new Vector2(p.Position.X, _level.Bounds.Bottom - 1), Life = 3.5f, Color = p.Color });
                 _particles.RemoveAt(i);
                 continue;
             }
@@ -3860,10 +3856,10 @@ public class Game1 : Game
                 item.VelY += 600f * dt; // gravity
                 item.Y += item.VelY * dt;
                 // Floor collision: level floor
-                float floorY = _level.Floor.Y - item.H;
+                float floorY = _level.Bounds.Bottom - item.H;
                 if (item.Y >= floorY) { item.Y = floorY; item.VelY = 0; item.HasGravity = false; }
                 // Solid rects
-                foreach (var s in _level.SolidFloorRects)
+                foreach (var s in (_level.TileGridInstance?.GetSolidRects() ?? Array.Empty<Rectangle>()))
                 {
                     if (item.Rect.Intersects(s) && item.Y + item.H > s.Top && item.Y + item.H < s.Top + 16)
                     {
@@ -3876,7 +3872,7 @@ public class Game1 : Game
                 // Platforms (land on top)
                 if (item.HasGravity && item.VelY > 0)
                 {
-                    foreach (var p in _level.AllPlatforms)
+                    foreach (var p in (_level.TileGridInstance?.GetPlatformRects() ?? Array.Empty<Rectangle>()))
                     {
                         if (item.X + item.W > p.X && item.X < p.Right &&
                             item.Y + item.H >= p.Y && item.Y + item.H <= p.Y + item.VelY * dt + 8)
@@ -5345,16 +5341,16 @@ public class Game1 : Game
                 _editorTool = (EditorTool)(((int)_editorTool + 1) % toolCount);
 
             // Number keys select and close
-            if (kb.IsKeyDown(Keys.D0) && _prevKb.IsKeyUp(Keys.D0)) { _editorTool = EditorTool.SolidFloor; _toolPaletteOpen = false; }
-            if (kb.IsKeyDown(Keys.D1) && _prevKb.IsKeyUp(Keys.D1)) { _editorTool = EditorTool.Platform; _toolPaletteOpen = false; }
-            if (kb.IsKeyDown(Keys.D2) && _prevKb.IsKeyUp(Keys.D2)) { _editorTool = EditorTool.Rope; _toolPaletteOpen = false; }
-            if (kb.IsKeyDown(Keys.D3) && _prevKb.IsKeyUp(Keys.D3)) { _editorTool = EditorTool.Wall; _toolPaletteOpen = false; }
-            if (kb.IsKeyDown(Keys.D4) && _prevKb.IsKeyUp(Keys.D4)) { _editorTool = EditorTool.Spike; _toolPaletteOpen = false; }
-            if (kb.IsKeyDown(Keys.D5) && _prevKb.IsKeyUp(Keys.D5)) { _editorTool = EditorTool.Exit; _toolPaletteOpen = false; }
-            if (kb.IsKeyDown(Keys.D6) && _prevKb.IsKeyUp(Keys.D6)) { _editorTool = EditorTool.Spawn; _toolPaletteOpen = false; }
-            if (kb.IsKeyDown(Keys.D7) && _prevKb.IsKeyUp(Keys.D7)) { _editorTool = EditorTool.WallSpike; _toolPaletteOpen = false; }
-            if (kb.IsKeyDown(Keys.D8) && _prevKb.IsKeyUp(Keys.D8)) { _editorTool = EditorTool.OverworldExit; _toolPaletteOpen = false; }
-            if (kb.IsKeyDown(Keys.D9) && _prevKb.IsKeyUp(Keys.D9)) { _editorTool = EditorTool.Ceiling; _toolPaletteOpen = false; }
+            if (kb.IsKeyDown(Keys.D0) && _prevKb.IsKeyUp(Keys.D0)) { _editorTool = EditorTool.Rope; _toolPaletteOpen = false; }
+            if (kb.IsKeyDown(Keys.D1) && _prevKb.IsKeyUp(Keys.D1)) { _editorTool = EditorTool.Wall; _toolPaletteOpen = false; }
+            if (kb.IsKeyDown(Keys.D2) && _prevKb.IsKeyUp(Keys.D2)) { _editorTool = EditorTool.Spike; _toolPaletteOpen = false; }
+            if (kb.IsKeyDown(Keys.D3) && _prevKb.IsKeyUp(Keys.D3)) { _editorTool = EditorTool.Exit; _toolPaletteOpen = false; }
+            if (kb.IsKeyDown(Keys.D4) && _prevKb.IsKeyUp(Keys.D4)) { _editorTool = EditorTool.Spawn; _toolPaletteOpen = false; }
+            if (kb.IsKeyDown(Keys.D5) && _prevKb.IsKeyUp(Keys.D5)) { _editorTool = EditorTool.WallSpike; _toolPaletteOpen = false; }
+            if (kb.IsKeyDown(Keys.D6) && _prevKb.IsKeyUp(Keys.D6)) { _editorTool = EditorTool.OverworldExit; _toolPaletteOpen = false; }
+            if (kb.IsKeyDown(Keys.D7) && _prevKb.IsKeyUp(Keys.D7)) { _editorTool = EditorTool.TilePaint; _toolPaletteOpen = false; }
+            if (kb.IsKeyDown(Keys.D8) && _prevKb.IsKeyUp(Keys.D8)) { _editorTool = EditorTool.Enemy; _toolPaletteOpen = false; }
+            if (kb.IsKeyDown(Keys.D9) && _prevKb.IsKeyUp(Keys.D9)) { _editorTool = EditorTool.Item; _toolPaletteOpen = false; }
             // TilePaint: select via Q palette only (T key is grab/move)
 
             // Space/Enter confirm and close
@@ -5493,17 +5489,17 @@ public class Game1 : Game
         if (kb.IsKeyDown(Keys.D)) _editorCursor.X += speed * dt;
 
         // Tool select with number keys
-        if (kb.IsKeyDown(Keys.D0) && _prevKb.IsKeyUp(Keys.D0)) _editorTool = EditorTool.SolidFloor;
-        if (kb.IsKeyDown(Keys.D1) && _prevKb.IsKeyUp(Keys.D1)) _editorTool = EditorTool.Platform;
-        if (kb.IsKeyDown(Keys.D2) && _prevKb.IsKeyUp(Keys.D2)) _editorTool = EditorTool.Rope;
-        if (kb.IsKeyDown(Keys.D3) && _prevKb.IsKeyUp(Keys.D3)) _editorTool = EditorTool.Wall;
-        if (kb.IsKeyDown(Keys.D4) && _prevKb.IsKeyUp(Keys.D4)) _editorTool = EditorTool.Spike;
-        if (kb.IsKeyDown(Keys.D5) && _prevKb.IsKeyUp(Keys.D5)) _editorTool = EditorTool.Exit;
-        if (kb.IsKeyDown(Keys.D6) && _prevKb.IsKeyUp(Keys.D6)) _editorTool = EditorTool.Spawn;
+        if (kb.IsKeyDown(Keys.D0) && _prevKb.IsKeyUp(Keys.D0)) _editorTool = EditorTool.Rope;
+        if (kb.IsKeyDown(Keys.D1) && _prevKb.IsKeyUp(Keys.D1)) _editorTool = EditorTool.Wall;
+        if (kb.IsKeyDown(Keys.D2) && _prevKb.IsKeyUp(Keys.D2)) _editorTool = EditorTool.Spike;
+        if (kb.IsKeyDown(Keys.D3) && _prevKb.IsKeyUp(Keys.D3)) _editorTool = EditorTool.Exit;
+        if (kb.IsKeyDown(Keys.D4) && _prevKb.IsKeyUp(Keys.D4)) _editorTool = EditorTool.Spawn;
+        if (kb.IsKeyDown(Keys.D5) && _prevKb.IsKeyUp(Keys.D5)) _editorTool = EditorTool.WallSpike;
+        if (kb.IsKeyDown(Keys.D6) && _prevKb.IsKeyUp(Keys.D6)) _editorTool = EditorTool.OverworldExit;
 
-        if (kb.IsKeyDown(Keys.D7) && _prevKb.IsKeyUp(Keys.D7)) _editorTool = EditorTool.WallSpike;
-        if (kb.IsKeyDown(Keys.D8) && _prevKb.IsKeyUp(Keys.D8)) _editorTool = EditorTool.OverworldExit;
-        if (kb.IsKeyDown(Keys.D9) && _prevKb.IsKeyUp(Keys.D9)) _editorTool = EditorTool.Ceiling;
+        if (kb.IsKeyDown(Keys.D7) && _prevKb.IsKeyUp(Keys.D7)) _editorTool = EditorTool.TilePaint;
+        if (kb.IsKeyDown(Keys.D8) && _prevKb.IsKeyUp(Keys.D8)) _editorTool = EditorTool.Enemy;
+        if (kb.IsKeyDown(Keys.D9) && _prevKb.IsKeyUp(Keys.D9)) _editorTool = EditorTool.Item;
 
         // Grid visibility toggle (G key); snap is always on
         if (kb.IsKeyDown(Keys.G) && _prevKb.IsKeyUp(Keys.G))
@@ -5791,20 +5787,6 @@ public class Game1 : Game
 
             switch (_editorTool)
             {
-                case EditorTool.SolidFloor:
-                    var sfList = new List<RectData>(_level.SolidFloors);
-                    sfList.Add(new RectData { X = x, Y = y, W = w, H = h < 12 ? 24 : h });
-                    _level.SolidFloors = sfList.ToArray();
-                    _level.Build();
-                    SetEditorStatus("Solid floor added");
-                    break;
-                case EditorTool.Platform:
-                    var pList = new List<RectData>(_level.Platforms);
-                    pList.Add(new RectData { X = x, Y = y, W = w, H = 12 });
-                    _level.Platforms = pList.ToArray();
-                    _level.Build();
-                    SetEditorStatus("Platform added");
-                    break;
                 case EditorTool.Rope:
                     var rList = new List<RopeData>(_level.Ropes);
                     rList.Add(new RopeData { X = _editorDragStart.X, Top = MathF.Min(_editorDragStart.Y, dragEnd.Y), Bottom = MathF.Max(_editorDragStart.Y, dragEnd.Y) });
@@ -5815,7 +5797,7 @@ public class Game1 : Game
                 case EditorTool.Wall:
                     // Clamp wall bottom to floor
                     int wallH = h;
-                    if (y + wallH > _level.Floor.Y) wallH = _level.Floor.Y - y;
+                    if (y + wallH > _level.Bounds.Bottom) wallH = _level.Bounds.Bottom - y;
                     if (wallH < 16) wallH = 16;
                     var wList = new List<WallData>(_level.Walls);
                     wList.Add(new WallData { X = x, Y = y, W = w, H = wallH, ClimbSide = 0 });
@@ -5824,17 +5806,20 @@ public class Game1 : Game
                     SetEditorStatus("Wall added (both sides, [F] to cycle)");
                     break;
                 case EditorTool.Spike:
-                    // Check if near a ceiling bottom — snap upward (hanging spikes)
+                    // Check if near a solid tile bottom — snap upward (hanging spikes)
                     int spikeY = y;
                     bool ceilingSpike = false;
-                    foreach (var ceil in _level.Ceilings)
+                    if (_level.TileGridInstance != null)
                     {
-                        if (MathF.Abs(y - (ceil.Y + ceil.H)) < 20 &&
-                            x + w > ceil.X && x < ceil.X + ceil.W)
+                        foreach (var ceil in _level.TileGridInstance.GetSolidRects())
                         {
-                            spikeY = ceil.Y + ceil.H;
-                            ceilingSpike = true;
-                            break;
+                            if (MathF.Abs(y - (ceil.Y + ceil.Height)) < 20 &&
+                                x + w > ceil.X && x < ceil.X + ceil.Width)
+                            {
+                                spikeY = ceil.Y + ceil.Height;
+                                ceilingSpike = true;
+                                break;
+                            }
                         }
                     }
                     var sList = new List<RectData>(_level.Spikes);
@@ -5892,13 +5877,6 @@ public class Game1 : Game
                     _level.Build();
                     SetEditorStatus($"Overworld exit added (ID: {owExitId})");
                     break;
-                case EditorTool.Ceiling:
-                    var cList = new List<RectData>(_level.Ceilings);
-                    cList.Add(new RectData { X = x, Y = y, W = w, H = 12 });
-                    _level.Ceilings = cList.ToArray();
-                    _level.Build();
-                    SetEditorStatus("Ceiling added");
-                    break;
                 case EditorTool.EnvRegion:
                     var erList = new List<EnvironmentRegion>(_level.EnvRegions);
                     erList.Add(new EnvironmentRegion { X = x, Y = y, W = w, H = h, Type = "cold" });
@@ -5915,11 +5893,6 @@ public class Game1 : Game
         {
             _editorMovingEntity = null;
             var mp = new Point((int)worldMouse.X, (int)worldMouse.Y);
-            // Check platforms
-            if (_editorMovingEntity == null)
-                foreach (var p in _level.Platforms)
-                    if (new Rectangle(p.X, p.Y, p.W, p.H).Contains(mp))
-                    { _editorMovingEntity = p; _editorMoveOffset = new Vector2(worldMouse.X - p.X, worldMouse.Y - p.Y); SetEditorStatus("Grabbed platform"); break; }
             // Check walls
             if (_editorMovingEntity == null)
                 foreach (var w in _level.Walls)
@@ -5935,11 +5908,6 @@ public class Game1 : Game
                 foreach (var sf in _level.SolidFloors)
                     if (new Rectangle(sf.X, sf.Y, sf.W, sf.H).Contains(mp))
                     { _editorMovingEntity = sf; _editorMoveOffset = new Vector2(worldMouse.X - sf.X, worldMouse.Y - sf.Y); SetEditorStatus("Grabbed solid floor"); break; }
-            // Check ceilings
-            if (_editorMovingEntity == null)
-                foreach (var c in _level.Ceilings)
-                    if (new Rectangle(c.X, c.Y, c.W, c.H).Contains(mp))
-                    { _editorMovingEntity = c; _editorMoveOffset = new Vector2(worldMouse.X - c.X, worldMouse.Y - c.Y); SetEditorStatus("Grabbed ceiling"); break; }
             // Check ropes (10px tolerance)
             if (_editorMovingEntity == null)
                 foreach (var r in _level.Ropes)
@@ -6088,21 +6056,6 @@ public class Game1 : Game
         // Expand hit area for small objects
         int tolerance = 8;
         
-        // Check platforms
-        for (int i = _level.Platforms.Length - 1; i >= 0; i--)
-        {
-            var r = _level.Platforms[i];
-            var expanded = new Rectangle(r.X - tolerance, r.Y - tolerance, r.W + tolerance * 2, r.H + tolerance * 2);
-            if (expanded.Contains(p))
-            {
-                _entityUndoStack.Add(("platform", i, _level.Platforms[i]));
-                var list = new List<RectData>(_level.Platforms);
-                list.RemoveAt(i);
-                _level.Platforms = list.ToArray();
-                _level.Build();
-                return true;
-            }
-        }
         // Check spikes
         for (int i = _level.Spikes.Length - 1; i >= 0; i--)
         {
@@ -6167,19 +6120,6 @@ public class Game1 : Game
                 var list = new List<WallSpikeData>(_level.WallSpikes);
                 list.RemoveAt(i);
                 _level.WallSpikes = list.ToArray();
-                _level.Build();
-                return true;
-            }
-        }
-        // Check ceilings
-        for (int i = _level.Ceilings.Length - 1; i >= 0; i--)
-        {
-            var c = _level.Ceilings[i];
-            if (new Rectangle(c.X, c.Y, c.W, c.H).Contains(p))
-            {
-                var list = new List<RectData>(_level.Ceilings);
-                list.RemoveAt(i);
-                _level.Ceilings = list.ToArray();
                 _level.Build();
                 return true;
             }
@@ -6279,22 +6219,24 @@ public class Game1 : Game
     /// <summary>Find the nearest surface (platform/solid floor/main floor) below a point and return Y so entity sits on it.</summary>
     private float SnapToSurface(float x, float y, int entityW, int entityH)
     {
-        float bestY = _level.Floor.Y - entityH; // default: main floor
+        float bestY = _level.Bounds.Bottom - entityH; // default: main floor
         
-        // Check platforms
-        foreach (var p in _level.Platforms)
-        {
-            float surfaceY = p.Y - entityH;
-            if (x + entityW > p.X && x < p.X + p.W && surfaceY >= y - 20 && surfaceY < bestY)
-                bestY = surfaceY;
-        }
-        // Check solid floors
-        foreach (var sf in _level.SolidFloors)
-        {
-            float surfaceY = sf.Y - entityH;
-            if (x + entityW > sf.X && x < sf.X + sf.W && surfaceY >= y - 20 && surfaceY < bestY)
-                bestY = surfaceY;
-        }
+        // Check tile platforms
+        if (_level.TileGridInstance != null)
+            foreach (var p in _level.TileGridInstance.GetPlatformRects())
+            {
+                float surfaceY = p.Y - entityH;
+                if (x + entityW > p.X && x < p.Right && surfaceY >= y - 20 && surfaceY < bestY)
+                    bestY = surfaceY;
+            }
+        // Check tile solids
+        if (_level.TileGridInstance != null)
+            foreach (var s in _level.TileGridInstance.GetSolidRects())
+            {
+                float surfaceY = s.Y - entityH;
+                if (x + entityW > s.X && x < s.Right && surfaceY >= y - 20 && surfaceY < bestY)
+                    bestY = surfaceY;
+            }
         // Check wall tops (walls can be stood on)
         foreach (var w in _level.Walls)
         {
@@ -6333,18 +6275,20 @@ public class Game1 : Game
     /// <summary>Find the left/right edges of the surface at the given foot position.</summary>
     private (float, float) FindSurfaceEdges(float x, float footY)
     {
-        // Check platforms — find the one the entity is standing on
-        foreach (var p in _level.Platforms)
-        {
-            if (MathF.Abs(footY - p.Y) < 4 && x + Crawler.Width > p.X && x < p.X + p.W)
-                return (p.X, p.X + p.W);
-        }
-        // Check solid floors
-        foreach (var sf in _level.SolidFloors)
-        {
-            if (MathF.Abs(footY - sf.Y) < 4 && x + Crawler.Width > sf.X && x < sf.X + sf.W)
-                return (sf.X, sf.X + sf.W);
-        }
+        // Check tile platforms
+        if (_level.TileGridInstance != null)
+            foreach (var p in _level.TileGridInstance.GetPlatformRects())
+            {
+                if (MathF.Abs(footY - p.Y) < 4 && x + Crawler.Width > p.X && x < p.Right)
+                    return (p.X, p.Right);
+            }
+        // Check tile solids
+        if (_level.TileGridInstance != null)
+            foreach (var s in _level.TileGridInstance.GetSolidRects())
+            {
+                if (MathF.Abs(footY - s.Y) < 4 && x + Crawler.Width > s.X && x < s.Right)
+                    return (s.X, s.Right);
+            }
         // Default: main floor spans the full level bounds
         return (_level.Bounds.Left, _level.Bounds.Right);
     }
@@ -6747,11 +6691,6 @@ public class Game1 : Game
             _entityUndoStack.RemoveAt(_entityUndoStack.Count - 1);
             switch (type)
             {
-                case "platform":
-                    var pList = new List<RectData>(_level.Platforms);
-                    pList.Insert(Math.Min(index, pList.Count), (RectData)data);
-                    _level.Platforms = pList.ToArray();
-                    break;
                 case "spike":
                     var sList = new List<RectData>(_level.Spikes);
                     sList.Insert(Math.Min(index, sList.Count), (RectData)data);
@@ -6969,16 +6908,8 @@ public class Game1 : Game
         }
         _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.NonPremultiplied, SamplerState.PointClamp, transformMatrix: _camera.TransformMatrix * shakeOffset);
 
-        // Draw floor
-        int floorY = _level.Floor.Y;
-        int floorH = _level.Floor.Height;
         int bL = _level.Bounds.Left;
         int bR = _level.Bounds.Right;
-        if (floorH > 0)
-        {
-            _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, floorH), new Color(70, 50, 30));
-            _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, 2), new Color(110, 80, 50));
-        }
 
         // Draw grid
         if (_editorShowGrid)
@@ -7001,20 +6932,9 @@ public class Game1 : Game
 
         // (tile grid drawn after walls — see below)
 
-        // Draw platforms
-        foreach (var p in _level.Platforms)
-            _spriteBatch.Draw(_pixel, new Rectangle(p.X, p.Y, p.W, p.H), new Color(50, 50, 50));
-
         // Draw spikes
         foreach (var s in _level.Spikes)
             _spriteBatch.Draw(_pixel, new Rectangle(s.X, s.Y, s.W, s.H), Color.Red * 0.6f);
-
-        // Draw ceilings
-        foreach (var c in _level.Ceilings)
-        {
-            _spriteBatch.Draw(_pixel, new Rectangle(c.X, c.Y, c.W, c.H), new Color(50, 50, 50));
-            _spriteBatch.Draw(_pixel, new Rectangle(c.X, c.Y + c.H - 2, c.W, 2), new Color(90, 90, 90));
-        }
 
         // Draw solid floors
         foreach (var sf in _level.SolidFloors)
@@ -7345,13 +7265,6 @@ public class Game1 : Game
             }
         }
 
-        // Re-draw ceilings over background tiles so they stay visible in editor
-        foreach (var c in _level.Ceilings)
-        {
-            _spriteBatch.Draw(_pixel, new Rectangle(c.X, c.Y, c.W, c.H), new Color(50, 50, 50));
-            _spriteBatch.Draw(_pixel, new Rectangle(c.X, c.Y + c.H - 2, c.W, 2), new Color(90, 90, 90));
-        }
-
         // Noise-based water shader pass (editor)
         if (_useShaderWater && _level.TileGridInstance != null)
             DrawWaterShaderPass(_level.TileGridInstance, _camera.TransformMatrix);
@@ -7587,21 +7500,18 @@ public class Game1 : Game
 
             Color previewColor = _editorTool switch
             {
-                EditorTool.Platform => Color.White * 0.3f,
                 EditorTool.Rope => new Color(120, 80, 40) * 0.5f,
                 EditorTool.Wall => Color.Gray * 0.3f,
                 EditorTool.Spike => Color.Red * 0.3f,
                 EditorTool.Exit => Color.LimeGreen * 0.3f,
                 EditorTool.WallSpike => Color.Red * 0.3f,
-                EditorTool.SolidFloor => new Color(70, 50, 30) * 0.3f,
-                EditorTool.Ceiling => Color.Gray * 0.3f,
                 EditorTool.EnvRegion => Color.CornflowerBlue * 0.2f,
                 _ => Color.White * 0.2f
             };
 
             if (_editorTool == EditorTool.Rope)
                 _spriteBatch.Draw(_pixel, new Rectangle((int)_editorDragStart.X - 1, py, 3, ph), previewColor);
-            else if (_editorTool == EditorTool.Platform || _editorTool == EditorTool.Spike || _editorTool == EditorTool.Ceiling)
+            else if (_editorTool == EditorTool.Spike)
                 _spriteBatch.Draw(_pixel, new Rectangle(px, py, pw, 12), previewColor);
             else
                 _spriteBatch.Draw(_pixel, new Rectangle(px, py, pw, ph), previewColor);
@@ -10153,14 +10063,14 @@ public class Game1 : Game
                 _rainDrops[i] = d;
 
                 // Remove if below floor or too many
-                if (d.Y > _level.Floor.Y + 20)
+                if (d.Y > _level.Bounds.Bottom + 20)
                 {
                     // Splash particle on impact
                     if (_dustParticlesEnabled && _rng.NextDouble() < 0.3)
                     {
                         _particles.Add(new Particle
                         {
-                            Position = new Vector2(d.X, _level.Floor.Y),
+                            Position = new Vector2(d.X, _level.Bounds.Bottom),
                             Velocity = new Vector2((float)(_rng.NextDouble() * 30 - 15), -(float)(_rng.NextDouble() * 40)),
                             Life = 0.2f,
                             Color = new Color(100, 140, 180) * 0.6f
@@ -11486,13 +11396,10 @@ public class Game1 : Game
 
         _spriteBatch.Begin(transformMatrix: _camera.TransformMatrix * shakeOff);
 
-        // Draw floor (extended across world)
-        int floorY = _level.Floor.Y;
-        int floorH = _level.Floor.Height;
         int bL = _level.Bounds.Left;
         int bR = _level.Bounds.Right;
 
-        // Draw background tiles BEFORE floor/platforms so they appear behind everything
+        // Draw background tiles BEFORE platforms so they appear behind everything
         if (_level.TileGridInstance != null)
         {
             var tg = _level.TileGridInstance;
@@ -11524,14 +11431,8 @@ public class Game1 : Game
             }
         }
 
-        if (floorH > 0)
-        {
-            _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, floorH), isDebugLevel ? new Color(140, 80, 160) : new Color(40, 40, 40));
-            _spriteBatch.Draw(_pixel, new Rectangle(bL, floorY, bR - bL, 1), isDebugLevel ? new Color(190, 160, 100) : new Color(80, 80, 80));
-        }
-
         // Draw platforms
-        foreach (var plat in _level.PlatformRects)
+        foreach (var plat in (_level.TileGridInstance?.GetPlatformRects() ?? Array.Empty<Rectangle>()))
         {
             // Skip platforms fully covered by solid foreground tiles
             if (_level.TileGridInstance != null)
@@ -11560,14 +11461,14 @@ public class Game1 : Game
         }
 
         // Draw ceilings
-        foreach (var ceil in _level.CeilingRects)
+        foreach (var ceil in (_level.TileGridInstance?.GetSolidRects() ?? Array.Empty<Rectangle>()))
         {
             _spriteBatch.Draw(_pixel, ceil, new Color(50, 50, 50));
             _spriteBatch.Draw(_pixel, new Rectangle(ceil.X, ceil.Bottom - 2, ceil.Width, 2), new Color(90, 90, 90));
         }
 
         // Draw solid floors
-        foreach (var sf in _level.SolidFloorRects)
+        foreach (var sf in (_level.TileGridInstance?.GetSolidRects() ?? Array.Empty<Rectangle>()))
         {
             // Skip solid floors covered by solid foreground tiles
             if (_level.TileGridInstance != null)

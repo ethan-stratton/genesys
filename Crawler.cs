@@ -237,7 +237,7 @@ public class Crawler : Creature
 
     public void Update(float dt, Vector2 playerCenter,
         TileGrid tileGrid, int tileSize,
-        Rectangle[] platforms, Rectangle[] solidFloors, float floorY)
+        float levelBottom)
     {
         // Cache tile grid for LOS checks
         if (tileGrid != null) { _tileGridRef = tileGrid; _tileSizeRef = tileSize; _hasTileGridRef = true; }
@@ -292,7 +292,7 @@ public class Crawler : Creature
             float footY = Position.Y + EffectiveHeight;
             var edges = EnemyPhysics.FindSurfaceEdges(
                 Position.X, footY, EffectiveWidth,
-                tileGrid, tileSize, platforms, solidFloors,
+                tileGrid, tileSize,
                 SurfaceLeft, SurfaceRight);
             SurfaceLeft = edges.Left;
             SurfaceRight = edges.Right;
@@ -557,8 +557,7 @@ public class Crawler : Creature
         _onGround = EnemyPhysics.ApplyGravityAndCollision(
             ref Position, ref Velocity,
             EffectiveWidth, EffectiveHeight, Gravity, dt,
-            tileGrid, tileSize,
-            platforms, solidFloors, floorY);
+            tileGrid, tileSize, levelBottom);
 
         // Landing squash
         if (_onGround && !_wasOnGround)
@@ -646,14 +645,12 @@ public class Crawler : Creature
     /// Refresh surface edge detection using tile-aware method.
     /// </summary>
     public void UpdateSurfaceEdges(TileGrid tileGrid, int tileSize,
-        Rectangle[] platforms, Rectangle[] solidFloors,
         float boundsLeft, float boundsRight)
     {
         float footY = Position.Y + EffectiveHeight;
         var edges = EnemyPhysics.FindSurfaceEdges(
             Position.X, footY, EffectiveWidth,
             tileGrid, tileSize,
-            platforms, solidFloors,
             boundsLeft, boundsRight);
         SurfaceLeft = edges.Left;
         SurfaceRight = edges.Right;

@@ -1,12 +1,12 @@
 {
   "currentLevel": "ship-interior",
-  "spawnX": 2590.0972,
-  "spawnY": 472,
+  "spawnX": 2464.766,
+  "spawnY": 907.3309,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 133.4282,
+  "playTime": 137.3106,
   "meleeInventory": [
     "Knife"
   ],
@@ -46,7 +46,7 @@
   "bestiary": {
     "entries": {}
   },
-  "worldTime": 13.047146,
+  "worldTime": 13.112085,
   "evolutionFlags": [],
   "cipherScanUnlocked": false
 }

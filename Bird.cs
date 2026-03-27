@@ -34,8 +34,6 @@ public class Bird : Creature
     // Cached for ground detection during flight
     private TileGrid _tileGrid;
     private int _tileSize;
-    private Rectangle[] _platforms;
-    private Rectangle[] _solidFloors;
     private float _floorY;
 
     private float FindGroundBelow(float x, float startY)
@@ -50,11 +48,11 @@ public class Bird : Creature
                     return ty * _tileSize + _tileGrid.OriginY - Height;
             }
         }
-        // Check platforms
-        if (_platforms != null)
+        // Check tile-based platforms
+        if (_tileGrid != null)
         {
             float bestY = _floorY - Height;
-            foreach (var p in _platforms)
+            foreach (var p in _tileGrid.GetPlatformRects())
             {
                 if (x + Width > p.X && x < p.X + p.Width && p.Y >= startY && p.Y < bestY + Height)
                     bestY = p.Y - Height;
@@ -84,16 +82,15 @@ public class Bird : Creature
     public override Rectangle Rect => new((int)Position.X, (int)Position.Y, Width, Height);
 
     public void Update(float dt, Vector2 playerPos,
-        TileGrid tileGrid, int tileSize,
-        Rectangle[] platforms, Rectangle[] solidFloors, float floorY)
+        TileGrid tileGrid, int tileSize, float levelBottom)
     {
         if (!Alive) return;
 
         _tileGrid = tileGrid;
         _tileSize = tileSize;
-        _platforms = platforms;
-        _solidFloors = solidFloors;
-        _floorY = floorY;
+        
+        
+        _floorY = levelBottom;
 
         if (KnockbackVel.LengthSquared() > 1f)
         {
@@ -170,7 +167,7 @@ public class Bird : Creature
                 Velocity.Y = 0;
                 _onGround = EnemyPhysics.ApplyGravityAndCollision(
                     ref Position, ref Velocity, Width, Height, 600f, dt,
-                    tileGrid, tileSize, platforms, solidFloors, floorY);
+                    tileGrid, tileSize, levelBottom);
 
                 // Clamp to surface edges
                 if (Position.X < SurfaceLeft) { Position.X = SurfaceLeft; _dir = 1; }
@@ -187,7 +184,7 @@ public class Bird : Creature
                 Velocity.Y = 0;
                 _onGround = EnemyPhysics.ApplyGravityAndCollision(
                     ref Position, ref Velocity, Width, Height, 600f, dt,
-                    tileGrid, tileSize, platforms, solidFloors, floorY);
+                    tileGrid, tileSize, levelBottom);
 
                 if (Position.X < SurfaceLeft || Position.X + Width > SurfaceRight)
                 {
@@ -231,7 +228,7 @@ public class Bird : Creature
                         _state = State.Perched;
                         _stateTimer = 2f + (float)_rng.NextDouble() * 3f;
                         // Update surface edges for new position
-                        UpdateSurfaceEdges(_tileGrid, _tileSize, _platforms, _solidFloors,
+                        UpdateSurfaceEdges(_tileGrid, _tileSize,
                             Position.X - 200, Position.X + 200);
                     }
                 }
@@ -258,14 +255,12 @@ public class Bird : Creature
     /// Refresh surface edge detection using tile-aware method.
     /// </summary>
     public void UpdateSurfaceEdges(TileGrid tileGrid, int tileSize,
-        Rectangle[] platforms, Rectangle[] solidFloors,
         float boundsLeft, float boundsRight)
     {
         float footY = Position.Y + Height;
         var edges = EnemyPhysics.FindSurfaceEdges(
             Position.X, footY, Width,
             tileGrid, tileSize,
-            platforms, solidFloors,
             boundsLeft, boundsRight);
         SurfaceLeft = edges.Left;
         SurfaceRight = edges.Right;

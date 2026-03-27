@@ -18,8 +18,7 @@ public static class EnemyPhysics
         ref Vector2 position, ref Vector2 velocity,
         int entityW, int entityH,
         float gravity, float dt,
-        TileGrid tileGrid, int tileSize,
-        Rectangle[] platforms, Rectangle[] solidFloors, float mainFloorY)
+        TileGrid tileGrid, int tileSize, float levelBottom)
     {
         // Apply gravity
         velocity.Y += gravity * dt;
@@ -35,7 +34,7 @@ public static class EnemyPhysics
         // Move Y
         position.Y += velocity.Y * dt;
         bool onGround = ResolveVerticalCollision(ref position, ref velocity, entityW, entityH,
-            tileGrid, tileSize, platforms, solidFloors, mainFloorY, prevFootY);
+            tileGrid, tileSize, levelBottom, prevFootY);
 
         return onGround;
     }
@@ -100,7 +99,7 @@ public static class EnemyPhysics
         ref Vector2 position, ref Vector2 velocity,
         int entityW, int entityH,
         TileGrid tileGrid, int tileSize,
-        Rectangle[] platforms, Rectangle[] solidFloors, float mainFloorY,
+        float levelBottom,
         float prevFootY)
     {
         bool onGround = false;
@@ -131,47 +130,30 @@ public static class EnemyPhysics
                         }
                     }
                 }
-            }
 
-            // Platform collision (one-way: must have been above before)
-            if (!onGround && platforms != null)
-            {
-                footY = position.Y + entityH;
-                foreach (var p in platforms)
+                // Tile platform collision (one-way)
+                if (!onGround)
                 {
-                    if (position.X + entityW > p.X + 2 && position.X < p.Right - 2 &&
-                        footY >= p.Y && prevFootY <= p.Y + 4)
+                    footY = position.Y + entityH;
+                    foreach (var p in tileGrid.GetPlatformRects())
                     {
-                        position.Y = p.Y - entityH;
-                        velocity.Y = 0;
-                        onGround = true;
-                        break;
+                        if (position.X + entityW > p.X + 2 && position.X < p.Right - 2 &&
+                            footY >= p.Y && prevFootY <= p.Y + 4)
+                        {
+                            position.Y = p.Y - entityH;
+                            velocity.Y = 0;
+                            onGround = true;
+                            break;
+                        }
                     }
                 }
             }
 
-            // Solid floors (same as platforms but thicker)
-            if (!onGround && solidFloors != null)
-            {
-                footY = position.Y + entityH;
-                foreach (var sf in solidFloors)
-                {
-                    if (position.X + entityW > sf.X + 2 && position.X < sf.Right - 2 &&
-                        footY >= sf.Y && prevFootY <= sf.Y + 4)
-                    {
-                        position.Y = sf.Y - entityH;
-                        velocity.Y = 0;
-                        onGround = true;
-                        break;
-                    }
-                }
-            }
-
-            // Main floor
+            // Level bottom
             footY = position.Y + entityH;
-            if (!onGround && footY >= mainFloorY)
+            if (!onGround && footY >= levelBottom)
             {
-                position.Y = mainFloorY - entityH;
+                position.Y = levelBottom - entityH;
                 velocity.Y = 0;
                 onGround = true;
             }
@@ -203,10 +185,9 @@ public static class EnemyPhysics
     public static (float Left, float Right) FindSurfaceEdges(
         float x, float footY, int entityW,
         TileGrid tileGrid, int tileSize,
-        Rectangle[] platforms, Rectangle[] solidFloors,
         float boundsLeft, float boundsRight)
     {
-        // Build a unified walkable surface by merging tiles + platforms at foot level
+        // Build a unified walkable surface by merging tiles at foot level
         float left = boundsLeft;
         float right = boundsRight;
         bool foundAny = false;
@@ -242,54 +223,19 @@ public static class EnemyPhysics
                 right = tileRight;
                 foundAny = true;
             }
-        }
 
-        // Extend with any platforms that connect at the same Y level (within 4px)
-        if (platforms != null)
-        {
-            foreach (var p in platforms)
+            // Extend with tile-based platforms that connect at the same Y level
+            if (foundAny)
             {
-                if (MathF.Abs(footY - p.Y) < 4)
+                foreach (var p in tileGrid.GetPlatformRects())
                 {
-                    if (foundAny)
+                    if (MathF.Abs(footY - p.Y) < 4)
                     {
-                        // Extend left/right if platform overlaps or touches our current surface
                         if (p.Right >= left - 2 && p.X <= right + 2)
                         {
                             left = MathF.Min(left, p.X);
                             right = MathF.Max(right, p.Right);
                         }
-                    }
-                    else if (x + entityW > p.X && x < p.Right)
-                    {
-                        left = p.X;
-                        right = p.Right;
-                        foundAny = true;
-                    }
-                }
-            }
-        }
-
-        // Same for solid floors
-        if (solidFloors != null)
-        {
-            foreach (var sf in solidFloors)
-            {
-                if (MathF.Abs(footY - sf.Y) < 4)
-                {
-                    if (foundAny)
-                    {
-                        if (sf.Right >= left - 2 && sf.X <= right + 2)
-                        {
-                            left = MathF.Min(left, sf.X);
-                            right = MathF.Max(right, sf.Right);
-                        }
-                    }
-                    else if (x + entityW > sf.X && x < sf.Right)
-                    {
-                        left = sf.X;
-                        right = sf.Right;
-                        foundAny = true;
                     }
                 }
             }
@@ -329,24 +275,20 @@ public static class EnemyPhysics
     public static float SnapToSurface(
         float x, float y, int entityW, int entityH,
         TileGrid tileGrid, int tileSize,
-        Rectangle[] platforms, Rectangle[] solidFloors,
-        Rectangle[] walls, float mainFloorY)
+        Rectangle[] walls, float levelBottom)
     {
-        float bestY = mainFloorY - entityH;
+        float bestY = levelBottom - entityH;
 
-        if (platforms != null)
+        // Use tile grid platforms
+        if (tileGrid != null)
         {
-            foreach (var p in platforms)
+            foreach (var p in tileGrid.GetPlatformRects())
             {
                 float surfaceY = p.Y - entityH;
                 if (x + entityW > p.X && x < p.Right && surfaceY >= y - 20 && surfaceY < bestY)
                     bestY = surfaceY;
             }
-        }
-
-        if (solidFloors != null)
-        {
-            foreach (var sf in solidFloors)
+            foreach (var sf in tileGrid.GetSolidRects())
             {
                 float surfaceY = sf.Y - entityH;
                 if (x + entityW > sf.X && x < sf.Right && surfaceY >= y - 20 && surfaceY < bestY)

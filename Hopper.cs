@@ -57,7 +57,7 @@ public class Hopper : Creature
 
     public void Update(float dt, Vector2 playerCenter,
         TileGrid tileGrid, int tileSize,
-        Rectangle[] platforms, Rectangle[] solidFloors, float floorY)
+        float levelBottom)
     {
         if (!Alive) return;
         if (DamageCooldown > 0) DamageCooldown -= dt;
@@ -113,7 +113,7 @@ public class Hopper : Creature
                     ref Position, ref Velocity,
                     Width, Height, Gravity, dt,
                     tileGrid, tileSize,
-                    platforms, solidFloors, floorY);
+                    levelBottom);
 
                 if (_onGround)
                 {

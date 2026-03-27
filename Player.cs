@@ -896,7 +896,7 @@ public class Player
 
 
     /// <summary>Check if there's headroom to expand to the given height at current position.</summary>
-    private bool HasHeadroom(int targetHeight, Rectangle[] ceilings, Rectangle[] solidFloors, TileGrid tileGrid)
+    private bool HasHeadroom(int targetHeight, TileGrid tileGrid)
     {
         int currentH = CurrentHeight;
         if (targetHeight <= currentH) return true;
@@ -905,20 +905,6 @@ public class Player
         int newTop = (int)Position.Y + Height - targetHeight;
         int left = (int)Position.X + CollisionOffsetX;
         int right = left + CollisionWidth - 1;
-
-        // Check ceiling rects
-        if (ceilings != null)
-        {
-            var testRect = new Rectangle(left, newTop, CollisionWidth, targetHeight);
-            foreach (var c in ceilings)
-                if (testRect.Intersects(c)) return false;
-        }
-        if (solidFloors != null)
-        {
-            var testRect = new Rectangle(left, newTop, CollisionWidth, targetHeight);
-            foreach (var sf in solidFloors)
-                if (testRect.Intersects(sf)) return false;
-        }
 
         // Check tile grid
         if (tileGrid != null)
@@ -1152,7 +1138,7 @@ public class Player
         }
     }
 
-    public void Update(float dt, KeyboardState kb, float floorY, Rectangle[] platforms, float[] ropeXPositions = null, float[] ropeTops = null, float[] ropeBottoms = null, Rectangle[] walls = null, int[] wallClimbSides = null, Rectangle[] solidWalls = null, Rectangle[] ceilings = null, Rectangle[] solidFloors = null, TileGrid tileGrid = null, Vector2? mouseWorldPos = null, MouseState? mouseState = null)
+    public void Update(float dt, KeyboardState kb, float levelBottom, float[] ropeXPositions = null, float[] ropeTops = null, float[] ropeBottoms = null, Rectangle[] walls = null, int[] wallClimbSides = null, Rectangle[] solidWalls = null, TileGrid tileGrid = null, Vector2? mouseWorldPos = null, MouseState? mouseState = null)
     {
         WantsToShoot = false;
         WantsToMelee = false;
@@ -1366,7 +1352,7 @@ public class Player
         else if (IsCrouching)
         {
             // Releasing crouch — check if there's headroom to stand
-            if (HasHeadroom(Height, ceilings, solidFloors, tileGrid))
+            if (HasHeadroom(Height, tileGrid))
                 IsCrouching = false;
             // else stay crouched until there's room
         }
@@ -1399,7 +1385,7 @@ public class Player
 
         // --- Slide (S + Space while grounded, OR Shift + Space with no direction from crouch, OR Space when stuck crouching) ---
         bool spacePressed = kb.IsKeyDown(Keys.Space);
-        bool stuckCrouching = IsCrouching && !HasHeadroom(Height, ceilings, solidFloors, tileGrid);
+        bool stuckCrouching = IsCrouching && !HasHeadroom(Height, tileGrid);
         bool wantsCrouchSlide = IsCrouching && inputX == 0;
         bool wantsSlide = (inputY > 0 && !IsCrouching) || wantsCrouchSlide || stuckCrouching;
         if (EnableSlide && wantsSlide && spacePressed && !_jumpHeld && _wasGrounded && !IsSliding && !IsCartwheeling && _slideCooldownTimer <= 0f)
@@ -1437,7 +1423,7 @@ public class Player
                 if (_uppercutInputWindow <= 0) _uppercutInputReady = false;
             }
             if (_uppercutInputReady && inputY < 0 && spacePressed && !_jumpHeld && !IsUppercutting
-                && HasHeadroom(Height, ceilings, solidFloors, tileGrid))
+                && HasHeadroom(Height, tileGrid))
             {
                 _uppercutInputReady = false;
                 IsUppercutting = true;
@@ -1483,7 +1469,7 @@ public class Player
                 _qcfStage = 2;
             }
             else if (_qcfStage == 2 && pressingFwd && !pressingDown && kDown)
-            if (HasHeadroom(Height, ceilings, solidFloors, tileGrid))
+            if (HasHeadroom(Height, tileGrid))
             {
                 // QCF + K complete!
                 _qcfStage = 0;
@@ -1674,9 +1660,9 @@ public class Player
             }
 
             // Block climbing up through solid floors / platforms
-            if (vel.Y < 0 && solidFloors != null)
+            if (vel.Y < 0 && tileGrid != null)
             {
-                foreach (var sf in solidFloors)
+                foreach (var sf in tileGrid.GetSolidRects())
                 {
                     if (Position.X + Width > sf.X && Position.X < sf.X + sf.Width &&
                         Position.Y >= sf.Y + sf.Height && Position.Y + vel.Y * dt < sf.Y + sf.Height)
@@ -1689,7 +1675,7 @@ public class Player
             }
 
             // Drop off bottom of wall (holding S at the bottom edge OR reaching floor)
-            float wallClimbBottom = MathF.Min(_currentWall.Bottom, floorY) - Height;
+            float wallClimbBottom = MathF.Min(_currentWall.Bottom, levelBottom) - Height;
             if (Position.Y >= wallClimbBottom - 2)
             {
                 Position = new Vector2(Position.X, wallClimbBottom);
@@ -1905,7 +1891,7 @@ public class Player
             // Vault kick: jump during slide (after minimum slide time, requires fresh space press)
             bool spaceSlide = kb.IsKeyDown(Keys.Space);
             if (EnableVaultKick && spaceSlide && !_jumpHeld && elapsed >= VaultKickMinSlideTime
-                && HasHeadroom(Height, ceilings, solidFloors, tileGrid))
+                && HasHeadroom(Height, tileGrid))
             {
                 IsSliding = false;
                 IsVaultKicking = true;
@@ -1930,12 +1916,12 @@ public class Player
                 if (_slideTimer <= 0)
                 {
                     // Check if there's headroom to stand up
-                    if (HasHeadroom(Height, ceilings, solidFloors, tileGrid))
+                    if (HasHeadroom(Height, tileGrid))
                     {
                         IsSliding = false;
                         vel.X = _slideDir * SlideEndSpeed;
                     }
-                    else if (HasHeadroom(CrouchHeight, ceilings, solidFloors, tileGrid))
+                    else if (HasHeadroom(CrouchHeight, tileGrid))
                     {
                         // Can't stand, but can crouch — force crouch
                         IsSliding = false;
@@ -2416,9 +2402,9 @@ public class Player
         // --- Collision (always full Height) ---
         IsGrounded = false;
 
-        if (pos.Y + Height >= floorY)
+        if (pos.Y + Height >= levelBottom)
         {
-            pos.Y = floorY - Height;
+            pos.Y = levelBottom - Height;
             vel.Y = 0;
             IsGrounded = true;
             _jumpsLeft = MaxJumps;
@@ -2458,9 +2444,9 @@ public class Player
             }
         }
 
-        if (Velocity.Y >= 0 && !WantsDropThrough)
+        if (Velocity.Y >= 0 && !WantsDropThrough && tileGrid != null)
         {
-            foreach (var plat in platforms)
+            foreach (var plat in tileGrid.GetPlatformRects())
             {
                 float prevBottom = Position.Y + Height;
                 float newBottom = pos.Y + Height;
@@ -2494,11 +2480,12 @@ public class Player
         }
 
         // Ceiling collision (bonk head) — skip if near ceiling slope tiles
-        if (ceilings != null && vel.Y < 0)
+        if (tileGrid != null && vel.Y < 0)
         {
+            var ceilRects = tileGrid.GetSolidRects();
             int collLeft = (int)pos.X + CollisionOffsetX;
             int collRight = collLeft + CollisionWidth;
-            foreach (var ceil in ceilings)
+            foreach (var ceil in ceilRects)
             {
                 float slideOffset = Height - CurrentHeight;
                 float prevTop = Position.Y + slideOffset;
@@ -2559,11 +2546,12 @@ public class Player
         }
 
         // Solid floor collision (stand on top + block from below)
-        if (solidFloors != null)
+        if (tileGrid != null)
         {
+            var solidFloorRects = tileGrid.GetSolidRects();
             int collLeft = (int)pos.X + CollisionOffsetX;
             int collRight = collLeft + CollisionWidth;
-            foreach (var sf in solidFloors)
+            foreach (var sf in solidFloorRects)
             {
                 bool xOverlap = collRight > sf.X && collLeft < sf.X + sf.Width;
                 if (xOverlap)

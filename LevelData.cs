@@ -38,14 +38,10 @@ public class LevelData
     [JsonIgnore] public TileGrid TileGridInstance { get; set; }
 
     // Derived arrays (populated after load)
-    [JsonIgnore] public Rectangle[] PlatformRects { get; private set; } = Array.Empty<Rectangle>();
     [JsonIgnore] public Rectangle[] WallRects { get; private set; } = Array.Empty<Rectangle>();
     [JsonIgnore] public int[] WallClimbSides { get; private set; } = Array.Empty<int>();
     [JsonIgnore] public Rectangle[] WallLedges { get; private set; } = Array.Empty<Rectangle>();
-    [JsonIgnore] public Rectangle[] AllPlatforms { get; private set; } = Array.Empty<Rectangle>();
     [JsonIgnore] public Rectangle[] SpikeRects { get; private set; } = Array.Empty<Rectangle>();
-    [JsonIgnore] public Rectangle[] CeilingRects { get; private set; } = Array.Empty<Rectangle>();
-    [JsonIgnore] public Rectangle[] SolidFloorRects { get; private set; } = Array.Empty<Rectangle>();
     [JsonIgnore] public Rectangle[] WallSpikeRects { get; private set; } = Array.Empty<Rectangle>();
     [JsonIgnore] public Rectangle[] AllSpikeRects { get; private set; } = Array.Empty<Rectangle>();
     [JsonIgnore] public Rectangle[] ExitRects { get; private set; } = Array.Empty<Rectangle>();
@@ -62,14 +58,6 @@ public class LevelData
 
     public void Build()
     {
-        // Platforms
-        PlatformRects = new Rectangle[Platforms.Length];
-        for (int i = 0; i < Platforms.Length; i++)
-        {
-            var p = Platforms[i];
-            PlatformRects[i] = new Rectangle(p.X, p.Y, p.W, p.H);
-        }
-
         // Walls
         WallRects = new Rectangle[Walls.Length];
         WallClimbSides = new int[Walls.Length];
@@ -82,33 +70,12 @@ public class LevelData
             WallLedges[i] = new Rectangle(w.X, w.Y, w.W, 12);
         }
 
-        // AllPlatforms = platforms + wall ledges
-        AllPlatforms = new Rectangle[PlatformRects.Length + WallLedges.Length];
-        PlatformRects.CopyTo(AllPlatforms, 0);
-        WallLedges.CopyTo(AllPlatforms, PlatformRects.Length);
-
         // Spikes
         SpikeRects = new Rectangle[Spikes.Length];
         for (int i = 0; i < Spikes.Length; i++)
         {
             var s = Spikes[i];
             SpikeRects[i] = new Rectangle(s.X, s.Y, s.W, s.H);
-        }
-
-        // Ceilings
-        CeilingRects = new Rectangle[Ceilings.Length];
-        for (int i = 0; i < Ceilings.Length; i++)
-        {
-            var c = Ceilings[i];
-            CeilingRects[i] = new Rectangle(c.X, c.Y, c.W, c.H);
-        }
-
-        // Solid floors
-        SolidFloorRects = new Rectangle[SolidFloors.Length];
-        for (int i = 0; i < SolidFloors.Length; i++)
-        {
-            var sf = SolidFloors[i];
-            SolidFloorRects[i] = new Rectangle(sf.X, sf.Y, sf.W, sf.H);
         }
 
         // Wall spikes
@@ -189,50 +156,13 @@ public class LevelData
     {
         if (TileGridInstance == null) return;
         
-        var tileSolids = TileGridInstance.GetSolidRects();
-        var tilePlatforms = TileGridInstance.GetPlatformRects();
         var tileHazards = TileGridInstance.GetHazardRects();
 
-        // Reset to base rects (non-tile)
-        SolidFloorRects = new Rectangle[SolidFloors.Length];
-        for (int i = 0; i < SolidFloors.Length; i++)
-        {
-            var sf = SolidFloors[i];
-            SolidFloorRects[i] = new Rectangle(sf.X, sf.Y, sf.W, sf.H);
-        }
-        CeilingRects = new Rectangle[Ceilings.Length];
-        for (int i = 0; i < Ceilings.Length; i++)
-        {
-            var c = Ceilings[i];
-            CeilingRects[i] = new Rectangle(c.X, c.Y, c.W, c.H);
-        }
-        AllPlatforms = new Rectangle[PlatformRects.Length + WallLedges.Length];
-        PlatformRects.CopyTo(AllPlatforms, 0);
-        WallLedges.CopyTo(AllPlatforms, PlatformRects.Length);
+        // Rebuild spike rects (base + tile hazards)
         AllSpikeRects = new Rectangle[SpikeRects.Length + WallSpikeRects.Length];
         SpikeRects.CopyTo(AllSpikeRects, 0);
         WallSpikeRects.CopyTo(AllSpikeRects, SpikeRects.Length);
 
-        // Merge tile rects
-        if (tileSolids.Length > 0)
-        {
-            var merged = new Rectangle[SolidFloorRects.Length + tileSolids.Length];
-            SolidFloorRects.CopyTo(merged, 0);
-            tileSolids.CopyTo(merged, SolidFloorRects.Length);
-            SolidFloorRects = merged;
-
-            var mergedCeil = new Rectangle[CeilingRects.Length + tileSolids.Length];
-            CeilingRects.CopyTo(mergedCeil, 0);
-            tileSolids.CopyTo(mergedCeil, CeilingRects.Length);
-            CeilingRects = mergedCeil;
-        }
-        if (tilePlatforms.Length > 0)
-        {
-            var merged = new Rectangle[AllPlatforms.Length + tilePlatforms.Length];
-            AllPlatforms.CopyTo(merged, 0);
-            tilePlatforms.CopyTo(merged, AllPlatforms.Length);
-            AllPlatforms = merged;
-        }
         if (tileHazards.Length > 0)
         {
             var merged = new Rectangle[AllSpikeRects.Length + tileHazards.Length];
