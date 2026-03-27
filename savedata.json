@@ -1,12 +1,12 @@
 {
   "currentLevel": "ship-interior",
-  "spawnX": 2442.2986,
-  "spawnY": 408,
+  "spawnX": 2987,
+  "spawnY": 504,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 1353.3158,
+  "playTime": 1393.2853,
   "meleeInventory": [
     "Knife",
     "WoodShield"
@@ -38,7 +38,7 @@
   ],
   "windowSizeIndex": 0,
   "crtEnabled": false,
-  "moveTier": 0,
+  "moveTier": 2,
   "upgrades": [],
   "shelterLevel": "",
   "shelterX": 0,
@@ -46,7 +46,7 @@
   "deathCount": 1,
   "hp": 10,
   "suitIntegrity": 50,
-  "battery": 100,
+  "battery": 92,
   "bestiary": {
     "entries": {
       "Crawler (Forager)": {
@@ -182,12 +182,33 @@
         "loreText": null,
         "thoughts": null,
         "originalNature": null
+      },
+      "forager": {
+        "speciesName": "forager",
+        "classification": "herbivore",
+        "observations": [
+          {
+            "time": "dawn",
+            "weather": "clear",
+            "behavior": "idle",
+            "biome": "Ship Interior"
+          }
+        ],
+        "sightCount": 2,
+        "scanTier": 0,
+        "l2Scanned": true,
+        "detailedRole": null,
+        "temperament": null,
+        "weaknesses": null,
+        "resistances": null,
+        "l3Scanned": true,
+        "loreText": null,
+        "thoughts": null,
+        "originalNature": null
       }
     }
   },
-  "worldTime": 6.5281925,
-  "evolutionFlags": [
-    "evolution_wave_1",
-    "evolution_wave_2"
-  ]
+  "worldTime": 7.192881,
+  "evolutionFlags": [],
+  "cipherScanUnlocked": false
 }

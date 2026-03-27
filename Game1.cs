@@ -8272,7 +8272,8 @@ public class Game1 : Game
 
         void DrawStat(string label, string val, Color vc) {
             _spriteBatch.DrawString(_font, SafeText(label), new Vector2(statX, statY), labelColor);
-            _spriteBatch.DrawString(_font, SafeText(val), new Vector2(statX + 90, statY), vc);
+            float labelW = _font.MeasureString(label).X;
+            _spriteBatch.DrawString(_font, SafeText(val), new Vector2(statX + Math.Max(labelW + 8, 100), statY), vc);
             statY += lineH;
         }
 
@@ -8291,31 +8292,22 @@ public class Game1 : Game
     {
         int tx = rx + 10;
         int ty = ry + 10;
+        int maxW = rw - 20;
         DrawOutlinedString(_font, "SUIT DETAILS", new Vector2(tx, ty), new Color(120, 200, 255));
         ty += 22;
-        _spriteBatch.Draw(_pixel, new Rectangle(tx, ty, rw - 20, 1), new Color(40, 80, 120) * 0.4f);
+        _spriteBatch.Draw(_pixel, new Rectangle(tx, ty, maxW, 1), new Color(40, 80, 120) * 0.4f);
         ty += 8;
 
-        string[] details = {
-            "Suit integrity protects",
-            "against environmental",
-            "hazards and impacts.",
-            "",
-            "Battery powers tech",
-            "abilities: dash, grapple,",
-            "shield, and EVE scans.",
-            "",
-            "Tier affects movement",
-            "physics and abilities.",
-            "  Tech: precision, dash",
-            "  Bio: agility, regen",
-            "  Cipher: power, speed"
-        };
-        foreach (var line in details)
-        {
-            _spriteBatch.DrawString(_font, SafeText(line), new Vector2(tx, ty), Color.Gray * 0.6f);
-            ty += 14;
-        }
+        var detailColor = Color.Gray * 0.6f;
+        ty = DrawWrappedString(_font, "Suit integrity protects against environmental hazards and impacts.", tx, ty, maxW, detailColor, 14);
+        ty += 6;
+        ty = DrawWrappedString(_font, "Battery powers tech abilities: dash, grapple, shield, and EVE scans.", tx, ty, maxW, detailColor, 14);
+        ty += 6;
+        ty = DrawWrappedString(_font, "Tier affects movement physics and abilities.", tx, ty, maxW, detailColor, 14);
+        ty += 4;
+        ty = DrawWrappedString(_font, "  Tech: precision, dash", tx, ty, maxW, detailColor, 14);
+        ty = DrawWrappedString(_font, "  Bio: agility, regen", tx, ty, maxW, detailColor, 14);
+        ty = DrawWrappedString(_font, "  Cipher: power, speed", tx, ty, maxW, detailColor, 14);
     }
 
     private void DrawToolsCenter(int cx, int cy, int cw, int ch)
@@ -8350,26 +8342,33 @@ public class Game1 : Game
     {
         int tx = rx + 10;
         int ty = ry + 10;
+        int maxW = rw - 20;
         DrawOutlinedString(_font, "DETAILS", new Vector2(tx, ty), new Color(120, 200, 255));
         ty += 22;
-        _spriteBatch.Draw(_pixel, new Rectangle(tx, ty, rw - 20, 1), new Color(40, 80, 120) * 0.4f);
+        _spriteBatch.Draw(_pixel, new Rectangle(tx, ty, maxW, 1), new Color(40, 80, 120) * 0.4f);
         ty += 8;
 
-        string[] desc;
+        var detailColor = Color.Gray * 0.6f;
         if (_invRightScroll == 0)
         {
-            desc = _player.HasGrapple
-                ? new[] { "Grapple Gun", "", "Partially functional.", "Fires a magnetic tether", "that pulls you to anchor", "points. Drains battery.", "", "Cost: 0.5 battery/use" }
-                : new[] { "Grapple Gun", "", "Not yet acquired.", "Keep exploring." };
+            ty = DrawWrappedString(_font, "Grapple Gun", tx, ty, maxW, Color.White * 0.7f, 16);
+            ty += 4;
+            if (_player.HasGrapple)
+            {
+                ty = DrawWrappedString(_font, "Fires a magnetic tether that pulls you to anchor points. Drains battery.", tx, ty, maxW, detailColor, 14);
+                ty += 4;
+                ty = DrawWrappedString(_font, "Cost: 0.5 battery/use", tx, ty, maxW, detailColor, 14);
+            }
+            else
+            {
+                ty = DrawWrappedString(_font, "Not yet acquired. Keep exploring.", tx, ty, maxW, detailColor, 14);
+            }
         }
         else
         {
-            desc = new[] { "Map Module", "", "Not yet acquired.", "Keep exploring." };
-        }
-        foreach (var line in desc)
-        {
-            _spriteBatch.DrawString(_font, SafeText(line), new Vector2(tx, ty), Color.Gray * 0.6f);
-            ty += 14;
+            ty = DrawWrappedString(_font, "Map Module", tx, ty, maxW, Color.White * 0.7f, 16);
+            ty += 4;
+            ty = DrawWrappedString(_font, "Not yet acquired. Keep exploring.", tx, ty, maxW, detailColor, 14);
         }
     }
 
@@ -8406,12 +8405,19 @@ public class Game1 : Game
             string listName = e.SpeciesName;
             if (e.SightCount >= 5 && CreatureDatabase.Profiles.TryGetValue(e.SpeciesName, out var lp))
                 listName = lp.DisplayName;
-            string status = e.L1Progress >= 1f ? "[OK]" : $"[{(int)(e.L1Progress * 100)}%]";
-            _spriteBatch.DrawString(_font, SafeText($"{listName}  {status}"), new Vector2(tx + 2, ty + 2), c);
 
-            // Progress bar
-            int barX = tx + cw - 70;
-            int barW = 50;
+            // Truncate name to fit before progress bar
+            int maxNameW = cw - 100;
+            string displayName = listName;
+            while (_font.MeasureString(displayName).X > maxNameW && displayName.Length > 3)
+                displayName = displayName[..^1];
+            if (displayName.Length < listName.Length) displayName += "..";
+
+            _spriteBatch.DrawString(_font, SafeText(displayName), new Vector2(tx + 2, ty + 2), c);
+
+            // Progress bar (right-aligned)
+            int barW = 40;
+            int barX = tx + cw - barW - 18;
             int barH = 6;
             int barY2 = ty + 7;
             _spriteBatch.Draw(_pixel, new Rectangle(barX, barY2, barW, barH), new Color(20, 40, 35));
@@ -8485,7 +8491,11 @@ public class Game1 : Game
             if (entry.SightCount >= 5) displayName = p.DisplayName;
         }
 
-        DrawOutlinedString(_font, displayName.ToUpper(), new Vector2(tx, ty), cyan);
+        // Truncate title to fit panel
+        string title = displayName.ToUpper();
+        while (_font.MeasureString(title).X > rw - 24 && title.Length > 3)
+            title = title[..^1];
+        DrawOutlinedString(_font, title, new Vector2(tx, ty), cyan);
         ty += 22;
         _spriteBatch.Draw(_pixel, new Rectangle(tx, ty, rw - 20, 1), new Color(40, 80, 60) * 0.4f);
         ty += 8;
