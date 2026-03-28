@@ -8496,7 +8496,8 @@ public class Game1 : Game
             }
         }
         else if (_invCategory == 3)
-        {: W/S navigates species list or scrolls right panel
+        {
+            // Log/Bestiary: W/S navigates species list or scrolls right panel
             if (_bestiaryFocusRight)
             {
                 // Right panel scrolling mode
