@@ -79,7 +79,8 @@ public class Scavenger : Creature
         
         // Safety from player proximity
         Needs.Safety = MathHelper.Clamp(dist / 160f, 0f, 1f);
-        CurrentGoal = SelectGoal();
+        if (BurrowProgress > 0 && BurrowProgress < 1f) { }
+        else CurrentGoal = SelectGoal();
 
         // Creature awareness — scavengers fear everyone
         var (threat, threatDist, _, _) = ScanCreatures(ctx.NearbyCreatures, 160f, 0f);
@@ -88,9 +89,8 @@ public class Scavenger : Creature
             _dir = threat.Position.X > Position.X ? -1 : 1;
             Needs.Safety = Math.Min(Needs.Safety, 0.15f);
         }
-        CurrentGoal = SelectGoal();
-
-        // Noise detection
+        if (BurrowProgress > 0 && BurrowProgress < 1f) { }
+        else CurrentGoal = SelectGoal();        // Noise detection
         var noise = CheckNoise(ctx.NoiseEvents);
         if (noise != null)
         {
@@ -112,8 +112,10 @@ public class Scavenger : Creature
 
         float fleeSpeedBoost = CurrentGoal == CreatureGoal.Flee ? 1.3f : 1f;
 
-        // Burrowing
-        if (CurrentGoal == CreatureGoal.Rest && CanBurrow && !IsBurrowed)
+        // Burrowing — rest, hide from threats, or cornered
+        bool wantsBurrow = (CurrentGoal == CreatureGoal.Rest || 
+            (Needs.Safety < 0.2f && CurrentGoal == CreatureGoal.Flee)) && CanBurrow;
+        if (wantsBurrow && !IsBurrowed)
         {
             BurrowProgress = MathHelper.Clamp(BurrowProgress + dt * 0.5f, 0f, 1f);
             if (BurrowProgress >= 1f) IsBurrowed = true;

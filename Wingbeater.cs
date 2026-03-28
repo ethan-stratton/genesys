@@ -420,13 +420,21 @@ public class Wingbeater : Creature
 
             case State.Stunned:
                 _stateTimer -= dt;
+                // Apply gravity while stunned (fall to ground)
+                Velocity.Y += 400f * dt;
+                Position += Velocity * dt;
+                if (Position.Y + Height >= floorY)
+                {
+                    Position.Y = floorY - Height;
+                    Velocity = Vector2.Zero;
+                }
                 if (_stateTimer <= 0)
                     _state = State.Returning;
                 break;
 
             case State.Returning:
-                // If still hungry, don't return — go back to hovering to search
-                if (CurrentGoal == CreatureGoal.Eat && _huntTarget != null && _huntTarget.Alive)
+                // If still hungry, don't return to spawn — continue hunting
+                if (CurrentGoal == CreatureGoal.Eat)
                 {
                     _state = State.Hovering;
                     break;
@@ -568,12 +576,12 @@ public class Wingbeater : Creature
             Alive = false;
             return true;
         }
-        // Getting hit during dive stuns it
-        if (_state == State.DiveBomb)
+        // Getting hit stuns it — forced to fall briefly
+        if (_state == State.DiveBomb || _state == State.Hovering || _state == State.Tracking)
         {
-            Velocity = Vector2.Zero;
+            Velocity = new Vector2(kbX, MathF.Max(kbY, 200f)); // ensure downward
             _state = State.Stunned;
-            _stateTimer = StunTime * 1.5f;
+            _stateTimer = StunTime * (kbY > 0 ? 2f : 1.5f); // longer stun if yanked down
         }
         return false;
     }

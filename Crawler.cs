@@ -381,7 +381,11 @@ public class Crawler : Creature
             case CrawlerVariant.Resonant:
                 break;
         }
-        CurrentGoal = SelectGoal();
+        // Don't override goal if actively burrowing (mid-progress)
+        if (BurrowProgress > 0 && BurrowProgress < 1f)
+        { /* keep current goal — burrowing in progress */ }
+        else
+            CurrentGoal = SelectGoal();
 
         // Predator attack — damage prey on contact
         if (_huntTarget != null && _huntTarget.Alive && Rect.Intersects(_huntTarget.Rect) && _huntTimer <= 0)
@@ -428,8 +432,10 @@ public class Crawler : Creature
 
         float fleeSpeedBoost = CurrentGoal == CreatureGoal.Flee ? 1.3f : 1f;
 
-        // Burrowing behavior
-        if (CurrentGoal == CreatureGoal.Rest && CanBurrow && !IsBurrowed)
+        // Burrowing behavior — rest, hide from threats, or cornered
+        bool wantsBurrow = (CurrentGoal == CreatureGoal.Rest || 
+            (Needs.Safety < 0.2f && CurrentGoal == CreatureGoal.Flee)) && CanBurrow;
+        if (wantsBurrow && !IsBurrowed)
         {
             BurrowProgress = MathHelper.Clamp(BurrowProgress + dt * 0.5f, 0f, 1f);
             if (BurrowProgress >= 1f) IsBurrowed = true;
@@ -544,11 +550,14 @@ public class Crawler : Creature
                 Aggroed = dist < effectiveAggroRange && canSeePlayer;
             else if (Variant == CrawlerVariant.Skitter)
                 Aggroed = false;
+            else if (Variant == CrawlerVariant.Forager)
+                Aggroed = false; // foragers don't chase, but they DO flee (below)
             else
                 Aggroed = false;
 
-            // Skitter flee behavior
-            bool fleeing = Variant == CrawlerVariant.Skitter && dist < effectiveAggroRange && canSeePlayer;
+            // Skitter AND Forager flee behavior — both are prey that flee
+            bool fleeing = (Variant == CrawlerVariant.Skitter || Variant == CrawlerVariant.Forager) 
+                && dist < effectiveAggroRange && canSeePlayer;
 
             // Keep flee timer alive
             if (fleeing) _fleeTimer = 1.5f + (float)_rng.NextDouble() * 1f; // flee 1.5-2.5s after last trigger

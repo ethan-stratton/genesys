@@ -2919,8 +2919,9 @@ public class Game1 : Game
             else if (target is Wingbeater w)
             {
                 // Wingbeater: yank downward — hollow bones, can't support grapple
+                w.Position.Y += 80f; // force downward
                 w.Velocity = new Vector2(w.Velocity.X * 0.5f, 500f);
-                w.Hp -= 3;
+                w.TakeHit(3, 0f, 60f); // damage + knockback down, triggers aggro
                 _shakeTimer = 0.15f;
                 _shakeIntensity = 3f;
                 EveAlert("Hollow bones. They can't take that.", 3f);
@@ -3135,7 +3136,7 @@ public class Game1 : Game
             if (canFire)
             {
                 _bullets.Add(new Bullet(PlayerCenter, _player.ShootDirection));
-                _noiseEvents.Add(new NoiseEvent(PlayerCenter, 400f, 1.0f, "BANG", Color.Yellow, 1f));
+                _noiseEvents.Add(new NoiseEvent(PlayerCenter + new Vector2(0, -60f), 400f, 1.0f, "BANG", Color.Yellow, 1f));
                 _sidearmFireTimer = SidearmFireCooldown;
                 if (isGun)
                 {
@@ -3424,7 +3425,7 @@ public class Game1 : Game
         // Detect melee swing start — emit noise
         if (_player.MeleeTimer > 0 && _prevPlayerMeleeTimer <= 0)
         {
-            var swingPos = new Vector2(_player.Position.X + Player.Width / 2f, _player.Position.Y - 10f);
+            var swingPos = new Vector2(_player.Position.X + Player.Width / 2f, _player.Position.Y - 60f);
             _noiseEvents.Add(new NoiseEvent(swingPos, 150f, 0.4f, "SWSH", Color.LightGray * 0.7f, 1.0f));
         }
         _prevPlayerMeleeTimer = _player.MeleeTimer;
@@ -3438,7 +3439,7 @@ public class Game1 : Game
                 float loudness = MathF.Abs(_player.Velocity.X) > 250f ? 0.5f : 0.25f;
                 string label = MathF.Abs(_player.Velocity.X) > 250f ? "THMP" : "tap";
                 float radius = MathF.Abs(_player.Velocity.X) > 250f ? 120f : 60f;
-                var footPos = new Vector2(_player.Position.X + Player.Width / 2f, _player.Position.Y + Player.Height - 4f);
+                var footPos = new Vector2(_player.Position.X + Player.Width / 2f, _player.Position.Y - 55f);
                 _noiseEvents.Add(new NoiseEvent(footPos, radius, loudness, label, Color.Gray * 0.5f, 0.4f));
                 _footstepTimer = MathF.Abs(_player.Velocity.X) > 250f ? 0.25f : 0.4f;
             }
@@ -3533,6 +3534,7 @@ public class Game1 : Game
             var a = _creatures[i];
             if (!a.Alive || a.DamageCooldown > 0) continue;
             if (a.Role is not (EcologicalRole.Predator or EcologicalRole.Apex)) continue;
+            if (a.CurrentGoal == CreatureGoal.Flee) continue; // fleeing creatures don't attack
 
             for (int j = 0; j < _creatures.Count; j++)
             {

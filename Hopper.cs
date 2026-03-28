@@ -100,7 +100,10 @@ public class Hopper : Creature
         float dist = Vector2.Distance(playerCenter, Position + new Vector2(Width / 2f, Height / 2f));
         // Safety from player proximity
         Needs.Safety = MathHelper.Clamp(dist / 200f, 0f, 1f);
-        CurrentGoal = SelectGoal();
+        if (BurrowProgress > 0 && BurrowProgress < 1f)
+        { /* burrowing in progress — keep goal */ }
+        else
+            CurrentGoal = SelectGoal();
 
         // Creature awareness
         var (hopThreat, hopThreatDist, _, _) = ScanCreatures(ctx.NearbyCreatures, 200f, 0f);
@@ -109,7 +112,10 @@ public class Hopper : Creature
             _dir = hopThreat.Position.X > Position.X ? -1 : 1;
             Needs.Safety = Math.Min(Needs.Safety, 0.2f);
         }
-        CurrentGoal = SelectGoal();
+        if (BurrowProgress > 0 && BurrowProgress < 1f)
+        { /* burrowing in progress */ }
+        else
+            CurrentGoal = SelectGoal();
 
         // Noise detection
         var noise = CheckNoise(ctx.NoiseEvents);
@@ -126,7 +132,9 @@ public class Hopper : Creature
         float fleeSpeedBoost = CurrentGoal == CreatureGoal.Flee ? 1.3f : 1f;
 
         // Burrowing
-        if (CurrentGoal == CreatureGoal.Rest && CanBurrow && !IsBurrowed)
+        bool wantsBurrow = (CurrentGoal == CreatureGoal.Rest || 
+            (Needs.Safety < 0.2f && CurrentGoal == CreatureGoal.Flee)) && CanBurrow;
+        if (wantsBurrow && !IsBurrowed)
         {
             BurrowProgress = MathHelper.Clamp(BurrowProgress + dt * 0.5f, 0f, 1f);
             if (BurrowProgress >= 1f) IsBurrowed = true;
