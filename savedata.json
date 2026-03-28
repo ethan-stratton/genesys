@@ -1,28 +1,39 @@
 {
   "currentLevel": "ship-interior",
-  "spawnX": 5993.91,
-  "spawnY": 2295.3318,
+  "spawnX": 6201.1665,
+  "spawnY": 2232,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 303.45337,
-  "meleeInventory": [],
+  "playTime": 598.0981,
+  "meleeInventory": [
+    "GreatSword",
+    "Torch"
+  ],
   "rangedInventory": [],
   "meleeIndex": 0,
   "rangedIndex": 0,
-  "weaponInventory": [],
+  "weaponInventory": [
+    "GreatSword",
+    "Torch"
+  ],
   "leftHand": "None",
-  "rightHand": "None",
-  "rightHand1": "None",
+  "rightHand": "GreatSword",
+  "rightHand1": "GreatSword",
   "rightHand2": "None",
-  "leftHand1": "None",
+  "leftHand1": "Torch",
   "leftHand2": "None",
   "rightActiveSlot1": true,
-  "leftActiveSlot1": true,
+  "leftActiveSlot1": false,
   "collectedItems": [
     "grapple-2",
-    "debug_grapple_639103216437212280"
+    "debug_grapple_639103216437212280",
+    "debug_greatsword_639103265972717510",
+    "debug_grapple_639103266563882930",
+    "lantern-3",
+    "torch-4",
+    "cipher-helmet-5"
   ],
   "windowSizeIndex": 0,
   "crtEnabled": false,
@@ -31,10 +42,10 @@
   "shelterLevel": "",
   "shelterX": 0,
   "shelterY": 0,
-  "deathCount": 1,
+  "deathCount": 2,
   "hp": 10,
   "suitIntegrity": 30,
-  "battery": 75.32374,
+  "battery": 65.08703,
   "bestiary": {
     "entries": {
       "forager": {
@@ -141,7 +152,7 @@
             "biome": "The Living Forest"
           }
         ],
-        "sightCount": 5,
+        "sightCount": 8,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -191,9 +202,15 @@
             "weather": "clear",
             "behavior": "fleeing",
             "biome": "The Living Forest"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "idle",
+            "biome": "Ship Interior"
           }
         ],
-        "sightCount": 1,
+        "sightCount": 2,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -207,19 +224,19 @@
       }
     }
   },
-  "worldTime": 13.412457,
+  "worldTime": 19.486807,
   "evolutionFlags": [],
   "cipherScanUnlocked": false,
-  "hasLantern": false,
-  "hasCipherHelmet": false,
-  "cipherHelmetEquipped": false,
-  "torchFuel": 100,
+  "hasLantern": true,
+  "hasCipherHelmet": true,
+  "cipherHelmetEquipped": true,
+  "torchFuel": 99.15047,
   "hasChestPlate": true,
   "chestPlateEquipped": true,
   "hasRocketBoots": true,
   "rocketBootsEquipped": true,
-  "durR1": 0,
+  "durR1": 149,
   "durR2": 0,
-  "durL1": 0,
+  "durL1": 1000,
   "durL2": 0
 }

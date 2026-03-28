@@ -58,6 +58,30 @@
       "y": 2080,
       "w": 20,
       "h": 20
+    },
+    {
+      "id": "lantern-3",
+      "type": "lantern",
+      "x": 256,
+      "y": 2080,
+      "w": 20,
+      "h": 20
+    },
+    {
+      "id": "torch-4",
+      "type": "torch",
+      "x": 256,
+      "y": 2080,
+      "w": 20,
+      "h": 20
+    },
+    {
+      "id": "cipher-helmet-5",
+      "type": "cipher-helmet",
+      "x": 256,
+      "y": 2080,
+      "w": 20,
+      "h": 20
     }
   ],
   "objects": [],
