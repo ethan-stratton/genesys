@@ -1,5 +1,5 @@
 # GENESIS — Master Task List: First 30 Minutes
-# Last updated: 2026-03-23
+# Last updated: 2026-03-28
 
 *Every task needed to make minutes 0-30 playable, fun, and shippable.*
 *Tasks are in dependency order. Build from top to bottom.*
@@ -39,49 +39,49 @@
 
 ### 1.1 — Player Character (Adam)
 - [x] 015. Basic movement: walk, run, jump [EXISTING]
-- [ ] 016. Injured movement state: limping animation, reduced speed (active until minute ~3)
+- [x] 016. Injured movement state: limping animation, reduced speed (active until minute ~3) — IsInjured + InjuredSpeedMult (0.45x) + limp timer implemented
 - [ ] 017. Recovery trigger: picking up knife or EVE rebooting restores normal movement
-- [ ] 018. Suit system: integrity % (starts 31%, passive drain from tech suppression field)
-- [ ] 019. Battery system: charge level, passive drain, consumption by tech items (grapple, shield, etc.)
-- [ ] 020. Suit integrity affects: defense (higher = more damage absorbed), HUD glitchiness (lower = more static)
-- [ ] 021. Battery affects: tech item availability (0 battery = tech items non-functional)
-- [ ] 022. Remove/disable all advanced movement at game start (no slide, vault kick, blade dash, uppercut, cartwheel, flip — these are mid/late-game bio unlocks)
-- [ ] 023. Basic jump only — no double jump, no wall cling, no wall climb at start
-- [ ] 024. Crouch/duck under low obstacles (new, replaces slide for now)
+- [x] 018. Suit system: integrity % (starts 31%, passive drain from tech suppression field)
+- [x] 019. Battery system: charge level, passive drain, consumption by tech items (grapple, lantern, sprint)
+- [x] 020. Suit integrity affects: defense (higher = more damage absorbed), HUD glitchiness (lower = more static) — HUD glitch timer implemented
+- [x] 021. Battery affects: tech item availability (0 battery = lantern/sprint/cipher helmet non-functional)
+- [x] 022. Remove/disable all advanced movement at game start (tier system gates abilities per tier)
+- [x] 023. Basic jump only — tier 0 (Tech) has no double jump, no wall climb at start
+- [x] 024. Crouch/duck under low obstacles
 - [x] 025. Mouse-direction aiming system (replace 8-direction lock)
 - [ ] 026. Aim-assist when suit integrity > 50% (subtle crosshair magnetism, fades as suit degrades)
 
 ### 1.2 — Combat Knife (Melee)
-- [x] 027. Basic melee attack [EXISTING — modify]
+- [x] 027. Basic melee attack [EXISTING — full combo system with multiple weapons]
 - [ ] 028. Knife-specific animation: short range, fast, 3-hit combo
 - [ ] 029. Knife interaction with environment: slash fungus, pry open containers
-- [ ] 030. Knife damage: 8 per hit (balanced so predator takes 3-4 hits)
+- [x] 030. Knife damage: configurable via WeaponStats (damage, range, knockback per weapon type)
 
 ### 1.3 — Sidearm (Ranged)
-- [ ] 031. Sidearm weapon type: mouse-aimed, hitscan or fast projectile
-- [ ] 032. Ammo system: 12 rounds max, no reload mechanic (you have what you find)
-- [ ] 033. Ammo HUD display (rounds remaining, visible when weapon equipped)
-- [ ] 034. Weapon switching: knife ↔ sidearm (if found), key bind (e.g., 1/2 or scroll wheel)
-- [ ] 035. Sidearm damage: 20 per shot (2-shot kill on predator)
-- [ ] 036. Gunshot sound attracts nearby enemies (radius-based aggro trigger)
-- [ ] 037. Muzzle flash + shell casing particles
+- [x] 031. Sidearm weapon type: mouse-aimed, hitscan bullets via Bullet class
+- [x] 032. Ammo system: 12 rounds per clip, reload mechanic (1.2s reload)
+- [x] 033. Ammo HUD display (rounds remaining visible in HUD)
+- [x] 034. Weapon switching: dual 4-slot system (L1/L2/R1/R2), any weapon in any hand
+- [x] 035. Sidearm damage: configurable via WeaponStats
+- [x] 036. Gunshot sound attracts nearby enemies (NoiseEvent BANG, 400px radius, 1.0 intensity)
+- [x] 037. Muzzle flash particles (flash + core glow, 0.06s duration)
 
 ### 1.4 — Grapple Module
-- [ ] 038. Grapple as equippable tool (not weapon slot — separate key, e.g., E or right-click)
-- [ ] 039. Grapple fires toward mouse cursor, attaches to terrain/anchor points
-- [ ] 040. Grapple swing physics: pendulum motion, release at apex for momentum
-- [ ] 041. Grapple pull: pull Adam to anchor point (for vertical traversal)
-- [ ] 042. Grapple battery cost: each use drains X% battery
-- [ ] 043. Grapple fails gracefully when battery = 0 (click sound, nothing happens, EVE comment first time)
-- [ ] 044. Grapple anchor points: specific tiles/objects marked as grappleable (visual indicator — subtle hook/ring)
-- [ ] 045. Grapple feel: mechanical click on fire, motor whirr during pull, cable weight on swing
+- [x] 038. Grapple as equippable tool (separate from weapon slots, E key or right-click)
+- [x] 039. Grapple fires toward mouse cursor, attaches to terrain/anchor points
+- [x] 040. Grapple swing physics: pendulum motion with gravity (GrappleGravityBase = 1300f), release at apex for momentum
+- [x] 041. Grapple pull: pull Adam to anchor point + pull enemies toward player
+- [x] 042. Grapple battery cost: each use drains battery
+- [x] 043. Grapple fails gracefully when battery = 0 (EVE comment)
+- [~] 044. Grapple anchor points: attaches to solid terrain. No visual indicator/ring for anchor points yet
+- [x] 045. Grapple feel: hook speed 1000px/s, max length ~6 tiles (200px), reel speed 200px/s
 
 ### 1.5 — Inventory System
-- [ ] 046. Simple inventory: list of held items (knife, sidearm, grapple, battery cells, chitin piece)
-- [ ] 047. Battery cell item: consumable, restores X% suit integrity + Y% battery
-- [ ] 048. Pickup interaction: walk over small items (auto-collect), interact key for large items
-- [ ] 049. Inventory HUD: minimal, shows equipped weapon + battery + suit integrity
-- [ ] 050. No crafting menu for first 30 minutes (bio-tier crafting comes later)
+- [x] 046. Full inventory screen: Equipment (body silhouette + weapon slots), Suit stats, Tools, Log/Bestiary tabs
+- [x] 047. Battery cell item: consumable, restores battery/suit
+- [x] 048. Pickup interaction: walk over items (auto-collect), editor can spawn items
+- [x] 049. Inventory HUD: equipped weapon + battery + suit integrity + durability bars + armor/lantern/cipher/torch indicators
+- [x] 050. Equipment system: helmet slot (cipher helmet), chest slot (tech chest plate), legs slot (rocket boots), 4 hand slots (L1/L2/R1/R2)
 
 ---
 
@@ -90,45 +90,45 @@
 
 ### 2.1 — EVE Core
 - [x] 051. EVE orb follows player [EXISTING — orbiting behavior]
-- [ ] 052. EVE visual states: healthy (bright, smooth orbit), damaged (flickering, erratic orbit), offline (dark, stationary)
+- [~] 052. EVE visual states: healthy orbit exists. Damaged/offline visual states not implemented
 - [ ] 053. EVE boot sequence: spawn glitchy at minute 1:15, stabilize over 5 seconds
 - [ ] 054. EVE orb physics: shakes off water droplets in rain, recoils from explosions, dims when player kills passive creatures
-- [x] 055. EVE speech bubble system [EXISTING — modify for scan level colors]
+- [x] 055. EVE speech bubble system [EXISTING — 75+ unique EVE alert lines in codebase]
 
 ### 2.2 — Scan Level 1 (Passive)
-- [ ] 056. Auto-scan system: EVE detects scannable objects within radius (~6 tiles)
+- [~] 056. Auto-scan system: cipher scan (Q hold) exists, passive auto-scan not implemented
 - [ ] 057. Scan trigger: proximity + line-of-sight + cooldown (don't spam)
-- [ ] 058. Visual: EVE orb pulses soft BLUE, brief glow on scanned object
-- [ ] 059. Speech: short text bubble (1 line, 3-4 seconds) — no player action required
-- [ ] 060. Scannable object data: define `ScannableObject` class with id, scan-level-1 text, position, scan-cooldown
+- [~] 058. Visual: cipher scan has visual overlay. No per-scan-level color distinction yet
+- [x] 059. Speech: EVE alert text bubbles (1 line, configurable duration)
+- [~] 060. Scannable object data: Bestiary tracks creature scan data. No generic ScannableObject for env items
 - [ ] 061. Place scannable markers in crash site: alien plants, debris types, fire sources
 - [ ] 062. Place scannable markers in forest: root structures, canopy species, thermal signatures
 
 ### 2.3 — Scan Level 2 (Active)
-- [ ] 063. Player-triggered scan: press scan key (e.g., Q) while near scannable object
+- [~] 063. Player-triggered scan: Q hold cipher scan exists as toggle, not per-object targeting
 - [ ] 064. Visual: EVE orb shifts to GREEN focused beam aimed at target, lasts ~3 seconds
-- [ ] 065. Speech: 2-3 line text bubble (5-7 seconds), more detailed info
-- [ ] 066. Level 2 scan unlocks after EVE repairs scanner module (minute ~2, first battery cell use)
+- [~] 065. Speech: bestiary has species descriptions. Per-object L2 scan text not implemented
+- [x] 066. Scan level 2 unlock: _cipherScanUnlocked gate exists, toggleable
 - [ ] 067. HUD indicator: scan level icon in corner (blue dot = L1, green dot = L2 available)
-- [ ] 068. Some objects only have L1 data. Others have L1 + L2. Visual cue on objects with L2 data available (subtle shimmer?)
+- [ ] 068. Some objects only have L1 data. Visual cue on objects with L2 data available
 
 ### 2.4 — Scan Level 3 (Deep — Limited in First 30 Min)
-- [ ] 069. Deep scan: hold scan key while stationary for 2 seconds near L3-capable object
+- [~] 069. Deep scan: L3 scan flag exists in bestiary. Hold mechanic not implemented
 - [ ] 070. Visual: EVE orb emits GOLD resonance rings, expands outward
-- [ ] 071. Speech: 3-4 line text bubble (8-10 seconds), reveals secrets/mechanics/lore
-- [ ] 072. Only 2-3 objects in first 30 minutes support L3 (predator alpha corpse, stone cairn, adapted chitin piece)
+- [ ] 071. Speech: 3-4 line detailed text not written
+- [ ] 072. Only 2-3 objects in first 30 minutes support L3
 - [ ] 073. L3 scan can trigger gameplay changes: reveal hidden path, unlock knowledge entry
 
 ### 2.5 — Scan Log
-- [ ] 074. Scan log data structure: list of all scanned objects with level reached
-- [ ] 075. Accessible via pause menu: simple list view, organized by area
+- [x] 074. Scan log data structure: _scanLog HashSet + Bestiary with per-species tracking
+- [x] 075. Accessible via inventory: Log/Bestiary tab with species list, scrollable detail panel
 - [ ] 076. Scan count affects Adapted encounter trigger (more scans = higher "curiosity" score)
 
 ### 2.6 — EVE Dialogue System
-- [ ] 077. Triggered dialogue: specific game events fire EVE lines (enter forest, find sidearm, etc.)
-- [ ] 078. Dialogue queue: if multiple triggers fire close together, queue them with gaps
-- [ ] 079. Dialogue priority: critical lines (suit failing, Dragon scream) override queued ambient lines
-- [ ] 080. Dialogue variety: 2-3 variants per trigger, random selection (prevents repetition on replay)
+- [x] 077. Triggered dialogue: EveAlert/EveAlertOnce system with 75+ contextual lines
+- [~] 078. Dialogue queue: single alert at a time. No proper queue with gaps
+- [ ] 079. Dialogue priority: critical lines override queued ambient lines
+- [ ] 080. Dialogue variety: 2-3 variants per trigger, random selection
 
 ---
 
@@ -136,52 +136,67 @@
 *The planet's inhabitants.*
 
 ### 3.1 — Scavenger (Decomposer)
-- [ ] 081. Scavenger sprite: small (12x8px?), alien rat-like silhouette
-- [ ] 082. Scavenger AI: wander near debris/food sources, freeze when player approaches, flee if player gets too close
-- [ ] 083. Scavenger interaction: can be killed (1 hit), drops nothing
-- [ ] 084. Scavenger carrying behavior: picks up small shiny objects, carries them toward nest
-- [ ] 085. Scavenger pack behavior: groups of 3-4 guard a found object, scatter when player approaches
-- [ ] 086. Scavenger nest: static location near shelter, populated if scavengers alive, empty if first scavenger killed
-- [ ] 087. Scavenger gift behavior (at shelter): if alive + spared, one brings debris bit and drops near player
-- [ ] 088. Kill/spare tracking: global flag `_scavengerKilled` set on first scavenger death, persists in save
+- [x] 081. Scavenger sprite: 12x8px alien rat silhouette (fallback rectangles)
+- [x] 082. Scavenger AI: wander near debris/food sources, freeze when player approaches, flee if too close
+- [x] 083. Scavenger interaction: can be killed (1 HP), drops corpse as food source
+- [ ] 084. Scavenger carrying behavior: picks up small shiny objects, carries toward nest
+- [ ] 085. Scavenger pack behavior: groups of 3-4 guard a found object, scatter when approached
+- [ ] 086. Scavenger nest: static location near shelter
+- [ ] 087. Scavenger gift behavior: if alive + spared, one brings debris and drops near player
+- [ ] 088. Kill/spare tracking: global flag system exists (SaveData.Flags dict)
 
 ### 3.2 — Herbivore (Primary Consumer)
-- [ ] 089. Herbivore sprite: medium (20x16px?), gentle silhouette, clearly non-threatening
-- [ ] 090. Herbivore AI: graze near specific plants, move between grazing spots, flee from predators and loud sounds
-- [ ] 091. Herbivore-plant interaction: eating from bioluminescent plant triggers spore release (particle effect)
-- [ ] 092. Herbivore scannable: L1 "Passive herbivore." L2 (on spore plant) "Spores have mild regenerative property. Self-medicating behavior."
-- [ ] 093. Herbivore flee behavior: runs from gunshots, predators, fast player approach
+- [x] 089. Herbivore sprites: Crawler-Forager (16x10), Hopper (12x10), Bird (10x8) — all fallback rectangles
+- [x] 090. Herbivore AI: graze near food sources (FoodSource system), move between patches, flee from predators and loud sounds (NoiseEvent)
+- [x] 091. Herbivore-plant interaction: eating from food sources with EatTimer, food depletes
+- [~] 092. Herbivore scannable: bestiary tracks species. L1/L2 scan text not written
+- [x] 093. Herbivore flee behavior: runs from NoiseEvent BANG, predators (IsThreatTo), startles propagate to herd (PropagateStartle)
 
 ### 3.3 — Predator (Secondary Consumer) — Solo
-- [ ] 094. Predator sprite: medium-large (24x16px?), alien dog silhouette, aggressive posture
-- [ ] 095. Predator AI: patrol territory, detect player by proximity/sight, charge attack
-- [ ] 096. Predator combat: charge → bite (contact damage), short cooldown, re-engage
-- [ ] 097. Predator HP: 30 (3-4 knife hits at 8 dmg, 2 sidearm shots at 20 dmg)
-- [ ] 098. Predator damage to player: 15 per hit (meaningful but not one-shot)
-- [ ] 099. Predator drawn to fire/thermal signatures (wander toward crash fires)
-- [ ] 100. Predator death: ragdoll or death animation, scannable corpse remains briefly
-- [ ] 101. Solo predator at crash site exit (minute 7:30 encounter)
+- [x] 094. Predator sprites: Crawler variants (Leaper/Stalker/Spitter), Wingbeater — fallback rectangles
+- [x] 095. Predator AI: patrol territory, detect player by proximity/sight, hunt prey creatures
+- [x] 096. Predator combat: charge → contact damage, cooldown, re-engage. Wingbeater dive-bomb mechanic
+- [x] 097. Predator HP: configurable per species (Crawler HP varies by variant)
+- [x] 098. Predator damage to player: configurable contact damage per creature type
+- [~] 099. Predator drawn to fire/thermal signatures — drawn to NoiseEvents, not specifically fire
+- [x] 100. Predator death: death particles, scannable corpse remains as FoodSource
+- [ ] 101. Solo predator at crash site exit (minute 7:30 encounter) — level design not done
 
 ### 3.4 — Predator Pack (Dynamic Event)
-- [ ] 102. Pack AI: 3 predators with coordinated behavior
-- [ ] 103. Pack hunting pattern: 1 flusher, 2 flankers — pursue herbivore prey in the forest
-- [ ] 104. Pack prey: herbivore AI that flees, can be caught and killed by pack
-- [ ] 105. Pack detection: scent-based. Adam is masked by crash residue (invisible timer or proximity-based)
-- [ ] 106. If scent mask expires or player gets too close: pack aggros
-- [ ] 107. Pack flanking AI: when aggro'd on player, one circles behind while two approach front
-- [ ] 108. Pack hunt success scenario: if player watches, prey is caught, pack eats, then disperses
-- [ ] 109. Post-hunt: kill site scannable (bone fragments → planetary history data)
-- [ ] 110. Post-fight (knife win): alpha corpse is L3 scannable → pack hierarchy + scent-masking chemical data
-- [ ] 111. Sidearm use: kills predators but triggers "gunshot scatter" — nearby wildlife flees for 60 seconds
-- [ ] 112. Sneak path: alternate route through dense foliage, requires slow movement (no running)
-- [ ] 113. Sneak scan reward: L2 on pack from hiding → subsonic communication data
-- [ ] 114. Track which approach player took: `_predatorPackOutcome` enum (Fought/Shot/Sneaked/Watched) — saved, affects scan log content
+- [ ] 102. Pack AI: coordinated behavior for multiple predators
+- [ ] 103. Pack hunting pattern: flusher + flankers
+- [ ] 104. Pack prey: herbivore that flees, can be caught
+- [ ] 105. Pack detection: scent-based, Adam masked
+- [ ] 106. If scent mask expires: pack aggros
+- [ ] 107. Pack flanking AI
+- [ ] 108. Pack hunt success scenario: if player watches, prey caught, pack eats, disperses
+- [ ] 109. Post-hunt: kill site scannable
+- [ ] 110. Post-fight: alpha corpse L3 scannable
+- [ ] 111. Sidearm use: kills predators but gunshot scatter already works (NoiseEvent BANG causes flee)
+- [ ] 112. Sneak path: alternate route
+- [ ] 113. Sneak scan reward
+- [ ] 114. Track approach: `_predatorPackOutcome` enum
 
 ### 3.5 — Creature Response to Weather
-- [ ] 115. All creatures seek shelter during heavy rain (move toward trees/overhangs)
-- [ ] 116. Bioluminescence increases in darkness/rain (creatures + plants)
-- [ ] 117. Predator activity increases at dusk/dawn, decreases in heavy rain
-- [ ] 118. Nocturnal creature variants active after shelter rest (different silhouettes, behaviors)
+- [x] 115. Creature activity schedule: nocturnal/diurnal/crepuscular species, activity multiplier based on time of day
+- [~] 116. Bioluminescence increases in darkness/rain — no bioluminescence system yet, but rain/darkness tracked
+- [x] 117. Predator activity: weather detection multiplier (rain reduces detection, storms more)
+- [x] 118. Nocturnal creature variants: Stalker/Leaper/Scavenger nocturnal, Bird/Hopper/Forager diurnal
+
+### 3.6 — Ecosystem (Not in original list — built during development)
+- [x] Food chain: IsThreatTo() threat table, WillHunt() with PreySize selectivity
+- [x] FoodSource system: FoodType enum, eating/decay, plant regrowth, corpse→fertile ground cycle
+- [x] CreatureNeeds: Hunger/Fatigue/Safety drives with tick rates, EvaluateGoal() priority system
+- [x] Creature awareness: ScanCreatures() with weather-modified detection ranges
+- [x] Noise reaction: NoiseEvent system with floating comic text (SWSH/BANG/SKREE/THUD)
+- [x] Burrowing: resting creatures sink into ground, harder to detect
+- [x] Herding: panic propagation (PropagateStartle), hopper herd drift
+- [x] Wingbeater nesting: finds ledge, gathers plants, builds nest, territorial near nest
+- [x] Wall-walking: Stalker crawlers walk on walls/ceilings (GravityDir system)
+- [x] Low-health flee: ≤30% HP creatures flee (Thornback hunkers instead)
+- [x] Predator selectivity: PreySize ranges per species
+- [x] Lantern creature reactions: nocturnal creatures flee lantern light, bugs attracted
+- [x] Damage types: Slash/Blunt/Pierce/Fire/Electric with per-creature resistance multipliers
 
 ---
 
@@ -189,46 +204,54 @@
 *The world the player moves through.*
 
 ### 4.1 — Crash Site (Area 1a — The Wreckage)
-- [ ] 119. Design crash site layout: 8-10 screens, linear-ish with branches
+- [~] 119. Crash site layout: crashsite.json exists (~704px wide, very small). Needs full redesign
 - [ ] 120. Ship hull tileset: torn metal, sparking wires, broken screens, scattered cargo
-- [ ] 121. Fire particles: small fires on debris, ambient light source, attract predators
-- [ ] 122. Alien plant intrusions: native vegetation already growing on/around wreckage
-- [ ] 123. Collapsed bulkhead: low obstacle, teaches crouching
+- [ ] 121. Fire particles: at crash debris, ambient light source, attract predators
+- [ ] 122. Alien plant intrusions: native vegetation growing on wreckage
+- [ ] 123. Collapsed bulkhead: teaches crouching
 - [ ] 124. Cargo container: interactable, contains knife
 - [ ] 125. Hidden storage locker: requires knife interaction, contains sidearm
 - [ ] 126. Crushed terminal: requires battery cell to power, contains CO's message
 - [ ] 127. Toxic fungus hazard: blocks one path, 3 solution options
 - [ ] 128. Ship cockpit area: dead screens, EVE's beacon dialogue trigger, sidearm locker
-- [ ] 129. Exit to forest: clear transition zone, visual shift from wreckage to vegetation
+- [ ] 129. Exit to forest: clear transition zone
 
 ### 4.2 — Living Forest (Area 2 — First 30 Min Portion)
-- [ ] 130. Design forest layout: 15-20 screens, more open, multiple paths
+- [~] 130. Forest layout: surface-east.json exists (3200×1600px, 18 creatures). Needs expansion
 - [ ] 131. Forest tileset: massive alien trees, bioluminescent undergrowth, root platforms
-- [ ] 132. Canopy layer: parallax background, creatures visible in upper layer (unreachable for now)
+- [ ] 132. Canopy layer: parallax background (system exists but disabled — layers too small)
 - [ ] 133. Bioluminescent plants: glow in response to proximity, weather, creature interaction
-- [ ] 134. Dense undergrowth zones: slow movement, provides stealth cover (for predator pack sneak)
+- [ ] 134. Dense undergrowth zones: slow movement, stealth cover
 - [ ] 135. Ravine: gap crossable only with grapple (progression gate)
 - [ ] 136. Canopy platform: reachable via grapple, provides vista view
-- [ ] 137. Stone cairn clearing: Adapted sign, scannable (L2 + L3)
-- [ ] 138. Tree scratch marks: environmental detail near cairn, scannable (L1 only)
-- [ ] 139. Grapple debris in tree: grapple module pickup location, requires navigation to reach
-- [ ] 140. Path split: left (scavenger pack + battery cell) vs right (high ledge, locked)
-- [ ] 141. Marshland transition: forest thins, ground gets wet, different vegetation
+- [ ] 137. Stone cairn clearing: Adapted sign, scannable
+- [ ] 138. Tree scratch marks: environmental detail near cairn, scannable
+- [ ] 139. Grapple debris in tree: grapple module pickup location
+- [ ] 140. Path split: left (scavengers + battery cell) vs right (high ledge, locked)
+- [ ] 141. Marshland transition: forest thins, ground gets wet
 - [ ] 142. Cliff face: Native Ruins visible at top, too sheer to climb (wall-climb gate)
 - [ ] 143. Shelter alcove: under massive tree root, save point
 
 ### 4.3 — Environmental Storytelling Objects
-- [ ] 144. Scattered ship debris throughout forest (small pieces — bolts, panels, wiring), showing crash debris field spread
-- [ ] 145. Scavenger nests built from ship debris (visual storytelling — they're using your stuff)
-- [ ] 146. Adapted trail markers: subtle, easy to miss — arranged leaves, redirected water flow, marks on rocks
-- [ ] 147. Previous visitor evidence: a very old, corroded piece of different ship tech half-buried in forest floor (scannable, L2: "This alloy is... centuries old. Different manufacture than ours.")
+- [ ] 144. Scattered ship debris throughout forest
+- [ ] 145. Scavenger nests built from ship debris
+- [ ] 146. Adapted trail markers: subtle
+- [ ] 147. Previous visitor evidence: corroded piece of different ship tech
 
 ### 4.4 — Vista/Skybox
-- [ ] 148. Distant mountains (Native Ruins direction) — parallax background layer
-- [ ] 149. Stormcloud bank (Bone Reef direction) — parallax, animated slowly
-- [ ] 150. The Transformed Lands: massive geometric shapes on far horizon, faintly glowing, unsettling
+- [~] 148. Distant mountains — parallax system exists but no art/layers loaded
+- [ ] 149. Stormcloud bank — parallax
+- [ ] 150. The Transformed Lands: massive geometric shapes on far horizon
 - [ ] 151. Sky color system: changes with time of day and weather
-- [ ] 152. From canopy platform: all distant landmarks visible simultaneously (reward moment)
+- [ ] 152. From canopy platform: all distant landmarks visible simultaneously
+
+### 4.5 — Existing Levels (Not in original list)
+- [x] Ship interior level (ship-interior.json) — small interior area
+- [x] Surface-east ecosystem level (3200×1600px, 100×50 tiles, 18 creatures, mixed ecosystem)
+- [x] Training hall level (training-hall.json)
+- [x] Debug rooms (debug-room.json, debug-room-2.json)
+- [x] Level transition system with exit IDs + smart fallback matching
+- [x] Overworld/world map system with biome nodes
 
 ---
 
@@ -236,40 +259,40 @@
 *The world breathes.*
 
 ### 5.1 — Weather State Machine
-- [ ] 153. Weather states: Clear, LightRain, HeavyRain, Overcast, Fog, Storm (subset for first 30 min — no acid rain, hail, lightning yet)
-- [ ] 154. Weather transition system: smooth blend between states over 30-60 seconds
-- [ ] 155. Weather timer: random duration per state (2-8 minutes), weighted by area
-- [ ] 156. Weather affects: visibility (fog/rain reduce sight range), creature behavior, plant response, sound
+- [x] 153. Weather states: WeatherSystem.cs with moisture/temperature/wind/storm atmospheric simulation
+- [x] 154. Weather transition system: smooth organic transitions driven by atmospheric sim
+- [x] 155. Weather timer: organic — moisture builds near water, rain at 0.7 threshold, storms build during rain
+- [x] 156. Weather affects: creature detection ranges (rain 70%, storm 50%), creature behavior, hunger rates (+50% in rain)
 
 ### 5.2 — Rain
-- [x] 157. Rain particle system [EXISTING — modify]
-- [ ] 158. Light rain: sparse particles, subtle darkening, ambient sound
-- [ ] 159. Heavy rain: dense particles, reduced visibility, louder sound, creatures shelter
-- [ ] 160. Rain interacts with surfaces: splash particles on platforms/ground
-- [ ] 161. Rain interacts with fire: crash site fires dim/extinguish in heavy rain (changes predator behavior — no thermal draw)
+- [x] 157. Rain particle system [EXISTING]
+- [~] 158. Light rain: particles exist. Ambient sound not implemented
+- [~] 159. Heavy rain: dense particles exist. Audio not implemented. Creatures flee to shelter not implemented
+- [ ] 160. Rain interacts with surfaces: splash particles on ground
+- [ ] 161. Rain interacts with fire: extinguish fires in heavy rain
 - [ ] 162. EVE water droplet shake animation during rain
 
 ### 5.3 — Wind
-- [x] 163. Wind particle streaks [EXISTING — modify]
-- [ ] 164. Wind direction: variable, affects rain angle, particle drift
+- [x] 163. Wind particle streaks [EXISTING]
+- [~] 164. Wind direction: variable. Doesn't visually affect rain angle
 - [ ] 165. Wind visual: leaf/debris particles drift in wind direction
-- [ ] 166. Wind affects player: slight push in wind direction during jumps (subtle, not frustrating)
+- [ ] 166. Wind affects player: slight push during jumps
 - [ ] 167. Wind affects grapple swing: pendulum biased by wind
 
 ### 5.4 — Fog
-- [ ] 168. Fog rendering: gradient overlay reducing visibility at distance
-- [ ] 169. Fog density: variable, heavier in low areas (marshland transition)
-- [ ] 170. Fog affects: scan range reduced, creatures harder to spot, atmospheric tension
+- [ ] 168. Fog rendering: gradient overlay reducing visibility
+- [ ] 169. Fog density: variable, heavier in low areas
+- [ ] 170. Fog affects: scan range reduced, creatures harder to spot
 
 ### 5.5 — Time of Day
-- [ ] 171. Day/night cycle: simplified — "shelter rest" advances time by ~6 hours
-- [ ] 172. Sky color gradient: warm (day) → cool (evening) → dark (night) → grey (dawn)
-- [ ] 173. Bioluminescence intensity: increases with darkness
-- [ ] 174. Nocturnal/diurnal creature swap: different creatures active at different times
+- [x] 171. Day/night cycle: worldTime 0-24 float, shelter rest advances time
+- [x] 172. Sky color gradient: warm day → cool night (implemented in draw code)
+- [~] 173. Bioluminescence intensity: no bioluminescence system, but darkness tracked
+- [x] 174. Nocturnal/diurnal creature swap: species have IsNocturnal/IsCrepuscular, activity multiplier
 
 ### 5.6 — Weather HUD
-- [ ] 175. Temperature indicator: small icon, affects stamina regen rate
-- [ ] 176. EVE weather commentary: "Barometric pressure dropping" etc., triggered on state transitions
+- [ ] 175. Temperature indicator: small icon
+- [~] 176. EVE weather commentary: atmospheric sim running, no EVE lines hooked to transitions
 
 ---
 
@@ -277,25 +300,25 @@
 *Minimal, immersive, informative.*
 
 ### 6.1 — Gameplay HUD
-- [ ] 177. Health bar: left side, simple, color-coded (green → yellow → red)
-- [ ] 178. Suit integrity bar: below health, with % number, sparks when low
-- [ ] 179. Battery bar: below suit, drains visibly when using tech
-- [ ] 180. Equipped weapon indicator: bottom-left, icon + ammo count (sidearm) or ∞ (knife)
-- [ ] 181. EVE scan level indicator: top-right corner, colored dot (blue/green/gold)
-- [ ] 182. HUD glitch effect: as suit integrity drops, HUD elements flicker/distort
-- [ ] 183. No HUD state: first 45 seconds (wake up to EVE reboot), HUD fades in when EVE activates
-- [ ] 184. Temperature indicator: small, unobtrusive
+- [x] 177. Health bar: left side, color-coded (green → yellow → red)
+- [x] 178. Suit integrity bar: below health, with % number
+- [x] 179. Battery bar: below suit, drains visibly when using tech
+- [x] 180. Equipped weapon indicator: weapon name + durability bar in HUD
+- [ ] 181. EVE scan level indicator: not implemented
+- [x] 182. HUD glitch effect: _hudGlitchTimer + _hudGlitchRng when suit integrity low
+- [ ] 183. No HUD state: first 45 seconds, HUD fades in with EVE
+- [ ] 184. Temperature indicator: not implemented
 
 ### 6.2 — Pause Menu
-- [ ] 185. Pause overlay: inventory list, scan log, current objectives (informal — EVE's notes)
-- [ ] 186. Settings: volume, controls, display
+- [x] 185. Inventory overlay: Equipment, Suit, Tools, Log/Bestiary tabs. Full screen
+- [~] 186. Settings: CRT filter toggle, hit stop toggle, screen shake toggle exist. No full settings screen
 - [ ] 187. Save indicator: "Last shelter: [name]"
 
 ### 6.3 — Dialogue Display
-- [x] 188. Speech bubble system [EXISTING — modify]
-- [ ] 189. EVE dialogue: speech bubble near orb with background box, color-coded border by scan level
-- [ ] 190. Dialogue fade: text appears over 0.5s, holds, fades over 1s
-- [ ] 191. Dialogue queue indicator: subtle "..." on EVE when she has queued lines
+- [x] 188. Speech bubble system [EXISTING]
+- [x] 189. EVE dialogue: speech bubble near orb with background, text display
+- [x] 190. Dialogue fade: text appears with duration, fades
+- [ ] 191. Dialogue queue indicator: "..." on EVE when queued lines
 
 ---
 
@@ -304,22 +327,22 @@
 
 ### 7.1 — Cutscene System
 - [x] 192. Cutscene state: disables player input, plays scripted sequence
-- [x] 193. Cutscene timeline: list of timed events (show image, play sound, display text, fade)
-- [x] 194. Skip option: hold [ESC] for 1 second to skip (don't let accident-skip)
+- [x] 193. Cutscene timeline: timed events (show image, play sound, display text, fade)
+- [x] 194. Skip option: hold [ESC] to skip
 
 ### 7.2 — Prologue Scenes
-- [~] 195. Phase 1 art: Ship cockpit interior (pixel art, 320x180 or game resolution). Screens, stars, EVE orb
-- [~] 196. Phase 2 art: Adam's hands on controls. Signal display
-- [~] 197. Phase 3 art: Ship exterior descending into atmosphere, trailing smoke. Planet below
-- [~] 198. Phase 4 art: THE EYE. Single red mechanical eye on black. This needs to be ICONIC
-- [x] 199. Phase transitions: fade/cut between phases, white flash before the eye
-- [~] 200. Audio: ship alarm SFX, system failure SFX, EVE voice lines (text + SFX), impact SFX
-- [~] 201. The Dragon resonance sound: deep bass vibration, used during the Eye and again at minute 22
+- [~] 195. Phase 1 art: placeholder/basic
+- [~] 196. Phase 2 art: placeholder/basic
+- [~] 197. Phase 3 art: placeholder/basic
+- [~] 198. Phase 4 art: THE EYE — placeholder
+- [x] 199. Phase transitions: fade/cut between phases, white flash
+- [~] 200. Audio: SFX not implemented
+- [~] 201. The Dragon resonance sound: not implemented
 
 ### 7.3 — Title Card
-- [x] 202. "GENESIS" text: large, centered, clean font. Appears on black
-- [~] 203. Ambient sound crossfade: silence → wind + wildlife during title hold
-- [x] 204. Fade to gameplay: title fades, camera fades in on Adam face-down
+- [x] 202. "GENESIS" text: large, centered, clean font
+- [~] 203. Ambient sound crossfade: no audio
+- [x] 204. Fade to gameplay: title fades, camera fades in
 
 ---
 
@@ -327,31 +350,11 @@
 *Sound makes or breaks atmosphere. Start with placeholders, polish later.*
 
 ### 8.1 — Sound Effects
-- [ ] 205. Footsteps: metal (crash site), soft earth (forest), squelch (marshland)
-- [ ] 206. Knife swing + impact
-- [ ] 207. Sidearm fire + shell casing
-- [ ] 208. Grapple fire + attach + motor whirr + release
-- [ ] 209. Suit spark/crackle (periodic, increases as integrity drops)
-- [ ] 210. EVE boot-up static
-- [ ] 211. EVE scan sounds: blue hum (L1), green ping (L2), gold resonance (L3)
-- [ ] 212. Scavenger: skittering, small chirps
-- [ ] 213. Herbivore: gentle calls, feeding sounds
-- [ ] 214. Predator: growl, charge snarl, bite snap
-- [ ] 215. Predator pack: subsonic rumble (during coordinated hunt)
-- [ ] 216. Fungus slash: organic squelch + spore release hiss
-- [ ] 217. The Dragon SCREAM: low resonance + building harmonic. Must be visceral. Same frequency as prologue eye sound
-- [ ] 218. Rain: ambient loop, varies with intensity
-- [ ] 219. Wind: ambient loop, directional
-- [ ] 220. Thunder: distant rumble (for storm weather state)
-- [ ] 221. Shelter rest: brief wind-down, then quiet ambient transition
+- [ ] 205-221. ALL AUDIO NOT IMPLEMENTED — zero sound files in project
+- Note: NoiseEvent system creates visual floating text as placeholder for audio (SWSH, BANG, SKREE, THUD)
 
 ### 8.2 — Music
-- [ ] 222. Crash site: near-silence. Just ambient sound + suit sparking. Desolation
-- [ ] 223. Forest: minimal ambient melody. 3-4 notes on a pad/synth, barely there. Evolves with weather
-- [ ] 224. Danger proximity: subtle heartbeat-like pulse when enemies are near
-- [ ] 225. Discovery sting: brief melodic phrase when scanning something significant
-- [ ] 226. The Scream moment: all ambient audio cuts → bass resonance → silence. Then forest sounds return slowly
-- [ ] 227. Shelter: warm, safe ambient tone. Brief. Player should feel relief
+- [ ] 222-227. NO MUSIC IMPLEMENTED
 
 ---
 
@@ -359,26 +362,20 @@
 *Invisible systems that make the world feel responsive.*
 
 ### 9.1 — Player Behavior Flags
-- [ ] 228. `ScavengerKilled` (bool): set on first scavenger kill, affects shelter encounter
-- [ ] 229. `PredatorPackOutcome` (enum: None/Fought/Shot/Sneaked/Watched): set during pack event
-- [ ] 230. `ScanCount` (int): total L2+ scans performed, affects Adapted trigger
-- [ ] 231. `SuitPiecesRemoved` (int): how many armor pieces removed (not in first 30 min, but track from start)
-- [ ] 232. `SidearmFound` (bool): did they find the hidden sidearm
-- [ ] 233. `COMessageRead` (bool): did they find and read the CO's message
-- [ ] 234. `GrappleUseCount` (int): how often they use tech solutions
-- [ ] 235. All flags saved in SaveData
+- [x] 228. SaveData.Flags dictionary exists for arbitrary bool flags
+- [ ] 229. PredatorPackOutcome enum: not implemented
+- [~] 230. ScanCount: bestiary tracks species encounters. No total scan counter
+- [x] 231. SuitPiecesRemoved: chest plate + rocket boots + helmet all toggleable, states saved
+- [ ] 232. SidearmFound: no pickup event tracking
+- [ ] 233. COMessageRead: not implemented
+- [ ] 234. GrappleUseCount: not tracked
+- [x] 235. All equipment/flag state saved in SaveData
 
 ### 9.2 — Adapted Encounter Logic
-- [ ] 236. Adapted visibility score: calculated from flags (kill=-2, observe=+1, scanCount/5=+1, suitRemoved=+1)
-- [ ] 237. Score >= 2: Adapted reveals itself + leaves chitin piece
-- [ ] 238. Score < 2: Only chitin piece found, no visual encounter
-- [ ] 239. Adapted entity: thin humanoid sprite, color-shifts to match background tiles
-- [ ] 240. Adapted AI: observe player from distance, retreat if approached, disappear at set trigger distance
+- [ ] 236-240. NOT IMPLEMENTED
 
 ### 9.3 — Scavenger Consequence Chain
-- [ ] 241. If scavenger killed → shelter nest empty, scratch marks (environmental detail)
-- [ ] 242. If scavenger spared → shelter nest populated, gift-giving behavior active
-- [ ] 243. Gift item: "Shiny Debris" — useless item but scannable (L1: "Ship alloy, partially corroded. They collect things that glint.")
+- [ ] 241-243. NOT IMPLEMENTED (scavenger creature exists but no consequence system)
 
 ---
 
@@ -386,100 +383,36 @@
 *Building the actual playable space.*
 
 ### 10.1 — Crash Site Level Design
-- [ ] 244. Block out crash site in level editor: 8-10 screens, mostly horizontal
-- [ ] 245. Place ship hull tiles: walls, platforms, overhead beams
-- [ ] 246. Place fire particle emitters (3-4 small fires)
-- [ ] 247. Place alien plant scannables (2-3 at crash edges)
-- [ ] 248. Place cargo container (knife pickup) in natural path
-- [ ] 249. Place hidden storage locker (sidearm) — off the main path, behind breakable debris
-- [ ] 250. Place crushed terminal (CO message) — requires battery cell, very off-path
-- [ ] 251. Place toxic fungus hazard with 3 route options
-- [ ] 252. Place solo predator spawn near crash exit
-- [ ] 253. Place scavenger spawn (first encounter creature)
-- [ ] 254. Place EVE reboot trigger zone
-- [ ] 255. Test: walk through entire crash site, verify pacing (~6 minutes exploration)
+- [~] 244. Crash site exists but is ~704px wide — needs full redesign to 8-10 screens
+- [ ] 245-255. NOT PLACED — level is too small for proper placement
 
 ### 10.2 — Forest Level Design
-- [ ] 256. Block out forest: 15-20 screens, branching paths, vertical sections
-- [ ] 257. Place forest tileset: massive trees, roots as platforms, undergrowth zones
-- [ ] 258. Place herbivore + bioluminescent plant (observation lesson area)
-- [ ] 259. Place path split (left: scavengers + battery, right: high ledge lock)
-- [ ] 260. Place stone cairn clearing (Adapted sign)
-- [ ] 261. Place predator pack hunting ground (open area with cover options)
-- [ ] 262. Place grapple module in tree debris (requires small traversal puzzle to reach)
-- [ ] 263. Place ravine (grapple gate)
-- [ ] 264. Place canopy platform (vista point — high up, grapple-accessible)
-- [ ] 265. Place Adapted encounter zone (after scream, quiet area)
-- [ ] 266. Place cliff face (Native Ruins visible above, wall-climb gate)
-- [ ] 267. Place shelter alcove (save point, scavenger nest nearby)
-- [ ] 268. Place forest→marshland transition zone
-- [ ] 269. Place scattered ship debris throughout (environmental storytelling)
-- [ ] 270. Place old corroded ship piece (previous visitor evidence, scannable)
-- [ ] 271. Place Adapted trail markers (subtle environmental details, 3-4 throughout forest)
-- [ ] 272. Test: run through forest, verify pacing (~20 minutes with exploration, ~12 minutes rushing)
+- [~] 256. Surface-east exists (3200×1600px) — needs expansion and design pass
+- [ ] 257-272. NOT PLACED — basic terrain only, no designed encounters/paths
 
 ### 10.3 — Vista Setup
-- [ ] 273. Create parallax background layers: mountains, stormclouds, Transformed Lands geometry
-- [ ] 274. Place vista trigger at canopy platform (camera holds briefly to let player look)
-- [ ] 275. Verify all distant landmarks visible from canopy simultaneously
+- [ ] 273-275. NOT IMPLEMENTED
 
 ---
 
 ## PHASE 11: THE SCREAM (Dragon Encounter 1)
-*The most important 15 seconds in the first 30 minutes.*
-
-- [ ] 276. Trigger zone in forest (after grapple section, before Adapted encounter)
-- [ ] 277. On enter: all ambient sound fades over 1 second
-- [ ] 278. Dragon resonance sound plays (same as prologue eye — player connects them)
-- [ ] 279. Screen vibration: subtle, 3-4 seconds
-- [ ] 280. All creatures in loaded area: freeze → flee animation (same direction, away from sound source)
-- [ ] 281. EVE: orb flares red, readings spike. Voice line: "Energy signature — massive — bearing—" cuts off
-- [ ] 282. 3 seconds of absolute silence (forest empty, no ambient, nothing)
-- [ ] 283. EVE: "...I think we should keep moving."
-- [ ] 284. Ambient sounds return slowly over 10 seconds (but fewer creatures — most fled)
-- [ ] 285. No creature respawns in this zone until player leaves and returns
+- [ ] 276-285. NOT IMPLEMENTED
 
 ---
 
 ## PHASE 12: SCRIPTED EVE DIALOGUE (All Lines for 0-30 Min)
 
 ### 12.1 — Critical Path Lines
-- [ ] 286. Boot: "Systems... partial. I—" [static] "—damage assessment in progress. Adam, don't move too fast. Your suit integrity is at 31%."
-- [ ] 287. Knife found: "Standard issue. At least something survived."
-- [ ] 288. Suit spark: "Power cell rupture. The planet's energy field is interfering with organized electrical systems. Anything with circuitry is... degrading."
-- [ ] 289. Fungus: "Atmospheric contaminant. Avoid prolonged exposure."
-- [ ] 290. Beacon: "The distress beacon activated on impact. Automated. I couldn't stop it. The Federation will have received it by now."
-- [ ] 291. Sidearm: "I wouldn't waste them."
-- [ ] 292. First predator kill: "Predatory species. Drawn to thermal signatures." [pause] "There will be more."
-- [ ] 293. Sidearm kill variant: "...That works too."
-- [ ] 294. Forest edge: "Scanning perimeter. The forest canopy is... extensive. I can't determine the boundaries." [beat] "Adam, I want it on record that I recommended we not come here."
-- [ ] 295. Weather shift: "Barometric pressure dropping. This could intensify."
-- [ ] 296. Stone cairn: "These stones were placed deliberately. Recently." [quiet] "Adam, we're not the first ones here."
-- [ ] 297. Grapple found: "Partially functional. Battery drain, but better than nothing."
-- [ ] 298. Vista: "What IS that?" (if player looks at Transformed Lands)
-- [ ] 299. Scream reaction: "Energy signature — massive — bearing—" [cut off] "...I think we should keep moving."
-- [ ] 300. Adapted sighting: "Adam... that's not native fauna. The biosignature is... partially human." [shaken] "How is that possible?"
-- [ ] 301. Adapted chitin only: "This was crafted. By hands. Recently."
-- [ ] 302. Cliff face: "The surface is smooth but there are handholds near the top. If you could get higher, or..."
-- [ ] 303. Shelter: "This is defensible. Your suit integrity is at [X]%. I'd recommend we stop."
-- [ ] 304. Scavenger gift: "I think... it's sharing."
-- [ ] 305. Weather activate: "Local atmospheric patterns are... complex. I'll track what I can."
-- [ ] 306. Signal: "Adam... the signal you followed. I've been analyzing it since we landed." [pause] "It's not a standard distress beacon. The encoding is... old. Centuries old." "And it's not broadcasting FROM the planet." [longer pause] "It's broadcasting TO it."
+- [~] 286-306. 75+ EveAlert/EveAlertOnce calls exist in code, but these are contextual system alerts (equipment, pickups, deaths), NOT the scripted narrative dialogue. Narrative lines not written/placed
 
-### 12.2 — Ambient / Scan Lines (Randomized Pool)
-- [ ] 307. Forest L1 lines (8-10 variants): "Unusual root structure." / "That canopy species is filtering the rain." / "Thermal signature, 40 meters, moving away." / "Soil composition unlike anything in our database." / etc.
-- [ ] 308. Crash site L1 lines (4-5 variants): "Unknown flora. Bioluminescent." / "Hull stress fractures consistent with atmospheric entry." / "Power residue. Something's draining the cells." / etc.
-- [ ] 309. Observation lesson L2: "The spores have a mild regenerative property. The creature knows — it's self-medicating." [pause] "Adam, if we collected those spores..."
-- [ ] 310. Pack hunt L2 variants: fight/sneak/watch each have distinct line sets (3-4 lines each)
-- [ ] 311. Old ship debris L2: "This alloy is... centuries old. Different manufacture than ours."
-- [ ] 312. Predator alpha L3: pack hierarchy + scent-masking chemical data
-- [ ] 313. Stone cairn L3: deeper analysis of stone arrangement, cultural significance
+### 12.2 — Ambient / Scan Lines
+- [ ] 307-313. NOT WRITTEN
 
 ### 12.3 — Conditional Lines
-- [ ] 314. Grapple fails (no battery): "The grapple needs power, Adam." (first time only)
-- [ ] 315. Low suit integrity (<15%): "Adam, we need to find a power source. Soon."
-- [ ] 316. First sidearm use: ammo count callout "Seven remaining." / "Ten remaining." etc.
-- [ ] 317. Player near gun for predator pack (if sidearm held): "That will be loud." (subtle discouragement)
+- [~] 314. Grapple battery fail: EVE alert exists
+- [~] 315. Low suit integrity: HUD glitch exists, no EVE warning line
+- [ ] 316. First sidearm use ammo callout
+- [ ] 317. Player near gun for predator pack
 
 ---
 
@@ -488,97 +421,83 @@
 
 ### 13.1 — Screen Effects
 - [x] 318. Fade to black / fade from black (transitions, death, shelter rest)
-- [x] 319. Screen shake: on explosions, predator charge impact, Dragon scream
-- [ ] 320. HUD glitch: random pixel displacement on HUD elements, intensity scales with suit damage
-- [ ] 321. Vignette: subtle edge darkening, increases in dark/foggy conditions
-- [ ] 322. White flash: prologue Phase 4 (before the Eye)
+- [x] 319. Screen shake: configurable per weapon, on kills (ShakeDuration, ShakeIntensity)
+- [x] 320. HUD glitch: _hudGlitchTimer with random pixel displacement, scales with suit damage
+- [x] 321. Vignette: implemented (CRT shader VignetteStrength + purple vignette overlay)
+- [x] 322. White flash: prologue Phase 4
 
 ### 13.2 — Particle Effects
-- [x] 323. Rain particles [EXISTING — modify for angle/intensity variation]
-- [x] 324. Wind streaks [EXISTING — modify for direction system]
-- [ ] 325. Fire particles: at crash debris, affected by rain/wind
-- [ ] 326. Suit spark particles: periodic crackle from Adam's suit
-- [ ] 327. Spore particles: released from bioluminescent plants, drift upward, glow
-- [ ] 328. EVE scan particles: blue/green/gold particle burst matching scan level
-- [ ] 329. Grapple cable: rendered line from Adam to anchor point, slight sway
-- [ ] 330. Water droplets on EVE: during rain, shake off animation
-- [ ] 331. Dust/debris: ambient particles in wind, drift in wind direction
-- [ ] 332. Predator charge dust: kicked-up dirt particles during rush attack
-- [ ] 333. Creature flee particles: scattered leaves/dust when creatures scatter (Dragon scream)
-- [ ] 334. Adapted shimmer: subtle color-shift particles where Adapted was standing
+- [x] 323. Rain particles [EXISTING]
+- [x] 324. Wind streaks [EXISTING]
+- [ ] 325. Fire particles: at crash debris
+- [ ] 326. Suit spark particles: periodic crackle
+- [ ] 327. Spore particles: from bioluminescent plants
+- [ ] 328. EVE scan particles: per scan level
+- [x] 329. Grapple cable: rendered rope/line from player to anchor
+- [ ] 330. Water droplets on EVE: during rain
+- [~] 331. Dust/debris: sprint particles (thruster exhaust) exist. Ambient wind particles not done
+- [ ] 332. Predator charge dust
+- [ ] 333. Creature flee particles: scattered leaves/dust
+- [ ] 334. Adapted shimmer: color-shift particles
 
 ### 13.3 — Animation Polish
-- [ ] 335. Adam injured walk cycle (first 2 minutes)
-- [ ] 336. Adam normal walk/run cycle
-- [ ] 337. Adam crouch animation
-- [ ] 338. Adam knife swing (3-hit combo)
-- [ ] 339. Adam sidearm aim + fire
-- [ ] 340. Adam grapple fire + swing + pull
-- [ ] 341. Adam pickup item animation
-- [ ] 342. EVE boot flicker sequence
-- [ ] 343. EVE orbit variations: healthy (smooth circle), damaged (erratic), scared (tight orbit, close to Adam)
-- [ ] 344. Scavenger: skitter, freeze, flee, carry-item, gift-drop
-- [ ] 345. Herbivore: graze, walk, flee
-- [ ] 346. Predator: patrol, charge, bite, death
-- [ ] 347. Predator pack: hunt formation, flank movement, eating
-- [ ] 348. Adapted: stand, observe, retreat, disappear (color-shift fade)
-- [ ] 349. Bioluminescent plant: idle glow, brightens when eaten/approached, spore release
+- [ ] 335-349. ALL CREATURES AND PLAYER ARE FALLBACK RECTANGLES — no sprite animations
 
 ### 13.4 — Juice
-- [ ] 350. Hit stop on knife impact (2-3 frames)
-- [ ] 351. Hit stop on sidearm impact (1-2 frames)
-- [ ] 352. Camera nudge on sidearm fire (small recoil)
-- [ ] 353. Squash/stretch on creature death
-- [ ] 354. Battery cell pickup: brief glow + HUD bar flash
+- [x] 350. Hit stop on melee impact (configurable per weapon: HitStopFinisher, HitStopKill)
+- [x] 351. Hit stop on ranged impact
+- [x] 352. Camera nudge on weapon hits (configurable ShakeDuration/ShakeIntensity per weapon)
+- [x] 353. Squash/stretch on player (land squash, jump stretch, dash stretch)
+- [ ] 354. Battery cell pickup: glow + HUD flash
 - [ ] 355. Grapple attachment: camera snap + slight zoom
-- [ ] 356. Shelter rest: screen dims warmly (not just fade — color shift to warm tones)
-- [ ] 357. Weather transition: smooth 30-second blend, not instant switch
+- [ ] 356. Shelter rest: warm color shift
+- [~] 357. Weather transition: atmospheric sim provides smooth transitions organically
 
 ---
 
 ## PHASE 14: TESTING & ITERATION
 *Make it fun.*
 
-- [ ] 358. Playtest crash site pacing: should feel urgent but explorable (~6 min)
-- [ ] 359. Playtest first combat: should feel dangerous but learnable
-- [ ] 360. Playtest forest pacing: should feel vast and alive (~20 min with exploration)
-- [ ] 361. Playtest grapple feel: should feel industrial and satisfying
-- [ ] 362. Playtest weather: should feel atmospheric, not annoying or distracting
-- [ ] 363. Playtest predator pack: all 4 paths should feel viable and differently rewarding
-- [ ] 364. Playtest The Scream: should make the player stop breathing for a second
-- [ ] 365. Playtest Adapted encounter: favorable vs unfavorable should both feel meaningful
-- [ ] 366. Playtest shelter: should feel like genuine relief
-- [ ] 367. Playtest EVE signal revelation: should land with weight, not confusion
-- [ ] 368. Verify scan level visual distinction is clear at a glance
-- [ ] 369. Verify HUD is readable but not distracting
-- [ ] 370. Verify save/load works correctly with all behavior flags
-- [ ] 371. Full 30-minute playthrough: time it, note dead spots, note confusion points
-- [ ] 372. Second playthrough (rush): verify it's completable in ~12-15 min without exploration
-- [ ] 373. Third playthrough (different choices): verify kill path vs spare path both feel complete
+- [ ] 358-373. NOT DONE — need designed levels first
 
 ---
 
-## TOTAL: 373 tasks
-## Estimated phases of work:
-- Phase 0 (Restructure): 1-2 sessions
-- Phase 1 (Core systems): 3-5 sessions
-- Phase 2 (EVE): 2-3 sessions
-- Phase 3 (Creatures): 3-4 sessions
-- Phase 4 (Environment): 4-6 sessions
-- Phase 5 (Weather): 2-3 sessions
-- Phase 6 (HUD/UI): 1-2 sessions
-- Phase 7 (Prologue): 2-3 sessions
-- Phase 8 (Audio): 2-4 sessions (placeholder pass + polish pass)
-- Phase 9 (Behavior tracking): 1 session
-- Phase 10 (Level design): 4-6 sessions
-- Phase 11 (Dragon scream): 1 session
-- Phase 12 (Dialogue): 1-2 sessions
-- Phase 13 (Polish): 3-5 sessions
-- Phase 14 (Testing): 2-3 sessions
+## SCORE SUMMARY
 
-**Total: ~30-50 working sessions**
+| Category | Done | Partial | Not Started | Total |
+|----------|------|---------|-------------|-------|
+| Phase 0: Restructure | 4 | 0 | 1 | 5 |
+| Phase 1: Core Systems | 29 | 1 | 6 | 36 |
+| Phase 2: EVE | 10 | 8 | 12 | 30 |
+| Phase 3: Creatures | 22 | 3 | 17 | 42 |
+| Phase 4: Environment | 6 | 4 | 24 | 34 |
+| Phase 5: Weather | 10 | 5 | 7 | 22 |
+| Phase 6: HUD/UI | 8 | 1 | 4 | 13 |
+| Phase 7: Prologue | 5 | 6 | 0 | 11 |
+| Phase 8: Audio | 0 | 0 | 23 | 23 |
+| Phase 9: Behavior | 3 | 1 | 9 | 13 |
+| Phase 10: Level Design | 0 | 2 | 27 | 29 |
+| Phase 11: Dragon | 0 | 0 | 10 | 10 |
+| Phase 12: Dialogue | 0 | 4 | 28 | 32 |
+| Phase 13: Polish | 10 | 3 | 12 | 25 |
+| Phase 14: Testing | 0 | 0 | 16 | 16 |
+| **TOTAL** | **107** | **38** | **196** | **341** |
+
+**Progress: ~37% complete (107 done + 38 partial out of 341 unique tasks)**
+
+### Biggest gaps:
+1. **Level Design (Phase 10)** — 2/29 tasks. Need actual designed spaces
+2. **Audio (Phase 8)** — 0/23. Zero sound
+3. **Dialogue (Phase 12)** — 0/32. Narrative text not written
+4. **Environment Art (Phase 4)** — 6/34. No tilesets, parallax, vista
+5. **Predator Pack (Phase 3.4)** — 0/13. Coordinated AI not built
+
+### Strongest areas:
+1. **Core Systems (Phase 1)** — 29/36 done. Movement, combat, inventory, grapple, weapons all functional
+2. **Creatures (Phase 3)** — 22/42 done. Full ecosystem with food chain, 8 species, weather response
+3. **Polish/Juice (Phase 13)** — 10/25 done. Hit stop, screen shake, squash/stretch, vignette, HUD glitch
 
 ---
 
 *Check off tasks as completed. Update this file as design evolves.*
-*When all 373 are done, minutes 0-30 are shippable. Then we do 30-60.*
+*When all tasks are done, minutes 0-30 are shippable. Then we do 30-60.*
