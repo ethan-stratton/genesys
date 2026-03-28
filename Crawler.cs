@@ -196,6 +196,9 @@ public class Crawler : Creature
     private Creature _huntTarget;
     private float _huntTimer;
 
+    // Forager flee distance
+    private float _safeDistance;
+
     // Latch-on behavior
     public bool IsLatched;
     public Vector2 LatchOffset;
@@ -560,8 +563,12 @@ public class Crawler : Creature
                 && dist < effectiveAggroRange && canSeePlayer;
 
             // Keep flee timer alive
-            if (fleeing) _fleeTimer = 1.5f + (float)_rng.NextDouble() * 1f; // flee 1.5-2.5s after last trigger
-            bool isFleeing = fleeing || _fleeTimer > 0;
+            if (fleeing) {
+                if (_fleeTimer <= 0) _safeDistance = Vector2.Distance(Position, playerCenter) + 150f; // set safe distance on first trigger
+                _fleeTimer = 1.5f + (float)_rng.NextDouble() * 1f; // flee 1.5-2.5s after last trigger
+            }
+            bool needMoreDistance = Vector2.Distance(Position, playerCenter) < _safeDistance;
+            bool isFleeing = fleeing || _fleeTimer > 0 || needMoreDistance;
 
             // Startle: transition from calm to aggroed/fleeing
             if ((Aggroed || isFleeing) && !wasAggroed && _bugState != BugState.Startled && _bugState != BugState.Fleeing)
@@ -643,11 +650,12 @@ public class Crawler : Creature
                 float fleeSpeed = ChaseSpeed * 2f; // much faster flee
                 Velocity.X = Dir * fleeSpeed;
                 _fleeTimer -= dt;
-                // Stop fleeing when timer expires
-                if (_fleeTimer <= 0)
+                // Stop fleeing when timer expires AND safe distance reached
+                if (_fleeTimer <= 0 && !needMoreDistance)
                 {
                     _bugState = BugState.Paused;
-                    _bugStateTimer = 0.5f + (float)_rng.NextDouble() * 1f;
+                    _bugStateTimer = 2f + (float)_rng.NextDouble() * 2f; // 2-4s calm down
+                    _safeDistance = 0f;
                     Velocity.X = 0;
                 }
                 } // end burrowing else
@@ -808,7 +816,25 @@ public class Crawler : Creature
                 new Vector2(Position.X + (Dir > 0 ? EffectiveWidth : 0), Position.Y + EffectiveHeight / 2f), Dir);
             if (wallAhead)
             {
-                if (CurrentGoal == CreatureGoal.Flee)
+                // Stalker: attempt wall climb instead of reversing
+                if (Variant == CrawlerVariant.Stalker && _gravDir == GravityDir.Down && tileGrid != null)
+                {
+                    // Check for at least 3 solid tiles vertically above
+                    int wallCol = (int)((Position.X + (Dir > 0 ? EffectiveWidth + 4 : -4)) / tileSize);
+                    int baseRow = (int)(Position.Y / tileSize);
+                    int solidCount = 0;
+                    for (int r = baseRow; r >= baseRow - 3 && r >= 0; r--)
+                    {
+                        if (wallCol >= 0 && wallCol < tileGrid.Width && r < tileGrid.Height
+                            && TileProperties.IsSolid(tileGrid.GetTileAt(wallCol, r)))
+                            solidCount++;
+                    }
+                    if (solidCount >= 3)
+                        _gravDir = Dir > 0 ? GravityDir.Right : GravityDir.Left;
+                    else
+                        Dir = -Dir;
+                }
+                else if (CurrentGoal == CreatureGoal.Flee)
                 {
                     if (CanBurrow && !IsBurrowed) { CurrentGoal = CreatureGoal.Rest; BurrowProgress = 0.3f; Velocity.X = 0; }
                     else { Dir = -Dir; Needs.Safety = MathHelper.Clamp(Needs.Safety + 0.3f, 0f, 1f); }
@@ -852,10 +878,17 @@ public class Crawler : Creature
             UpdateWallWalk(dt, tileGrid, tileSize);
 
         // Apply gravity and tile collision
-        _onGround = EnemyPhysics.ApplyGravityAndCollision(
-            ref Position, ref Velocity,
-            EffectiveWidth, EffectiveHeight, Gravity, dt,
-            tileGrid, tileSize, levelBottom);
+        if (Variant == CrawlerVariant.Stalker && _gravDir != GravityDir.Down)
+        {
+            ApplyWallWalkPhysics(dt, tileGrid, tileSize, levelBottom);
+        }
+        else
+        {
+            _onGround = EnemyPhysics.ApplyGravityAndCollision(
+                ref Position, ref Velocity,
+                EffectiveWidth, EffectiveHeight, Gravity, dt,
+                tileGrid, tileSize, levelBottom);
+        }
 
         // Landing squash
         if (_onGround && !_wasOnGround)
@@ -969,6 +1002,83 @@ public class Crawler : Creature
                     _gravDir = GravityDir.Up;
                 break;
         }
+    }
+
+    private void ApplyWallWalkPhysics(float dt, TileGrid tg, int ts, float levelBottom)
+    {
+        if (tg == null) { _gravDir = GravityDir.Down; return; }
+
+        // Determine forward/gravity axes based on _gravDir
+        float walkSpeed = Speed * _walkSpeedMult * 0.6f; // 60% ground speed on walls
+        float moveX = 0, moveY = 0;
+        int checkOffX = 0, checkOffY = 0; // offset to check if surface tile exists
+
+        switch (_gravDir)
+        {
+            case GravityDir.Right: // walking on left wall, gravity pulls +X
+                moveY = Dir * walkSpeed * dt; // Dir controls up/down on wall
+                moveX = 30f * dt; // gentle push toward wall
+                checkOffX = 1; checkOffY = 0;
+                break;
+            case GravityDir.Left: // walking on right wall, gravity pulls -X
+                moveY = Dir * walkSpeed * dt;
+                moveX = -30f * dt;
+                checkOffX = -1; checkOffY = 0;
+                break;
+            case GravityDir.Up: // ceiling, gravity pulls -Y
+                moveX = Dir * walkSpeed * dt;
+                moveY = -30f * dt; // push toward ceiling
+                checkOffX = 0; checkOffY = -1;
+                break;
+            default:
+                _gravDir = GravityDir.Down;
+                return;
+        }
+
+        Position.X += moveX;
+        Position.Y += moveY;
+        Velocity = Vector2.Zero;
+
+        // Check if surface tile still exists
+        int cx = (int)((Position.X + EffectiveWidth / 2f) / ts);
+        int cy = (int)((Position.Y + EffectiveHeight / 2f) / ts);
+        int surfTX = cx + checkOffX;
+        int surfTY = cy + checkOffY;
+
+        bool surfaceExists = surfTX >= 0 && surfTX < tg.Width && surfTY >= 0 && surfTY < tg.Height
+            && TileProperties.IsSolid(tg.GetTileAt(surfTX, surfTY));
+
+        if (!surfaceExists)
+        {
+            // Surface disappeared — try next direction in cycle (Right→Up→Left→Down)
+            var nextDir = _gravDir switch
+            {
+                GravityDir.Right => GravityDir.Up,
+                GravityDir.Up => GravityDir.Left,
+                GravityDir.Left => GravityDir.Down,
+                _ => GravityDir.Down,
+            };
+
+            // Check if next surface has a solid tile
+            int nCheckX = 0, nCheckY = 0;
+            switch (nextDir)
+            {
+                case GravityDir.Right: nCheckX = 1; break;
+                case GravityDir.Left: nCheckX = -1; break;
+                case GravityDir.Up: nCheckY = -1; break;
+                default: nCheckX = 0; nCheckY = 0; break;
+            }
+
+            int nSurfTX = cx + nCheckX;
+            int nSurfTY = cy + nCheckY;
+            bool nextSurfaceExists = nextDir != GravityDir.Down
+                && nSurfTX >= 0 && nSurfTX < tg.Width && nSurfTY >= 0 && nSurfTY < tg.Height
+                && TileProperties.IsSolid(tg.GetTileAt(nSurfTX, nSurfTY));
+
+            _gravDir = nextSurfaceExists ? nextDir : GravityDir.Down;
+        }
+
+        _onGround = true; // on a surface
     }
 
     /// Refresh surface edge detection using tile-aware method.
@@ -1257,8 +1367,14 @@ public class Crawler : Creature
             drawY += burrowClip;
         }
 
-        // Wall-walking Stalker: flip for ceiling
+        // Wall-walking Stalker: flip for ceiling / walls
         bool ceilingFlip = Variant == CrawlerVariant.Stalker && _gravDir == GravityDir.Up;
+        bool wallWalk = Variant == CrawlerVariant.Stalker && (_gravDir == GravityDir.Left || _gravDir == GravityDir.Right);
+        if (ceilingFlip)
+        {
+            // Draw upside-down: flip drawY to top of entity
+            drawY = (int)Position.Y;
+        }
 
         // --- PROCEDURAL LEGS ---
         if (!IsDummy && Legs != null && Legs.Length == LegCount)

@@ -52,6 +52,12 @@ public class Wingbeater : Creature
     private Creature _huntTarget;
     private float _huntCooldown;
 
+    // Idle patrol
+    private Vector2? _patrolTarget;
+    private float _patrolTimer;
+    private float _perchTimer;
+    private bool _isPerched;
+
     // Detection
     public float DetectRange = 200f;
     public float DiveRange = 180f;
@@ -164,7 +170,14 @@ public class Wingbeater : Creature
         var noise = CheckNoise(ctx.NoiseEvents);
         if (noise != null)
         {
-            if (Role is EcologicalRole.Predator or EcologicalRole.Apex)
+            if (noise.Intensity >= 0.7f)
+            {
+                // Loud noise — flee away from source
+                Needs.Safety = Math.Min(Needs.Safety, 0.15f);
+                Dir = noise.Position.X > Position.X ? -1 : 1; // flee AWAY
+                _isPerched = false; // take off if perched
+            }
+            else if (Role is EcologicalRole.Predator or EcologicalRole.Apex)
             {
                 if (Needs.Hunger > 0.5f && CurrentGoal != CreatureGoal.Flee)
                     Dir = noise.Position.X > Position.X ? 1 : -1;
@@ -357,9 +370,54 @@ public class Wingbeater : Creature
                 }
                 else
                 {
-                    // Idle hover — pin to SpawnPos with gentle oscillation
-                    Position.Y = SpawnPos.Y + MathF.Sin(_hoverPhase) * 8f;
-                    Position.X = SpawnPos.X + MathF.Sin(_hoverPhase * 0.4f) * 15f;
+                    // Idle patrol / perch behavior
+                    if (_isPerched)
+                    {
+                        // Gentle bob while perched
+                        Position.Y = (_patrolTarget ?? SpawnPos).Y + MathF.Sin(_hoverPhase) * 2f;
+                        _perchTimer -= dt;
+                        if (_perchTimer <= 0)
+                        {
+                            _isPerched = false;
+                            _patrolTarget = null;
+                        }
+                    }
+                    else
+                    {
+                        // Pick a patrol target if we don't have one
+                        if (!_patrolTarget.HasValue)
+                        {
+                            float offsetX = ((float)Random.Shared.NextDouble() * 2f - 1f) * 300f;
+                            float targetX = MathHelper.Clamp(SpawnPos.X + offsetX, ctx.BoundsLeft + 20, ctx.BoundsRight - 20);
+                            float targetY = SpawnPos.Y + ((float)Random.Shared.NextDouble() * 2f - 1f) * 40f;
+                            _patrolTarget = new Vector2(targetX, targetY);
+                        }
+
+                        // Fly toward patrol target
+                        var toTarget = _patrolTarget.Value - Position;
+                        float distToTarget = toTarget.Length();
+                        if (distToTarget < 6f)
+                        {
+                            // Arrived — perch or pick new target
+                            if (Random.Shared.NextDouble() < 0.4)
+                            {
+                                _isPerched = true;
+                                _perchTimer = 3f + (float)Random.Shared.NextDouble() * 5f;
+                            }
+                            else
+                            {
+                                _patrolTarget = null; // pick new target next frame
+                            }
+                        }
+                        else
+                        {
+                            toTarget.Normalize();
+                            Position += toTarget * 50f * dt;
+                            // Gentle vertical bob while flying
+                            Position.Y += MathF.Sin(_hoverPhase) * 0.5f;
+                            _dir = _patrolTarget.Value.X > Position.X ? 1 : -1;
+                        }
+                    }
                 }
 
                 // Dive-bomb prey if hunting

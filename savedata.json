@@ -1,12 +1,12 @@
 {
-  "currentLevel": "ship-interior",
-  "spawnX": 4736,
-  "spawnY": 6320,
+  "currentLevel": "surface-east",
+  "spawnX": 17,
+  "spawnY": 1100,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 1742.9932,
+  "playTime": 1848.235,
   "meleeInventory": [
     "Knife",
     "Torch"
@@ -47,7 +47,7 @@
   "deathCount": 1,
   "hp": 10,
   "suitIntegrity": 50,
-  "battery": 0,
+  "battery": 60,
   "bestiary": {
     "entries": {
       "skitter": {
@@ -192,7 +192,7 @@
             "biome": "Surface East"
           }
         ],
-        "sightCount": 27,
+        "sightCount": 28,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -269,7 +269,7 @@
             "biome": "Surface East"
           }
         ],
-        "sightCount": 16,
+        "sightCount": 17,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -320,9 +320,15 @@
             "weather": "clear",
             "behavior": "aggressive",
             "biome": "Ship Interior"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "aggressive",
+            "biome": "Ship Interior"
           }
         ],
-        "sightCount": 14,
+        "sightCount": 15,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -482,7 +488,7 @@
       }
     }
   },
-  "worldTime": 13.831138,
+  "worldTime": 15.578954,
   "evolutionFlags": [],
   "cipherScanUnlocked": false,
   "hasLantern": true,
