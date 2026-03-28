@@ -3352,6 +3352,7 @@ public class Game1 : Game
             float right = _level.Bounds.Right;
             var tg = _level.TileGridInstance;
             int ts = _level.TileGrid?.TileSize ?? 32;
+            if (tg == null) return;
             
             for (int i = 0; i < count; i++)
             {
