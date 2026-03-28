@@ -225,7 +225,7 @@ public class Hopper : Creature
             {
                 bool floorAhead = HasFloorAhead(tileGrid, tileSize,
                     new Vector2(Position.X + Width / 2f, Position.Y + Height), _dir);
-                if (!floorAhead) TrySetHopDir(-_dir, force: true);
+                if (!floorAhead && !AllowLedgeDrop) { TrySetHopDir(-_dir, force: true); NoteLedgeReversal(); }
             }
         }
 

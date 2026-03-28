@@ -846,7 +846,8 @@ public class Crawler : Creature
             {
                 bool floorAhead = HasFloorAhead(tileGrid, tileSize,
                     new Vector2(Position.X + EffectiveWidth / 2f, Position.Y + EffectiveHeight), Dir);
-                if (!floorAhead) TrySetDir(-Dir, force: true);
+                if (!floorAhead && !AllowLedgeDrop) { TrySetDir(-Dir, force: true); NoteLedgeReversal(); }
+                // If AllowLedgeDrop, creature walks off the ledge naturally (gravity catches it)
             }
         }
 

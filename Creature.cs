@@ -105,6 +105,10 @@ public abstract class Creature
     // Direction change cooldown — prevents spazzy flip-flopping
     private float _dirChangeCooldown;
     private const float DirChangeCooldownTime = 0.3f; // can't flip more than ~3x/sec
+    // Ledge-stuck detection: if creature reverses at ledge edges too many times, allow drop
+    protected int _ledgeReverseCount;
+    protected float _ledgeReverseTimer;
+    protected bool AllowLedgeDrop => _ledgeReverseCount >= 3; // after 3 reversals, just walk off
     /// <summary>Set Dir with anti-flip cooldown. Force=true bypasses cooldown (wall collision).</summary>
     protected bool TrySetDir(int dir, bool force = false)
     {
@@ -114,7 +118,13 @@ public abstract class Creature
         _dirChangeCooldown = DirChangeCooldownTime;
         return true;
     }
-    public void TickDirCooldown(float dt) { if (_dirChangeCooldown > 0) _dirChangeCooldown -= dt; }
+    public void TickDirCooldown(float dt)
+    {
+        if (_dirChangeCooldown > 0) _dirChangeCooldown -= dt;
+        if (_ledgeReverseTimer > 0) { _ledgeReverseTimer -= dt; if (_ledgeReverseTimer <= 0) _ledgeReverseCount = 0; }
+    }
+    /// <summary>Call when creature reverses due to no floor ahead. Tracks stuck-on-ledge state.</summary>
+    protected void NoteLedgeReversal() { _ledgeReverseCount++; _ledgeReverseTimer = 3f; }
 
     // --- Health ---
     public bool Alive = true;

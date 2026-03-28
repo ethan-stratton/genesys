@@ -197,7 +197,7 @@ public class Scavenger : Creature
             {
                 bool floorAhead = HasFloorAhead(tileGrid, tileSize,
                     new Vector2(Position.X + Width / 2f, Position.Y + Height), _dir);
-                if (!floorAhead) TrySetScavDir(-_dir, force: true);
+                if (!floorAhead && !AllowLedgeDrop) { TrySetScavDir(-_dir, force: true); NoteLedgeReversal(); }
             }
         }
 

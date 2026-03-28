@@ -6035,55 +6035,82 @@ public class Game1 : Game
             {
                 _visTilePanelOpen = !_visTilePanelOpen;
                 if (_visTilePanelOpen)
+                {
                     _visTilesetFiles = DiscoverTilesetFiles();
+                    // Auto-select first tileset if none selected
+                    if (_visTilesetFiles.Length > 0 && (_visTilesetFileIndex < 0 || _visTilesetFileIndex >= _visTilesetFiles.Length))
+                    {
+                        _visTilesetFileIndex = 0;
+                        if (layer != null) layer.TilesetPath = _visTilesetFiles[0];
+                    }
+                }
             }
 
-            // Handle tileset picker panel clicks (screen space)
-            if (_visTilePanelOpen && layer != null)
+            // Handle tileset picker panel input (screen space)
+            if (_visTilePanelOpen)
             {
                 var ms = Mouse.GetState();
-                var tex = LoadTilesetTexture(layer.TilesetPath);
+                bool freshClick = ms.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released;
 
-                // Tileset file list on left side
-                int listX = 10, listY = 80, listLineH = 18;
+                // Use a separate "selected tileset path" so we can show the preview before assigning to layer
+                string activeTilesetPath = _visTilesetFileIndex >= 0 && _visTilesetFileIndex < _visTilesetFiles.Length
+                    ? _visTilesetFiles[_visTilesetFileIndex] : (layer?.TilesetPath ?? "");
+                var tex = !string.IsNullOrEmpty(activeTilesetPath) ? LoadTilesetTexture(activeTilesetPath) : null;
+
+                // Tileset file list on left side — MUST match draw coordinates
+                int listX = 10, listY = 40, listLineH = 16;
                 int listW = 280;
-                if (ms.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released
-                    && ms.X >= listX && ms.X < listX + listW && ms.Y >= listY)
+                if (freshClick && ms.X >= listX && ms.X < listX + listW && ms.Y >= listY)
                 {
                     int clickedIdx = (ms.Y - listY) / listLineH + _visTilePanelScroll;
                     if (clickedIdx >= 0 && clickedIdx < _visTilesetFiles.Length)
                     {
                         _visTilesetFileIndex = clickedIdx;
-                        layer.TilesetPath = _visTilesetFiles[clickedIdx];
-                        SetEditorStatus($"Tileset: {layer.TilesetPath}");
+                        activeTilesetPath = _visTilesetFiles[clickedIdx];
+                        if (layer != null) layer.TilesetPath = activeTilesetPath;
+                        tex = LoadTilesetTexture(activeTilesetPath);
+                        SetEditorStatus($"Tileset: {Path.GetFileName(activeTilesetPath)}");
                     }
                 }
 
-                // Scroll tileset file list
+                // Arrow keys / WASD to navigate file list
+                if (kb.IsKeyDown(Keys.W) && _prevKb.IsKeyUp(Keys.W) || kb.IsKeyDown(Keys.Up) && _prevKb.IsKeyUp(Keys.Up))
+                {
+                    _visTilesetFileIndex = Math.Max(0, _visTilesetFileIndex - 1);
+                    if (layer != null && _visTilesetFileIndex < _visTilesetFiles.Length)
+                        layer.TilesetPath = _visTilesetFiles[_visTilesetFileIndex];
+                }
+                if (kb.IsKeyDown(Keys.S) && _prevKb.IsKeyUp(Keys.S) || kb.IsKeyDown(Keys.Down) && _prevKb.IsKeyUp(Keys.Down))
+                {
+                    _visTilesetFileIndex = Math.Min(_visTilesetFiles.Length - 1, _visTilesetFileIndex + 1);
+                    if (layer != null && _visTilesetFileIndex < _visTilesetFiles.Length)
+                        layer.TilesetPath = _visTilesetFiles[_visTilesetFileIndex];
+                }
+
+                // Scroll tileset file list with mouse wheel
                 if (ms.ScrollWheelValue != _prevMouse.ScrollWheelValue && ms.X < listX + listW)
                 {
                     _visTilePanelScroll -= (ms.ScrollWheelValue - _prevMouse.ScrollWheelValue) / 120;
-                    _visTilePanelScroll = Math.Clamp(_visTilePanelScroll, 0, Math.Max(0, _visTilesetFiles.Length - 20));
+                    _visTilePanelScroll = Math.Clamp(_visTilePanelScroll, 0, Math.Max(0, _visTilesetFiles.Length - 30));
                 }
 
                 // Tile picker grid on right side
                 if (tex != null)
                 {
-                    int ts = layer.TilesetTileSize > 0 ? layer.TilesetTileSize : 32;
+                    int ts = (layer?.TilesetTileSize > 0 ? layer.TilesetTileSize : 32);
                     int cols = tex.Width / ts;
                     int rows = tex.Height / ts;
-                    int pickerX = 300, pickerY = 80;
-                    float scale = Math.Min(1f, (float)(ViewW - pickerX - 10) / tex.Width);
+                    int pickerX = 300, pickerY = 40;
+                    float scale = Math.Min(2f, Math.Min((float)(ViewW - pickerX - 10) / tex.Width, (float)(ViewH - pickerY - 10) / tex.Height));
                     int dispTs = Math.Max(1, (int)(ts * scale));
-                    if (ms.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released
-                        && ms.X >= pickerX && ms.Y >= pickerY)
+                    if (freshClick && ms.X >= pickerX && ms.Y >= pickerY)
                     {
                         int tc = (ms.X - pickerX) / dispTs;
                         int tr = (ms.Y - pickerY) / dispTs;
                         if (tc >= 0 && tc < cols && tr >= 0 && tr < rows)
                         {
                             _visTileSelectedIndex = tr * cols + tc + 1; // 1-based
-                            SetEditorStatus($"Tile #{_visTileSelectedIndex}");
+                            SetEditorStatus($"Tile #{_visTileSelectedIndex} selected — press V to close & paint");
                         }
                     }
                 }
@@ -8295,7 +8322,8 @@ public class Game1 : Game
             if (_visTilePanelOpen)
             {
                 _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), Color.Black * 0.85f);
-                _spriteBatch.DrawString(_font, "TILESET PICKER  [V] Close  Click file → Click tile", new Vector2(10, 10), Color.White);
+                _spriteBatch.DrawString(_font, "TILESET PICKER  [V] Close  [W/S] Navigate  Click file or tile", new Vector2(10, 10), Color.White);
+                _spriteBatch.DrawString(_fontSmall, $"Layer: {_visTileLayerNames[_visTileLayerIndex].ToUpper()}  |  Tile #{_visTileSelectedIndex}", new Vector2(10, 26), Color.Yellow);
 
                 // File list (left)
                 int listX = 10, listY = 40, listLineH = 16;
