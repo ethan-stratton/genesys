@@ -1,12 +1,12 @@
 {
   "currentLevel": "ship-interior",
-  "spawnX": 2668.7703,
-  "spawnY": 6296,
+  "spawnX": 1137.5967,
+  "spawnY": 2232,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 2008.2802,
+  "playTime": 2182.1228,
   "meleeInventory": [
     "Knife",
     "Torch"
@@ -35,19 +35,20 @@
     "grapple-6",
     "torch-5",
     "cipher-helmet-4",
-    "lantern-3"
+    "lantern-3",
+    "knife-1"
   ],
   "windowSizeIndex": 0,
   "crtEnabled": false,
-  "moveTier": 0,
+  "moveTier": 2,
   "upgrades": [],
   "shelterLevel": "",
   "shelterX": 0,
   "shelterY": 0,
   "deathCount": 1,
-  "hp": 10,
+  "hp": 5,
   "suitIntegrity": 50,
-  "battery": 100,
+  "battery": 99.72498,
   "bestiary": {
     "entries": {
       "skitter": {
@@ -494,7 +495,7 @@
       }
     }
   },
-  "worldTime": 18.549927,
+  "worldTime": 14.519875,
   "evolutionFlags": [],
   "cipherScanUnlocked": false,
   "hasLantern": true,
@@ -503,6 +504,8 @@
   "torchFuel": 93.74344,
   "hasChestPlate": true,
   "chestPlateEquipped": true,
+  "hasRocketBoots": true,
+  "rocketBootsEquipped": true,
   "durR1": 0,
   "durR2": 0,
   "durL1": 0,

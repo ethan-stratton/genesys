@@ -92,10 +92,10 @@
   ],
   "items": [
     {
-      "id": "grapple-0",
-      "type": "grapple",
-      "x": 352,
-      "y": 1760,
+      "id": "knife-0",
+      "type": "knife",
+      "x": 672,
+      "y": -2240,
       "w": 20,
       "h": 20
     }
@@ -113,14 +113,7 @@
     }
   ],
   "retractableSpikes": [],
-  "shelters": [
-    {
-      "id": "shelter-crashsite",
-      "x": 259.66663,
-      "y": 1824,
-      "name": "Shelter"
-    }
-  ],
+  "shelters": [],
   "neighbors": {
     "left": "",
     "right": "",
