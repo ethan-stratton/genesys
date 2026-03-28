@@ -1,12 +1,12 @@
 {
   "currentLevel": "ship-interior",
-  "spawnX": 1137.5967,
-  "spawnY": 2232,
+  "spawnX": 6288,
+  "spawnY": 2296,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 2182.1228,
+  "playTime": 2314.653,
   "meleeInventory": [
     "Knife",
     "Torch"
@@ -21,11 +21,11 @@
     "Knife",
     "Torch"
   ],
-  "leftHand": "Knife",
+  "leftHand": "None",
   "rightHand": "Gun",
   "rightHand1": "Gun",
   "rightHand2": "Torch",
-  "leftHand1": "Knife",
+  "leftHand1": "None",
   "leftHand2": "Knife",
   "rightActiveSlot1": true,
   "leftActiveSlot1": true,
@@ -45,10 +45,10 @@
   "shelterLevel": "",
   "shelterX": 0,
   "shelterY": 0,
-  "deathCount": 1,
-  "hp": 5,
-  "suitIntegrity": 50,
-  "battery": 99.72498,
+  "deathCount": 2,
+  "hp": 10,
+  "suitIntegrity": 49.07051,
+  "battery": 78.08904,
   "bestiary": {
     "entries": {
       "skitter": {
@@ -193,7 +193,7 @@
             "biome": "Surface East"
           }
         ],
-        "sightCount": 32,
+        "sightCount": 34,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -270,7 +270,7 @@
             "biome": "Surface East"
           }
         ],
-        "sightCount": 18,
+        "sightCount": 20,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -327,9 +327,15 @@
             "weather": "clear",
             "behavior": "aggressive",
             "biome": "Ship Interior"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "aggressive",
+            "biome": "Surface East"
           }
         ],
-        "sightCount": 16,
+        "sightCount": 17,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -417,7 +423,7 @@
             "biome": "Surface East"
           }
         ],
-        "sightCount": 8,
+        "sightCount": 9,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -495,7 +501,7 @@
       }
     }
   },
-  "worldTime": 14.519875,
+  "worldTime": 16.896845,
   "evolutionFlags": [],
   "cipherScanUnlocked": false,
   "hasLantern": true,
