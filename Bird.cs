@@ -23,8 +23,8 @@ public class Bird : Creature
     private readonly Random _rng;
     private bool _onGround;
 
-    public float FleeRange = 80f;
-    public float AlertRange = 140f;
+    public float FleeRange = 160f;
+    public float AlertRange = 220f;
 
     public float GroundY;
     public float SurfaceLeft, SurfaceRight;
@@ -195,8 +195,8 @@ public class Bird : Creature
         float dx = playerPos.X - (Position.X + Width / 2f);
 
         // Goal-influenced flee ranges
-        float effectiveFleeRange = FleeRange * weatherDetectMult * (CurrentGoal == CreatureGoal.Flee ? 0.7f : 1f);
-        float effectiveAlertRange = AlertRange * weatherDetectMult * (CurrentGoal == CreatureGoal.Flee ? 0.7f : 1f);
+        float effectiveFleeRange = FleeRange * weatherDetectMult * (CurrentGoal == CreatureGoal.Flee ? 1.5f : 1f);
+        float effectiveAlertRange = AlertRange * weatherDetectMult * (CurrentGoal == CreatureGoal.Flee ? 1.5f : 1f);
 
         // React to player proximity
         if (_state != State.Flying && _state != State.Fleeing && dist < effectiveFleeRange)

@@ -68,6 +68,9 @@ public class Wingbeater : Creature
     private bool _carryingPlant = false;
     public bool HasNest => _hasNest;
     public Vector2? NestPosition => _nestPosition;
+    public float NestMaterial => _nestMaterial;
+    public bool WantsToLeaveLevel { get; private set; }
+    public string PreferredExitDirection { get; private set; }
     private FoodSource _gatherTarget;
 
     public override bool CanBurrow => false;
@@ -254,23 +257,107 @@ public class Wingbeater : Creature
         float dist = Vector2.Distance(playerPos, Position + new Vector2(Width / 2f, Height / 2f));
         float dx = playerPos.X - (Position.X + Width / 2f);
 
+        // Return to nest before nightfall
+        if (_hasNest && _nestPosition.HasValue && ctx.WorldTime > 18f)
+        {
+            float distToNest = Vector2.Distance(Position, _nestPosition.Value);
+            if (distToNest > 20f)
+            {
+                var toNest = _nestPosition.Value - Position;
+                toNest.Normalize();
+                Position += toNest * 80f * dt;
+                _dir = _nestPosition.Value.X > Position.X ? 1 : -1;
+                _state = State.Hovering;
+            }
+            else
+            {
+                _state = State.Nesting;
+            }
+            _prevGoal = CurrentGoal;
+            return;
+        }
+
+        // Level boundary check for cross-screen movement
+        WantsToLeaveLevel = false;
+        if (CurrentGoal == CreatureGoal.Eat && !_hasNest)
+        {
+            if (Position.X < ctx.BoundsLeft + 30)
+            {
+                PreferredExitDirection = "left";
+                WantsToLeaveLevel = true;
+            }
+            else if (Position.X > ctx.BoundsRight - 30)
+            {
+                PreferredExitDirection = "right";
+                WantsToLeaveLevel = true;
+            }
+        }
+
         switch (_state)
         {
             case State.Hovering:
                 _hoverPhase += dt * 2f;
                 Position.Y = SpawnPos.Y + MathF.Sin(_hoverPhase) * 8f;
-                Position.X = SpawnPos.X + MathF.Sin(_hoverPhase * 0.4f) * 15f;
+                
+                // Active food/prey seeking when hungry
+                if (CurrentGoal == CreatureGoal.Eat)
+                {
+                    if (_huntTarget != null && _huntTarget.Alive)
+                    {
+                        float preyDist = Vector2.Distance(Position, _huntTarget.Position);
+                        if (preyDist < DiveRange && _huntCooldown <= 0)
+                        {
+                            _currentTargetType = TargetType.Prey;
+                            _state = State.Tracking;
+                            _stateTimer = TrackTime;
+                        }
+                        else
+                        {
+                            float moveSpeed = 60f;
+                            var toTarget = _huntTarget.Position - Position;
+                            if (toTarget.LengthSquared() > 0)
+                            {
+                                toTarget.Normalize();
+                                Position += toTarget * moveSpeed * dt;
+                            }
+                            _dir = _huntTarget.Position.X > Position.X ? 1 : -1;
+                        }
+                    }
+                    else
+                    {
+                        var food = FindFood(ctx.FoodSources, 400f);
+                        if (food != null)
+                        {
+                            float foodDist = Vector2.Distance(Position, food.Position);
+                            if (foodDist > 10f)
+                            {
+                                var toFood = food.Position - Position;
+                                toFood.Normalize();
+                                Position += toFood * 50f * dt;
+                                _dir = food.Position.X > Position.X ? 1 : -1;
+                            }
+                        }
+                        else
+                        {
+                            Position.X += _dir * 30f * dt;
+                        }
+                    }
+                }
+                else
+                {
+                    Position.X = SpawnPos.X + MathF.Sin(_hoverPhase * 0.4f) * 15f;
+                }
                 _dir = dx > 0 ? 1 : -1;
 
                 // Dive-bomb prey if hunting
-                if (_huntTarget != null && _huntTarget.Alive && _huntCooldown <= 0)
+                if (_huntTarget != null && _huntTarget.Alive && _huntCooldown <= 0 && _state == State.Hovering)
                 {
                     _currentTargetType = TargetType.Prey;
                     _state = State.Tracking;
                     _stateTimer = TrackTime;
                 }
                 // Dive-bomb player if aggressive
-                else if (dist < effectiveDetectRange && !Passive)
+                else if (dist < effectiveDetectRange && !Passive && _state == State.Hovering)
                 {
                     _currentTargetType = TargetType.Player;
                     _state = State.Tracking;
@@ -325,6 +412,12 @@ public class Wingbeater : Creature
                 break;
 
             case State.Returning:
+                // If still hungry, don't return — go back to hovering to search
+                if (CurrentGoal == CreatureGoal.Eat && _huntTarget != null && _huntTarget.Alive)
+                {
+                    _state = State.Hovering;
+                    break;
+                }
                 var toSpawn = SpawnPos - Position;
                 float distToSpawn = toSpawn.Length();
                 if (distToSpawn < 4f)

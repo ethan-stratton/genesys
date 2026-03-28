@@ -202,6 +202,7 @@ public class Game1 : Game
     private bool _playerWasGrappleFiring;
     private Random _shakeRng = new();
     private List<NoiseEvent> _noiseEvents = new();
+    private float _prevPlayerMeleeTimer;
 
     private List<Bullet> _bullets;
     private List<InsectSwarm> _swarms = new();
@@ -3251,7 +3252,7 @@ public class Game1 : Game
             creature.Update(dt, creatureCtx);
 
         // Update food sources
-        foreach (var f in _foodSources) f.Update(dt);
+        foreach (var f in _foodSources) f.Update(dt, _level?.TileGridInstance, _level?.TileGrid?.TileSize ?? 32);
         // Convert depleted corpses to fertile ground
         for (int i = _foodSources.Count - 1; i >= 0; i--)
         {
@@ -3415,6 +3416,14 @@ public class Game1 : Game
                 }
             }
         }
+
+        // Detect melee swing start — emit noise
+        if (_player.MeleeTimer > 0 && _prevPlayerMeleeTimer <= 0)
+        {
+            var swingPos = new Vector2(_player.Position.X + Player.Width / 2f, _player.Position.Y - 10f);
+            _noiseEvents.Add(new NoiseEvent(swingPos, 150f, 0.4f, "SWSH", Color.LightGray * 0.7f, 1.0f));
+        }
+        _prevPlayerMeleeTimer = _player.MeleeTimer;
 
         // Unified melee hit detection
         if (_player.MeleeTimer > 0)
@@ -12086,6 +12095,15 @@ public class Game1 : Game
 
                     // Goal
                     string goalText = creature.CurrentGoal.ToString();
+                    if (creature.IsBurrowed)
+                        goalText = "BURROW";
+                    else if (creature.CurrentGoal == CreatureGoal.Rest)
+                        goalText = "REST";
+                    if (creature is Wingbeater wb)
+                    {
+                        if (wb.HasNest) goalText += " [NEST]";
+                        else if (wb.NestPosition.HasValue) goalText += $" [BUILDING {(int)(wb.NestMaterial * 100)}%]";
+                    }
                     var goalColor = creature.CurrentGoal switch
                     {
                         CreatureGoal.Eat => Color.Orange,
@@ -12112,6 +12130,15 @@ public class Game1 : Game
                     // Eating indicator
                     if (creature.IsEating)
                         _spriteBatch.DrawString(_fontSmall, "EATING", basePos + new Vector2(0, 28), Color.Yellow);
+
+                    // Burrow progress bar
+                    if (creature.BurrowProgress > 0f)
+                    {
+                        var burrowBarBg = new Rectangle((int)basePos.X, (int)basePos.Y + 32, 40, 3);
+                        var burrowBarFg = new Rectangle((int)basePos.X, (int)basePos.Y + 32, (int)(40 * creature.BurrowProgress), 3);
+                        _spriteBatch.Draw(_pixel, burrowBarBg, Color.DarkGray * 0.5f);
+                        _spriteBatch.Draw(_pixel, burrowBarFg, new Color(139, 90, 43) * 0.8f);
+                    }
                 }
 
                 // Food source labels

@@ -29,6 +29,10 @@ public class FoodSource
     public float DecayTimer;  // corpses: age counter (counts UP); fertile ground: age counter
     public float SmellRadius = 200f; // how far creatures can detect this food
     
+    // Physics for falling corpses/debris
+    public Vector2 Velocity;
+    public bool OnGround;
+    
     public FoodSource(Vector2 pos, FoodType type, float nutrition = 0.5f)
     {
         Position = pos;
@@ -45,6 +49,7 @@ public class FoodSource
             case FoodType.Plant:
                 Size = 6f;
                 DrawColor = new Color(60, 140, 50);
+                OnGround = true;
                 break;
             case FoodType.Corpse:
                 Size = 8f;
@@ -63,6 +68,7 @@ public class FoodSource
                 Amount = 1f; // doesn't deplete
                 Nutrition = 0f;
                 DecayTimer = 0f; // counts up
+                OnGround = true;
                 break;
         }
     }
@@ -75,8 +81,27 @@ public class FoodSource
         return actual * Nutrition;
     }
     
-    public void Update(float dt)
+    public void Update(float dt, TileGrid tg = null, int tileSize = 32)
     {
+        // Gravity for corpses/debris
+        if ((Type == FoodType.Corpse || Type == FoodType.Debris) && !OnGround)
+        {
+            Velocity.Y += 400f * dt;
+            Position += Velocity * dt;
+            
+            if (tg != null)
+            {
+                int tx = (int)(Position.X / tileSize);
+                int ty = (int)((Position.Y + Size) / tileSize);
+                if (TileProperties.IsSolid(tg.GetTileAt(tx, ty)))
+                {
+                    Position.Y = ty * tileSize - Size;
+                    Velocity = Vector2.Zero;
+                    OnGround = true;
+                }
+            }
+        }
+        
         if (Type == FoodType.Corpse)
         {
             DecayTimer += dt; // now counts UP (age of corpse)

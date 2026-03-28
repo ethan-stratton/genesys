@@ -51,6 +51,7 @@ public class Hopper : Creature
         HitColor = new Color(100, 80, 60);
         _state = State.Grounded;
         _stateTimer = RestTime * 0.5f;
+        SpawnOrigin = pos;
         // Need rates & randomize
         HungerRate = 0.0025f;
         FatigueRate = 0.001f;
@@ -194,6 +195,49 @@ public class Hopper : Creature
         }
 
         Aggroed = dist < AggroRange;
+
+        // Terrain navigation
+        if (_onGround && tileGrid != null)
+        {
+            bool wallAhead = HasWallAhead(tileGrid, tileSize,
+                new Vector2(Position.X + (_dir > 0 ? Width : 0), Position.Y + Height / 2f), _dir);
+            if (wallAhead)
+            {
+                if (CurrentGoal == CreatureGoal.Flee)
+                {
+                    if (CanBurrow && !IsBurrowed) { CurrentGoal = CreatureGoal.Rest; BurrowProgress = 0.3f; }
+                    else _dir = -_dir;
+                }
+                else _dir = -_dir;
+            }
+            if (CurrentGoal != CreatureGoal.Flee)
+            {
+                bool floorAhead = HasFloorAhead(tileGrid, tileSize,
+                    new Vector2(Position.X + Width / 2f, Position.Y + Height), _dir);
+                if (!floorAhead) _dir = -_dir;
+            }
+        }
+
+        // Wander range
+        if (CurrentGoal == CreatureGoal.Eat)
+        {
+            var wanderFood = FindFood(ctx.FoodSources);
+            if (wanderFood == null) WanderRadius = MathHelper.Clamp(WanderRadius + dt * 20f, 100f, MaxWanderRadius);
+            else WanderRadius = 100f;
+        }
+        if (Math.Abs(Position.X - SpawnOrigin.X) > WanderRadius && CurrentGoal == CreatureGoal.Wander)
+            _dir = Position.X > SpawnOrigin.X ? -1 : 1;
+
+        // Bounds awareness
+        if (Position.X < ctx.BoundsLeft + 10 || Position.X + Width > ctx.BoundsRight - 10)
+        {
+            if (CurrentGoal == CreatureGoal.Flee)
+            {
+                if (CanBurrow && !IsBurrowed) { CurrentGoal = CreatureGoal.Rest; BurrowProgress = 0.3f; }
+                else { _dir = -_dir; Needs.Safety = MathHelper.Clamp(Needs.Safety + 0.2f, 0f, 1f); }
+            }
+            else _dir = -_dir;
+        }
 
         float dx = playerCenter.X - (Position.X + Width / 2f);
         if (MathF.Abs(dx) > 4f)

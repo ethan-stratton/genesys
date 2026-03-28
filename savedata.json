@@ -1,12 +1,12 @@
 {
   "currentLevel": "surface-east",
-  "spawnX": 300.5562,
-  "spawnY": 1080,
+  "spawnX": 876.09894,
+  "spawnY": 1016,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 907.2226,
+  "playTime": 1083.3127,
   "meleeInventory": [
     "Knife",
     "Torch"
@@ -77,9 +77,21 @@
             "weather": "clear",
             "behavior": "fleeing",
             "biome": "Surface East"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "moving",
+            "biome": "Surface East"
+          },
+          {
+            "time": "dusk",
+            "weather": "clear",
+            "behavior": "idle",
+            "biome": "Surface East"
           }
         ],
-        "sightCount": 6,
+        "sightCount": 8,
         "scanTier": 0,
         "l2Scanned": true,
         "detailedRole": null,
@@ -148,9 +160,15 @@
             "weather": "clear",
             "behavior": "fleeing",
             "biome": "Ship Interior"
+          },
+          {
+            "time": "dusk",
+            "weather": "clear",
+            "behavior": "idle",
+            "biome": "Surface East"
           }
         ],
-        "sightCount": 15,
+        "sightCount": 19,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -195,9 +213,21 @@
             "weather": "clear",
             "behavior": "idle",
             "biome": "Ship Interior"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "moving",
+            "biome": "Surface East"
+          },
+          {
+            "time": "dusk",
+            "weather": "clear",
+            "behavior": "moving",
+            "biome": "Surface East"
           }
         ],
-        "sightCount": 6,
+        "sightCount": 8,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -230,9 +260,15 @@
             "weather": "clear",
             "behavior": "fleeing",
             "biome": "Ship Interior"
+          },
+          {
+            "time": "dusk",
+            "weather": "clear",
+            "behavior": "idle",
+            "biome": "Surface East"
           }
         ],
-        "sightCount": 6,
+        "sightCount": 10,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -259,9 +295,15 @@
             "weather": "clear",
             "behavior": "aggressive",
             "biome": "Surface East"
+          },
+          {
+            "time": "dusk",
+            "weather": "clear",
+            "behavior": "idle",
+            "biome": "Surface East"
           }
         ],
-        "sightCount": 2,
+        "sightCount": 4,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -330,10 +372,33 @@
         "loreText": null,
         "thoughts": null,
         "originalNature": null
+      },
+      "wingbeater": {
+        "speciesName": "wingbeater",
+        "classification": "predator",
+        "observations": [
+          {
+            "time": "dusk",
+            "weather": "clear",
+            "behavior": "idle",
+            "biome": "Surface East"
+          }
+        ],
+        "sightCount": 1,
+        "scanTier": 0,
+        "l2Scanned": false,
+        "detailedRole": null,
+        "temperament": null,
+        "weaknesses": null,
+        "resistances": null,
+        "l3Scanned": false,
+        "loreText": null,
+        "thoughts": null,
+        "originalNature": null
       }
     }
   },
-  "worldTime": 16.042557,
+  "worldTime": 18.982674,
   "evolutionFlags": [],
   "cipherScanUnlocked": false,
   "hasLantern": true,

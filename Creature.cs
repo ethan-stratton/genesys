@@ -388,6 +388,55 @@ public abstract class Creature
         return area >= min && area <= max;
     }
 
+    // --- Tile Raycasting ---
+    /// <summary>Simple tile raycast: returns distance to first solid tile, or maxDist if clear.</summary>
+    public static float TileRaycast(TileGrid tg, int ts, Vector2 from, int dirX, int dirY, float maxDist = 200f)
+    {
+        if (tg == null) return maxDist;
+        float step = ts * 0.5f;
+        int steps = (int)(maxDist / step);
+        for (int i = 1; i <= steps; i++)
+        {
+            float x = from.X + dirX * step * i;
+            float y = from.Y + dirY * step * i;
+            int tx = (int)(x / ts);
+            int ty = (int)(y / ts);
+            if (TileProperties.IsSolid(tg.GetTileAt(tx, ty)))
+                return step * i;
+        }
+        return maxDist;
+    }
+
+    /// <summary>Check if there's a floor ahead for ledge detection.</summary>
+    public static bool HasFloorAhead(TileGrid tg, int ts, Vector2 pos, int dir, float checkAhead = 16f, float checkDepth = 48f)
+    {
+        if (tg == null) return true;
+        float checkX = pos.X + dir * checkAhead;
+        float checkY = pos.Y;
+        for (float dy = 0; dy < checkDepth; dy += ts * 0.5f)
+        {
+            int tx = (int)(checkX / ts);
+            int ty = (int)((checkY + dy) / ts);
+            if (TileProperties.IsSolid(tg.GetTileAt(tx, ty)))
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>Check if there's a wall immediately ahead.</summary>
+    public static bool HasWallAhead(TileGrid tg, int ts, Vector2 pos, int dir, float checkDist = 8f)
+    {
+        if (tg == null) return false;
+        int tx = (int)((pos.X + dir * checkDist) / ts);
+        int ty = (int)(pos.Y / ts);
+        return TileProperties.IsSolid(tg.GetTileAt(tx, ty));
+    }
+
+    // --- Wander Range ---
+    public Vector2 SpawnOrigin;
+    public float WanderRadius = 100f;
+    public float MaxWanderRadius = 500f;
+
     // --- Noise Reaction (Feature 3) ---
     /// <summary>Check for nearby noise events and react. Returns the loudest noise within hearing range.</summary>
     public NoiseEvent CheckNoise(List<NoiseEvent> events, float hearingRange = 300f)

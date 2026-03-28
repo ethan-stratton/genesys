@@ -234,6 +234,7 @@ public class Crawler : Creature
     {
         Position = pos;
         _spawnPos = pos;
+        SpawnOrigin = pos;
         PatrolLeft = patrolLeft;
         PatrolRight = patrolRight;
         SurfaceLeft = surfaceLeft;
@@ -759,6 +760,52 @@ public class Crawler : Creature
         // Apply flee speed boost
         if (fleeSpeedBoost > 1f)
             Velocity.X *= fleeSpeedBoost;
+
+        // Terrain navigation — ledge and wall detection
+        if (!IsDummy && !Frozen && !IsLatched && _onGround && tileGrid != null)
+        {
+            bool wallAhead = HasWallAhead(tileGrid, tileSize,
+                new Vector2(Position.X + (Dir > 0 ? EffectiveWidth : 0), Position.Y + EffectiveHeight / 2f), Dir);
+            if (wallAhead)
+            {
+                if (CurrentGoal == CreatureGoal.Flee)
+                {
+                    if (CanBurrow && !IsBurrowed) { CurrentGoal = CreatureGoal.Rest; BurrowProgress = 0.3f; }
+                    else Dir = -Dir;
+                }
+                else Dir = -Dir;
+            }
+            if (CurrentGoal != CreatureGoal.Flee)
+            {
+                bool floorAhead = HasFloorAhead(tileGrid, tileSize,
+                    new Vector2(Position.X + EffectiveWidth / 2f, Position.Y + EffectiveHeight), Dir);
+                if (!floorAhead) Dir = -Dir;
+            }
+        }
+
+        // Wander range expansion when hungry
+        if (CurrentGoal == CreatureGoal.Eat)
+        {
+            var food = FindFood(ctx.FoodSources);
+            if (food == null)
+                WanderRadius = MathHelper.Clamp(WanderRadius + dt * 20f, 100f, MaxWanderRadius);
+            else
+                WanderRadius = 100f;
+        }
+        float distFromSpawn = Math.Abs(Position.X - SpawnOrigin.X);
+        if (distFromSpawn > WanderRadius && CurrentGoal == CreatureGoal.Wander)
+            Dir = Position.X > SpawnOrigin.X ? -1 : 1;
+
+        // Bounds awareness
+        if (Position.X < ctx.BoundsLeft + 10 || Position.X + EffectiveWidth > ctx.BoundsRight - 10)
+        {
+            if (CurrentGoal == CreatureGoal.Flee)
+            {
+                if (CanBurrow && !IsBurrowed) { CurrentGoal = CreatureGoal.Rest; BurrowProgress = 0.3f; }
+                else { Dir = -Dir; Needs.Safety = MathHelper.Clamp(Needs.Safety + 0.2f, 0f, 1f); }
+            }
+            else Dir = -Dir;
+        }
 
         // Wall/ceiling walking for Stalker
         if (Variant == CrawlerVariant.Stalker && tileGrid != null)
