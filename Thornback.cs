@@ -29,6 +29,7 @@ public class Thornback : Creature
 
     public override int CreatureWidth => Width;
     public override int CreatureHeight => Height;
+    public override float GetActivityLevel(float worldTime) => 0.8f; // always moderately active
     public override Rectangle Rect => new((int)Position.X, (int)Position.Y, Width, Height);
 
     public override void Update(float dt, CreatureUpdateContext ctx)
@@ -40,6 +41,11 @@ public class Thornback : Creature
 
         // --- Needs system ---
         TickNeeds(dt);
+        // Weather effects
+        if (ctx.IsRaining)
+        {
+            Needs.Hunger += dt * HungerRate * 0.5f;
+        }
         float distToPlayer = Vector2.Distance(Position, ctx.PlayerCenter);
         Needs.Safety = Math.Min(Needs.Safety, MathHelper.Clamp(distToPlayer / 80f, 0f, 1f));
         CurrentGoal = SelectGoal();

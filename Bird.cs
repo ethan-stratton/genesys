@@ -103,6 +103,18 @@ public class Bird : Creature
 
         // --- Needs system ---
         TickNeeds(dt);
+        // Weather effects
+        if (ctx.IsRaining)
+        {
+            Needs.Hunger += dt * HungerRate * 0.5f;
+            if (Role is not (EcologicalRole.Predator or EcologicalRole.Apex or EcologicalRole.Defensive))
+                Needs.Safety = Math.Min(Needs.Safety, 0.6f);
+        }
+        // Time-of-day activity
+        float activity = GetActivityLevel(ctx.WorldTime);
+        if (activity < 0.2f && CurrentGoal != CreatureGoal.Flee)
+            CurrentGoal = CreatureGoal.Rest;
+        float weatherDetectMult = ctx.IsStorming ? 0.5f : ctx.IsRaining ? 0.7f : 1f;
         {
             float distToPlayer = Vector2.Distance(Position, playerPos);
             Needs.Safety = Math.Min(Needs.Safety, MathHelper.Clamp(distToPlayer / 120f, 0f, 1f));
@@ -168,8 +180,8 @@ public class Bird : Creature
         float dx = playerPos.X - (Position.X + Width / 2f);
 
         // Goal-influenced flee ranges
-        float effectiveFleeRange = FleeRange * (CurrentGoal == CreatureGoal.Flee ? 0.7f : 1f);
-        float effectiveAlertRange = AlertRange * (CurrentGoal == CreatureGoal.Flee ? 0.7f : 1f);
+        float effectiveFleeRange = FleeRange * weatherDetectMult * (CurrentGoal == CreatureGoal.Flee ? 0.7f : 1f);
+        float effectiveAlertRange = AlertRange * weatherDetectMult * (CurrentGoal == CreatureGoal.Flee ? 0.7f : 1f);
 
         // React to player proximity
         if (_state != State.Flying && _state != State.Fleeing && dist < effectiveFleeRange)
@@ -250,7 +262,7 @@ public class Bird : Creature
                 break;
 
             case State.Hopping:
-                Velocity.X = _dir * _hopSpeed;
+                Velocity.X = _dir * _hopSpeed * MathHelper.Clamp(activity, 0.3f, 1f);
                 Velocity.Y = 0;
                 _onGround = EnemyPhysics.ApplyGravityAndCollision(
                     ref Position, ref Velocity, Width, Height, 600f, dt,

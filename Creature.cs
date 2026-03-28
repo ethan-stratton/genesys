@@ -65,6 +65,11 @@ public struct CreatureUpdateContext
     public float BoundsRight;
     public List<FoodSource> FoodSources;
     public List<Creature> NearbyCreatures;
+    public float WorldTime;        // 0-24 hour clock
+    public bool IsRaining;
+    public bool IsStorming;
+    public float Temperature;      // 0-1
+    public float WindStrength;     // 0-1
 }
 
 /// <summary>
@@ -125,6 +130,30 @@ public abstract class Creature
     public string CurrentNodeId;  // which room/area this creature is in
     public string GoalNodeId;     // where it's trying to get to
     public string HomeNodeId;     // where it lives/nests
+
+    // --- Activity schedule ---
+    // Activity schedule — override per species
+    public virtual bool IsNocturnal => false;
+    public virtual bool IsCrepuscular => false; // active at dawn/dusk
+
+    /// <summary>
+    /// Activity level based on time of day (0-1). 
+    /// Diurnal creatures are active during day, nocturnal at night.
+    /// </summary>
+    public virtual float GetActivityLevel(float worldTime)
+    {
+        bool isNight = worldTime < 5f || worldTime >= 21f;
+        bool isDawn = worldTime >= 5f && worldTime < 7f;
+        bool isDusk = worldTime >= 17f && worldTime < 21f;
+        bool isDay = worldTime >= 7f && worldTime < 17f;
+        
+        if (IsCrepuscular)
+            return (isDawn || isDusk) ? 1f : 0.3f;
+        if (IsNocturnal)
+            return isNight ? 1f : isDawn || isDusk ? 0.5f : 0.15f;
+        // Diurnal (default)
+        return isDay ? 1f : isDawn || isDusk ? 0.6f : 0.1f;
+    }
 
     // --- Abstract interface ---
     public abstract int CreatureWidth { get; }
@@ -218,7 +247,9 @@ public abstract class Creature
             if (f.Depleted) continue;
             if (!FoodSource.CanEat(Role, f.Type)) continue;
             float d = Vector2.Distance(Position, f.Position);
-            if (d < bestDist) { bestDist = d; best = f; }
+            // Use SmellRadius for corpses — they're detectable from farther away as they age
+            float detectRange = Math.Min(maxRange, f.SmellRadius > 0 ? f.SmellRadius : maxRange);
+            if (d < detectRange && d < bestDist) { bestDist = d; best = f; }
         }
         return best;
     }

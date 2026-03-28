@@ -43,6 +43,7 @@ public class Scavenger : Creature
     
     public override int CreatureWidth => Width;
     public override int CreatureHeight => Height;
+    public override bool IsNocturnal => true;
     public override Rectangle Rect => new((int)Position.X, (int)Position.Y, Width, Height);
     
     public override void Update(float dt, CreatureUpdateContext ctx)
@@ -56,6 +57,18 @@ public class Scavenger : Creature
         
         // --- Needs system ---
         TickNeeds(dt);
+        // Weather effects
+        if (ctx.IsRaining)
+        {
+            Needs.Hunger += dt * HungerRate * 0.5f;
+            if (Role is not (EcologicalRole.Predator or EcologicalRole.Apex or EcologicalRole.Defensive))
+                Needs.Safety = Math.Min(Needs.Safety, 0.6f);
+        }
+        // Time-of-day activity
+        float activity = GetActivityLevel(ctx.WorldTime);
+        if (activity < 0.2f && CurrentGoal != CreatureGoal.Flee)
+            CurrentGoal = CreatureGoal.Rest;
+        float weatherDetectMult = ctx.IsStorming ? 0.5f : ctx.IsRaining ? 0.7f : 1f;
         
         var center = Position + new Vector2(Width / 2f, Height / 2f);
         float dist = Vector2.Distance(center, playerCenter);
@@ -112,8 +125,8 @@ public class Scavenger : Creature
         }
         
         // Goal-influenced detection ranges
-        float effectiveFleeRange = FleeRange;
-        float effectiveFreezeRange = FreezeRange;
+        float effectiveFleeRange = FleeRange * weatherDetectMult;
+        float effectiveFreezeRange = FreezeRange * weatherDetectMult;
         if (CurrentGoal == CreatureGoal.Flee) { effectiveFleeRange *= 1.3f; effectiveFreezeRange *= 1.3f; }
         
         switch (_state)
@@ -146,6 +159,7 @@ public class Scavenger : Creature
                         _wanderChangeTimer = 1.5f + Random.Shared.NextSingle() * 3f;
                     }
                     float wanderMult = CurrentGoal == CreatureGoal.Eat ? 1.2f : 1f;
+                    wanderMult *= MathHelper.Clamp(activity, 0.3f, 1f);
                     Velocity.X = _dir * _wanderSpeed * wanderMult;
                 }
                 break;

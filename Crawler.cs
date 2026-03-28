@@ -208,6 +208,8 @@ public class Crawler : Creature
     public int EffectiveHeight => IsDummy ? (int)(Height * (DummyScaleY > 0 ? DummyScaleY : DummyScale)) : Height;
     public override int CreatureWidth => EffectiveWidth;
     public override int CreatureHeight => EffectiveHeight;
+    public override bool IsNocturnal => Variant is CrawlerVariant.Stalker or CrawlerVariant.Leaper;
+    public override bool IsCrepuscular => Variant is CrawlerVariant.Skitter;
     private Vector2 _spawnPos;
     public void SetSpawnPos(Vector2 pos) => _spawnPos = pos;
     private float _respawnTimer;
@@ -292,6 +294,18 @@ public class Crawler : Creature
 
         // --- Needs system ---
         TickNeeds(dt);
+        // Weather effects
+        if (ctx.IsRaining)
+        {
+            Needs.Hunger += dt * HungerRate * 0.5f;
+            if (Role is not (EcologicalRole.Predator or EcologicalRole.Apex or EcologicalRole.Defensive))
+                Needs.Safety = Math.Min(Needs.Safety, 0.6f);
+        }
+        // Time-of-day activity
+        float activity = GetActivityLevel(ctx.WorldTime);
+        if (activity < 0.2f && CurrentGoal != CreatureGoal.Flee)
+            CurrentGoal = CreatureGoal.Rest;
+        float weatherDetectMult = ctx.IsStorming ? 0.5f : ctx.IsRaining ? 0.7f : 1f;
         // Safety from player proximity (variant-specific safe distance)
         float _safeDistForVariant = Variant switch
         {
@@ -439,7 +453,7 @@ public class Crawler : Creature
                 Position + new Vector2(Width / 2f, Height / 2f), playerCenter);
             
             // Needs-influenced aggro range: fleeing creatures react from farther
-            float effectiveAggroRange = AggroRange;
+            float effectiveAggroRange = AggroRange * weatherDetectMult;
             if (CurrentGoal == CreatureGoal.Flee) effectiveAggroRange *= 1.3f;
             
             if (Variant == CrawlerVariant.Leaper)
@@ -581,6 +595,7 @@ public class Crawler : Creature
                     case BugState.Walking:
                         float goalSpeedMult = CurrentGoal == CreatureGoal.Eat ? 1.15f
                             : CurrentGoal == CreatureGoal.Rest ? 0.7f : 1f;
+                        goalSpeedMult *= MathHelper.Clamp(activity, 0.3f, 1f);
                         Velocity.X = Dir * Speed * _walkSpeedMult * goalSpeedMult;
 
                         // Edge detection

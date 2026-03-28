@@ -74,6 +74,7 @@ public class Wingbeater : Creature
 
     public override int CreatureWidth => Width;
     public override int CreatureHeight => Height;
+    public override bool IsCrepuscular => true;
     public override Rectangle Rect => new((int)Position.X, (int)Position.Y, Width, Height);
 
     public override void Update(float dt, CreatureUpdateContext ctx)
@@ -86,6 +87,16 @@ public class Wingbeater : Creature
 
         // --- Needs system ---
         TickNeeds(dt);
+        // Weather effects
+        if (ctx.IsRaining)
+        {
+            Needs.Hunger += dt * HungerRate * 0.5f;
+        }
+        // Time-of-day activity
+        float activity = GetActivityLevel(ctx.WorldTime);
+        if (activity < 0.2f && CurrentGoal != CreatureGoal.Flee)
+            CurrentGoal = CreatureGoal.Rest;
+        float weatherDetectMult = ctx.IsStorming ? 0.5f : ctx.IsRaining ? 0.7f : 1f;
         float distToPlayer = Vector2.Distance(Position, playerPos);
         Needs.Safety = Math.Min(Needs.Safety, MathHelper.Clamp(distToPlayer / 100f, 0f, 1f));
         CurrentGoal = SelectGoal();
@@ -150,7 +161,7 @@ public class Wingbeater : Creature
         }
 
         // Goal-influenced detection ranges
-        float effectiveDetectRange = DetectRange;
+        float effectiveDetectRange = DetectRange * weatherDetectMult * MathHelper.Clamp(activity, 0.3f, 1f);
         if (CurrentGoal == CreatureGoal.Eat) effectiveDetectRange *= 1.3f;
         else if (CurrentGoal == CreatureGoal.Rest) effectiveDetectRange *= 0.6f;
         else if (CurrentGoal == CreatureGoal.Flee) effectiveDetectRange *= 0.4f;

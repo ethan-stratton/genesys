@@ -75,6 +75,17 @@ public class Hopper : Creature
 
         // --- Needs system ---
         TickNeeds(dt);
+        // Weather effects
+        if (ctx.IsRaining)
+        {
+            Needs.Hunger += dt * HungerRate * 0.5f;
+            if (Role is not (EcologicalRole.Predator or EcologicalRole.Apex or EcologicalRole.Defensive))
+                Needs.Safety = Math.Min(Needs.Safety, 0.6f);
+        }
+        // Time-of-day activity
+        float activity = GetActivityLevel(ctx.WorldTime);
+        if (activity < 0.2f && CurrentGoal != CreatureGoal.Flee)
+            CurrentGoal = CreatureGoal.Rest;
 
         if (KnockbackVel.LengthSquared() > 1f)
         {
@@ -169,8 +180,8 @@ public class Hopper : Creature
                     float hopSpeedMult = CurrentGoal == CreatureGoal.Eat ? 1.15f
                         : CurrentGoal == CreatureGoal.Flee ? 1.2f : 1f;
 
-                    Velocity.Y = (bigHop ? BigHopForce : SmallHopForce) * hopForceMult;
-                    Velocity.X = _dir * HopSpeedX * (bigHop ? 1.6f : 1f) * hopSpeedMult;
+                    Velocity.Y = (bigHop ? BigHopForce : SmallHopForce) * hopForceMult * MathHelper.Clamp(activity, 0.3f, 1f);
+                    Velocity.X = _dir * HopSpeedX * (bigHop ? 1.6f : 1f) * hopSpeedMult * MathHelper.Clamp(activity, 0.3f, 1f);
                     _state = State.Airborne;
                     _onGround = false;
                 }

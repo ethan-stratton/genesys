@@ -634,6 +634,8 @@ public class Game1 : Game
     private bool _weatherRain;
     private bool _weatherStorm;
     private bool _weatherWind;
+    private WeatherSystem _weather = new();
+    private float _plantRegrowthTimer;
     private float _windDir = 1f; // 1 = right, -1 = left
     private float _windStrength = 40f;
     private float _lightningTimer;
@@ -1013,6 +1015,7 @@ public class Game1 : Game
         _camera?.SnapTo(_player.Position, Player.Width, Player.Height);
         _bullets = new List<Bullet>();
         _rng = new Random();
+        _weather = new WeatherSystem(_rng);
 
         _isDead = false;
         _spawnInvincibility = 1.0f;
@@ -1158,6 +1161,24 @@ public class Game1 : Game
                 return row * ts;
         }
         return bottomY;
+    }
+
+    private float GetWaterTileRatio()
+    {
+        if (_level?.TileGridInstance == null) return 0f;
+        var tg = _level.TileGridInstance;
+        int ts = _level.TileGrid?.TileSize ?? 32;
+        int cx = (int)(_player.Position.X / ts);
+        int cy = (int)(_player.Position.Y / ts);
+        int waterCount = 0, totalCount = 0;
+        for (int dy = -5; dy <= 5; dy++)
+            for (int dx = -5; dx <= 5; dx++)
+            {
+                var tile = tg.GetTileAt(cx + dx, cy + dy);
+                totalCount++;
+                if (tile == TileType.Water) waterCount++;
+            }
+        return totalCount > 0 ? (float)waterCount / totalCount : 0f;
     }
 
     private void SpawnTestEcosystem()
@@ -1362,6 +1383,12 @@ public class Game1 : Game
         {
             _worldTime += dt * WorldTimeScale;
             if (_worldTime >= 24f) _worldTime -= 24f;
+            
+            // Update weather system
+            _weather.Update(dt, _worldTime, GetWaterTileRatio());
+            _weatherRain = _weather.IsRaining;
+            _weatherStorm = _weather.IsStorming;
+            _weatherWind = _weather.IsWindy;
             
             // Lantern battery drain
             if (_lanternActive)
@@ -1812,11 +1839,7 @@ public class Game1 : Game
                 _deathFadeTimer = 0;
                 _respawning = false;
                 _spawnInvincibility = 2f;
-                // Shift weather on death (consequence)
-                // Force weather shift on death (consequence)
-                _weatherRain = !_weatherRain;
-                if (!_weatherRain) _weatherStorm = false;
-                _weatherWind = _rng.NextDouble() > 0.5;
+                // Weather no longer toggles on death — handled by WeatherSystem
                 // TODO: shuffle enemy patrol patterns
                 if (_eveOrbActive && save?.DeathCount == 1)
                     EveAlert("Your vitals flatlined for... 11 seconds. The local microbiome appears to have... intervened.", 5f);
@@ -3194,6 +3217,11 @@ public class Game1 : Game
             BoundsRight = _level.Bounds.Right,
             FoodSources = _foodSources,
             NearbyCreatures = _creatures,
+            WorldTime = _worldTime,
+            IsRaining = _weather.IsRaining,
+            IsStorming = _weather.IsStorming,
+            Temperature = _weather.Temperature,
+            WindStrength = _weather.WindStrength,
         };
 
         // Crawler-specific pre-update: latch behavior and bombardier spray
@@ -3221,7 +3249,78 @@ public class Game1 : Game
 
         // Update food sources
         foreach (var f in _foodSources) f.Update(dt);
-        _foodSources.RemoveAll(f => f.Depleted);
+        // Convert depleted corpses to fertile ground
+        for (int i = _foodSources.Count - 1; i >= 0; i--)
+        {
+            if (_foodSources[i].Depleted)
+            {
+                if (_foodSources[i].Type == FoodType.Corpse)
+                {
+                    var fertile = new FoodSource(_foodSources[i].Position, FoodType.FertileGround, 0f);
+                    _foodSources[i] = fertile;
+                }
+                else if (_foodSources[i].Type == FoodType.FertileGround && _foodSources[i].DecayTimer > 120f)
+                {
+                    _foodSources.RemoveAt(i);
+                }
+                else if (_foodSources[i].Type != FoodType.FertileGround)
+                {
+                    _foodSources.RemoveAt(i);
+                }
+            }
+        }
+        
+        // Plant regrowth
+        _plantRegrowthTimer -= dt;
+        if (_plantRegrowthTimer <= 0 && _level != null)
+        {
+            _plantRegrowthTimer = 15f + (float)_rng.NextDouble() * 15f;
+            
+            // Accelerated growth near fertile ground
+            var fertileSnap = new System.Collections.Generic.List<FoodSource>();
+            foreach (var f in _foodSources)
+                if (f.Type == FoodType.FertileGround) fertileSnap.Add(f);
+            foreach (var f in fertileSnap)
+            {
+                if (_rng.NextDouble() < 0.5)
+                {
+                    var plantPos = f.Position + new Vector2(-20 + (float)_rng.NextDouble() * 40, -4);
+                    bool exists = false;
+                    foreach (var p in _foodSources)
+                    {
+                        if (p.Type == FoodType.Plant && Vector2.Distance(p.Position, plantPos) < 20f)
+                        { exists = true; break; }
+                    }
+                    if (!exists)
+                        _foodSources.Add(new FoodSource(plantPos, FoodType.Plant, 0.4f));
+                }
+            }
+            
+            // Spawn 1-2 new plants at random ground positions
+            int count = _rng.Next(1, 3);
+            float left = _level.Bounds.Left;
+            float right = _level.Bounds.Right;
+            var tg = _level.TileGridInstance;
+            int ts = _level.TileGrid?.TileSize ?? 32;
+            
+            for (int i = 0; i < count; i++)
+            {
+                float x = left + (float)_rng.NextDouble() * (right - left);
+                float groundY = FindGroundY(tg, ts, x, _level.Bounds.Top, _level.Bounds.Bottom);
+                if (groundY < _level.Bounds.Bottom - 10)
+                {
+                    var pos = new Vector2(x, groundY - 4);
+                    bool tooClose = false;
+                    foreach (var f in _foodSources)
+                    {
+                        if (f.Type == FoodType.Plant && Vector2.Distance(f.Position, pos) < 40f)
+                        { tooClose = true; break; }
+                    }
+                    if (!tooClose)
+                        _foodSources.Add(new FoodSource(pos, FoodType.Plant, 0.3f));
+                }
+            }
+        }
 
         // Crawler-specific post-update: bombardier spray and latch-on
         foreach (var creature in _creatures)

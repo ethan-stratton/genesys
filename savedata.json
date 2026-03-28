@@ -1,12 +1,12 @@
 {
-  "currentLevel": "surface-east",
-  "spawnX": 1078,
-  "spawnY": 1080,
+  "currentLevel": "ship-interior",
+  "spawnX": 4736,
+  "spawnY": 6320,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 540.02893,
+  "playTime": 898.90796,
   "meleeInventory": [
     "Knife",
     "Torch"
@@ -44,10 +44,10 @@
   "shelterLevel": "",
   "shelterX": 0,
   "shelterY": 0,
-  "deathCount": 0,
-  "hp": 3,
+  "deathCount": 1,
+  "hp": 10,
   "suitIntegrity": 50,
-  "battery": 47.557735,
+  "battery": 40.557735,
   "bestiary": {
     "entries": {
       "skitter": {
@@ -71,9 +71,15 @@
             "weather": "clear",
             "behavior": "aggressive",
             "biome": "Surface East"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "fleeing",
+            "biome": "Surface East"
           }
         ],
-        "sightCount": 5,
+        "sightCount": 6,
         "scanTier": 0,
         "l2Scanned": true,
         "detailedRole": null,
@@ -112,9 +118,39 @@
             "weather": "clear",
             "behavior": "idle",
             "biome": "Surface East"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "aggressive",
+            "biome": "Ship Interior"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "fleeing",
+            "biome": "Surface East"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "aggressive",
+            "biome": "Surface East"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "foraging",
+            "biome": "Surface East"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "fleeing",
+            "biome": "Ship Interior"
           }
         ],
-        "sightCount": 7,
+        "sightCount": 14,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -141,9 +177,27 @@
             "weather": "clear",
             "behavior": "idle",
             "biome": "Surface East"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "aggressive",
+            "biome": "Ship Interior"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "fleeing",
+            "biome": "Surface East"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "idle",
+            "biome": "Ship Interior"
           }
         ],
-        "sightCount": 2,
+        "sightCount": 6,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -170,9 +224,15 @@
             "weather": "clear",
             "behavior": "idle",
             "biome": "Surface East"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "fleeing",
+            "biome": "Ship Interior"
           }
         ],
-        "sightCount": 2,
+        "sightCount": 6,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -193,9 +253,15 @@
             "weather": "clear",
             "behavior": "idle",
             "biome": "Surface East"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "aggressive",
+            "biome": "Surface East"
           }
         ],
-        "sightCount": 1,
+        "sightCount": 2,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -216,9 +282,44 @@
             "weather": "clear",
             "behavior": "aggressive",
             "biome": "Surface East"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "idle",
+            "biome": "Surface East"
           }
         ],
-        "sightCount": 1,
+        "sightCount": 3,
+        "scanTier": 0,
+        "l2Scanned": false,
+        "detailedRole": null,
+        "temperament": null,
+        "weaknesses": null,
+        "resistances": null,
+        "l3Scanned": false,
+        "loreText": null,
+        "thoughts": null,
+        "originalNature": null
+      },
+      "thornback": {
+        "speciesName": "thornback",
+        "classification": "defensive",
+        "observations": [
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "idle",
+            "biome": "Surface East"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "fleeing",
+            "biome": "Surface East"
+          }
+        ],
+        "sightCount": 2,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -232,7 +333,7 @@
       }
     }
   },
-  "worldTime": 9.868718,
+  "worldTime": 15.888943,
   "evolutionFlags": [],
   "cipherScanUnlocked": false,
   "hasLantern": true,

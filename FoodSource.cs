@@ -10,6 +10,7 @@ public enum FoodType
     Plant,     // organic vegetation — herbivores
     Corpse,    // dead creature — scavengers, predators
     Insect,    // small bugs — birds
+    FertileGround, // decomposed corpse → accelerates plant growth here
 }
 
 public class FoodSource
@@ -25,8 +26,8 @@ public class FoodSource
     public Color DrawColor;
     
     // Corpse-specific
-    public float DecayTimer;  // corpses decay over time
-    public float MaxDecayTime = 30f; // seconds before corpse disappears
+    public float DecayTimer;  // corpses: age counter (counts UP); fertile ground: age counter
+    public float SmellRadius = 200f; // how far creatures can detect this food
     
     public FoodSource(Vector2 pos, FoodType type, float nutrition = 0.5f)
     {
@@ -48,11 +49,20 @@ public class FoodSource
             case FoodType.Corpse:
                 Size = 8f;
                 DrawColor = new Color(140, 50, 50);
-                DecayTimer = MaxDecayTime;
+                DecayTimer = 0f; // age counter, counts UP
+                Nutrition = 0.6f;
+                SmellRadius = 200f;
                 break;
             case FoodType.Insect:
                 Size = 3f;
                 DrawColor = new Color(80, 70, 50);
+                break;
+            case FoodType.FertileGround:
+                Size = 10f;
+                DrawColor = new Color(80, 50, 30); // dark earth
+                Amount = 1f; // doesn't deplete
+                Nutrition = 0f;
+                DecayTimer = 0f; // counts up
                 break;
         }
     }
@@ -69,10 +79,20 @@ public class FoodSource
     {
         if (Type == FoodType.Corpse)
         {
-            DecayTimer -= dt;
-            if (DecayTimer <= 0) Amount = 0;
-            float fade = MathHelper.Clamp(DecayTimer / MaxDecayTime, 0f, 1f);
-            DrawColor = new Color((int)(140 * fade), (int)(50 * fade), (int)(50 * fade));
+            DecayTimer += dt; // now counts UP (age of corpse)
+            // Visual aging only — corpse persists until eaten
+            float age = DecayTimer;
+            float freshness = MathHelper.Clamp(1f - age / 600f, 0.3f, 1f); // darkens over 10 min, never below 30%
+            DrawColor = new Color((int)(140 * freshness), (int)(40 * freshness), (int)(40 * freshness));
+            // Older corpses are "smellier" — increase detection range
+            SmellRadius = 200f + MathHelper.Clamp(age / 2f, 0f, 600f); // 200px fresh → 800px at 10min
+        }
+        else if (Type == FoodType.FertileGround)
+        {
+            DecayTimer += dt;
+            if (DecayTimer > 120f) Amount = 0; // expire after 2 min
+            float life = MathHelper.Clamp(1f - DecayTimer / 120f, 0.2f, 1f);
+            DrawColor = new Color((int)(80 * life), (int)(60 * life), (int)(30 * life));
         }
     }
     
@@ -92,6 +112,9 @@ public class FoodSource
     
     public static bool CanEat(EcologicalRole role, FoodType food)
     {
+        // FertileGround is never eaten
+        if (food == FoodType.FertileGround) return false;
+        
         return (role, food) switch
         {
             (EcologicalRole.Herbivore, FoodType.Plant) => true,
