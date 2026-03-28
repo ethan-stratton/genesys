@@ -33,9 +33,11 @@ public class LevelData
     [JsonPropertyName("neighbors")] public NeighborData Neighbors { get; set; } = new();
     [JsonPropertyName("envRegions")] public EnvironmentRegion[] EnvRegions { get; set; } = Array.Empty<EnvironmentRegion>();
     [JsonPropertyName("tileGrid")] public TileGridData TileGrid { get; set; }
+    [JsonPropertyName("visualLayers")] public VisualTileLayerData[] VisualLayers { get; set; } = Array.Empty<VisualTileLayerData>();
     [JsonPropertyName("isUnderground")] public bool IsUnderground { get; set; }
 
     [JsonIgnore] public TileGrid TileGridInstance { get; set; }
+    [JsonIgnore] public List<VisualTileLayer> VisualTileLayerInstances { get; set; } = new();
 
     // Derived arrays (populated after load)
     [JsonIgnore] public Rectangle[] WallRects { get; private set; } = Array.Empty<Rectangle>();
@@ -144,6 +146,13 @@ public class LevelData
         if (TileGrid != null)
         {
             TileGridInstance = Genesis.TileGrid.FromData(TileGrid);
+        }
+        // Visual tile layers
+        VisualTileLayerInstances = new List<VisualTileLayer>();
+        if (VisualLayers != null)
+        {
+            foreach (var vld in VisualLayers)
+                VisualTileLayerInstances.Add(VisualTileLayer.FromData(vld));
         }
         if (TileGridInstance != null)
         {

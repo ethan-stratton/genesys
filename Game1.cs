@@ -711,7 +711,7 @@ public class Game1 : Game
     private const int MaxLatched = 4; // max crawlers latched at once
 
     // --- Editor state ---
-    private enum EditorTool { Rope = 0, Wall = 1, Spike = 2, Exit = 3, Spawn = 4, WallSpike = 5, OverworldExit = 6, TilePaint = 7, Enemy = 8, Item = 9, EnvRegion = 10 }
+    private enum EditorTool { Rope = 0, Wall = 1, Spike = 2, Exit = 3, Spawn = 4, WallSpike = 5, OverworldExit = 6, TilePaint = 7, Enemy = 8, Item = 9, EnvRegion = 10, VisualTile = 11 }
     // Wall climbSide values: 0=both, 1=right face, -1=left face, 99=no climb (solid only)
     private EditorTool _editorTool = EditorTool.TilePaint;
     private bool _toolPaletteOpen;
@@ -759,6 +759,16 @@ public class Game1 : Game
 
     // Entity delete undo stack (stores JSON snapshots of level arrays before deletion)
     private readonly List<(string type, int index, object data)> _entityUndoStack = new();
+
+    // Visual tile layer editor state
+    private Dictionary<string, Microsoft.Xna.Framework.Graphics.Texture2D> _tilesetTextures = new();
+    private int _visTileLayerIndex; // 0=bg, 1=mid, 2=fg
+    private readonly string[] _visTileLayerNames = { "bg", "mid", "fg" };
+    private int _visTileSelectedIndex = 1; // selected tile index from tileset
+    private bool _visTilePanelOpen; // tileset picker panel visible
+    private string[] _visTilesetFiles = Array.Empty<string>(); // discovered tileset PNGs
+    private int _visTilesetFileIndex; // which tileset is selected in picker
+    private int _visTilePanelScroll; // scroll offset in tileset panel
 
     // Enemy/item editor placement — accordion structure
     private static readonly (string category, string[] variants)[] EnemyCategories = {
@@ -6006,6 +6016,100 @@ public class Game1 : Game
             { _editorItemCursor = (_editorItemCursor + 1) % ItemTypes.Length; SetEditorStatus($"Item: {ItemTypes[_editorItemCursor]}"); }
         }
 
+        // Visual tile paint mode
+        if (_editorTool == EditorTool.VisualTile)
+        {
+            EnsureVisualTileLayers();
+            var layer = _level.VisualTileLayerInstances.Count > _visTileLayerIndex
+                ? _level.VisualTileLayerInstances[_visTileLayerIndex] : null;
+
+            // Tab cycles layers
+            if (kb.IsKeyDown(Keys.Tab) && _prevKb.IsKeyUp(Keys.Tab))
+            {
+                _visTileLayerIndex = (_visTileLayerIndex + 1) % _visTileLayerNames.Length;
+                SetEditorStatus($"Visual layer: {_visTileLayerNames[_visTileLayerIndex].ToUpper()}");
+            }
+
+            // V toggles tileset picker panel
+            if (kb.IsKeyDown(Keys.V) && _prevKb.IsKeyUp(Keys.V))
+            {
+                _visTilePanelOpen = !_visTilePanelOpen;
+                if (_visTilePanelOpen)
+                    _visTilesetFiles = DiscoverTilesetFiles();
+            }
+
+            // Handle tileset picker panel clicks (screen space)
+            if (_visTilePanelOpen && layer != null)
+            {
+                var ms = Mouse.GetState();
+                var tex = LoadTilesetTexture(layer.TilesetPath);
+
+                // Tileset file list on left side
+                int listX = 10, listY = 80, listLineH = 18;
+                int listW = 280;
+                if (ms.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released
+                    && ms.X >= listX && ms.X < listX + listW && ms.Y >= listY)
+                {
+                    int clickedIdx = (ms.Y - listY) / listLineH + _visTilePanelScroll;
+                    if (clickedIdx >= 0 && clickedIdx < _visTilesetFiles.Length)
+                    {
+                        _visTilesetFileIndex = clickedIdx;
+                        layer.TilesetPath = _visTilesetFiles[clickedIdx];
+                        SetEditorStatus($"Tileset: {layer.TilesetPath}");
+                    }
+                }
+
+                // Scroll tileset file list
+                if (ms.ScrollWheelValue != _prevMouse.ScrollWheelValue && ms.X < listX + listW)
+                {
+                    _visTilePanelScroll -= (ms.ScrollWheelValue - _prevMouse.ScrollWheelValue) / 120;
+                    _visTilePanelScroll = Math.Clamp(_visTilePanelScroll, 0, Math.Max(0, _visTilesetFiles.Length - 20));
+                }
+
+                // Tile picker grid on right side
+                if (tex != null)
+                {
+                    int ts = layer.TilesetTileSize > 0 ? layer.TilesetTileSize : 32;
+                    int cols = tex.Width / ts;
+                    int rows = tex.Height / ts;
+                    int pickerX = 300, pickerY = 80;
+                    float scale = Math.Min(1f, (float)(ViewW - pickerX - 10) / tex.Width);
+                    int dispTs = Math.Max(1, (int)(ts * scale));
+                    if (ms.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released
+                        && ms.X >= pickerX && ms.Y >= pickerY)
+                    {
+                        int tc = (ms.X - pickerX) / dispTs;
+                        int tr = (ms.Y - pickerY) / dispTs;
+                        if (tc >= 0 && tc < cols && tr >= 0 && tr < rows)
+                        {
+                            _visTileSelectedIndex = tr * cols + tc + 1; // 1-based
+                            SetEditorStatus($"Tile #{_visTileSelectedIndex}");
+                        }
+                    }
+                }
+            }
+
+            // Paint/erase with mouse (world space) — only when panel is closed
+            if (!_visTilePanelOpen && layer != null)
+            {
+                int ox = layer.OriginX, oy = layer.OriginY;
+                int tileSnappedX = ox + (int)MathF.Floor((worldMouse.X - ox) / (float)layer.TileSize) * layer.TileSize;
+                int tileSnappedY = oy + (int)MathF.Floor((worldMouse.Y - oy) / (float)layer.TileSize) * layer.TileSize;
+                var (col, row) = layer.WorldToTile(tileSnappedX, tileSnappedY);
+
+                if (mouse.LeftButton == ButtonState.Pressed && col >= 0 && col < layer.Width && row >= 0 && row < layer.Height)
+                {
+                    int oldTile = layer.GetTile(col, row);
+                    if (oldTile != _visTileSelectedIndex)
+                        layer.SetTile(col, row, _visTileSelectedIndex);
+                }
+                if (mouse.RightButton == ButtonState.Pressed && col >= 0 && col < layer.Width && row >= 0 && row < layer.Height)
+                {
+                    layer.SetTile(col, row, 0);
+                }
+            }
+        }
+
         // Continue to T-drag and other tools (no early return)
 
         // Right click, X+Left click, or Delete key — delete nearest object
@@ -7188,6 +7292,93 @@ public class Game1 : Game
         }
     }
 
+    private Microsoft.Xna.Framework.Graphics.Texture2D LoadTilesetTexture(string relativePath)
+    {
+        if (string.IsNullOrEmpty(relativePath)) return null;
+        if (_tilesetTextures.TryGetValue(relativePath, out var cached)) return cached;
+        string fullPath = System.IO.Path.Combine("Content", relativePath);
+        if (!System.IO.File.Exists(fullPath)) return null;
+        try
+        {
+            using var stream = System.IO.File.OpenRead(fullPath);
+            var texture = Microsoft.Xna.Framework.Graphics.Texture2D.FromStream(GraphicsDevice, stream);
+            _tilesetTextures[relativePath] = texture;
+            return texture;
+        }
+        catch { return null; }
+    }
+
+    private void EnsureVisualTileLayers()
+    {
+        if (_level == null || _level.TileGridInstance == null) return;
+        if (_level.VisualTileLayerInstances == null)
+            _level.VisualTileLayerInstances = new List<VisualTileLayer>();
+        var tg = _level.TileGridInstance;
+        foreach (var name in _visTileLayerNames)
+        {
+            if (!_level.VisualTileLayerInstances.Exists(l => l.Name == name))
+            {
+                _level.VisualTileLayerInstances.Add(VisualTileLayer.CreateEmpty(
+                    name, tg.Width, tg.Height, tg.TileSize, tg.OriginX, tg.OriginY));
+            }
+        }
+    }
+
+    private void DrawVisualTileLayers(string[] layerNames)
+    {
+        if (_level?.VisualTileLayerInstances == null) return;
+        var camInv = Matrix.Invert(_camera.TransformMatrix);
+        var tl = Vector2.Transform(Vector2.Zero, camInv);
+        var br = Vector2.Transform(new Vector2(ViewW, ViewH), camInv);
+
+        foreach (var layer in _level.VisualTileLayerInstances)
+        {
+            bool match = false;
+            foreach (var n in layerNames) { if (layer.Name == n) { match = true; break; } }
+            if (!match) continue;
+            var tex = LoadTilesetTexture(layer.TilesetPath);
+            if (tex == null) continue;
+
+            int ts = layer.TilesetTileSize;
+            if (ts <= 0) ts = 32;
+            int cols = tex.Width / ts;
+            if (cols <= 0) cols = 1;
+
+            int stx = Math.Max(0, ((int)tl.X - layer.OriginX) / layer.TileSize - 1);
+            int sty = Math.Max(0, ((int)tl.Y - layer.OriginY) / layer.TileSize - 1);
+            int etx = Math.Min(layer.Width, ((int)br.X - layer.OriginX) / layer.TileSize + 2);
+            int ety = Math.Min(layer.Height, ((int)br.Y - layer.OriginY) / layer.TileSize + 2);
+
+            for (int ty = sty; ty < ety; ty++)
+            {
+                for (int tx = stx; tx < etx; tx++)
+                {
+                    int idx = layer.GetTile(tx, ty);
+                    if (idx <= 0) continue;
+                    int srcIdx = idx - 1; // tile index 1 = first tile
+                    int srcX = (srcIdx % cols) * ts;
+                    int srcY = (srcIdx / cols) * ts;
+                    int wx = layer.OriginX + tx * layer.TileSize;
+                    int wy = layer.OriginY + ty * layer.TileSize;
+                    _spriteBatch.Draw(tex, new Rectangle(wx, wy, layer.TileSize, layer.TileSize),
+                        new Rectangle(srcX, srcY, ts, ts), Color.White);
+                }
+            }
+        }
+    }
+
+    private string[] DiscoverTilesetFiles()
+    {
+        string dir = "Content/tilesets";
+        if (!System.IO.Directory.Exists(dir)) return Array.Empty<string>();
+        var files = System.IO.Directory.GetFiles(dir, "*.png", System.IO.SearchOption.AllDirectories);
+        var result = new string[files.Length];
+        for (int i = 0; i < files.Length; i++)
+            result[i] = System.IO.Path.GetRelativePath("Content", files[i]).Replace('\\', '/');
+        Array.Sort(result);
+        return result;
+    }
+
     private void SaveLevel()
     {
         var dir = System.IO.Path.GetDirectoryName(_editorSaveFile);
@@ -7204,6 +7395,22 @@ public class Game1 : Game
         // Sync tile grid instance to serializable data
         if (_level.TileGridInstance != null)
             _level.TileGrid = _level.TileGridInstance.ToData();
+
+        // Sync visual tile layers to serializable data
+        if (_level.VisualTileLayerInstances != null && _level.VisualTileLayerInstances.Count > 0)
+        {
+            var layerDataList = new List<VisualTileLayerData>();
+            foreach (var vl in _level.VisualTileLayerInstances)
+            {
+                if (vl.HasAnyTiles())
+                    layerDataList.Add(vl.ToData());
+            }
+            _level.VisualLayers = layerDataList.ToArray();
+        }
+        else
+        {
+            _level.VisualLayers = Array.Empty<VisualTileLayerData>();
+        }
 
         var opts = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
         var json = System.Text.Json.JsonSerializer.Serialize(_level, opts);
@@ -7256,6 +7463,9 @@ public class Game1 : Game
         }
 
         // (tile grid drawn after walls — see below)
+
+        // Draw visual tile layers in editor (all layers, bg dimmed)
+        DrawVisualTileLayers(new[] { "bg", "mid", "fg" });
 
         // Draw spikes
         foreach (var s in _level.Spikes)
@@ -8040,6 +8250,7 @@ public class Game1 : Game
             EditorTool.Enemy => $"[=]Play [Q]Tools [Click]Place [[ ]]Type: {SelectedEnemyType}",
             EditorTool.Item => $"[=]Play [Q]Tools [Click]Place [[ ]]Type: {ItemTypes[_editorItemCursor]}",
             EditorTool.EnvRegion => "[=]Play [Q]Tools [Drag]Place [RClick]Del [F]Cycle Type",
+            EditorTool.VisualTile => $"[=]Play [Q]Tools [V]Tileset [Tab]Layer:{_visTileLayerNames[_visTileLayerIndex].ToUpper()} [Click]Paint [RClick]Erase",
             _ => "[=]Play [Esc]Menu [Q]Tile [E]Enemy [P]Item [Drag]Place [RClick]Del [Tab]Target [Ctrl+1-4]Time",
         };
         _spriteBatch.DrawString(_fontSmall, controlsHint, new Vector2(10, ViewH - 16), Color.Gray * 0.45f);
@@ -8069,13 +8280,73 @@ public class Game1 : Game
             }
         }
 
+        // Visual tile info and tileset picker panel
+        if (_editorTool == EditorTool.VisualTile)
+        {
+            string layerLabel = $"Layer: {_visTileLayerNames[_visTileLayerIndex].ToUpper()}  Tile: #{_visTileSelectedIndex}";
+            _spriteBatch.DrawString(_font, SafeText(layerLabel), new Vector2(ViewW - 300, 30), Color.Yellow);
+            if (!string.IsNullOrEmpty(_level.VisualTileLayerInstances?.Count > _visTileLayerIndex
+                ? _level.VisualTileLayerInstances[_visTileLayerIndex].TilesetPath : ""))
+            {
+                string tsPath = _level.VisualTileLayerInstances[_visTileLayerIndex].TilesetPath;
+                _spriteBatch.DrawString(_fontSmall, SafeText($"Tileset: {tsPath}"), new Vector2(ViewW - 300, 48), Color.Gray * 0.7f);
+            }
+
+            if (_visTilePanelOpen)
+            {
+                _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), Color.Black * 0.85f);
+                _spriteBatch.DrawString(_font, "TILESET PICKER  [V] Close  Click file → Click tile", new Vector2(10, 10), Color.White);
+
+                // File list (left)
+                int listX = 10, listY = 40, listLineH = 16;
+                for (int i = _visTilePanelScroll; i < Math.Min(_visTilesetFiles.Length, _visTilePanelScroll + 30); i++)
+                {
+                    bool sel = i == _visTilesetFileIndex;
+                    if (sel)
+                        _spriteBatch.Draw(_pixel, new Rectangle(listX, listY, 280, listLineH), Color.Yellow * 0.15f);
+                    string fn = _visTilesetFiles[i];
+                    if (fn.Length > 40) fn = "..." + fn.Substring(fn.Length - 37);
+                    _spriteBatch.DrawString(_fontSmall, SafeText(fn), new Vector2(listX + 2, listY), sel ? Color.Yellow : Color.Gray);
+                    listY += listLineH;
+                }
+
+                // Tileset preview (right)
+                var layer = _level.VisualTileLayerInstances?.Count > _visTileLayerIndex
+                    ? _level.VisualTileLayerInstances[_visTileLayerIndex] : null;
+                if (layer != null && !string.IsNullOrEmpty(layer.TilesetPath))
+                {
+                    var tex = LoadTilesetTexture(layer.TilesetPath);
+                    if (tex != null)
+                    {
+                        int ts = layer.TilesetTileSize > 0 ? layer.TilesetTileSize : 32;
+                        int cols = tex.Width / ts;
+                        int rows = tex.Height / ts;
+                        int pickerX = 300, pickerY = 40;
+                        float scale = Math.Min(2f, Math.Min((float)(ViewW - pickerX - 10) / tex.Width, (float)(ViewH - pickerY - 10) / tex.Height));
+                        int dispW = (int)(tex.Width * scale);
+                        int dispH = (int)(tex.Height * scale);
+                        _spriteBatch.Draw(tex, new Rectangle(pickerX, pickerY, dispW, dispH), Color.White);
+                        // Highlight selected tile
+                        int selIdx = _visTileSelectedIndex - 1;
+                        if (selIdx >= 0)
+                        {
+                            int selCol = selIdx % cols;
+                            int selRow = selIdx / cols;
+                            int dispTs = (int)(ts * scale);
+                            DrawHollowRect(pickerX + selCol * dispTs, pickerY + selRow * dispTs, dispTs, dispTs, Color.Yellow);
+                        }
+                    }
+                }
+            }
+        }
+
         // Tool palette overlay
         if (_toolPaletteOpen)
         {
             // Semi-transparent background
             _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), Color.Black * 0.7f);
 
-            string[] paletteNames = { "Solid Floor", "Platform", "Rope", "Wall", "Spike", "Exit", "Spawn", "Wall Spike", "Overworld Exit", "Ceiling", "Tile Paint", "Enemy (E)", "Item (P)", "Env Region" };
+            string[] paletteNames = { "Solid Floor", "Platform", "Rope", "Wall", "Spike", "Exit", "Spawn", "Wall Spike", "Overworld Exit", "Ceiling", "Tile Paint", "Enemy (E)", "Item (P)", "Env Region", "Visual Tile" };
             int paletteCount = paletteNames.Length;
             float palW = 260f;
             float palLineH = 24f;
@@ -11852,6 +12123,9 @@ public class Game1 : Game
 
         _spriteBatch.Begin(transformMatrix: _camera.TransformMatrix * shakeOff);
 
+        // Draw visual tile background layers (behind everything)
+        DrawVisualTileLayers(new[] { "bg" });
+
         int bL = _level.Bounds.Left;
         int bR = _level.Bounds.Right;
 
@@ -12581,6 +12855,9 @@ public class Game1 : Game
             }
         }
 
+        // Draw visual tile midground layers (behind player, in front of terrain)
+        DrawVisualTileLayers(new[] { "mid" });
+
         // Draw player
         if (!_isDead)
         {
@@ -12985,6 +13262,9 @@ public class Game1 : Game
         }
         
         // (Crosshair drawn after lighting overlay — see below)
+
+        // Draw visual tile foreground layers (in front of everything)
+        DrawVisualTileLayers(new[] { "fg" });
 
         _spriteBatch.End();
 
