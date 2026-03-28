@@ -71,6 +71,9 @@ public struct CreatureUpdateContext
     public float Temperature;      // 0-1
     public float WindStrength;     // 0-1
     public List<NoiseEvent> NoiseEvents;
+    public bool LanternActive;
+    public Vector2 LanternPos;     // player center when lantern is on
+    public float LanternRadius;    // 160px default
 }
 
 /// <summary>
@@ -460,5 +463,25 @@ public abstract class Creature
             }
         }
         return loudest;
+    }
+
+    /// <summary>
+    /// React to lantern light. Nocturnal creatures flee, some bugs are attracted.
+    /// Call from creature Update. Returns: -1 = flee, +1 = attracted, 0 = ignore.
+    /// </summary>
+    public int ReactToLantern(CreatureUpdateContext ctx)
+    {
+        if (!ctx.LanternActive) return 0;
+        float dist = Vector2.Distance(Position + new Vector2(CreatureWidth / 2f, CreatureHeight / 2f), ctx.LanternPos);
+        if (dist > ctx.LanternRadius * 1.5f) return 0;
+
+        if (IsNocturnal)
+        {
+            Needs.Safety = MathHelper.Clamp(Needs.Safety - 0.3f, 0f, 1f);
+            return -1; // flee
+        }
+        if (this is Crawler cr && (cr.Variant == CrawlerVariant.Skitter || cr.Variant == CrawlerVariant.Forager))
+            return 1; // attracted to light
+        return 0;
     }
 }

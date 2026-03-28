@@ -399,6 +399,19 @@ public class Crawler : Creature
         if (CurrentGoal == CreatureGoal.Flee && _prevGoal != CreatureGoal.Flee)
             PropagateStartle(this, ctx.NearbyCreatures);
 
+        // Lantern reaction
+        int lanternReaction = ReactToLantern(ctx);
+        if (lanternReaction == 1) // attracted to light
+        {
+            float ldx = ctx.LanternPos.X - (Position.X + EffectiveWidth / 2f);
+            if (MathF.Abs(ldx) > 10f) Dir = ldx > 0 ? 1 : -1;
+        }
+        else if (lanternReaction == -1) // nocturnal — flee light
+        {
+            float ldx = ctx.LanternPos.X - (Position.X + EffectiveWidth / 2f);
+            Dir = ldx > 0 ? -1 : 1;
+        }
+
         float fleeSpeedBoost = CurrentGoal == CreatureGoal.Flee ? 1.3f : 1f;
 
         // Burrowing behavior
@@ -600,6 +613,9 @@ public class Crawler : Creature
             {
                 // Skitter: run away from player at high speed
                 _bugState = BugState.Fleeing;
+                if (BurrowProgress > 0) { Velocity.X = 0; } // burrowing — don't move
+                else
+                {
                 if (fleeing) Dir = dx > 0 ? -1 : 1; // update direction only while player is near
                 float fleeSpeed = ChaseSpeed * 2f; // much faster flee
                 Velocity.X = Dir * fleeSpeed;
@@ -611,6 +627,7 @@ public class Crawler : Creature
                     _bugStateTimer = 0.5f + (float)_rng.NextDouble() * 1f;
                     Velocity.X = 0;
                 }
+                } // end burrowing else
             }
             else if (Aggroed)
             {
@@ -770,8 +787,8 @@ public class Crawler : Creature
             {
                 if (CurrentGoal == CreatureGoal.Flee)
                 {
-                    if (CanBurrow && !IsBurrowed) { CurrentGoal = CreatureGoal.Rest; BurrowProgress = 0.3f; }
-                    else Dir = -Dir;
+                    if (CanBurrow && !IsBurrowed) { CurrentGoal = CreatureGoal.Rest; BurrowProgress = 0.3f; Velocity.X = 0; }
+                    else { Dir = -Dir; Needs.Safety = MathHelper.Clamp(Needs.Safety + 0.3f, 0f, 1f); }
                 }
                 else Dir = -Dir;
             }

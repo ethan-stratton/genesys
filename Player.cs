@@ -1912,7 +1912,7 @@ public class Player
                 float t = 1f - (_slideTimer / SlideDuration);
                 float speed = MathHelper.Lerp(SlideStartSpeed, SlideEndSpeed, t);
                 vel.X = _slideDir * speed;
-                vel.Y = 0;
+                if (_wasGrounded) vel.Y = 0; // only zero Y if on ground — allow gravity in air
                 if (_slideTimer <= 0)
                 {
                     // Check if there's headroom to stand up

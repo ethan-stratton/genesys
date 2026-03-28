@@ -3226,6 +3226,9 @@ public class Game1 : Game
             Temperature = _weather.Temperature,
             WindStrength = _weather.WindStrength,
             NoiseEvents = _noiseEvents,
+            LanternActive = _lanternActive && _player.Battery > 0,
+            LanternPos = playerCenter2,
+            LanternRadius = 160f,
         };
 
         // Crawler-specific pre-update: latch behavior and bombardier spray

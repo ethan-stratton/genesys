@@ -100,6 +100,14 @@ public class Scavenger : Creature
         if (CurrentGoal == CreatureGoal.Flee && _prevGoal != CreatureGoal.Flee)
             PropagateStartle(this, ctx.NearbyCreatures);
 
+        // Lantern reaction — scavengers are nocturnal, flee light
+        int lanternReaction = ReactToLantern(ctx);
+        if (lanternReaction == -1)
+        {
+            float ldx = ctx.LanternPos.X - (Position.X + Width / 2f);
+            _dir = ldx > 0 ? -1 : 1;
+        }
+
         float fleeSpeedBoost = CurrentGoal == CreatureGoal.Flee ? 1.3f : 1f;
 
         // Burrowing
@@ -173,8 +181,8 @@ public class Scavenger : Creature
             {
                 if (CurrentGoal == CreatureGoal.Flee)
                 {
-                    if (CanBurrow && !IsBurrowed) { CurrentGoal = CreatureGoal.Rest; BurrowProgress = 0.3f; }
-                    else _dir = -_dir;
+                    if (CanBurrow && !IsBurrowed) { CurrentGoal = CreatureGoal.Rest; BurrowProgress = 0.3f; Velocity.X = 0; }
+                    else { _dir = -_dir; Needs.Safety = MathHelper.Clamp(Needs.Safety + 0.3f, 0f, 1f); }
                 }
                 else _dir = -_dir;
             }

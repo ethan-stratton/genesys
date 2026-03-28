@@ -1,12 +1,12 @@
 {
   "currentLevel": "surface-east",
-  "spawnX": 876.09894,
-  "spawnY": 1016,
+  "spawnX": 707.83765,
+  "spawnY": 952,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 1083.3127,
+  "playTime": 1216.851,
   "meleeInventory": [
     "Knife",
     "Torch"
@@ -47,7 +47,7 @@
   "deathCount": 1,
   "hp": 10,
   "suitIntegrity": 50,
-  "battery": 40.557735,
+  "battery": 37.673786,
   "bestiary": {
     "entries": {
       "skitter": {
@@ -89,9 +89,15 @@
             "weather": "clear",
             "behavior": "idle",
             "biome": "Surface East"
+          },
+          {
+            "time": "night",
+            "weather": "clear",
+            "behavior": "idle",
+            "biome": "Surface East"
           }
         ],
-        "sightCount": 8,
+        "sightCount": 9,
         "scanTier": 0,
         "l2Scanned": true,
         "detailedRole": null,
@@ -168,7 +174,7 @@
             "biome": "Surface East"
           }
         ],
-        "sightCount": 19,
+        "sightCount": 23,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -225,9 +231,15 @@
             "weather": "clear",
             "behavior": "moving",
             "biome": "Surface East"
+          },
+          {
+            "time": "night",
+            "weather": "clear",
+            "behavior": "moving",
+            "biome": "Surface East"
           }
         ],
-        "sightCount": 8,
+        "sightCount": 9,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -266,9 +278,21 @@
             "weather": "clear",
             "behavior": "idle",
             "biome": "Surface East"
+          },
+          {
+            "time": "night",
+            "weather": "clear",
+            "behavior": "fleeing",
+            "biome": "Surface East"
+          },
+          {
+            "time": "night",
+            "weather": "clear",
+            "behavior": "aggressive",
+            "biome": "Ship Interior"
           }
         ],
-        "sightCount": 10,
+        "sightCount": 13,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -301,9 +325,15 @@
             "weather": "clear",
             "behavior": "idle",
             "biome": "Surface East"
+          },
+          {
+            "time": "night",
+            "weather": "clear",
+            "behavior": "idle",
+            "biome": "Surface East"
           }
         ],
-        "sightCount": 4,
+        "sightCount": 9,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -382,9 +412,15 @@
             "weather": "clear",
             "behavior": "idle",
             "biome": "Surface East"
+          },
+          {
+            "time": "night",
+            "weather": "clear",
+            "behavior": "idle",
+            "biome": "Surface East"
           }
         ],
-        "sightCount": 1,
+        "sightCount": 4,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -398,7 +434,7 @@
       }
     }
   },
-  "worldTime": 18.982674,
+  "worldTime": 21.206837,
   "evolutionFlags": [],
   "cipherScanUnlocked": false,
   "hasLantern": true,

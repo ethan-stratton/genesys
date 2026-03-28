@@ -205,8 +205,8 @@ public class Hopper : Creature
             {
                 if (CurrentGoal == CreatureGoal.Flee)
                 {
-                    if (CanBurrow && !IsBurrowed) { CurrentGoal = CreatureGoal.Rest; BurrowProgress = 0.3f; }
-                    else _dir = -_dir;
+                    if (CanBurrow && !IsBurrowed) { CurrentGoal = CreatureGoal.Rest; BurrowProgress = 0.3f; Velocity.X = 0; }
+                    else { _dir = -_dir; Needs.Safety = MathHelper.Clamp(Needs.Safety + 0.3f, 0f, 1f); }
                 }
                 else _dir = -_dir;
             }
@@ -240,7 +240,7 @@ public class Hopper : Creature
         }
 
         float dx = playerCenter.X - (Position.X + Width / 2f);
-        if (MathF.Abs(dx) > 4f)
+        if (Aggroed && MathF.Abs(dx) > 4f)
             _dir = dx > 0 ? 1 : -1;
 
         switch (_state)

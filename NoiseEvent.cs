@@ -39,7 +39,8 @@ public class NoiseEvent
     {
         if (Expired || font == null) return;
         float alpha = MathHelper.Clamp(Timer / MaxTimer, 0f, 1f);
-        var drawPos = Position + new Vector2(0, YOffset) - cameraOffset;
+        // Don't subtract cameraOffset — SpriteBatch already applies camera transform
+        var drawPos = Position + new Vector2(0, YOffset);
         var color = TextColor * alpha;
         var size = font.MeasureString(Label);
         sb.DrawString(font, Label, drawPos - size / 2f, color);
