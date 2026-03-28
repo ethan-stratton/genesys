@@ -675,6 +675,7 @@ public class Game1 : Game
     private WeaponType _rightHand2 = WeaponType.None; // R2 - backup right
     private WeaponType _leftHand1 = WeaponType.None;  // L1 - active left
     private WeaponType _leftHand2 = WeaponType.None;  // L2 - backup left
+    private int _durR1, _durR2, _durL1, _durL2; // per-slot weapon durability
     private bool _rightActiveSlot1 = true;  // true = R1 active, false = R2 active
     private bool _leftActiveSlot1 = true;   // true = L1 active, false = L2 active
 
@@ -2785,6 +2786,17 @@ public class Game1 : Game
                     Color = new Color(160, 140, 120),
                     Size = 1 + _rng.Next(2)
                 });
+                // Thruster exhaust — blue-white particles behind feet
+                _particles.Add(new Particle
+                {
+                    Position = new Vector2(px - _player.FacingDir * 4 + (float)(_rng.NextDouble() * 6 - 3), py + 2),
+                    Velocity = new Vector2(-_player.FacingDir * (40f + (float)_rng.NextDouble() * 20f), -5f - (float)_rng.NextDouble() * 10f),
+                    Life = 0.15f + (float)_rng.NextDouble() * 0.1f,
+                    MaxLife = 0.25f,
+                    Color = new Color(180, 220, 255),
+                    Size = 1 + _rng.Next(1)
+                });
+                EveAlertOnce("Thruster assist engaged. Monitoring battery drain.", 3f);
             }
             
             // Landing puff
@@ -3462,6 +3474,7 @@ public class Game1 : Game
                 int prevHp = creature.Hp;
                 var ws = WeaponStats.Get(_player.CurrentWeapon);
                 int dmg = finisher ? ws.FinisherDamage : ws.Damage;
+                dmg = (int)Math.Max(1, dmg * creature.GetDamageMultiplier(ws.DType));
                 // Use species-specific scan name (crawler dummies use "dummy")
                 string scanName = creature is Crawler cs
                     ? (cs.IsDummy ? "dummy" : cs.Variant.ToString().ToLower())
@@ -3495,6 +3508,41 @@ public class Game1 : Game
                     {
                         if (_hitStopEnabled) _hitStopTimer = ws.HitStopNormal;
                         if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration; _shakeIntensity = ws.ShakeIntensity * 0.8f; }
+                    }
+
+                    // Durability decrement
+                    if (_player.CurrentWeapon != WeaponType.None)
+                    {
+                        bool isRight = _player.CurrentWeapon == ActiveRight;
+                        bool isLeft = _player.CurrentWeapon == ActiveLeft;
+                        if (isRight)
+                        {
+                            ref int dur = ref (_rightActiveSlot1 ? ref _durR1 : ref _durR2);
+                            dur--;
+                            if (dur <= 0)
+                            {
+                                dur = 0;
+                                if (_rightActiveSlot1) _rightHand1 = WeaponType.None; else _rightHand2 = WeaponType.None;
+                                var bp = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
+                                for (int bi = 0; bi < 8; bi++)
+                                    _particles.Add(new Particle { Position = bp, Velocity = new Vector2((float)(_rng.NextDouble() * 100 - 50), (float)(_rng.NextDouble() * -80)), Life = 0.4f, MaxLife = 0.4f, Color = new Color(200, 180, 140), Size = 2 });
+                                EveAlertOnce("Weapon broken. It couldn't take any more.", 3f);
+                            }
+                        }
+                        else if (isLeft)
+                        {
+                            ref int dur = ref (_leftActiveSlot1 ? ref _durL1 : ref _durL2);
+                            dur--;
+                            if (dur <= 0)
+                            {
+                                dur = 0;
+                                if (_leftActiveSlot1) _leftHand1 = WeaponType.None; else _leftHand2 = WeaponType.None;
+                                var bp = _player.Position + new Vector2(Player.Width / 2f, Player.Height / 2f);
+                                for (int bi = 0; bi < 8; bi++)
+                                    _particles.Add(new Particle { Position = bp, Velocity = new Vector2((float)(_rng.NextDouble() * 100 - 50), (float)(_rng.NextDouble() * -80)), Life = 0.4f, MaxLife = 0.4f, Color = new Color(200, 180, 140), Size = 2 });
+                                EveAlertOnce("Weapon broken. It couldn't take any more.", 3f);
+                            }
+                        }
                     }
                 }
             }
@@ -5079,23 +5127,23 @@ public class Game1 : Game
         // Auto-equip to first empty hand slot
         if ((_rightActiveSlot1 ? _rightHand1 : _rightHand2) == WeaponType.None)
         {
-            if (_rightActiveSlot1) _rightHand1 = w;
-            else _rightHand2 = w;
+            if (_rightActiveSlot1) { _rightHand1 = w; _durR1 = WeaponStats.Get(w).MaxDurability; }
+            else { _rightHand2 = w; _durR2 = WeaponStats.Get(w).MaxDurability; }
         }
         else if ((_leftActiveSlot1 ? _leftHand1 : _leftHand2) == WeaponType.None)
         {
-            if (_leftActiveSlot1) _leftHand1 = w;
-            else _leftHand2 = w;
+            if (_leftActiveSlot1) { _leftHand1 = w; _durL1 = WeaponStats.Get(w).MaxDurability; }
+            else { _leftHand2 = w; _durL2 = WeaponStats.Get(w).MaxDurability; }
         }
         else if ((!_rightActiveSlot1 ? _rightHand1 : _rightHand2) == WeaponType.None)
         {
-            if (!_rightActiveSlot1) _rightHand1 = w;
-            else _rightHand2 = w;
+            if (!_rightActiveSlot1) { _rightHand1 = w; _durR1 = WeaponStats.Get(w).MaxDurability; }
+            else { _rightHand2 = w; _durR2 = WeaponStats.Get(w).MaxDurability; }
         }
         else if ((!_leftActiveSlot1 ? _leftHand1 : _leftHand2) == WeaponType.None)
         {
-            if (!_leftActiveSlot1) _leftHand1 = w;
-            else _leftHand2 = w;
+            if (!_leftActiveSlot1) { _leftHand1 = w; _durL1 = WeaponStats.Get(w).MaxDurability; }
+            else { _leftHand2 = w; _durL2 = WeaponStats.Get(w).MaxDurability; }
         }
         // else just in inventory, player equips manually
     }
@@ -5125,6 +5173,10 @@ public class Game1 : Game
         _rightHand2 = Enum.TryParse<WeaponType>(_saveData.RightHand2, out var rh2) ? rh2 : WeaponType.None;
         _leftHand1 = Enum.TryParse<WeaponType>(_saveData.LeftHand1, out var lh1) ? lh1 : WeaponType.None;
         _leftHand2 = Enum.TryParse<WeaponType>(_saveData.LeftHand2, out var lh2) ? lh2 : WeaponType.None;
+        _durR1 = _saveData.DurR1;
+        _durR2 = _saveData.DurR2;
+        _durL1 = _saveData.DurL1;
+        _durL2 = _saveData.DurL2;
         _rightActiveSlot1 = _saveData.RightActiveSlot1;
         _leftActiveSlot1 = _saveData.LeftActiveSlot1;
     }
@@ -6726,6 +6778,10 @@ public class Game1 : Game
         _saveData.Hp = _player.Hp;
         _saveData.SuitIntegrity = _player.SuitIntegrity;
         _saveData.Battery = _player.Battery;
+        _saveData.DurR1 = _durR1;
+        _saveData.DurR2 = _durR2;
+        _saveData.DurL1 = _durL1;
+        _saveData.DurL2 = _durL2;
         _saveData.Bestiary = _bestiary;
         _saveData.EvolutionFlags = _evolutionFlags;
         _saveData.CipherScanUnlocked = _cipherScanUnlocked;
@@ -8305,10 +8361,10 @@ public class Game1 : Game
                     if (_leftHand2 == chosen) _leftHand2 = WeaponType.None;
                 }
                 // Assign to current slot
-                if (_equipCursorX == 0 && _equipCursorY == 0) _leftHand1 = chosen;
-                else if (_equipCursorX == 0 && _equipCursorY == 1) _leftHand2 = chosen;
-                else if (_equipCursorX == 2 && _equipCursorY == 0) _rightHand1 = chosen;
-                else if (_equipCursorX == 2 && _equipCursorY == 1) _rightHand2 = chosen;
+                if (_equipCursorX == 0 && _equipCursorY == 0) { _leftHand1 = chosen; _durL1 = WeaponStats.Get(chosen).MaxDurability; }
+                else if (_equipCursorX == 0 && _equipCursorY == 1) { _leftHand2 = chosen; _durL2 = WeaponStats.Get(chosen).MaxDurability; }
+                else if (_equipCursorX == 2 && _equipCursorY == 0) { _rightHand1 = chosen; _durR1 = WeaponStats.Get(chosen).MaxDurability; }
+                else if (_equipCursorX == 2 && _equipCursorY == 1) { _rightHand2 = chosen; _durR2 = WeaponStats.Get(chosen).MaxDurability; }
                 _equipPickerOpen = false;
             }
             return;
@@ -8690,6 +8746,13 @@ public class Game1 : Game
         StatLine("Knockback:", $"{ws.KnockbackForce:F0}");
         StatLine("Weight:", $"{ws.Weight:P0}");
         StatLine("Type:", ws.IsRanged ? "Ranged" : "Melee");
+        // Durability display
+        int selDur = 0, selMaxDur = ws.MaxDurability;
+        if (_equipCursorX == 0 && _equipCursorY == 0) selDur = _durL1;
+        else if (_equipCursorX == 0 && _equipCursorY == 1) selDur = _durL2;
+        else if (_equipCursorX == 2 && _equipCursorY == 0) selDur = _durR1;
+        else if (_equipCursorX == 2 && _equipCursorY == 1) selDur = _durR2;
+        if (selMaxDur > 0) StatLine("Durability:", $"{selDur}/{selMaxDur}");
         if (ws.IsRanged && selWeapon == WeaponType.Gun)
         {
             ty += 4;
@@ -13182,6 +13245,24 @@ public class Game1 : Game
 
                 DrawOutlinedString(_font, $"R: {rName}{rAmmo}", new Vector2(10, ViewH - 36), rColor);
                 DrawOutlinedString(_font, $"L: {lName}{lAmmo}", new Vector2(10, ViewH - 18), lColor);
+
+                // Durability bars under weapon names
+                int durR = _rightActiveSlot1 ? _durR1 : _durR2;
+                int maxDurR = ActiveRight != WeaponType.None ? WeaponStats.Get(ActiveRight).MaxDurability : 0;
+                int durL = _leftActiveSlot1 ? _durL1 : _durL2;
+                int maxDurL = ActiveLeft != WeaponType.None ? WeaponStats.Get(ActiveLeft).MaxDurability : 0;
+                if (maxDurR > 0)
+                {
+                    float pctR = (float)durR / maxDurR;
+                    var durColor = pctR > 0.5f ? new Color(80, 200, 80) : pctR > 0.2f ? new Color(200, 200, 40) : new Color(200, 60, 60);
+                    _spriteBatch.Draw(_pixel, new Rectangle(10, ViewH - 40, (int)(40 * pctR), 2), durColor * 0.8f);
+                }
+                if (maxDurL > 0)
+                {
+                    float pctL = (float)durL / maxDurL;
+                    var durColor = pctL > 0.5f ? new Color(80, 200, 80) : pctL > 0.2f ? new Color(200, 200, 40) : new Color(200, 60, 60);
+                    _spriteBatch.Draw(_pixel, new Rectangle(10, ViewH - 22, (int)(40 * pctL), 2), durColor * 0.8f);
+                }
             }
 
             // Sidearm detail HUD (bottom-right, only when gun equipped)

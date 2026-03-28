@@ -49,6 +49,10 @@ public class SaveData
     [JsonPropertyName("hasCipherHelmet")] public bool HasCipherHelmet { get; set; } = false;
     [JsonPropertyName("cipherHelmetEquipped")] public bool CipherHelmetEquipped { get; set; } = false;
     [JsonPropertyName("torchFuel")] public float TorchFuel { get; set; } = 100f;
+    [JsonPropertyName("durR1")] public int DurR1 { get; set; }
+    [JsonPropertyName("durR2")] public int DurR2 { get; set; }
+    [JsonPropertyName("durL1")] public int DurL1 { get; set; }
+    [JsonPropertyName("durL2")] public int DurL2 { get; set; }
 
     public void Save()
     {

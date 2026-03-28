@@ -1982,7 +1982,18 @@ public class Player
             // Sprint: dash transitions into sprint (hold direction after dash ends)
             if (IsSprinting && IsGrounded && inputX == _sprintDir)
             {
-                moveSpeed *= SprintMaxSpeedMult;
+                // Battery drain while sprinting
+                Battery -= 1.5f * dt;
+                if (Battery <= 0f)
+                {
+                    Battery = 0f;
+                    IsSprinting = false;
+                    CancelDash();
+                }
+                else
+                {
+                    moveSpeed *= SprintMaxSpeedMult;
+                }
             }
             else
             {

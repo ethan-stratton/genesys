@@ -125,6 +125,8 @@ public abstract class Creature
     // --- Combat ---
     /// <summary>Contact damage to player (0 = no contact damage). Override per species.</summary>
     public virtual int ContactDamage => 0;
+    /// <summary>Damage type multiplier. Override per species for resistances/weaknesses.</summary>
+    public virtual float GetDamageMultiplier(DamageType type) => 1f;
     /// <summary>Whether this creature does contact damage to player on touch</summary>
     public virtual bool DoesContactDamage => ContactDamage > 0;
     /// <summary>Damage cooldown tracking for contact damage</summary>

@@ -12,6 +12,14 @@ public class Thornback : Creature
 
     public override int ContactDamage => 2;
 
+    public override float GetDamageMultiplier(DamageType type) => type switch
+    {
+        DamageType.Slash => 0.5f,
+        DamageType.Blunt => 1.5f,
+        DamageType.Pierce => 0.75f,
+        _ => 1f,
+    };
+
     public Thornback(Vector2 pos)
     {
         Position = pos;
