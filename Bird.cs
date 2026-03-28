@@ -90,6 +90,7 @@ public class Bird : Creature
 
     public override void Update(float dt, CreatureUpdateContext ctx)
     {
+        TickDirCooldown(dt);
         var playerPos = ctx.PlayerCenter;
         var tileGrid = ctx.TileGrid;
         var tileSize = ctx.TileSize;
@@ -126,7 +127,7 @@ public class Bird : Creature
         var (creatureThreat, creatureThreatDist, _, _) = ScanCreatures(ctx.NearbyCreatures, 120f, 0f);
         if (creatureThreat != null && creatureThreatDist < 80f)
         {
-            Dir = creatureThreat.Position.X > Position.X ? -1 : 1;
+            TrySetDir(creatureThreat.Position.X > Position.X ? -1 : 1);
             Needs.Safety = Math.Min(Needs.Safety, 0.05f);
             CurrentGoal = SelectGoal();
         }
@@ -136,7 +137,7 @@ public class Bird : Creature
         if (noise != null)
         {
             Needs.Safety = Math.Min(Needs.Safety, 1f - noise.Intensity);
-            Dir = noise.Position.X > Position.X ? -1 : 1;
+            TrySetDir(noise.Position.X > Position.X ? -1 : 1);
         }
 
         // Startle propagation
@@ -161,7 +162,7 @@ public class Bird : Creature
                 }
                 else
                 {
-                    Dir = food.Position.X > Position.X ? 1 : -1;
+                    TrySetDir(food.Position.X > Position.X ? 1 : -1);
                 }
             }
         }

@@ -101,6 +101,20 @@ public abstract class Creature
     public Vector2 Position;
     public Vector2 Velocity;
     public int Dir = 1; // facing direction: 1 = right, -1 = left
+    
+    // Direction change cooldown — prevents spazzy flip-flopping
+    private float _dirChangeCooldown;
+    private const float DirChangeCooldownTime = 0.3f; // can't flip more than ~3x/sec
+    /// <summary>Set Dir with anti-flip cooldown. Force=true bypasses cooldown (wall collision).</summary>
+    protected bool TrySetDir(int dir, bool force = false)
+    {
+        if (dir == Dir) return true; // already facing this way
+        if (!force && _dirChangeCooldown > 0) return false; // on cooldown
+        Dir = dir;
+        _dirChangeCooldown = DirChangeCooldownTime;
+        return true;
+    }
+    public void TickDirCooldown(float dt) { if (_dirChangeCooldown > 0) _dirChangeCooldown -= dt; }
 
     // --- Health ---
     public bool Alive = true;

@@ -3939,15 +3939,8 @@ public class Game1 : Game
         _playerWasGrappleFiring = _player.IsGrappleFiring;
 
         // Segmented suit regen — slowly repairs to next 25% mark (disabled in hazard zones)
-        if (_player.SuitIntegrity < 100f && _currentEnvType == "neutral")
-        {
-            float nextMark = MathF.Ceiling(_player.SuitIntegrity / 25f) * 25f;
-            if (nextMark > _player.SuitIntegrity)
-            {
-                float regenRate = 1.5f; // % per second
-                _player.SuitIntegrity = MathF.Min(nextMark, _player.SuitIntegrity + regenRate * dt);
-            }
-        }
+        // Suit integrity does NOT auto-regen. It's a long-term resource
+        // that degrades over time. Repair requires crafting/EVE assistance.
 
         // Suit spark particles when integrity is low
         if (_player.SuitIntegrity < 25f)

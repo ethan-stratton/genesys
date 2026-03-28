@@ -117,6 +117,7 @@ public class Wingbeater : Creature
 
     public override void Update(float dt, CreatureUpdateContext ctx)
     {
+        TickDirCooldown(dt);
         var playerPos = ctx.PlayerCenter;
         var floorY = ctx.LevelBottom;
         if (!Alive) return;
@@ -149,7 +150,7 @@ public class Wingbeater : Creature
         if (CurrentGoal == CreatureGoal.Eat && wbPrey != null && wbPreyDist < 500f && _huntCooldown <= 0 && WillHunt(wbPrey))
         {
             _huntTarget = wbPrey;
-            Dir = wbPrey.Position.X > Position.X ? 1 : -1;
+            TrySetDir(wbPrey.Position.X > Position.X ? 1 : -1);
         }
         else if (_huntTarget != null && (!_huntTarget.Alive || Vector2.Distance(Position, _huntTarget.Position) > 600f))
         {
@@ -174,13 +175,13 @@ public class Wingbeater : Creature
             {
                 // Loud noise — flee away from source
                 Needs.Safety = Math.Min(Needs.Safety, 0.15f);
-                Dir = noise.Position.X > Position.X ? -1 : 1; // flee AWAY
+                TrySetDir(noise.Position.X > Position.X ? -1 : 1); // flee AWAY
                 _isPerched = false; // take off if perched
             }
             else if (Role is EcologicalRole.Predator or EcologicalRole.Apex)
             {
                 if (Needs.Hunger > 0.5f && CurrentGoal != CreatureGoal.Flee)
-                    Dir = noise.Position.X > Position.X ? 1 : -1;
+                    TrySetDir(noise.Position.X > Position.X ? 1 : -1);
             }
         }
 
@@ -226,7 +227,7 @@ public class Wingbeater : Creature
                 }
                 else
                 {
-                    Dir = food.Position.X > Position.X ? 1 : -1;
+                    TrySetDir(food.Position.X > Position.X ? 1 : -1);
                 }
             }
         }

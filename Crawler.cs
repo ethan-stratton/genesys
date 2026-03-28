@@ -296,6 +296,7 @@ public class Crawler : Creature
         var tileGrid = ctx.TileGrid;
         var tileSize = ctx.TileSize;
         var levelBottom = ctx.LevelBottom;
+        TickDirCooldown(dt);
         // Cache tile grid for LOS checks
         if (tileGrid != null) { _tileGridRef = tileGrid; _tileSizeRef = tileSize; _hasTileGridRef = true; }
         
@@ -358,12 +359,12 @@ public class Crawler : Creature
         {
             case CrawlerVariant.Forager:
                 if (threat != null && threatDist < 80f)
-                    Dir = threat.Position.X > Position.X ? -1 : 1;
+                    TrySetDir(threat.Position.X > Position.X ? -1 : 1);
                 break;
             case CrawlerVariant.Skitter:
                 if (threat != null && threatDist < 120f)
                 {
-                    Dir = threat.Position.X > Position.X ? -1 : 1;
+                    TrySetDir(threat.Position.X > Position.X ? -1 : 1);
                     Needs.Safety = Math.Min(Needs.Safety, 0.1f);
                 }
                 break;
@@ -373,7 +374,7 @@ public class Crawler : Creature
                 if (CurrentGoal == CreatureGoal.Eat && prey != null && preyDist < 300f)
                 {
                     _huntTarget = prey;
-                    Dir = prey.Position.X > Position.X ? 1 : -1;
+                    TrySetDir(prey.Position.X > Position.X ? 1 : -1);
                 }
                 else
                 {
@@ -407,12 +408,12 @@ public class Crawler : Creature
             if (Role is EcologicalRole.Herbivore or EcologicalRole.Flighty or EcologicalRole.Scavenger)
             {
                 Needs.Safety = Math.Min(Needs.Safety, 1f - noise.Intensity);
-                Dir = noise.Position.X > Position.X ? -1 : 1;
+                TrySetDir(noise.Position.X > Position.X ? -1 : 1);
             }
             else if (Role is EcologicalRole.Predator or EcologicalRole.Apex)
             {
                 if (Needs.Hunger > 0.5f && CurrentGoal != CreatureGoal.Flee)
-                    Dir = noise.Position.X > Position.X ? 1 : -1;
+                    TrySetDir(noise.Position.X > Position.X ? 1 : -1);
             }
         }
 
@@ -474,7 +475,7 @@ public class Crawler : Creature
                 }
                 else
                 {
-                    Dir = food.Position.X > Position.X ? 1 : -1;
+                    TrySetDir(food.Position.X > Position.X ? 1 : -1);
                 }
             }
         }
@@ -584,7 +585,7 @@ public class Crawler : Creature
             {
                 _bugState = BugState.Swarming;
                 float sdx = SwarmTargetX.Value - (Position.X + Width / 2f);
-                Dir = sdx > 0 ? 1 : -1;
+                TrySetDir(sdx > 0 ? 1 : -1);
 
                 // Variant-specific swarm behavior
                 float swarmSpd, swarmJF, swarmJH;
@@ -646,7 +647,7 @@ public class Crawler : Creature
                 if (BurrowProgress > 0) { Velocity.X = 0; } // burrowing — don't move
                 else
                 {
-                if (fleeing) Dir = dx > 0 ? -1 : 1; // update direction only while player is near
+                if (fleeing) TrySetDir(dx > 0 ? -1 : 1); // update direction only while player is near
                 float fleeSpeed = ChaseSpeed * 2f; // much faster flee
                 Velocity.X = Dir * fleeSpeed;
                 _fleeTimer -= dt;
@@ -663,7 +664,7 @@ public class Crawler : Creature
             else if (Aggroed)
             {
                 _bugState = BugState.Chasing;
-                Dir = dx > 0 ? 1 : -1;
+                TrySetDir(dx > 0 ? 1 : -1);
                 Velocity.X = Dir * ChaseSpeed;
 
                 // Chase jump
@@ -839,13 +840,13 @@ public class Crawler : Creature
                     if (CanBurrow && !IsBurrowed) { CurrentGoal = CreatureGoal.Rest; BurrowProgress = 0.3f; Velocity.X = 0; }
                     else { Dir = -Dir; Needs.Safety = MathHelper.Clamp(Needs.Safety + 0.3f, 0f, 1f); }
                 }
-                else Dir = -Dir;
+                else { TrySetDir(-Dir, force: true); }
             }
             if (CurrentGoal != CreatureGoal.Flee)
             {
                 bool floorAhead = HasFloorAhead(tileGrid, tileSize,
                     new Vector2(Position.X + EffectiveWidth / 2f, Position.Y + EffectiveHeight), Dir);
-                if (!floorAhead) Dir = -Dir;
+                if (!floorAhead) TrySetDir(-Dir, force: true);
             }
         }
 
@@ -870,7 +871,7 @@ public class Crawler : Creature
                 if (CanBurrow && !IsBurrowed) { CurrentGoal = CreatureGoal.Rest; BurrowProgress = 0.3f; }
                 else { Dir = -Dir; Needs.Safety = MathHelper.Clamp(Needs.Safety + 0.2f, 0f, 1f); }
             }
-            else Dir = -Dir;
+            else { TrySetDir(-Dir, force: true); }
         }
 
         // Wall/ceiling walking for Stalker

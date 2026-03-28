@@ -12,6 +12,8 @@ public class Scavenger : Creature
     private State _state = State.Wander;
     private float _stateTimer;
     private int _dir = 1;
+    private float _dirCd;
+    private void TrySetScavDir(int d, bool force = false) { if (d == _dir) return; if (!force && _dirCd > 0) return; _dir = d; _dirCd = 0.3f; }
     private float _wanderSpeed = 35f;
     private float _fleeSpeed = 140f;
     private bool _onGround;
@@ -51,6 +53,7 @@ public class Scavenger : Creature
     
     public override void Update(float dt, CreatureUpdateContext ctx)
     {
+        if (_dirCd > 0) _dirCd -= dt;
         var playerCenter = ctx.PlayerCenter;
         var tileGrid = ctx.TileGrid;
         var tileSize = ctx.TileSize;
@@ -86,7 +89,7 @@ public class Scavenger : Creature
         var (threat, threatDist, _, _) = ScanCreatures(ctx.NearbyCreatures, 160f, 0f);
         if (threat != null && threatDist < 100f)
         {
-            _dir = threat.Position.X > Position.X ? -1 : 1;
+            TrySetScavDir(threat.Position.X > Position.X ? -1 : 1);
             Needs.Safety = Math.Min(Needs.Safety, 0.15f);
         }
         if (BurrowProgress > 0 && BurrowProgress < 1f) { }
@@ -95,7 +98,7 @@ public class Scavenger : Creature
         if (noise != null)
         {
             Needs.Safety = Math.Min(Needs.Safety, 1f - noise.Intensity);
-            _dir = noise.Position.X > Position.X ? -1 : 1;
+            TrySetScavDir(noise.Position.X > Position.X ? -1 : 1);
         }
 
         // Startle propagation
@@ -107,7 +110,7 @@ public class Scavenger : Creature
         if (lanternReaction == -1)
         {
             float ldx = ctx.LanternPos.X - (Position.X + Width / 2f);
-            _dir = ldx > 0 ? -1 : 1;
+            TrySetScavDir(ldx > 0 ? -1 : 1);
         }
 
         float fleeSpeedBoost = CurrentGoal == CreatureGoal.Flee ? 1.3f : 1f;
@@ -150,7 +153,7 @@ public class Scavenger : Creature
                 }
                 else
                 {
-                    _dir = food.Position.X > Position.X ? 1 : -1;
+                    TrySetScavDir(food.Position.X > Position.X ? 1 : -1);
                 }
             }
         }
@@ -186,15 +189,15 @@ public class Scavenger : Creature
                 if (CurrentGoal == CreatureGoal.Flee)
                 {
                     if (CanBurrow && !IsBurrowed) { CurrentGoal = CreatureGoal.Rest; BurrowProgress = 0.3f; Velocity.X = 0; }
-                    else { _dir = -_dir; Needs.Safety = MathHelper.Clamp(Needs.Safety + 0.3f, 0f, 1f); }
+                    else { TrySetScavDir(-_dir, force: true); Needs.Safety = MathHelper.Clamp(Needs.Safety + 0.3f, 0f, 1f); }
                 }
-                else _dir = -_dir;
+                else TrySetScavDir(-_dir, force: true);
             }
             if (CurrentGoal != CreatureGoal.Flee)
             {
                 bool floorAhead = HasFloorAhead(tileGrid, tileSize,
                     new Vector2(Position.X + Width / 2f, Position.Y + Height), _dir);
-                if (!floorAhead) _dir = -_dir;
+                if (!floorAhead) TrySetScavDir(-_dir, force: true);
             }
         }
 
@@ -206,7 +209,7 @@ public class Scavenger : Creature
             else WanderRadius = 100f;
         }
         if (Math.Abs(Position.X - SpawnOrigin.X) > WanderRadius && CurrentGoal == CreatureGoal.Wander)
-            _dir = Position.X > SpawnOrigin.X ? -1 : 1;
+            TrySetScavDir(Position.X > SpawnOrigin.X ? -1 : 1);
 
         // Bounds awareness
         if (Position.X < ctx.BoundsLeft + 10 || Position.X + Width > ctx.BoundsRight - 10)
@@ -214,9 +217,9 @@ public class Scavenger : Creature
             if (CurrentGoal == CreatureGoal.Flee)
             {
                 if (CanBurrow && !IsBurrowed) { CurrentGoal = CreatureGoal.Rest; BurrowProgress = 0.3f; }
-                else { _dir = -_dir; Needs.Safety = MathHelper.Clamp(Needs.Safety + 0.2f, 0f, 1f); }
+                else { TrySetScavDir(-_dir, force: true); Needs.Safety = MathHelper.Clamp(Needs.Safety + 0.2f, 0f, 1f); }
             }
-            else _dir = -_dir;
+            else TrySetScavDir(-_dir, force: true);
         }
 
         switch (_state)
@@ -225,7 +228,7 @@ public class Scavenger : Creature
                 if (dist < effectiveFleeRange)
                 {
                     _state = State.Flee;
-                    _dir = dx > 0 ? -1 : 1;
+                    TrySetScavDir(dx > 0 ? -1 : 1);
                     _stateTimer = 0;
                 }
                 else if (dist < effectiveFreezeRange)
@@ -245,7 +248,7 @@ public class Scavenger : Creature
                     _wanderChangeTimer -= dt;
                     if (_wanderChangeTimer <= 0)
                     {
-                        _dir = -_dir;
+                        TrySetScavDir(-_dir, force: true);
                         _wanderChangeTimer = 1.5f + Random.Shared.NextSingle() * 3f;
                     }
                     float wanderMult = CurrentGoal == CreatureGoal.Eat ? 1.2f : 1f;
@@ -259,7 +262,7 @@ public class Scavenger : Creature
                 if (dist < effectiveFleeRange)
                 {
                     _state = State.Flee;
-                    _dir = dx > 0 ? -1 : 1;
+                    TrySetScavDir(dx > 0 ? -1 : 1);
                     _stateTimer = 0;
                 }
                 else if (dist > SafeRange)
@@ -287,7 +290,7 @@ public class Scavenger : Creature
             levelBottom);
         
         if (_state == State.Flee && MathF.Abs(Velocity.X) < 1f)
-            _dir = -_dir;
+            TrySetScavDir(-_dir, force: true);
             
         Dir = _dir;
         _prevGoal = CurrentGoal;

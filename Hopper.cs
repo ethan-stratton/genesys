@@ -36,6 +36,8 @@ public class Hopper : Creature
 
     private int _hopCount;
     private int _dir;
+    private float _dirCd; // direction change cooldown
+    private void TrySetHopDir(int d, bool force = false) { if (d == _dir) return; if (!force && _dirCd > 0) return; _dir = d; _dirCd = 0.3f; }
 
     public override int ContactDamage => HopContactDamage;
 
@@ -65,6 +67,7 @@ public class Hopper : Creature
 
     public override void Update(float dt, CreatureUpdateContext ctx)
     {
+        if (_dirCd > 0) _dirCd -= dt;
         var playerCenter = ctx.PlayerCenter;
         var tileGrid = ctx.TileGrid;
         var tileSize = ctx.TileSize;
@@ -109,7 +112,7 @@ public class Hopper : Creature
         var (hopThreat, hopThreatDist, _, _) = ScanCreatures(ctx.NearbyCreatures, 200f, 0f);
         if (hopThreat != null && hopThreatDist < 120f)
         {
-            _dir = hopThreat.Position.X > Position.X ? -1 : 1;
+            TrySetHopDir(hopThreat.Position.X > Position.X ? -1 : 1);
             Needs.Safety = Math.Min(Needs.Safety, 0.2f);
         }
         if (BurrowProgress > 0 && BurrowProgress < 1f)
@@ -122,7 +125,7 @@ public class Hopper : Creature
         if (noise != null)
         {
             Needs.Safety = Math.Min(Needs.Safety, 1f - noise.Intensity);
-            _dir = noise.Position.X > Position.X ? -1 : 1;
+            TrySetHopDir(noise.Position.X > Position.X ? -1 : 1);
         }
 
         // Startle propagation
@@ -161,7 +164,7 @@ public class Hopper : Creature
             {
                 float herdDist = Vector2.Distance(Position, nearestHerd.Position);
                 if (herdDist > 40f)
-                    _dir = nearestHerd.Position.X > Position.X ? 1 : -1;
+                    TrySetHopDir(nearestHerd.Position.X > Position.X ? 1 : -1);
             }
         }
 
@@ -181,7 +184,7 @@ public class Hopper : Creature
                 }
                 else
                 {
-                    _dir = food.Position.X > Position.X ? 1 : -1;
+                    TrySetHopDir(food.Position.X > Position.X ? 1 : -1);
                 }
             }
         }
@@ -214,15 +217,15 @@ public class Hopper : Creature
                 if (CurrentGoal == CreatureGoal.Flee)
                 {
                     if (CanBurrow && !IsBurrowed) { CurrentGoal = CreatureGoal.Rest; BurrowProgress = 0.3f; Velocity.X = 0; }
-                    else { _dir = -_dir; Needs.Safety = MathHelper.Clamp(Needs.Safety + 0.3f, 0f, 1f); }
+                    else { TrySetHopDir(-_dir, force: true); Needs.Safety = MathHelper.Clamp(Needs.Safety + 0.3f, 0f, 1f); }
                 }
-                else _dir = -_dir;
+                else TrySetHopDir(-_dir, force: true);
             }
             if (CurrentGoal != CreatureGoal.Flee)
             {
                 bool floorAhead = HasFloorAhead(tileGrid, tileSize,
                     new Vector2(Position.X + Width / 2f, Position.Y + Height), _dir);
-                if (!floorAhead) _dir = -_dir;
+                if (!floorAhead) TrySetHopDir(-_dir, force: true);
             }
         }
 
@@ -234,7 +237,7 @@ public class Hopper : Creature
             else WanderRadius = 100f;
         }
         if (Math.Abs(Position.X - SpawnOrigin.X) > WanderRadius && CurrentGoal == CreatureGoal.Wander)
-            _dir = Position.X > SpawnOrigin.X ? -1 : 1;
+            TrySetHopDir(Position.X > SpawnOrigin.X ? -1 : 1);
 
         // Bounds awareness
         if (Position.X < ctx.BoundsLeft + 10 || Position.X + Width > ctx.BoundsRight - 10)
@@ -242,14 +245,14 @@ public class Hopper : Creature
             if (CurrentGoal == CreatureGoal.Flee)
             {
                 if (CanBurrow && !IsBurrowed) { CurrentGoal = CreatureGoal.Rest; BurrowProgress = 0.3f; }
-                else { _dir = -_dir; Needs.Safety = MathHelper.Clamp(Needs.Safety + 0.2f, 0f, 1f); }
+                else { TrySetHopDir(-_dir, force: true); Needs.Safety = MathHelper.Clamp(Needs.Safety + 0.2f, 0f, 1f); }
             }
-            else _dir = -_dir;
+            else TrySetHopDir(-_dir, force: true);
         }
 
         float dx = playerCenter.X - (Position.X + Width / 2f);
         if (Aggroed && MathF.Abs(dx) > 4f)
-            _dir = dx > 0 ? 1 : -1;
+            TrySetHopDir(dx > 0 ? 1 : -1);
 
         switch (_state)
         {
