@@ -16,6 +16,7 @@ public class WeatherSystem
     public bool IsStorming => StormEnergy > 0.6f && IsRaining;
     public bool IsWindy => WindStrength > 0.4f;
     public bool IsFoggy => Moisture > 0.4f && Moisture < 0.7f && Temperature < 0.4f;
+    public bool IsIonicStorm => StormEnergy > 0.8f && IsStorming && Temperature > 0.55f;  // rare: hot storm with high energy
     
     // Wind direction (-1 to 1, negative = left, positive = right)
     public float WindDirection;

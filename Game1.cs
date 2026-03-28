@@ -3952,6 +3952,10 @@ public class Game1 : Game
         // Suit spark particles when integrity is low
         if (_player.SuitIntegrity < 25f)
         {
+            // EVE threshold alerts (one-time per threshold)
+            if (_player.SuitIntegrity < 25f) EveAlertOnce("Suit integrity critical. Seal failure imminent.", 4f);
+            if (_player.SuitIntegrity < 15f) EveAlertOnce("Adam, the suit is barely holding. You need to find alternatives.", 5f);
+            if (_player.SuitIntegrity < 5f) EveAlertOnce("Suit integrity near zero. It's... it's just cloth now.", 4f);
             _suitSparkTimer -= dt;
             float sparkFreq = 0.5f + (_player.SuitIntegrity / 25f) * 1.5f; // sparks every 0.5-2s
             if (_suitSparkTimer <= 0)
@@ -4120,6 +4124,44 @@ public class Game1 : Game
             }
 
             _player.EnvSpeedMult = speedMult;
+        }
+
+        // --- Water submersion suit degradation ---
+        // Check if player's chest/head is submerged in water tiles
+        if (_level?.TileGridInstance != null)
+        {
+            var tg = _level.TileGridInstance;
+            int ts = _level.TileGrid?.TileSize ?? 32;
+            int playerChestY = (int)(_player.Position.Y + Player.Height * 0.4f); // chest height
+            int playerCenterX = (int)(_player.Position.X + Player.CollisionWidth / 2);
+            int tx = playerCenterX / ts;
+            int tyChest = playerChestY / ts;
+            bool chestSubmerged = tg.GetTileAt(tx, tyChest) == TileType.Water;
+            if (chestSubmerged && _player.SuitIntegrity > 0)
+            {
+                // Slow degradation: 0.15%/s when chest-deep, seals corrode
+                _player.SuitIntegrity = MathF.Max(0f, _player.SuitIntegrity - 0.15f * dt);
+                if (_player.SuitIntegrity < 10f)
+                    _player.Battery = MathF.Max(0f, _player.Battery - 0.3f * dt); // water shorts out low-integrity suit
+            }
+        }
+
+        // --- Weather-based suit/battery effects ---
+        if (_weather.IsIonicStorm)
+        {
+            // Ionic storms: damage suit electronics but CHARGE battery (surprise!)
+            _player.SuitIntegrity = MathF.Max(0f, _player.SuitIntegrity - 0.4f * dt);
+            float chargeRate = 2f; // 2%/s — noticeable boost
+            if (_player.Battery < 100f)
+            {
+                _player.Battery = MathF.Min(100f, _player.Battery + chargeRate * dt);
+                EveAlertOnce("Ionic interference — suit circuits degrading, but... the battery is absorbing ambient charge. Fascinating.", 5f);
+            }
+        }
+        else if (_weather.IsStorming && _player.SuitIntegrity > 0)
+        {
+            // Regular storms: minor suit wear from wind/lightning proximity
+            _player.SuitIntegrity = MathF.Max(0f, _player.SuitIntegrity - 0.05f * dt);
         }
 
         // Ionized zone visual effects

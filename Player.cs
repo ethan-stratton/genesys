@@ -432,6 +432,10 @@ public class Player
         DamageCooldown = DamageCooldownTime;
         _regenDelay = 0f;
         _regenAccum = 0f;
+        
+        // Heavy hits degrade suit (3+ damage = 0.5% per damage point above 2)
+        if (amount >= 3 && SuitIntegrity > 0)
+            SuitIntegrity = MathF.Max(0f, SuitIntegrity - (amount - 2) * 0.5f);
         if (Hp <= 0) Hp = 0;
         
         // Knockback
