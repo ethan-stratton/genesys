@@ -754,6 +754,316 @@ public class TileGrid
         return rects.ToArray();
     }
 
+    // ── A* Pathfinding ──────────────────────────────────────────────
+
+    /// <summary>
+    /// A* pathfinding on the tile grid. Returns world-coordinate waypoints, or null if no path.
+    /// Prefers floor tiles (solid below) with cost 1; airborne tiles cost 5.
+    /// 4-directional, respects creature size, max 500 nodes.
+    /// </summary>
+    public List<Vector2> FindPath(Vector2 from, Vector2 to, int creatureWidth, int creatureHeight)
+    {
+        int cw = Math.Max(1, (creatureWidth + TileSize - 1) / TileSize);
+        int ch = Math.Max(1, (creatureHeight + TileSize - 1) / TileSize);
+
+        var (sx, sy) = WorldToTile((int)from.X, (int)from.Y);
+        var (gx, gy) = WorldToTile((int)to.X, (int)to.Y);
+        if (sx < 0 || sy < 0 || gx < 0 || gy < 0) return null;
+
+        // open set as sorted list (simple priority queue)
+        var gScore = new Dictionary<long, float>();
+        var fScore = new Dictionary<long, float>();
+        var cameFrom = new Dictionary<long, long>();
+        var open = new SortedSet<(float f, long key)>();
+        var closed = new HashSet<long>();
+
+        long Key(int x, int y) => (long)x << 32 | (uint)y;
+
+        bool IsPassable(int tx, int ty, int w, int h)
+        {
+            for (int dx = 0; dx < w; dx++)
+                for (int dy = 0; dy < h; dy++)
+                {
+                    var t = GetTileAt(tx + dx, ty + dy);
+                    if (TileProperties.IsSolid(t)) return false;
+                }
+            return true;
+        }
+
+        bool HasFloorBelow(int tx, int ty, int w, int h)
+        {
+            int belowY = ty + h;
+            for (int dx = 0; dx < w; dx++)
+                if (TileProperties.IsSolid(GetTileAt(tx + dx, belowY)))
+                    return true;
+            return false;
+        }
+
+        long startKey = Key(sx, sy);
+        gScore[startKey] = 0;
+        fScore[startKey] = Math.Abs(gx - sx) + Math.Abs(gy - sy);
+        open.Add((fScore[startKey], startKey));
+
+        int explored = 0;
+        int[] dx4 = { 1, -1, 0, 0 };
+        int[] dy4 = { 0, 0, 1, -1 };
+
+        while (open.Count > 0 && explored < 500)
+        {
+            var (_, curKey) = open.Min;
+            open.Remove(open.Min);
+            int cx = (int)(curKey >> 32);
+            int cy = (int)(curKey & 0xFFFFFFFF);
+
+            if (cx == gx && cy == gy)
+            {
+                // Reconstruct path
+                var path = new List<Vector2>();
+                long k = curKey;
+                while (cameFrom.ContainsKey(k))
+                {
+                    int px = (int)(k >> 32);
+                    int py = (int)(k & 0xFFFFFFFF);
+                    path.Add(TileToWorld(px, py));
+                    k = cameFrom[k];
+                }
+                path.Add(TileToWorld((int)(k >> 32), (int)(k & 0xFFFFFFFF)));
+                path.Reverse();
+                return path;
+            }
+
+            if (!closed.Add(curKey)) continue;
+            explored++;
+
+            for (int i = 0; i < 4; i++)
+            {
+                int nx = cx + dx4[i];
+                int ny = cy + dy4[i];
+                if (nx < 0 || ny < 0 || nx + cw > Width || ny + ch > Height) continue;
+                long nKey = Key(nx, ny);
+                if (closed.Contains(nKey)) continue;
+                if (!IsPassable(nx, ny, cw, ch)) continue;
+
+                float moveCost = HasFloorBelow(nx, ny, cw, ch) ? 1f : 5f;
+                float tentG = gScore[curKey] + moveCost;
+
+                if (!gScore.ContainsKey(nKey) || tentG < gScore[nKey])
+                {
+                    cameFrom[nKey] = curKey;
+                    gScore[nKey] = tentG;
+                    float f = tentG + Math.Abs(gx - nx) + Math.Abs(gy - ny);
+                    fScore[nKey] = f;
+                    open.Add((f, nKey));
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Ground-only pathfinding for creatures that walk on floors.
+    /// Allows horizontal movement on floors, falling, and jumping up to 4 tiles.
+    /// Returns world-coordinate waypoints or null. Max 300 nodes.
+    /// </summary>
+    public List<Vector2> FindGroundPath(Vector2 from, Vector2 to, int creatureWidth)
+    {
+        int cw = Math.Max(1, (creatureWidth + TileSize - 1) / TileSize);
+
+        var (sx, sy) = WorldToTile((int)from.X, (int)from.Y);
+        var (gx, gy) = WorldToTile((int)to.X, (int)to.Y);
+        if (sx < 0 || sy < 0 || gx < 0 || gy < 0) return null;
+
+        // Snap start/goal to nearest floor if not already on one
+        sy = SnapToFloorTile(sx, sy, cw);
+        gy = SnapToFloorTile(gx, gy, cw);
+        if (sy < 0 || gy < 0) return null;
+
+        var gScore = new Dictionary<long, float>();
+        var fScore = new Dictionary<long, float>();
+        var cameFrom = new Dictionary<long, long>();
+        var open = new SortedSet<(float f, long key)>();
+        var closed = new HashSet<long>();
+
+        long Key(int x, int y) => (long)x << 32 | (uint)y;
+
+        bool IsOnFloor(int tx, int ty)
+        {
+            // All tiles the creature occupies must be empty, and at least one tile below must be solid
+            for (int dx = 0; dx < cw; dx++)
+            {
+                if (TileProperties.IsSolid(GetTileAt(tx + dx, ty))) return false;
+            }
+            for (int dx = 0; dx < cw; dx++)
+            {
+                var below = GetTileAt(tx + dx, ty + 1);
+                if (TileProperties.IsSolid(below) || TileProperties.IsPlatform(below)) return true;
+            }
+            return false;
+        }
+
+        long startKey = Key(sx, sy);
+        gScore[startKey] = 0;
+        fScore[startKey] = Math.Abs(gx - sx) + Math.Abs(gy - sy);
+        open.Add((fScore[startKey], startKey));
+
+        int explored = 0;
+
+        while (open.Count > 0 && explored < 300)
+        {
+            var (_, curKey) = open.Min;
+            open.Remove(open.Min);
+            int cx = (int)(curKey >> 32);
+            int cy = (int)(curKey & 0xFFFFFFFF);
+
+            if (cx == gx && cy == gy)
+            {
+                var path = new List<Vector2>();
+                long k = curKey;
+                while (cameFrom.ContainsKey(k))
+                {
+                    int px = (int)(k >> 32);
+                    int py = (int)(k & 0xFFFFFFFF);
+                    path.Add(TileToWorld(px, py));
+                    k = cameFrom[k];
+                }
+                path.Add(TileToWorld((int)(k >> 32), (int)(k & 0xFFFFFFFF)));
+                path.Reverse();
+                return path;
+            }
+
+            if (!closed.Add(curKey)) continue;
+            explored++;
+
+            // Neighbors: walk left/right on floor
+            foreach (int dirX in new[] { -1, 1 })
+            {
+                int nx = cx + dirX;
+                int ny = cy;
+                if (nx < 0 || nx + cw > Width) continue;
+                long nKey = Key(nx, ny);
+                if (closed.Contains(nKey)) continue;
+                if (IsOnFloor(nx, ny))
+                {
+                    float tentG = gScore[curKey] + 1f;
+                    if (!gScore.ContainsKey(nKey) || tentG < gScore[nKey])
+                    {
+                        cameFrom[nKey] = curKey;
+                        gScore[nKey] = tentG;
+                        float f = tentG + Math.Abs(gx - nx) + Math.Abs(gy - ny);
+                        fScore[nKey] = f;
+                        open.Add((f, nKey));
+                    }
+                }
+            }
+
+            // Fall: drop down through empty tiles until hitting floor
+            for (int dy = 1; dy <= Height - cy; dy++)
+            {
+                int ny = cy + dy;
+                if (ny >= Height) break;
+                // Check tiles the creature occupies are clear
+                bool blocked = false;
+                for (int dx = 0; dx < cw; dx++)
+                    if (TileProperties.IsSolid(GetTileAt(cx + dx, ny))) { blocked = true; break; }
+                if (blocked) break;
+
+                if (IsOnFloor(cx, ny))
+                {
+                    long nKey = Key(cx, ny);
+                    if (!closed.Contains(nKey))
+                    {
+                        float tentG = gScore[curKey] + dy * 0.5f; // falling is cheap
+                        if (!gScore.ContainsKey(nKey) || tentG < gScore[nKey])
+                        {
+                            cameFrom[nKey] = curKey;
+                            gScore[nKey] = tentG;
+                            float f = tentG + Math.Abs(gx - cx) + Math.Abs(gy - ny);
+                            fScore[nKey] = f;
+                            open.Add((f, nKey));
+                        }
+                    }
+                    break; // stop falling once we land
+                }
+            }
+
+            // Jump: up to 4 tiles upward, landing on a floor
+            for (int dy = 1; dy <= 4; dy++)
+            {
+                int ny = cy - dy;
+                if (ny < 0) break;
+                // Check path is clear going up
+                bool blocked = false;
+                for (int uy = cy - 1; uy >= ny; uy--)
+                    for (int dx = 0; dx < cw; dx++)
+                        if (TileProperties.IsSolid(GetTileAt(cx + dx, uy))) { blocked = true; break; }
+                if (blocked) break;
+
+                if (IsOnFloor(cx, ny))
+                {
+                    long nKey = Key(cx, ny);
+                    if (!closed.Contains(nKey))
+                    {
+                        float tentG = gScore[curKey] + dy * 2f; // jumping is expensive
+                        if (!gScore.ContainsKey(nKey) || tentG < gScore[nKey])
+                        {
+                            cameFrom[nKey] = curKey;
+                            gScore[nKey] = tentG;
+                            float f = tentG + Math.Abs(gx - cx) + Math.Abs(gy - ny);
+                            fScore[nKey] = f;
+                            open.Add((f, nKey));
+                        }
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Find nearest floor position below a world position. Returns the world pos on top of the solid tile, or null.</summary>
+    public Vector2? FindNearestFloor(Vector2 worldPos)
+    {
+        var (tx, ty) = WorldToTile((int)worldPos.X, (int)worldPos.Y);
+        if (tx < 0) return null;
+
+        for (int y = ty; y < Height; y++)
+        {
+            if (TileProperties.IsSolid(GetTileAt(tx, y)))
+            {
+                // Return position on top of this solid tile
+                return new Vector2(OriginX + tx * TileSize, OriginY + y * TileSize - 1);
+            }
+        }
+        return null;
+    }
+
+    /// <summary>Convert tile indices to world center position.</summary>
+    private Vector2 TileToWorld(int tx, int ty)
+    {
+        return new Vector2(OriginX + tx * TileSize + TileSize / 2f, OriginY + ty * TileSize + TileSize / 2f);
+    }
+
+    /// <summary>Scan downward from ty to find the nearest floor tile. Returns tile Y or -1.</summary>
+    private int SnapToFloorTile(int tx, int ty, int cw)
+    {
+        for (int y = ty; y < Height - 1; y++)
+        {
+            bool clear = true;
+            bool hasFloor = false;
+            for (int dx = 0; dx < cw; dx++)
+            {
+                if (TileProperties.IsSolid(GetTileAt(tx + dx, y))) { clear = false; break; }
+                var below = GetTileAt(tx + dx, y + 1);
+                if (TileProperties.IsSolid(below) || TileProperties.IsPlatform(below)) hasFloor = true;
+            }
+            if (clear && hasFloor) return y;
+        }
+        return -1;
+    }
+
+    // ── End Pathfinding ─────────────────────────────────────────────
+
     public TileGridData ToData()
     {
         var data = new TileGridData

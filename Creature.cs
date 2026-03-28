@@ -451,6 +451,48 @@ public abstract class Creature
         return TileProperties.IsSolid(tg.GetTileAt(tx, ty));
     }
 
+    // --- Pathfinding ---
+    protected List<Vector2> _path;
+    protected int _pathIndex;
+
+    /// <summary>Navigate to target using ground pathfinding. Returns true if path found.</summary>
+    protected bool NavigateTo(Vector2 target, CreatureUpdateContext ctx)
+    {
+        if (ctx.TileGrid == null) return false;
+        _path = ctx.TileGrid.FindGroundPath(Position, target, CreatureWidth);
+        _pathIndex = 0;
+        return _path != null;
+    }
+
+    /// <summary>Follow the current path. Moves toward each waypoint in sequence.</summary>
+    protected void UpdatePathFollow(float dt, float speed)
+    {
+        if (_path == null || _pathIndex >= _path.Count) { _path = null; return; }
+
+        Vector2 target = _path[_pathIndex];
+        Vector2 diff = target - Position;
+        float dist = diff.Length();
+
+        if (dist < 4f)
+        {
+            _pathIndex++;
+            if (_pathIndex >= _path.Count) { _path = null; return; }
+            target = _path[_pathIndex];
+            diff = target - Position;
+            dist = diff.Length();
+        }
+
+        if (dist > 0)
+        {
+            Vector2 dir = diff / dist;
+            float move = speed * dt;
+            if (move > dist) move = dist;
+            Position += dir * move;
+            if (dir.X > 0.1f) TrySetDir(1);
+            else if (dir.X < -0.1f) TrySetDir(-1);
+        }
+    }
+
     // --- Wander Range ---
     public Vector2 SpawnOrigin;
     public float WanderRadius = 100f;
