@@ -150,7 +150,12 @@
   "labels": [],
   "retractableSpikes": [],
   "shelters": [],
-  "neighbors": [],
+  "neighbors": {
+    "left": "",
+    "right": "",
+    "up": "",
+    "down": ""
+  },
   "envRegions": [],
   "tileGrid": {
     "width": 100,
