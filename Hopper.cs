@@ -110,6 +110,52 @@ public class Hopper : Creature
         }
         CurrentGoal = SelectGoal();
 
+        // Noise detection
+        var noise = CheckNoise(ctx.NoiseEvents);
+        if (noise != null)
+        {
+            Needs.Safety = Math.Min(Needs.Safety, 1f - noise.Intensity);
+            _dir = noise.Position.X > Position.X ? -1 : 1;
+        }
+
+        // Startle propagation
+        if (CurrentGoal == CreatureGoal.Flee && _prevGoal != CreatureGoal.Flee)
+            PropagateStartle(this, ctx.NearbyCreatures);
+
+        float fleeSpeedBoost = CurrentGoal == CreatureGoal.Flee ? 1.3f : 1f;
+
+        // Burrowing
+        if (CurrentGoal == CreatureGoal.Rest && CanBurrow && !IsBurrowed)
+        {
+            BurrowProgress = MathHelper.Clamp(BurrowProgress + dt * 0.5f, 0f, 1f);
+            if (BurrowProgress >= 1f) IsBurrowed = true;
+            Velocity = Vector2.Zero;
+        }
+        else if (CurrentGoal != CreatureGoal.Rest && IsBurrowed)
+        {
+            BurrowProgress = MathHelper.Clamp(BurrowProgress - dt * 1.0f, 0f, 1f);
+            if (BurrowProgress <= 0) IsBurrowed = false;
+        }
+        if (IsBurrowed && Vector2.Distance(Position, ctx.PlayerCenter) < 20f)
+        {
+            Needs.Safety = 0f;
+            CurrentGoal = CreatureGoal.Flee;
+            IsBurrowed = false;
+            BurrowProgress = 0f;
+        }
+
+        // Herd behavior — drift toward nearby hoppers
+        if (CurrentGoal == CreatureGoal.Wander)
+        {
+            var nearestHerd = FindNearestCreature(ctx.NearbyCreatures, EcologicalRole.Herbivore, 200f);
+            if (nearestHerd is Hopper && nearestHerd != this)
+            {
+                float herdDist = Vector2.Distance(Position, nearestHerd.Position);
+                if (herdDist > 40f)
+                    _dir = nearestHerd.Position.X > Position.X ? 1 : -1;
+            }
+        }
+
         // Food seeking
         if (CurrentGoal == CreatureGoal.Eat && !IsEating)
         {
@@ -181,7 +227,7 @@ public class Hopper : Creature
                         : CurrentGoal == CreatureGoal.Flee ? 1.2f : 1f;
 
                     Velocity.Y = (bigHop ? BigHopForce : SmallHopForce) * hopForceMult * MathHelper.Clamp(activity, 0.3f, 1f);
-                    Velocity.X = _dir * HopSpeedX * (bigHop ? 1.6f : 1f) * hopSpeedMult * MathHelper.Clamp(activity, 0.3f, 1f);
+                    Velocity.X = _dir * HopSpeedX * (bigHop ? 1.6f : 1f) * hopSpeedMult * MathHelper.Clamp(activity, 0.3f, 1f) * fleeSpeedBoost;
                     _state = State.Airborne;
                     _onGround = false;
                 }
@@ -215,6 +261,7 @@ public class Hopper : Creature
                 }
                 break;
         }
+        _prevGoal = CurrentGoal;
     }
 
 
@@ -238,6 +285,11 @@ public class Hopper : Creature
 
         int drawW = Width, drawH = Height;
         int drawX = (int)Position.X, drawY = (int)Position.Y;
+
+        // Burrow visual
+        int burrowClip = (int)(Height * BurrowProgress * 0.7f);
+        drawH -= burrowClip;
+        drawY += burrowClip;
 
         switch (_state)
         {

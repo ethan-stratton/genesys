@@ -87,6 +87,40 @@ public class Scavenger : Creature
         }
         CurrentGoal = SelectGoal();
 
+        // Noise detection
+        var noise = CheckNoise(ctx.NoiseEvents);
+        if (noise != null)
+        {
+            Needs.Safety = Math.Min(Needs.Safety, 1f - noise.Intensity);
+            _dir = noise.Position.X > Position.X ? -1 : 1;
+        }
+
+        // Startle propagation
+        if (CurrentGoal == CreatureGoal.Flee && _prevGoal != CreatureGoal.Flee)
+            PropagateStartle(this, ctx.NearbyCreatures);
+
+        float fleeSpeedBoost = CurrentGoal == CreatureGoal.Flee ? 1.3f : 1f;
+
+        // Burrowing
+        if (CurrentGoal == CreatureGoal.Rest && CanBurrow && !IsBurrowed)
+        {
+            BurrowProgress = MathHelper.Clamp(BurrowProgress + dt * 0.5f, 0f, 1f);
+            if (BurrowProgress >= 1f) IsBurrowed = true;
+            Velocity = Vector2.Zero;
+        }
+        else if (CurrentGoal != CreatureGoal.Rest && IsBurrowed)
+        {
+            BurrowProgress = MathHelper.Clamp(BurrowProgress - dt * 1.0f, 0f, 1f);
+            if (BurrowProgress <= 0) IsBurrowed = false;
+        }
+        if (IsBurrowed && Vector2.Distance(Position, ctx.PlayerCenter) < 20f)
+        {
+            Needs.Safety = 0f;
+            CurrentGoal = CreatureGoal.Flee;
+            IsBurrowed = false;
+            BurrowProgress = 0f;
+        }
+
         // Food seeking
         if (CurrentGoal == CreatureGoal.Eat && !IsEating)
         {
@@ -180,7 +214,7 @@ public class Scavenger : Creature
                 break;
                 
             case State.Flee:
-                Velocity.X = _dir * _fleeSpeed;
+                Velocity.X = _dir * _fleeSpeed * fleeSpeedBoost;
                 _stateTimer += dt;
                 if (dist > SafeRange && _stateTimer > 1f)
                 {
@@ -200,6 +234,7 @@ public class Scavenger : Creature
             _dir = -_dir;
             
         Dir = _dir;
+        _prevGoal = CurrentGoal;
     }
     
     public override void Draw(SpriteBatch sb, Texture2D pixel)

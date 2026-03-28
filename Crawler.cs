@@ -210,6 +210,19 @@ public class Crawler : Creature
     public override int CreatureHeight => EffectiveHeight;
     public override bool IsNocturnal => Variant is CrawlerVariant.Stalker or CrawlerVariant.Leaper;
     public override bool IsCrepuscular => Variant is CrawlerVariant.Skitter;
+
+    public override (int min, int max) PreySize => Variant switch
+    {
+        CrawlerVariant.Leaper => (30, 300),
+        CrawlerVariant.Stalker => (30, 300),
+        CrawlerVariant.Spitter => (50, 500),
+        _ => (0, 0),
+    };
+
+    // Wall/ceiling walking (Stalker only)
+    private enum GravityDir { Down, Left, Right, Up }
+    private GravityDir _gravDir = GravityDir.Down;
+    private float _wallCheckTimer;
     private Vector2 _spawnPos;
     public void SetSpawnPos(Vector2 pos) => _spawnPos = pos;
     private float _respawnTimer;
@@ -364,6 +377,49 @@ public class Crawler : Creature
             _huntTimer = 1.5f;
         }
         if (_huntTimer > 0) _huntTimer -= dt;
+
+        // Noise detection
+        var noise = CheckNoise(ctx.NoiseEvents);
+        if (noise != null)
+        {
+            if (Role is EcologicalRole.Herbivore or EcologicalRole.Flighty or EcologicalRole.Scavenger)
+            {
+                Needs.Safety = Math.Min(Needs.Safety, 1f - noise.Intensity);
+                Dir = noise.Position.X > Position.X ? -1 : 1;
+            }
+            else if (Role is EcologicalRole.Predator or EcologicalRole.Apex)
+            {
+                if (Needs.Hunger > 0.5f && CurrentGoal != CreatureGoal.Flee)
+                    Dir = noise.Position.X > Position.X ? 1 : -1;
+            }
+        }
+
+        // Startle propagation
+        if (CurrentGoal == CreatureGoal.Flee && _prevGoal != CreatureGoal.Flee)
+            PropagateStartle(this, ctx.NearbyCreatures);
+
+        float fleeSpeedBoost = CurrentGoal == CreatureGoal.Flee ? 1.3f : 1f;
+
+        // Burrowing behavior
+        if (CurrentGoal == CreatureGoal.Rest && CanBurrow && !IsBurrowed)
+        {
+            BurrowProgress = MathHelper.Clamp(BurrowProgress + dt * 0.5f, 0f, 1f);
+            if (BurrowProgress >= 1f) IsBurrowed = true;
+            Velocity = Vector2.Zero;
+        }
+        else if (CurrentGoal != CreatureGoal.Rest && IsBurrowed)
+        {
+            BurrowProgress = MathHelper.Clamp(BurrowProgress - dt * 1.0f, 0f, 1f);
+            if (BurrowProgress <= 0) IsBurrowed = false;
+        }
+        // Burrowed creature wakes on very close player
+        if (IsBurrowed && Vector2.Distance(Position, ctx.PlayerCenter) < 20f)
+        {
+            Needs.Safety = 0f;
+            CurrentGoal = CreatureGoal.Flee;
+            IsBurrowed = false;
+            BurrowProgress = 0f;
+        }
 
         // Food seeking
         if (CurrentGoal == CreatureGoal.Eat && !IsEating)
@@ -700,6 +756,14 @@ public class Crawler : Creature
             }
         } // end non-dummy movement
 
+        // Apply flee speed boost
+        if (fleeSpeedBoost > 1f)
+            Velocity.X *= fleeSpeedBoost;
+
+        // Wall/ceiling walking for Stalker
+        if (Variant == CrawlerVariant.Stalker && tileGrid != null)
+            UpdateWallWalk(dt, tileGrid, tileSize);
+
         // Apply gravity and tile collision
         _onGround = EnemyPhysics.ApplyGravityAndCollision(
             ref Position, ref Velocity,
@@ -788,7 +852,38 @@ public class Crawler : Creature
                 }
             }
         }
+        _prevGoal = CurrentGoal;
     }
+    private void UpdateWallWalk(float dt, TileGrid tg, int ts)
+    {
+        _wallCheckTimer -= dt;
+        if (_wallCheckTimer > 0) return;
+        _wallCheckTimer = 0.5f;
+
+        int cx = (int)(Position.X / ts);
+        int cy = (int)(Position.Y / ts);
+
+        switch (_gravDir)
+        {
+            case GravityDir.Down:
+                if (TileProperties.IsSolid(tg.GetTileAt(cx + Dir, cy)))
+                    _gravDir = Dir > 0 ? GravityDir.Right : GravityDir.Left;
+                break;
+            case GravityDir.Right:
+                if (!TileProperties.IsSolid(tg.GetTileAt(cx + 1, cy)))
+                    _gravDir = GravityDir.Up;
+                break;
+            case GravityDir.Up:
+                if (!TileProperties.IsSolid(tg.GetTileAt(cx, cy - 1)))
+                    _gravDir = GravityDir.Down;
+                break;
+            case GravityDir.Left:
+                if (!TileProperties.IsSolid(tg.GetTileAt(cx - 1, cy)))
+                    _gravDir = GravityDir.Up;
+                break;
+        }
+    }
+
     /// Refresh surface edge detection using tile-aware method.
     /// </summary>
     public void UpdateSurfaceEdges(TileGrid tileGrid, int tileSize,
@@ -1066,6 +1161,17 @@ public class Crawler : Creature
         int scaledH = (int)(eh * VisualScale.Y);
         int drawX = (int)Position.X + ew / 2 - scaledW / 2;
         int drawY = (int)Position.Y + eh - scaledH;
+
+        // Burrowing visual — clip height
+        if (BurrowProgress > 0f)
+        {
+            int burrowClip = (int)(scaledH * BurrowProgress * 0.7f);
+            scaledH -= burrowClip;
+            drawY += burrowClip;
+        }
+
+        // Wall-walking Stalker: flip for ceiling
+        bool ceilingFlip = Variant == CrawlerVariant.Stalker && _gravDir == GravityDir.Up;
 
         // --- PROCEDURAL LEGS ---
         if (!IsDummy && Legs != null && Legs.Length == LegCount)

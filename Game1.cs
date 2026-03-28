@@ -201,6 +201,7 @@ public class Game1 : Game
     private bool _playerWasDashing;
     private bool _playerWasGrappleFiring;
     private Random _shakeRng = new();
+    private List<NoiseEvent> _noiseEvents = new();
 
     private List<Bullet> _bullets;
     private List<InsectSwarm> _swarms = new();
@@ -3132,6 +3133,7 @@ public class Game1 : Game
             if (canFire)
             {
                 _bullets.Add(new Bullet(PlayerCenter, _player.ShootDirection));
+                _noiseEvents.Add(new NoiseEvent(PlayerCenter, 400f, 1.0f, "BANG", Color.Yellow, 1f));
                 _sidearmFireTimer = SidearmFireCooldown;
                 if (isGun)
                 {
@@ -3222,6 +3224,7 @@ public class Game1 : Game
             IsStorming = _weather.IsStorming,
             Temperature = _weather.Temperature,
             WindStrength = _weather.WindStrength,
+            NoiseEvents = _noiseEvents,
         };
 
         // Crawler-specific pre-update: latch behavior and bombardier spray
@@ -3320,6 +3323,14 @@ public class Game1 : Game
                         _foodSources.Add(new FoodSource(pos, FoodType.Plant, 0.3f));
                 }
             }
+        }
+
+        // Update noise events
+        for (int i = _noiseEvents.Count - 1; i >= 0; i--)
+        {
+            _noiseEvents[i].Update(dt);
+            if (_noiseEvents[i].Expired)
+                _noiseEvents.RemoveAt(i);
         }
 
         // Crawler-specific post-update: bombardier spray and latch-on
@@ -3434,11 +3445,13 @@ public class Game1 : Game
                     if (finisher) creature.MeleeHitCooldown = 0.055f;
                     var hitPt = creature.Position + new Vector2(creature.CreatureWidth / 2f, creature.CreatureHeight / 2f);
                     SpawnHitSpray(hitPt, _player.FacingDir, creature.HitColor, ws.Weight, finisher);
+                    _noiseEvents.Add(new NoiseEvent(hitPt, 200f, 0.6f, "SWSH", Color.LightGray, 1f));
                     if (killed)
                     {
                         if (_hitStopEnabled) _hitStopTimer = ws.HitStopKill;
                         if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration * 1.5f; _shakeIntensity = ws.ShakeIntensity * 1.2f; }
                         if (_deathParticlesEnabled) SpawnDeathParticles(hitPt, creature.DeathParticleColor);
+                        _noiseEvents.Add(new NoiseEvent(hitPt, 150f, 0.5f, "SKREE", new Color(200, 60, 60), 1.2f));
                     }
                     else if (finisher)
                     {
@@ -3861,6 +3874,9 @@ public class Game1 : Game
             float fallSpeed = MathF.Abs(_playerPrevVelY);
             int dustCount = (int)MathHelper.Clamp(fallSpeed / 40f, 4, 20);
             SpawnDustParticles(new Vector2(_player.Position.X + Player.Width / 2f, _player.Position.Y + Player.Height), dustCount);
+            // Landing noise
+            if (fallSpeed > 200f)
+                _noiseEvents.Add(new NoiseEvent(new Vector2(_player.Position.X + Player.Width / 2f, _player.Position.Y + Player.Height), 100f + fallSpeed * 0.3f, 0.4f, "THUD", Color.Gray, 1f));
         }
         // Dust on dash start
         if (_dustParticlesEnabled && _player.IsDashing && !_playerWasDashing)
@@ -12052,6 +12068,9 @@ public class Game1 : Game
             foreach (var swarm in _swarms) swarm.Draw(_spriteBatch, _pixel);
             foreach (var f in _foodSources) f.Draw(_spriteBatch, _pixel);
             foreach (var creature in _creatures) { if (!_enemySquashEnabled) creature.VisualScale = Vector2.One; creature.Draw(_spriteBatch, _pixel); }
+            // Draw noise event labels
+            var camOffset = _camera?.Position ?? Vector2.Zero;
+            foreach (var n in _noiseEvents) n.Draw(_spriteBatch, _fontSmall, camOffset);
             // Debug: show eating state above creatures
             if (_debugEcosystem)
             {

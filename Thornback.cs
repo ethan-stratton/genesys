@@ -29,8 +29,17 @@ public class Thornback : Creature
 
     public override int CreatureWidth => Width;
     public override int CreatureHeight => Height;
-    public override float GetActivityLevel(float worldTime) => 0.8f; // always moderately active
+    public override float GetActivityLevel(float worldTime) => 0.8f;
     public override Rectangle Rect => new((int)Position.X, (int)Position.Y, Width, Height);
+
+    public override CreatureGoal SelectGoal()
+    {
+        if (Needs.Safety < 0.3f || (Hp > 0 && Hp <= MaxHp * 0.3f))
+            return CreatureGoal.Rest; // hunker down
+        if (Needs.Hunger > 0.7f) return CreatureGoal.Eat;
+        if (Needs.Fatigue > 0.7f) return CreatureGoal.Rest;
+        return CreatureGoal.Wander;
+    }
 
     public override void Update(float dt, CreatureUpdateContext ctx)
     {
@@ -49,6 +58,11 @@ public class Thornback : Creature
         float distToPlayer = Vector2.Distance(Position, ctx.PlayerCenter);
         Needs.Safety = Math.Min(Needs.Safety, MathHelper.Clamp(distToPlayer / 80f, 0f, 1f));
         CurrentGoal = SelectGoal();
+
+        // Noise detection — thornback doesn't flee, but gets defensive
+        var noise = CheckNoise(ctx.NoiseEvents);
+        if (noise != null && noise.Intensity > 0.5f)
+            Needs.Safety = Math.Min(Needs.Safety, 0.4f);
 
         // Food seeking (thornbacks eat slowly)
         if (CurrentGoal == CreatureGoal.Eat && !IsEating)
@@ -91,6 +105,7 @@ public class Thornback : Creature
             int fleeDir = dx > 0 ? -1 : 1;
             Position.X += fleeDir * 8f * dt; // very slow movement
         }
+        _prevGoal = CurrentGoal;
     }
 
     /// <summary>Contact damage suppressed when resting.</summary>

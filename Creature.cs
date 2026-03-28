@@ -70,6 +70,7 @@ public struct CreatureUpdateContext
     public bool IsStorming;
     public float Temperature;      // 0-1
     public float WindStrength;     // 0-1
+    public List<NoiseEvent> NoiseEvents;
 }
 
 /// <summary>
@@ -212,6 +213,8 @@ public abstract class Creature
     /// </summary>
     public virtual CreatureGoal SelectGoal()
     {
+        // Low health = flee (most creatures run when hurt)
+        if (Hp > 0 && Hp <= MaxHp * 0.3f) return CreatureGoal.Flee;
         if (Needs.Safety < 0.3f) return CreatureGoal.Flee;
         if (Needs.Hunger > 0.7f) return CreatureGoal.Eat;
         if (Needs.Fatigue > 0.7f) return CreatureGoal.Rest;
@@ -311,10 +314,15 @@ public abstract class Creature
                 threatDist = d;
             }
 
-            if (d < preyDist && IsThreatTo(this, other) && !IsSameFaction(this, other))
+            if (d < preyDist && WillHunt(other) && !IsSameFaction(this, other))
             {
-                nearestPrey = other;
-                preyDist = d;
+                // Burrowed creatures are harder to detect
+                float effectiveD = other.IsBurrowed ? d * 2f : d;
+                if (effectiveD < preyDist)
+                {
+                    nearestPrey = other;
+                    preyDist = effectiveD;
+                }
             }
         }
 
@@ -339,5 +347,69 @@ public abstract class Creature
             if (d < bestDist) { bestDist = d; best = c; }
         }
         return best;
+    }
+
+    // --- Burrowing (Feature 4) ---
+    public bool IsBurrowed;
+    public float BurrowProgress; // 0 = surface, 1 = fully burrowed
+    public virtual bool CanBurrow => true;
+
+    // --- Grazing (Feature 5) ---
+    public Vector2? LastFoodPosition;
+    public float GrazeMoveTimer;
+    protected CreatureGoal _prevGoal;
+
+    /// <summary>Propagate panic to nearby same-species creatures.</summary>
+    public static void PropagateStartle(Creature source, List<Creature> creatures, float range = 100f)
+    {
+        foreach (var c in creatures)
+        {
+            if (c == source || !c.Alive) continue;
+            if (!IsSameFaction(source, c)) continue;
+            float d = Vector2.Distance(source.Position, c.Position);
+            if (d < range)
+            {
+                float panicAmount = (1f - d / range) * 0.5f;
+                c.Needs.Safety = Math.Min(c.Needs.Safety, source.Needs.Safety + panicAmount);
+            }
+        }
+    }
+
+    // --- Predator Selectivity (Feature 7) ---
+    /// <summary>Minimum and maximum prey size (area in pixels²) this creature will hunt.</summary>
+    public virtual (int min, int max) PreySize => (0, int.MaxValue);
+
+    /// <summary>Whether this creature considers the target worth hunting.</summary>
+    public virtual bool WillHunt(Creature target)
+    {
+        if (!IsThreatTo(this, target)) return false;
+        int area = target.CreatureWidth * target.CreatureHeight;
+        var (min, max) = PreySize;
+        return area >= min && area <= max;
+    }
+
+    // --- Noise Reaction (Feature 3) ---
+    /// <summary>Check for nearby noise events and react. Returns the loudest noise within hearing range.</summary>
+    public NoiseEvent CheckNoise(List<NoiseEvent> events, float hearingRange = 300f)
+    {
+        if (events == null) return null;
+        NoiseEvent loudest = null;
+        float loudestIntensity = 0f;
+        foreach (var e in events)
+        {
+            if (e.Expired) continue;
+            if (e.Timer < e.MaxTimer - 0.3f) continue;
+            float d = Vector2.Distance(Position, e.Position);
+            if (d < hearingRange && d < e.Radius)
+            {
+                float effective = e.Intensity * (1f - d / e.Radius);
+                if (effective > loudestIntensity)
+                {
+                    loudest = e;
+                    loudestIntensity = effective;
+                }
+            }
+        }
+        return loudest;
     }
 }

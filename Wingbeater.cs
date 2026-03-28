@@ -14,16 +14,23 @@ public class Wingbeater : Creature
     public Vector2 SpawnPos;
     public override int ContactDamage => WingbeaterContactDamage;
     private const int WingbeaterContactDamage = 2;
-    public bool Passive = false;
+    public bool Passive = true; // passive toward player by default
     public const int Width = 20, Height = 14;
 
     public Vector2 KnockbackVel;
     private float _squashHoldTimer;
 
-    private enum State { Hovering, Tracking, DiveBomb, Returning, Stunned }
+    private enum State { Hovering, Tracking, DiveBomb, Returning, Stunned, Nesting, GatheringPlant }
     private State _state = State.Hovering;
     private float _stateTimer;
     private int _dir = 1;
+
+    // Target type for dive-bomb
+    private enum TargetType { Player, Prey }
+    private TargetType _currentTargetType = TargetType.Player;
+
+    // Player aggro
+    private bool _playerAggro = false;
 
     // Hover: gentle float at spawn height
     private float _hoverPhase;
@@ -52,6 +59,19 @@ public class Wingbeater : Creature
     // Wing animation
     private float _wingTimer;
     private int _wingFrame;
+
+    // Nesting
+    private Vector2? _nestPosition = null;
+    private float _nestMaterial = 0f;
+    private const float NestComplete = 1f;
+    private bool _hasNest = false;
+    private bool _carryingPlant = false;
+    public bool HasNest => _hasNest;
+    public Vector2? NestPosition => _nestPosition;
+    private FoodSource _gatherTarget;
+
+    public override bool CanBurrow => false;
+    public override (int min, int max) PreySize => (50, 400);
 
     public Wingbeater(Vector2 pos)
     {
@@ -87,12 +107,8 @@ public class Wingbeater : Creature
 
         // --- Needs system ---
         TickNeeds(dt);
-        // Weather effects
         if (ctx.IsRaining)
-        {
             Needs.Hunger += dt * HungerRate * 0.5f;
-        }
-        // Time-of-day activity
         float activity = GetActivityLevel(ctx.WorldTime);
         if (activity < 0.2f && CurrentGoal != CreatureGoal.Flee)
             CurrentGoal = CreatureGoal.Rest;
@@ -100,10 +116,19 @@ public class Wingbeater : Creature
         float distToPlayer = Vector2.Distance(Position, playerPos);
         Needs.Safety = Math.Min(Needs.Safety, MathHelper.Clamp(distToPlayer / 100f, 0f, 1f));
         CurrentGoal = SelectGoal();
+        float fleeSpeedBoost = CurrentGoal == CreatureGoal.Flee ? 1.3f : 1f;
+
+        // Aggro rework: only attack player if provoked, very close+hungry, or nest threatened
+        bool shouldAggroPlayer = false;
+        if (_playerAggro) shouldAggroPlayer = true;
+        else if (distToPlayer < 60f && Needs.Hunger > 0.5f) shouldAggroPlayer = true;
+        else if (_hasNest && _nestPosition.HasValue && Vector2.Distance(playerPos, _nestPosition.Value) < 100f)
+            shouldAggroPlayer = true;
+        Passive = !shouldAggroPlayer;
 
         // Creature awareness — wingbeater is an active hunter
         var (_, _, wbPrey, wbPreyDist) = ScanCreatures(ctx.NearbyCreatures, 100f, 200f);
-        if (CurrentGoal == CreatureGoal.Eat && wbPrey != null && wbPreyDist < 180f && _huntCooldown <= 0)
+        if (CurrentGoal == CreatureGoal.Eat && wbPrey != null && wbPreyDist < 180f && _huntCooldown <= 0 && WillHunt(wbPrey))
         {
             _huntTarget = wbPrey;
             Dir = wbPrey.Position.X > Position.X ? 1 : -1;
@@ -123,8 +148,45 @@ public class Wingbeater : Creature
         }
         if (_huntCooldown > 0) _huntCooldown -= dt;
 
-        // Food seeking
-        if (CurrentGoal == CreatureGoal.Eat && !IsEating)
+        // Noise detection
+        var noise = CheckNoise(ctx.NoiseEvents);
+        if (noise != null)
+        {
+            if (Role is EcologicalRole.Predator or EcologicalRole.Apex)
+            {
+                if (Needs.Hunger > 0.5f && CurrentGoal != CreatureGoal.Flee)
+                    Dir = noise.Position.X > Position.X ? 1 : -1;
+            }
+        }
+
+        // Startle propagation
+        if (CurrentGoal == CreatureGoal.Flee && _prevGoal != CreatureGoal.Flee)
+            PropagateStartle(this, ctx.NearbyCreatures);
+
+        // Nesting behavior
+        if (_state == State.Hovering || _state == State.Nesting || _state == State.GatheringPlant)
+        {
+            // Search for nest spot
+            if (!_hasNest && _nestPosition == null && Needs.Fatigue > 0.5f && ctx.TileGrid != null)
+            {
+                _nestPosition = FindNestSpot(ctx.TileGrid, ctx.TileSize, ctx.LevelBottom - 800f);
+            }
+
+            // Gather plants for nest
+            if (_nestPosition.HasValue && _nestMaterial < NestComplete && _state != State.GatheringPlant && _state != State.Tracking && _state != State.DiveBomb && _state != State.Stunned)
+            {
+                _state = State.GatheringPlant;
+            }
+
+            // Rest at nest
+            if (_hasNest && CurrentGoal == CreatureGoal.Rest && _state != State.GatheringPlant)
+            {
+                _state = State.Nesting;
+            }
+        }
+
+        // Food seeking (food sources)
+        if (CurrentGoal == CreatureGoal.Eat && !IsEating && _state == State.Hovering)
         {
             var food = FindFood(ctx.FoodSources);
             if (food != null)
@@ -156,6 +218,7 @@ public class Wingbeater : Creature
                 float gained = EatingTarget.Eat(dt);
                 Needs.Hunger = MathHelper.Clamp(Needs.Hunger - gained, 0f, 1f);
                 Velocity = Vector2.Zero;
+                _prevGoal = CurrentGoal;
                 return;
             }
         }
@@ -165,6 +228,9 @@ public class Wingbeater : Creature
         if (CurrentGoal == CreatureGoal.Eat) effectiveDetectRange *= 1.3f;
         else if (CurrentGoal == CreatureGoal.Rest) effectiveDetectRange *= 0.6f;
         else if (CurrentGoal == CreatureGoal.Flee) effectiveDetectRange *= 0.4f;
+        // Nest defense: increased detect range
+        if (_hasNest && _nestPosition.HasValue && Vector2.Distance(playerPos, _nestPosition.Value) < 150f)
+            effectiveDetectRange *= 1.5f;
 
         // Knockback
         if (KnockbackVel.LengthSquared() > 1f)
@@ -193,33 +259,45 @@ public class Wingbeater : Creature
             case State.Hovering:
                 _hoverPhase += dt * 2f;
                 Position.Y = SpawnPos.Y + MathF.Sin(_hoverPhase) * 8f;
-                // Gentle horizontal drift
                 Position.X = SpawnPos.X + MathF.Sin(_hoverPhase * 0.4f) * 15f;
                 _dir = dx > 0 ? 1 : -1;
 
-                if (dist < effectiveDetectRange && !Passive)
+                // Dive-bomb prey if hunting
+                if (_huntTarget != null && _huntTarget.Alive && _huntCooldown <= 0)
                 {
+                    _currentTargetType = TargetType.Prey;
+                    _state = State.Tracking;
+                    _stateTimer = TrackTime;
+                }
+                // Dive-bomb player if aggressive
+                else if (dist < effectiveDetectRange && !Passive)
+                {
+                    _currentTargetType = TargetType.Player;
                     _state = State.Tracking;
                     _stateTimer = TrackTime;
                 }
                 break;
 
             case State.Tracking:
-                // Lock on — hover in place, maybe shake
                 _stateTimer -= dt;
-                Position.X += MathF.Sin(_stateTimer * 30f) * 0.5f; // Vibrate
-                _dir = dx > 0 ? 1 : -1;
+                Position.X += MathF.Sin(_stateTimer * 30f) * 0.5f;
+                if (_currentTargetType == TargetType.Prey && _huntTarget != null && _huntTarget.Alive)
+                    _dir = _huntTarget.Position.X > Position.X ? 1 : -1;
+                else
+                    _dir = dx > 0 ? 1 : -1;
 
                 if (_stateTimer <= 0)
                 {
-                    // Dive toward player's current position
-                    _diveTarget = playerPos;
+                    if (_currentTargetType == TargetType.Prey && _huntTarget != null && _huntTarget.Alive)
+                        _diveTarget = _huntTarget.Position;
+                    else
+                        _diveTarget = playerPos;
                     var diveDir = _diveTarget - Position;
                     if (diveDir.LengthSquared() > 0)
                         diveDir.Normalize();
-                    Velocity = diveDir * DiveSpeed;
+                    Velocity = diveDir * DiveSpeed * fleeSpeedBoost;
                     _state = State.DiveBomb;
-                    _stateTimer = DiveMaxDist / DiveSpeed + 0.2f; // timeout
+                    _stateTimer = DiveMaxDist / DiveSpeed + 0.2f;
                     SetSquash(0.7f, 1.4f);
                 }
                 break;
@@ -229,7 +307,6 @@ public class Wingbeater : Creature
                 _dir = Velocity.X > 0 ? 1 : -1;
                 _stateTimer -= dt;
 
-                // Hit the floor or timeout
                 if (Position.Y + Height >= floorY || _stateTimer <= 0)
                 {
                     if (Position.Y + Height >= floorY)
@@ -244,9 +321,7 @@ public class Wingbeater : Creature
             case State.Stunned:
                 _stateTimer -= dt;
                 if (_stateTimer <= 0)
-                {
                     _state = State.Returning;
-                }
                 break;
 
             case State.Returning:
@@ -261,10 +336,108 @@ public class Wingbeater : Creature
                 else
                 {
                     toSpawn.Normalize();
-                    Position += toSpawn * ReturnSpeed * dt;
+                    Position += toSpawn * ReturnSpeed * fleeSpeedBoost * dt;
+                }
+                break;
+
+            case State.GatheringPlant:
+                if (!_nestPosition.HasValue || _nestMaterial >= NestComplete)
+                {
+                    _hasNest = _nestMaterial >= NestComplete;
+                    _state = State.Hovering;
+                    break;
+                }
+                if (_carryingPlant)
+                {
+                    // Fly back to nest
+                    var toNest = _nestPosition.Value - Position;
+                    if (toNest.Length() < 8f)
+                    {
+                        _nestMaterial += 0.1f;
+                        _carryingPlant = false;
+                        if (_nestMaterial >= NestComplete)
+                        {
+                            _hasNest = true;
+                            _state = State.Hovering;
+                        }
+                    }
+                    else
+                    {
+                        toNest.Normalize();
+                        Position += toNest * ReturnSpeed * dt;
+                    }
+                }
+                else
+                {
+                    // Find nearest plant
+                    if (_gatherTarget == null || _gatherTarget.Depleted)
+                    {
+                        _gatherTarget = null;
+                        float bestDist = float.MaxValue;
+                        foreach (var f in ctx.FoodSources)
+                        {
+                            if (f.Type != FoodType.Plant || f.Depleted) continue;
+                            float d = Vector2.Distance(Position, f.Position);
+                            if (d < bestDist) { bestDist = d; _gatherTarget = f; }
+                        }
+                    }
+                    if (_gatherTarget != null)
+                    {
+                        var toPlant = _gatherTarget.Position - Position;
+                        if (toPlant.Length() < 10f)
+                        {
+                            _carryingPlant = true;
+                            _gatherTarget.Amount -= 0.05f;
+                        }
+                        else
+                        {
+                            toPlant.Normalize();
+                            Position += toPlant * ReturnSpeed * dt;
+                        }
+                    }
+                    else
+                    {
+                        _state = State.Hovering; // no plants available
+                    }
+                }
+                break;
+
+            case State.Nesting:
+                if (!_hasNest || !_nestPosition.HasValue)
+                {
+                    _state = State.Hovering;
+                    break;
+                }
+                var toNestRest = _nestPosition.Value - Position;
+                if (toNestRest.Length() < 6f)
+                {
+                    // Resting at nest
+                    Needs.Fatigue = MathHelper.Clamp(Needs.Fatigue - dt * 0.05f, 0f, 1f);
+                    if (CurrentGoal != CreatureGoal.Rest)
+                        _state = State.Hovering;
+                }
+                else
+                {
+                    toNestRest.Normalize();
+                    Position += toNestRest * ReturnSpeed * dt;
                 }
                 break;
         }
+
+        _prevGoal = CurrentGoal;
+    }
+
+    private Vector2? FindNestSpot(TileGrid tg, int ts, float boundsTop)
+    {
+        int cx = (int)(SpawnPos.X / ts);
+        for (int y = (int)(SpawnPos.Y / ts) - 1; y >= (int)(boundsTop / ts) && y >= 0; y--)
+        {
+            var below = tg.GetTileAt(cx, y + 1);
+            var here = tg.GetTileAt(cx, y);
+            if (TileProperties.IsSolid(below) && !TileProperties.IsSolid(here))
+                return new Vector2(cx * ts + ts / 2f, (y + 1) * ts - 4);
+        }
+        return null;
     }
 
     public override int CheckPlayerDamage(Rectangle playerRect)
@@ -283,6 +456,7 @@ public class Wingbeater : Creature
         MeleeHitCooldown = 0.15f;
         KnockbackVel = new Vector2(kbX, kbY);
         SetSquash(1.3f, 0.7f);
+        _playerAggro = true; // player attacked us
         if (Hp <= 0)
         {
             Alive = false;

@@ -85,6 +85,7 @@ public class Bird : Creature
 
     public override int CreatureWidth => Width;
     public override int CreatureHeight => Height;
+    public override bool CanBurrow => false;
     public override Rectangle Rect => new((int)Position.X, (int)Position.Y, Width, Height);
 
     public override void Update(float dt, CreatureUpdateContext ctx)
@@ -129,6 +130,20 @@ public class Bird : Creature
             Needs.Safety = Math.Min(Needs.Safety, 0.05f);
             CurrentGoal = SelectGoal();
         }
+
+        // Noise detection
+        var noise = CheckNoise(ctx.NoiseEvents);
+        if (noise != null)
+        {
+            Needs.Safety = Math.Min(Needs.Safety, 1f - noise.Intensity);
+            Dir = noise.Position.X > Position.X ? -1 : 1;
+        }
+
+        // Startle propagation
+        if (CurrentGoal == CreatureGoal.Flee && _prevGoal != CreatureGoal.Flee)
+            PropagateStartle(this, ctx.NearbyCreatures);
+
+        float fleeSpeedBoost = CurrentGoal == CreatureGoal.Flee ? 1.3f : 1f;
 
         // Food seeking
         if (CurrentGoal == CreatureGoal.Eat && !IsEating)
@@ -337,6 +352,7 @@ public class Bird : Creature
         // Keep on ground when not flying (snap to ground Y)
         if (_state != State.Flying && _state != State.Hopping && _state != State.Fleeing)
             Position.Y = GroundY;
+        _prevGoal = CurrentGoal;
     }
 
     public override bool TakeHit(int damage, float knockbackX = 0, float knockbackY = 0)
