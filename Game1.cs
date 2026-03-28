@@ -328,6 +328,7 @@ public class Game1 : Game
     // Suit/battery systems — values live on Player, constants here
     private float _suitSparkTimer; // visual sparks when suit is low
     private float _hudGlitchTimer; // HUD distortion when suit is low
+    private float _hudAlpha;       // 0→1 fade-in after EVE boots
     private Random _hudGlitchRng = new();
     private const float TechDashBatteryCost = 0.5f;
     private const float GrappleBatteryCost = 0.5f;
@@ -1561,6 +1562,7 @@ public class Game1 : Game
                                 _evolutionFlags = _saveData.EvolutionFlags ?? new HashSet<string>();
                                 _cipherScanUnlocked = _saveData.CipherScanUnlocked;
                                 _wakeUpComplete = true;
+                                _hudAlpha = 1f;
                                 _player.IsLyingDown = false;
                                 _player.HasGrapple = _saveData?.CollectedItems?.Any(id => id.StartsWith("grapple")) == true;
                                 _hasMapModule = _saveData?.CollectedItems?.Any(id => id.StartsWith("map-module")) == true;
@@ -1870,6 +1872,7 @@ public class Game1 : Game
         }
 
         _totalTime += dt;
+        _hudAlpha = _wakeUpComplete ? Math.Min(1f, _hudAlpha + dt * 0.5f) : 0f; // fade in over 2s after EVE boots
         if (_eveMessageTimer > 0) _eveMessageTimer -= dt;
         if (_bestiaryNotifyTimer > 0) _bestiaryNotifyTimer -= dt;
         if (_eveSilenceTimer > 0) _eveSilenceTimer -= dt;
@@ -5053,6 +5056,7 @@ public class Game1 : Game
                             _torchFuel = _saveData.TorchFuel;
                             _player.ApplyTierConstants();
                             _wakeUpComplete = true;
+                            _hudAlpha = 1f;
                             _player.IsLyingDown = false;
                             // Restore inventory
                             LoadInventoryFromSave();
@@ -9837,6 +9841,7 @@ public class Game1 : Game
             {
                 // Skipped prologue — no wake-up, no EVE. Player must find her.
                 _wakeUpComplete = true;
+                _hudAlpha = 1f;
                 _player.IsLyingDown = false;
                 _camera.Zoom = 1f;
                 _camera.TargetZoom = 1f;
@@ -13256,46 +13261,47 @@ public class Game1 : Game
         }
         else if (!_isDead)
         {
+            float ha = _hudAlpha; // HUD fade-in alpha
             // Minimal HUD
-            _spriteBatch.DrawString(_font, "[Esc] Menu", new Vector2(10, 10), Color.Gray * 0.5f);
+            _spriteBatch.DrawString(_font, "[Esc] Menu", new Vector2(10, 10), Color.Gray * 0.5f * ha);
 
             // Health bar (top-left)
             int hpBarW = 200, hpBarH = 12;
             int hpBarX = 10, hpBarY = 30;
             float hpPct = _player.Hp / (float)_player.MaxHp;
-            _spriteBatch.Draw(_pixel, new Rectangle(hpBarX, hpBarY, hpBarW, hpBarH), Color.DarkRed * 0.6f);
+            _spriteBatch.Draw(_pixel, new Rectangle(hpBarX, hpBarY, hpBarW, hpBarH), Color.DarkRed * 0.6f * ha);
             _spriteBatch.Draw(_pixel, new Rectangle(hpBarX, hpBarY, (int)(hpBarW * hpPct), hpBarH),
-                hpPct > 0.5f ? Color.LimeGreen : (hpPct > 0.25f ? Color.Yellow : Color.Red));
-            DrawHollowRect(hpBarX, hpBarY, hpBarW, hpBarH, Color.White * 0.3f);
-            DrawOutlinedString(_font, $"HP {_player.Hp}/{_player.MaxHp}", new Vector2(hpBarX + hpBarW + 8, hpBarY - 2), Color.White * 0.7f);
+                (hpPct > 0.5f ? Color.LimeGreen : (hpPct > 0.25f ? Color.Yellow : Color.Red)) * ha);
+            DrawHollowRect(hpBarX, hpBarY, hpBarW, hpBarH, Color.White * 0.3f * ha);
+            DrawOutlinedString(_font, $"HP {_player.Hp}/{_player.MaxHp}", new Vector2(hpBarX + hpBarW + 8, hpBarY - 2), Color.White * 0.7f * ha);
 
             // Suit Integrity bar (below HP)
             int siBarY = hpBarY + hpBarH + 6;
             float siPct = _player.SuitIntegrity / 100f;
             var siColor = siPct > 0.6f ? new Color(100, 180, 255) : (siPct > 0.3f ? Color.Orange : Color.Red);
-            _spriteBatch.Draw(_pixel, new Rectangle(hpBarX, siBarY, hpBarW, hpBarH), new Color(20, 30, 50) * 0.6f);
-            _spriteBatch.Draw(_pixel, new Rectangle(hpBarX, siBarY, (int)(hpBarW * siPct), hpBarH), siColor);
-            DrawHollowRect(hpBarX, siBarY, hpBarW, hpBarH, Color.White * 0.3f);
-            DrawOutlinedString(_font, $"SUIT {(int)_player.SuitIntegrity}%", new Vector2(hpBarX + hpBarW + 8, siBarY - 2), siColor * 0.9f);
+            _spriteBatch.Draw(_pixel, new Rectangle(hpBarX, siBarY, hpBarW, hpBarH), new Color(20, 30, 50) * 0.6f * ha);
+            _spriteBatch.Draw(_pixel, new Rectangle(hpBarX, siBarY, (int)(hpBarW * siPct), hpBarH), siColor * ha);
+            DrawHollowRect(hpBarX, siBarY, hpBarW, hpBarH, Color.White * 0.3f * ha);
+            DrawOutlinedString(_font, $"SUIT {(int)_player.SuitIntegrity}%", new Vector2(hpBarX + hpBarW + 8, siBarY - 2), siColor * 0.9f * ha);
 
             // Battery bar (below suit)
             int batBarY = siBarY + hpBarH + 4;
             float batPct = _player.Battery / 100f;
             var batColor = batPct > 0.5f ? new Color(220, 200, 60) : (batPct > 0.2f ? Color.Orange : Color.Red);
-            _spriteBatch.Draw(_pixel, new Rectangle(hpBarX, batBarY, hpBarW, hpBarH), new Color(40, 35, 10) * 0.6f);
-            _spriteBatch.Draw(_pixel, new Rectangle(hpBarX, batBarY, (int)(hpBarW * batPct), hpBarH), batColor);
-            DrawHollowRect(hpBarX, batBarY, hpBarW, hpBarH, Color.White * 0.3f);
-            DrawOutlinedString(_font, $"BAT {(int)_player.Battery}%", new Vector2(hpBarX + hpBarW + 8, batBarY - 2), batColor * 0.9f);
+            _spriteBatch.Draw(_pixel, new Rectangle(hpBarX, batBarY, hpBarW, hpBarH), new Color(40, 35, 10) * 0.6f * ha);
+            _spriteBatch.Draw(_pixel, new Rectangle(hpBarX, batBarY, (int)(hpBarW * batPct), hpBarH), batColor * ha);
+            DrawHollowRect(hpBarX, batBarY, hpBarW, hpBarH, Color.White * 0.3f * ha);
+            DrawOutlinedString(_font, $"BAT {(int)_player.Battery}%", new Vector2(hpBarX + hpBarW + 8, batBarY - 2), batColor * 0.9f * ha);
             if (_lanternActive)
-                DrawOutlinedString(_fontSmall, "LANTERN", new Vector2(hpBarX + hpBarW + 8 + 80, batBarY), Color.Yellow * (0.8f + 0.2f * MathF.Sin(_totalTime * 4f)));
+                DrawOutlinedString(_fontSmall, "LANTERN", new Vector2(hpBarX + hpBarW + 8 + 80, batBarY), Color.Yellow * (0.8f + 0.2f * MathF.Sin(_totalTime * 4f)) * ha);
             if (_cipherHelmetEquipped)
-                DrawOutlinedString(_fontSmall, "CIPHER", new Vector2(hpBarX + hpBarW + 8 + 80, batBarY), new Color(180, 80, 220) * (0.8f + 0.2f * MathF.Sin(_totalTime * 4f)));
+                DrawOutlinedString(_fontSmall, "CIPHER", new Vector2(hpBarX + hpBarW + 8 + 80, batBarY), new Color(180, 80, 220) * (0.8f + 0.2f * MathF.Sin(_totalTime * 4f)) * ha);
             if (TorchActive && _torchFuel > 0)
             {
-                DrawOutlinedString(_fontSmall, $"TORCH {(int)_torchFuel}%", new Vector2(hpBarX + hpBarW + 8 + 80, batBarY + 14), Color.Orange * (0.8f + 0.2f * MathF.Sin(_totalTime * 3f)));
+                DrawOutlinedString(_fontSmall, $"TORCH {(int)_torchFuel}%", new Vector2(hpBarX + hpBarW + 8 + 80, batBarY + 14), Color.Orange * (0.8f + 0.2f * MathF.Sin(_totalTime * 3f)) * ha);
             }
             if (_chestPlateEquipped)
-                DrawOutlinedString(_fontSmall, "ARMOR", new Vector2(hpBarX + hpBarW + 8 + 80, batBarY + 28), new Color(100, 160, 200) * 0.8f);
+                DrawOutlinedString(_fontSmall, "ARMOR", new Vector2(hpBarX + hpBarW + 8 + 80, batBarY + 28), new Color(100, 160, 200) * 0.8f * ha);
 
             // HUD glitch effect at low suit integrity
             if (_player.SuitIntegrity < 20f)
