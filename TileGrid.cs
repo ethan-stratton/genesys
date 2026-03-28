@@ -19,6 +19,7 @@ public enum TileType : byte
     // Platform (pass-through from below, land on top)
     PlatformWood = 20,
     PlatformStone = 21,
+    PlatformMetal = 24,
 
     // Hazards
     Spikes = 40,
@@ -117,9 +118,9 @@ public enum TileType : byte
 public static class TileProperties
 {
     public static bool IsSolid(TileType t) => (t >= TileType.Dirt && t <= TileType.Sand) || t == TileType.Breakable || t == TileType.DamageFloorTile || t == TileType.BreakableGlass || t == TileType.BreakableBattery || t == TileType.MetalFloor || t == TileType.MetalWall;
-    public static bool IsPlatform(TileType t) => t >= TileType.PlatformWood && t <= TileType.PlatformBottom;
+    public static bool IsPlatform(TileType t) => (t >= TileType.PlatformWood && t <= TileType.PlatformBottom) || t == TileType.PlatformMetal;
     /// <summary>Standard thin platforms only (for merged rects). Half platforms use custom rects.</summary>
-    public static bool IsStandardPlatform(TileType t) => t == TileType.PlatformWood || t == TileType.PlatformStone;
+    public static bool IsStandardPlatform(TileType t) => t == TileType.PlatformWood || t == TileType.PlatformStone || t == TileType.PlatformMetal;
     public static bool IsHazard(TileType t) => (t >= TileType.Spikes && t <= TileType.RetractSpikesDown)
         || (t >= TileType.RetractSpikesLeft && t <= TileType.RetractHalfSpikesRight);
     public static bool IsRetractable(TileType t) => t == TileType.RetractSpikesUp || t == TileType.RetractSpikesDown
@@ -220,6 +221,7 @@ public static class TileProperties
         TileType.BreakableBattery => new Color(220, 200, 60),
         TileType.MetalFloor => new Color(140, 150, 165),
         TileType.MetalWall => new Color(100, 110, 125),
+        TileType.PlatformMetal => new Color(130, 140, 155),
         _ => Color.Transparent,
     };
 
@@ -305,6 +307,7 @@ public static class TileProperties
         TileType.Sand,
         TileType.PlatformWood,
         TileType.PlatformStone,
+        TileType.PlatformMetal,
         TileType.Spikes,
         TileType.SlopeUpRight,
         TileType.SlopeUpLeft,
