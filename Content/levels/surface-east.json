@@ -38,112 +38,220 @@
   "objects": [],
   "enemies": [
     {
+      "id": "",
       "type": "forager",
       "x": 200,
       "y": 1100,
-      "count": 0
+      "count": 0,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
+      "id": "",
       "type": "forager",
       "x": 500,
       "y": 1100,
-      "count": 0
+      "count": 0,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
+      "id": "",
       "type": "forager",
       "x": 900,
       "y": 1100,
-      "count": 0
+      "count": 0,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
+      "id": "",
       "type": "forager",
       "x": 1400,
       "y": 1100,
-      "count": 0
+      "count": 0,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
+      "id": "",
       "type": "skitter",
       "x": 700,
       "y": 1100,
-      "count": 0
+      "count": 0,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
+      "id": "",
       "type": "skitter",
       "x": 1800,
       "y": 1100,
-      "count": 0
+      "count": 0,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
+      "id": "",
       "type": "leaper",
       "x": 1200,
       "y": 1100,
-      "count": 0
+      "count": 0,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
+      "id": "",
       "type": "leaper",
       "x": 2400,
       "y": 1100,
-      "count": 0
+      "count": 0,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
+      "id": "",
       "type": "scavenger",
       "x": 400,
       "y": 1100,
-      "count": 0
+      "count": 0,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
+      "id": "",
       "type": "scavenger",
       "x": 1600,
       "y": 1100,
-      "count": 0
+      "count": 0,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
+      "id": "",
       "type": "scavenger",
       "x": 2800,
       "y": 1100,
-      "count": 0
+      "count": 0,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
+      "id": "",
       "type": "bird",
       "x": 600,
       "y": 1050,
-      "count": 0
+      "count": 0,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
+      "id": "",
       "type": "bird",
       "x": 1000,
       "y": 1050,
-      "count": 0
+      "count": 0,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
+      "id": "",
       "type": "bird",
       "x": 2000,
       "y": 1050,
-      "count": 0
+      "count": 0,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
+      "id": "",
       "type": "hopper",
       "x": 800,
       "y": 1100,
-      "count": 0
+      "count": 0,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
+      "id": "",
       "type": "hopper",
       "x": 2200,
       "y": 1100,
-      "count": 0
+      "count": 0,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
+      "id": "",
       "type": "wingbeater",
       "x": 1500,
       "y": 950,
-      "count": 0
+      "count": 0,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
+      "id": "",
       "type": "thornback",
       "x": 2600,
       "y": 1080,
-      "count": 0
+      "count": 0,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     }
   ],
   "switches": [],
@@ -154,7 +262,11 @@
     "left": "",
     "right": "",
     "up": "",
-    "down": ""
+    "down": "",
+    "LeftZones": [],
+    "RightZones": [],
+    "UpZones": [],
+    "DownZones": []
   },
   "envRegions": [],
   "tileGrid": {
@@ -3399,7 +3511,6 @@
       0,
       0,
       0,
-      3,
       0,
       0,
       0,
@@ -3499,7 +3610,8 @@
       0,
       0,
       0,
-      3,
+      0,
+      0,
       0,
       0,
       0,
@@ -3599,7 +3711,7 @@
       0,
       0,
       0,
-      3,
+      0,
       0,
       0,
       0,
@@ -3699,7 +3811,7 @@
       0,
       0,
       0,
-      3,
+      0,
       0,
       0,
       0,

@@ -2,8 +2,8 @@
   "name": "Ship Interior",
   "author": "",
   "playerSpawn": {
-    "x": 2432,
-    "y": 416
+    "x": 4320,
+    "y": 3552
   },
   "bounds": {
     "left": 0,
@@ -41,8 +41,8 @@
       "targetExitId": "exit-top"
     },
     {
-      "x": 4768,
-      "y": 3168,
+      "x": 4736,
+      "y": 6272,
       "w": 32,
       "h": 96,
       "targetLevel": "surface-east",

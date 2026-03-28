@@ -4793,19 +4793,37 @@ public class Game1 : Game
                         }
 
                         // Tunnel: reposition at target exit
-                        if (!string.IsNullOrEmpty(targetExitId))
                         {
-                            for (int j = 0; j < _level.ExitIds.Length; j++)
+                            int foundExit = -1;
+                            
+                            // 1. Try matching by targetExitId (explicit link)
+                            if (!string.IsNullOrEmpty(targetExitId))
                             {
-                                if (_level.ExitIds[j] == targetExitId)
+                                for (int j = 0; j < _level.ExitIds.Length; j++)
                                 {
-                                    var exitRect = _level.ExitRects[j];
-                                    float px = exitRect.X + (exitRect.Width - Player.Width) / 2f;
-                                    float py = exitRect.Y + exitRect.Height - Player.Height;
-                                    _player.Position = new Vector2(px, py);
-                                    _camera.SnapTo(_player.Position, Player.Width, Player.Height);
-                                    break;
+                                    if (_level.ExitIds[j] == targetExitId)
+                                    { foundExit = j; break; }
                                 }
+                            }
+                            
+                            // 2. Fallback: find exit whose targetLevel matches the level we came FROM
+                            if (foundExit < 0)
+                            {
+                                for (int j = 0; j < _level.ExitTargets.Length; j++)
+                                {
+                                    if (_level.ExitTargets[j] == _sourceLevel)
+                                    { foundExit = j; break; }
+                                }
+                            }
+                            
+                            // 3. Reposition player at found exit
+                            if (foundExit >= 0)
+                            {
+                                var exitRect = _level.ExitRects[foundExit];
+                                float px = exitRect.X + (exitRect.Width - Player.Width) / 2f;
+                                float py = exitRect.Y + exitRect.Height - Player.Height;
+                                _player.Position = new Vector2(px, py);
+                                _camera.SnapTo(_player.Position, Player.Width, Player.Height);
                             }
                         }
 

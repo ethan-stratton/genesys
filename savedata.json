@@ -1,12 +1,12 @@
 {
-  "currentLevel": "ship-interior",
-  "spawnX": 4135.863,
-  "spawnY": 6012.653,
+  "currentLevel": "surface-east",
+  "spawnX": 1078,
+  "spawnY": 1080,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 475.24475,
+  "playTime": 540.02893,
   "meleeInventory": [
     "Knife",
     "Torch"
@@ -39,15 +39,15 @@
   ],
   "windowSizeIndex": 0,
   "crtEnabled": false,
-  "moveTier": 0,
+  "moveTier": 1,
   "upgrades": [],
   "shelterLevel": "",
   "shelterX": 0,
   "shelterY": 0,
   "deathCount": 0,
-  "hp": 10,
+  "hp": 3,
   "suitIntegrity": 50,
-  "battery": 48.557735,
+  "battery": 47.557735,
   "bestiary": {
     "entries": {
       "skitter": {
@@ -65,9 +65,15 @@
             "weather": "clear",
             "behavior": "fleeing",
             "biome": "Ship Interior"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "aggressive",
+            "biome": "Surface East"
           }
         ],
-        "sightCount": 4,
+        "sightCount": 5,
         "scanTier": 0,
         "l2Scanned": true,
         "detailedRole": null,
@@ -100,9 +106,15 @@
             "weather": "clear",
             "behavior": "idle",
             "biome": "Ship Interior"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "idle",
+            "biome": "Surface East"
           }
         ],
-        "sightCount": 6,
+        "sightCount": 7,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -123,9 +135,15 @@
             "weather": "clear",
             "behavior": "fleeing",
             "biome": "Ship Interior"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "idle",
+            "biome": "Surface East"
           }
         ],
-        "sightCount": 1,
+        "sightCount": 2,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -146,6 +164,58 @@
             "weather": "clear",
             "behavior": "idle",
             "biome": "Ship Interior"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "idle",
+            "biome": "Surface East"
+          }
+        ],
+        "sightCount": 2,
+        "scanTier": 0,
+        "l2Scanned": false,
+        "detailedRole": null,
+        "temperament": null,
+        "weaknesses": null,
+        "resistances": null,
+        "l3Scanned": false,
+        "loreText": null,
+        "thoughts": null,
+        "originalNature": null
+      },
+      "hopper": {
+        "speciesName": "hopper",
+        "classification": "herbivore",
+        "observations": [
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "idle",
+            "biome": "Surface East"
+          }
+        ],
+        "sightCount": 1,
+        "scanTier": 0,
+        "l2Scanned": false,
+        "detailedRole": null,
+        "temperament": null,
+        "weaknesses": null,
+        "resistances": null,
+        "l3Scanned": false,
+        "loreText": null,
+        "thoughts": null,
+        "originalNature": null
+      },
+      "leaper": {
+        "speciesName": "leaper",
+        "classification": "predator",
+        "observations": [
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "aggressive",
+            "biome": "Surface East"
           }
         ],
         "sightCount": 1,
@@ -162,7 +232,7 @@
       }
     }
   },
-  "worldTime": 8.788613,
+  "worldTime": 9.868718,
   "evolutionFlags": [],
   "cipherScanUnlocked": false,
   "hasLantern": true,
