@@ -367,6 +367,8 @@ public class Game1 : Game
     private bool _cipherHelmetEquipped;
     private bool _hasChestPlate = true;
     private bool _chestPlateEquipped = true;
+    private bool _hasRocketBoots = true;
+    private bool _rocketBootsEquipped = true;
     private bool _eveProjectingMap;      // EVE is on ground projecting mini-map
     private Vector2 _eveMapGroundPos;    // where EVE landed to project
     private float _eveMapTimer;          // animation timer
@@ -1567,6 +1569,8 @@ public class Game1 : Game
                                 _cipherHelmetEquipped = _saveData.CipherHelmetEquipped;
                                 _hasChestPlate = _saveData.HasChestPlate;
                                 _chestPlateEquipped = _saveData.ChestPlateEquipped;
+                                _hasRocketBoots = _saveData.HasRocketBoots;
+                                _rocketBootsEquipped = _saveData.RocketBootsEquipped;
                                 _torchFuel = _saveData.TorchFuel;
                                 _camera.Zoom = 1f;
                                 _camera.TargetZoom = 1f;
@@ -1612,6 +1616,8 @@ public class Game1 : Game
                         _cipherHelmetEquipped = false;
                         _hasChestPlate = true;
                         _chestPlateEquipped = true;
+                        _hasRocketBoots = true;
+                        _rocketBootsEquipped = true;
                         _torchFuel = 100f;
                         _cipherHelmetEquipped = false;
                         _lanternActive = false;
@@ -2141,6 +2147,9 @@ public class Game1 : Game
         {
             _player.ArmorReduction = 0;
         }
+
+        // Rocket boots: gate ground pound
+        _player.EnableGroundPound = _rocketBootsEquipped;
 
         // Weapon system: set weapon availability and melee range
         var rightWs = WeaponStats.Get(ActiveRight);
@@ -5038,8 +5047,9 @@ public class Game1 : Game
                             _hasCipherHelmet = _saveData.HasCipherHelmet;
                             _hasChestPlate = _saveData.HasChestPlate;
                             _chestPlateEquipped = _saveData.ChestPlateEquipped;
+                            _hasRocketBoots = _saveData.HasRocketBoots;
+                            _rocketBootsEquipped = _saveData.RocketBootsEquipped;
                             _torchFuel = _saveData.TorchFuel;
-                            _player.CurrentTier = (Player.MoveTier)Math.Clamp(_saveData.MoveTier, 0, 2);
                             _player.ApplyTierConstants();
                             _wakeUpComplete = true;
                             _player.IsLyingDown = false;
@@ -6816,6 +6826,8 @@ public class Game1 : Game
         _saveData.CipherHelmetEquipped = _cipherHelmetEquipped;
         _saveData.HasChestPlate = _hasChestPlate;
         _saveData.ChestPlateEquipped = _chestPlateEquipped;
+        _saveData.HasRocketBoots = _hasRocketBoots;
+        _saveData.RocketBootsEquipped = _rocketBootsEquipped;
         _saveData.TorchFuel = _torchFuel;
     }
 
@@ -8467,8 +8479,22 @@ public class Game1 : Game
                     EveAlertOnce("Chest plate removed. You're lighter — dash and slide unlocked.", 4f);
                 }
             }
+
+            // Legs (rocket boots) slot
+            bool isLegsSlot = _equipCursorX == 1 && _equipCursorY == 2;
+            if (confirm && isLegsSlot && _hasRocketBoots)
+            {
+                _rocketBootsEquipped = !_rocketBootsEquipped;
+                if (_rocketBootsEquipped)
+                {
+                    EveAlertOnce("Rocket boots locked in. Ground pound online.", 4f);
+                }
+                else
+                {
+                    EveAlertOnce("Boots removed. Lighter on your feet, but no ground pound.", 4f);
+                }
+            }
         }
-        else if (_invCategory == 3)
         {
             // Log/Bestiary: W/S navigates species list or scrolls right panel
             if (_bestiaryFocusRight)
@@ -8730,7 +8756,30 @@ public class Game1 : Game
                 }
             }
         }
-        DrawLockedSlot(legsX, legsY, slotW, slotH, "Legs", _equipCursorX == 1 && _equipCursorY == 2);
+        // Legs slot
+        {
+            bool lgSelected = _equipCursorX == 1 && _equipCursorY == 2;
+            if (!_hasRocketBoots)
+            {
+                DrawLockedSlot(legsX, legsY, slotW, slotH, "Legs", lgSelected);
+            }
+            else
+            {
+                var lgBg = lgSelected ? new Color(80, 60, 40) * 0.9f : new Color(40, 30, 20) * 0.7f;
+                _spriteBatch.Draw(_pixel, new Rectangle(legsX, legsY, slotW, slotH), lgBg);
+                DrawHollowRect(legsX, legsY, slotW, slotH, lgSelected ? new Color(255, 160, 60) : Color.White * 0.3f);
+                if (_rocketBootsEquipped)
+                {
+                    DrawOutlinedString(_fontSmall, "Rocket", new Vector2(legsX + 4, legsY + 4), new Color(255, 160, 60));
+                    DrawOutlinedString(_fontSmall, "Boots", new Vector2(legsX + 4, legsY + 18), new Color(255, 160, 60));
+                }
+                else
+                {
+                    DrawOutlinedString(_fontSmall, "Legs", new Vector2(legsX + 4, legsY + 4), Color.Gray * 0.7f);
+                    DrawOutlinedString(_fontSmall, "[Removed]", new Vector2(legsX + 4, legsY + 18), Color.Gray * 0.5f);
+                }
+            }
+        }
 
         // Weapon picker overlay
         if (_equipPickerOpen)

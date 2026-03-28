@@ -494,6 +494,7 @@ public class Player
     public bool EnableUppercut { get; set; } = true;
     public bool EnableSpinMelee { get; set; } = true;
     public bool EnableFlip { get; set; } = true;
+    public bool EnableGroundPound { get; set; } = true;
     public bool EnableBladeDash { get; set; } = true;
     public bool EnableWallClimb { get; set; } = true;
     public bool EnableWallCling { get; set; } = true; // can grab wall (jump off). Climb = can also move up/down
@@ -2132,7 +2133,7 @@ public class Player
             // Don't allow during grapple (down extends rope instead)
             // Don't trigger if we just dropped through a platform
             bool freshDownPress = inputY > 0 && _prevInputY <= 0;
-            if (CurrentTier == MoveTier.Tech && !IsGrounded && freshDownPress && !IsGroundPounding
+            if (CurrentTier == MoveTier.Tech && EnableGroundPound && !IsGrounded && freshDownPress && !IsGroundPounding
                 && !IsGrappleFiring && !IsGrapplePulling && GrappleRopeLength <= 0
                 && _dropIgnoreTimer <= 0)
             {

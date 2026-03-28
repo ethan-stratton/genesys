@@ -51,6 +51,8 @@ public class SaveData
     [JsonPropertyName("torchFuel")] public float TorchFuel { get; set; } = 100f;
     [JsonPropertyName("hasChestPlate")] public bool HasChestPlate { get; set; } = true; // player starts with it
     [JsonPropertyName("chestPlateEquipped")] public bool ChestPlateEquipped { get; set; } = true; // equipped by default
+    [JsonPropertyName("hasRocketBoots")] public bool HasRocketBoots { get; set; } = true;
+    [JsonPropertyName("rocketBootsEquipped")] public bool RocketBootsEquipped { get; set; } = true;
     [JsonPropertyName("durR1")] public int DurR1 { get; set; }
     [JsonPropertyName("durR2")] public int DurR2 { get; set; }
     [JsonPropertyName("durL1")] public int DurL1 { get; set; }
