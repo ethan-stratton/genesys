@@ -1,12 +1,12 @@
 {
   "currentLevel": "surface-east",
-  "spawnX": 707.83765,
-  "spawnY": 952,
+  "spawnX": 598,
+  "spawnY": 1080,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 1216.851,
+  "playTime": 1450.8146,
   "meleeInventory": [
     "Knife",
     "Torch"
@@ -47,7 +47,7 @@
   "deathCount": 1,
   "hp": 10,
   "suitIntegrity": 50,
-  "battery": 37.673786,
+  "battery": 1.1396432,
   "bestiary": {
     "entries": {
       "skitter": {
@@ -95,9 +95,21 @@
             "weather": "clear",
             "behavior": "idle",
             "biome": "Surface East"
+          },
+          {
+            "time": "night",
+            "weather": "clear",
+            "behavior": "aggressive",
+            "biome": "Surface East"
+          },
+          {
+            "time": "dawn",
+            "weather": "clear",
+            "behavior": "fleeing",
+            "biome": "Surface East"
           }
         ],
-        "sightCount": 9,
+        "sightCount": 13,
         "scanTier": 0,
         "l2Scanned": true,
         "detailedRole": null,
@@ -174,7 +186,7 @@
             "biome": "Surface East"
           }
         ],
-        "sightCount": 23,
+        "sightCount": 24,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -237,9 +249,21 @@
             "weather": "clear",
             "behavior": "moving",
             "biome": "Surface East"
+          },
+          {
+            "time": "night",
+            "weather": "clear",
+            "behavior": "fleeing",
+            "biome": "Surface East"
+          },
+          {
+            "time": "dawn",
+            "weather": "clear",
+            "behavior": "moving",
+            "biome": "Surface East"
           }
         ],
-        "sightCount": 9,
+        "sightCount": 14,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -331,9 +355,15 @@
             "weather": "clear",
             "behavior": "idle",
             "biome": "Surface East"
+          },
+          {
+            "time": "night",
+            "weather": "clear",
+            "behavior": "fleeing",
+            "biome": "Surface East"
           }
         ],
-        "sightCount": 9,
+        "sightCount": 13,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -360,9 +390,21 @@
             "weather": "clear",
             "behavior": "idle",
             "biome": "Surface East"
+          },
+          {
+            "time": "dawn",
+            "weather": "clear",
+            "behavior": "aggressive",
+            "biome": "Surface East"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "moving",
+            "biome": "Surface East"
           }
         ],
-        "sightCount": 3,
+        "sightCount": 6,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -391,7 +433,7 @@
             "biome": "Surface East"
           }
         ],
-        "sightCount": 2,
+        "sightCount": 3,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -420,7 +462,7 @@
             "biome": "Surface East"
           }
         ],
-        "sightCount": 4,
+        "sightCount": 6,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -434,7 +476,7 @@
       }
     }
   },
-  "worldTime": 21.206837,
+  "worldTime": 8.982322,
   "evolutionFlags": [],
   "cipherScanUnlocked": false,
   "hasLantern": true,

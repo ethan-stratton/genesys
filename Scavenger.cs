@@ -36,6 +36,8 @@ public class Scavenger : Creature
         _wanderChangeTimer = 1f + Random.Shared.NextSingle() * 2f;
         _dir = Random.Shared.NextSingle() > 0.5f ? 1 : -1;
         SpawnOrigin = pos;
+        WanderRadius = 200f;
+        MaxWanderRadius = 800f;
         HungerRate = 0.004f;
         FatigueRate = 0.0015f;
         Needs.Hunger = 0.2f + (float)Random.Shared.NextDouble() * 0.3f;

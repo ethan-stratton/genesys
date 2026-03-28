@@ -76,6 +76,15 @@ public class Wingbeater : Creature
     public override bool CanBurrow => false;
     public override (int min, int max) PreySize => (50, 400);
 
+    public override CreatureGoal SelectGoal()
+    {
+        if (Hp > 0 && Hp <= MaxHp * 0.3f) return CreatureGoal.Flee;
+        if (Needs.Safety < 0.3f) return CreatureGoal.Flee;
+        if (Needs.Hunger > 0.45f) return CreatureGoal.Eat; // wingbeaters hunt earlier than others
+        if (Needs.Fatigue > 0.7f) return CreatureGoal.Rest;
+        return CreatureGoal.Wander;
+    }
+
     public Wingbeater(Vector2 pos)
     {
         Position = pos;
@@ -89,9 +98,9 @@ public class Wingbeater : Creature
         HitColor = new Color(160, 60, 40);
         _stateTimer = 1f;
         _hoverPhase = pos.X * 0.1f;
-        HungerRate = 0.003f;
+        HungerRate = 0.006f;
         FatigueRate = 0.002f;
-        Needs.Hunger = 0.2f + (float)Random.Shared.NextDouble() * 0.3f;
+        Needs.Hunger = 0.55f + (float)Random.Shared.NextDouble() * 0.25f;
         Needs.Fatigue = (float)Random.Shared.NextDouble() * 0.2f;
     }
 

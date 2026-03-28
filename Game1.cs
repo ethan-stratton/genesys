@@ -203,6 +203,7 @@ public class Game1 : Game
     private Random _shakeRng = new();
     private List<NoiseEvent> _noiseEvents = new();
     private float _prevPlayerMeleeTimer;
+    private float _footstepTimer;
 
     private List<Bullet> _bullets;
     private List<InsectSwarm> _swarms = new();
@@ -3427,6 +3428,25 @@ public class Game1 : Game
             _noiseEvents.Add(new NoiseEvent(swingPos, 150f, 0.4f, "SWSH", Color.LightGray * 0.7f, 1.0f));
         }
         _prevPlayerMeleeTimer = _player.MeleeTimer;
+
+        // Running footstep noise — periodic while sprinting/running on ground
+        if (_player.IsGrounded && !_player.IsCrouching && !_player.IsSliding && MathF.Abs(_player.Velocity.X) > 100f)
+        {
+            _footstepTimer -= dt;
+            if (_footstepTimer <= 0)
+            {
+                float loudness = MathF.Abs(_player.Velocity.X) > 250f ? 0.5f : 0.25f;
+                string label = MathF.Abs(_player.Velocity.X) > 250f ? "THMP" : "tap";
+                float radius = MathF.Abs(_player.Velocity.X) > 250f ? 120f : 60f;
+                var footPos = new Vector2(_player.Position.X + Player.Width / 2f, _player.Position.Y + Player.Height - 4f);
+                _noiseEvents.Add(new NoiseEvent(footPos, radius, loudness, label, Color.Gray * 0.5f, 0.4f));
+                _footstepTimer = MathF.Abs(_player.Velocity.X) > 250f ? 0.25f : 0.4f;
+            }
+        }
+        else
+        {
+            _footstepTimer = 0; // reset so first step is immediate
+        }
 
         // Unified melee hit detection
         if (_player.MeleeTimer > 0)
@@ -12080,9 +12100,6 @@ public class Game1 : Game
             foreach (var swarm in _swarms) swarm.Draw(_spriteBatch, _pixel);
             foreach (var f in _foodSources) f.Draw(_spriteBatch, _pixel);
             foreach (var creature in _creatures) { if (!_enemySquashEnabled) creature.VisualScale = Vector2.One; creature.Draw(_spriteBatch, _pixel); }
-            // Draw noise event labels
-            var camOffset = _camera?.Position ?? Vector2.Zero;
-            foreach (var n in _noiseEvents) n.Draw(_spriteBatch, _fontSmall, camOffset);
             // Debug: show eating state above creatures
             if (_debugEcosystem)
             {
@@ -12395,6 +12412,12 @@ public class Game1 : Game
                     int shieldY = (int)_player.Position.Y + (_player.CurrentHeight - shieldH) / 2;
                     _spriteBatch.Draw(_pixel, new Rectangle(shieldX, shieldY, shieldW, shieldH), new Color(139, 90, 43));
                 }
+        }
+
+        // Draw noise event labels (above player, above creatures)
+        if (_enemiesEnabled)
+        {
+            foreach (var n in _noiseEvents) n.Draw(_spriteBatch, _fontSmall, Vector2.Zero);
         }
 
         // Draw EVE orbiting companion

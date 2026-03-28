@@ -252,8 +252,11 @@ public class Crawler : Creature
         DeathParticleColor = new Color(120, 60, 20);
         HitColor = new Color(120, 60, 20);
         InitLegs();
-        // Randomize starting needs so creatures desync
-        Needs.Hunger = 0.2f + (float)Random.Shared.NextDouble() * 0.3f;
+        // Randomize starting needs — predators start hungrier
+        bool isPredator = Role is EcologicalRole.Predator or EcologicalRole.Apex;
+        Needs.Hunger = isPredator
+            ? 0.5f + (float)Random.Shared.NextDouble() * 0.25f
+            : 0.2f + (float)Random.Shared.NextDouble() * 0.3f;
         Needs.Fatigue = (float)Random.Shared.NextDouble() * 0.2f;
     }
 
@@ -264,11 +267,22 @@ public class Crawler : Creature
         {
             case CrawlerVariant.Forager: HungerRate = 0.003f; break;
             case CrawlerVariant.Skitter: FatigueRate = 0.002f; break;
-            case CrawlerVariant.Leaper: HungerRate = 0.002f; FatigueRate = 0.0015f; break;
+            case CrawlerVariant.Leaper: HungerRate = 0.005f; FatigueRate = 0.0015f; break;
             case CrawlerVariant.Bombardier: FatigueRate = 0.0008f; break;
             case CrawlerVariant.Stalker: HungerRate = 0.0025f; break;
             case CrawlerVariant.Spitter: FatigueRate = 0.0012f; break;
         }
+    }
+
+    public override CreatureGoal SelectGoal()
+    {
+        if (Hp > 0 && Hp <= MaxHp * 0.3f) return CreatureGoal.Flee;
+        if (Needs.Safety < 0.3f) return CreatureGoal.Flee;
+        // Predators hunt earlier
+        float eatThresh = (Role is EcologicalRole.Predator or EcologicalRole.Apex) ? 0.45f : 0.7f;
+        if (Needs.Hunger > eatThresh) return CreatureGoal.Eat;
+        if (Needs.Fatigue > 0.7f) return CreatureGoal.Rest;
+        return CreatureGoal.Wander;
     }
 
     public override Rectangle Rect => new((int)Position.X, (int)Position.Y, EffectiveWidth, EffectiveHeight);
@@ -353,7 +367,7 @@ public class Crawler : Creature
             case CrawlerVariant.Leaper:
             case CrawlerVariant.Stalker:
             case CrawlerVariant.Spitter:
-                if (CurrentGoal == CreatureGoal.Eat && prey != null && preyDist < 150f)
+                if (CurrentGoal == CreatureGoal.Eat && prey != null && preyDist < 300f)
                 {
                     _huntTarget = prey;
                     Dir = prey.Position.X > Position.X ? 1 : -1;
