@@ -89,6 +89,7 @@ public class Player
                 EnableBladeDash = false;
                 EnableUppercut = false;
                 EnableWallClimb = false;
+                EnableWallCling = false;
                 EnableSlide = false;
                 EnableVaultKick = false;
                 EnableCartwheel = false;
@@ -99,6 +100,7 @@ public class Player
                 EnableBladeDash = false;
                 EnableUppercut = false;
                 EnableWallClimb = true;
+                EnableWallCling = true;
                 EnableSlide = true;
                 EnableVaultKick = false;
                 EnableCartwheel = true;
@@ -109,6 +111,7 @@ public class Player
                 EnableBladeDash = true;
                 EnableUppercut = true;
                 EnableWallClimb = true;
+                EnableWallCling = true;
                 EnableSlide = true;
                 EnableVaultKick = true;
                 EnableCartwheel = true;
@@ -349,6 +352,7 @@ public class Player
     public int MaxHp { get; set; } = 10;
     public int Hp { get; set; } = 10;
     public float SuitIntegrity { get; set; } = 31f;  // 0-100, exploration/survival resource
+    public int ArmorReduction { get; set; } = 0; // flat damage reduction from armor pieces
     public float Battery { get; set; } = 80f;         // 0-100, power for tech systems
     public float DamageCooldown { get; set; }
     private const float DamageCooldownTime = 1.0f;
@@ -428,6 +432,10 @@ public class Player
             }
         }
         
+        // Armor reduction (flat, minimum 1 damage)
+        if (ArmorReduction > 0 && amount > 1)
+            amount = Math.Max(1, amount - ArmorReduction);
+        
         Hp -= amount;
         DamageCooldown = DamageCooldownTime;
         _regenDelay = 0f;
@@ -488,6 +496,7 @@ public class Player
     public bool EnableFlip { get; set; } = true;
     public bool EnableBladeDash { get; set; } = true;
     public bool EnableWallClimb { get; set; } = true;
+    public bool EnableWallCling { get; set; } = true; // can grab wall (jump off). Climb = can also move up/down
 
     // Tech charged jump: hold Space on ground to charge, release to jump higher
     private float _chargeJumpTimer;
@@ -1215,7 +1224,7 @@ public class Player
 
         // --- Wall attachment check ---
         _wallHopCooldown -= dt;
-        if (!IsOnWall && !IsOnRope && walls != null && EnableWallClimb && !IsSliding && _wallHopCooldown <= 0f)
+        if (!IsOnWall && !IsOnRope && walls != null && (EnableWallClimb || EnableWallCling) && !IsSliding && _wallHopCooldown <= 0f)
         {
             float playerCenterY = Position.Y + Height / 2f;
             bool nearAnyWall = false;
@@ -1658,9 +1667,14 @@ public class Player
             {
                 // Stationary on wall
             }
-            else
+            else if (EnableWallClimb)
             {
                 if (inputY != 0) vel.Y = inputY * WallClimbSpeed;
+            }
+            else
+            {
+                // Cling only: slowly slide down (no climbing)
+                vel.Y = 30f; // gentle slide
             }
 
             // Block climbing up through solid floors / platforms

@@ -365,6 +365,8 @@ public class Game1 : Game
     private bool _hasLantern;
     private bool _hasCipherHelmet;
     private bool _cipherHelmetEquipped;
+    private bool _hasChestPlate = true;
+    private bool _chestPlateEquipped = true;
     private bool _eveProjectingMap;      // EVE is on ground projecting mini-map
     private Vector2 _eveMapGroundPos;    // where EVE landed to project
     private float _eveMapTimer;          // animation timer
@@ -1563,6 +1565,8 @@ public class Game1 : Game
                                 _hasLantern = _saveData.HasLantern;
                                 _hasCipherHelmet = _saveData.HasCipherHelmet;
                                 _cipherHelmetEquipped = _saveData.CipherHelmetEquipped;
+                                _hasChestPlate = _saveData.HasChestPlate;
+                                _chestPlateEquipped = _saveData.ChestPlateEquipped;
                                 _torchFuel = _saveData.TorchFuel;
                                 _camera.Zoom = 1f;
                                 _camera.TargetZoom = 1f;
@@ -1605,6 +1609,9 @@ public class Game1 : Game
                         _hasMapModule = false;
                         _hasLantern = false;
                         _hasCipherHelmet = false;
+                        _cipherHelmetEquipped = false;
+                        _hasChestPlate = true;
+                        _chestPlateEquipped = true;
                         _torchFuel = 100f;
                         _cipherHelmetEquipped = false;
                         _lanternActive = false;
@@ -2121,6 +2128,20 @@ public class Game1 : Game
         _player.EnableDash = _enableDash;
         _player.EnableDropThrough = _enableDropThrough;
         _player.EnableSpinMelee = _enableSpinMelee;
+
+        // Chest plate equipment restrictions
+        if (_chestPlateEquipped)
+        {
+            _player.EnableDash = false;      // too heavy for dash
+            _player.EnableSlide = false;     // rigid chest can't compress
+            _player.EnableWallClimb = false; // too heavy to climb
+            _player.EnableWallCling = true;  // can still grab and wall-jump
+            _player.ArmorReduction = 1;      // -1 damage from all hits
+        }
+        else
+        {
+            _player.ArmorReduction = 0;
+        }
 
         // Weapon system: set weapon availability and melee range
         var rightWs = WeaponStats.Get(ActiveRight);
@@ -4147,7 +4168,10 @@ public class Game1 : Game
             }
 
             if (suitDeg > 0f)
+            {
+                if (_chestPlateEquipped) suitDeg *= 0.5f; // chest plate halves degradation
                 _player.SuitIntegrity = MathF.Max(0f, _player.SuitIntegrity - suitDeg * dt);
+            }
 
             if (hpDrain > 0f)
             {
@@ -5013,6 +5037,8 @@ public class Game1 : Game
                             _hasMapModule = _saveData.CollectedItems?.Any(id => id.StartsWith("map-module")) == true;
                             _hasLantern = _saveData.HasLantern;
                             _hasCipherHelmet = _saveData.HasCipherHelmet;
+                            _hasChestPlate = _saveData.HasChestPlate;
+                            _chestPlateEquipped = _saveData.ChestPlateEquipped;
                             _torchFuel = _saveData.TorchFuel;
                             _player.CurrentTier = (Player.MoveTier)Math.Clamp(_saveData.MoveTier, 0, 2);
                             _player.ApplyTierConstants();
@@ -6789,6 +6815,8 @@ public class Game1 : Game
         _saveData.HasLantern = _hasLantern;
         _saveData.HasCipherHelmet = _hasCipherHelmet;
         _saveData.CipherHelmetEquipped = _cipherHelmetEquipped;
+        _saveData.HasChestPlate = _hasChestPlate;
+        _saveData.ChestPlateEquipped = _chestPlateEquipped;
         _saveData.TorchFuel = _torchFuel;
     }
 
@@ -8425,6 +8453,21 @@ public class Game1 : Game
                     EveAlertOnce("Cipher visor disengaged.");
                 }
             }
+
+            // Chest plate slot
+            bool isChestSlot = _equipCursorX == 1 && _equipCursorY == 1;
+            if (confirm && isChestSlot && _hasChestPlate)
+            {
+                _chestPlateEquipped = !_chestPlateEquipped;
+                if (_chestPlateEquipped)
+                {
+                    EveAlertOnce("Chest plate secured. Heavier, but you'll take less damage.", 4f);
+                }
+                else
+                {
+                    EveAlertOnce("Chest plate removed. You're lighter — dash and slide unlocked.", 4f);
+                }
+            }
         }
         else if (_invCategory == 3)
         {
@@ -8664,7 +8707,30 @@ public class Game1 : Game
                 }
             }
         }
-        DrawLockedSlot(chestX, chestY, slotW, slotH, "Chest", _equipCursorX == 1 && _equipCursorY == 1);
+        // Chest slot
+        {
+            bool chSelected = _equipCursorX == 1 && _equipCursorY == 1;
+            if (!_hasChestPlate)
+            {
+                DrawLockedSlot(chestX, chestY, slotW, slotH, "Chest", chSelected);
+            }
+            else
+            {
+                var chBg = chSelected ? new Color(60, 80, 100) * 0.9f : new Color(30, 40, 50) * 0.7f;
+                _spriteBatch.Draw(_pixel, new Rectangle(chestX, chestY, slotW, slotH), chBg);
+                DrawHollowRect(chestX, chestY, slotW, slotH, chSelected ? new Color(120, 180, 220) : Color.White * 0.3f);
+                if (_chestPlateEquipped)
+                {
+                    DrawOutlinedString(_fontSmall, "Tech", new Vector2(chestX + 4, chestY + 4), new Color(120, 180, 220));
+                    DrawOutlinedString(_fontSmall, "Chest Plate", new Vector2(chestX + 4, chestY + 18), new Color(120, 180, 220));
+                }
+                else
+                {
+                    DrawOutlinedString(_fontSmall, "Chest", new Vector2(chestX + 4, chestY + 4), Color.Gray * 0.7f);
+                    DrawOutlinedString(_fontSmall, "[Removed]", new Vector2(chestX + 4, chestY + 18), Color.Gray * 0.5f);
+                }
+            }
+        }
         DrawLockedSlot(legsX, legsY, slotW, slotH, "Legs", _equipCursorX == 1 && _equipCursorY == 2);
 
         // Weapon picker overlay
@@ -13178,6 +13244,8 @@ public class Game1 : Game
             {
                 DrawOutlinedString(_fontSmall, $"TORCH {(int)_torchFuel}%", new Vector2(hpBarX + hpBarW + 8 + 80, batBarY + 14), Color.Orange * (0.8f + 0.2f * MathF.Sin(_totalTime * 3f)));
             }
+            if (_chestPlateEquipped)
+                DrawOutlinedString(_fontSmall, "ARMOR", new Vector2(hpBarX + hpBarW + 8 + 80, batBarY + 28), new Color(100, 160, 200) * 0.8f);
 
             // HUD glitch effect at low suit integrity
             if (_player.SuitIntegrity < 20f)
