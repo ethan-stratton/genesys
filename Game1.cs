@@ -121,6 +121,9 @@ public class Game1 : Game
 
     // CRT effect
     private RenderTarget2D _crtTarget;
+    private Texture2D _crtSlotMaskTex;  // RGB subpixel slot mask pattern
+    private Texture2D _crtGrainTex;     // noise texture for film grain
+    private float _crtGrainTimer;       // regenerate grain periodically
     
     // Lantern & lighting system
     private bool _lanternActive;
@@ -1344,9 +1347,12 @@ public class Game1 : Game
         {
             try { _crtShader = Content.Load<Effect>("shaders/CRT"); } catch { _crtShader = null; }
         }
-        // Build scanline overlay texture (fallback when no shader)
+        // Build scanline overlay texture
         _scanlineTex = new Texture2D(GraphicsDevice, 1, 4);
         _scanlineTex.SetData(new[] { Color.Transparent, new Color(0, 0, 0, 60), new Color(0, 0, 0, 80), Color.Transparent });
+        // Build CRT slot mask and grain textures
+        BuildCrtSlotMask(3);
+        BuildCrtGrainTex();
         _fontSystem = new FontSystem();
         _fontSystem.AddFont(File.ReadAllBytes("Content/Fonts/main.ttf"));
         _font = _fontSystem.GetFont(12);       // main text (was 16, too large for Press Start 2P)
@@ -14049,49 +14055,144 @@ public class Game1 : Game
         GraphicsDevice.SetRenderTarget(null);
         GraphicsDevice.Clear(Color.Black);
 
-        if (_crtShader != null)
-        {
-            // Full shader path
-            _crtShader.Parameters["TextureSize"]?.SetValue(new Vector2(_crtTarget.Width, _crtTarget.Height));
-            _crtShader.Parameters["OutputSize"]?.SetValue(new Vector2(ViewW, ViewH));
-            _crtShader.Parameters["ScanlineWeight"]?.SetValue(0.25f);
-            _crtShader.Parameters["Curvature"]?.SetValue(0.02f);
-            _crtShader.Parameters["VignetteStrength"]?.SetValue(0.3f);
-            _crtShader.Parameters["BleedAmount"]?.SetValue(0.001f);
-            _crtShader.Parameters["Brightness"]?.SetValue(1.15f);
-            _spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.Opaque,
-                SamplerState.PointClamp, null, null, _crtShader);
-            _spriteBatch.Draw(_crtTarget, new Rectangle(0, 0, ViewW, ViewH), Color.White);
-            _spriteBatch.End();
-        }
-        else
-        {
-            // Fallback: draw game frame + scanline overlay
-            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Opaque,
-                SamplerState.PointClamp);
-            _spriteBatch.Draw(_crtTarget, new Rectangle(0, 0, ViewW, ViewH), Color.White);
-            _spriteBatch.End();
+        // ===== Flowerwall-style CRT (SpriteBatch multi-pass) =====
+        
+        // Pass 1: Draw game frame
+        _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Opaque,
+            SamplerState.PointClamp);
+        _spriteBatch.Draw(_crtTarget, new Rectangle(0, 0, ViewW, ViewH), Color.White);
+        _spriteBatch.End();
 
-            // Scanline overlay with alpha blending
-            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend,
+        // Pass 2: RGB slot mask overlay (multiply blend)
+        if (_crtSlotMaskTex != null)
+        {
+            _spriteBatch.Begin(SpriteSortMode.Deferred, _multiplyBlend,
                 SamplerState.LinearWrap);
-            // Tile the scanline texture across the screen
-            _spriteBatch.Draw(_scanlineTex,
+            _spriteBatch.Draw(_crtSlotMaskTex,
                 new Rectangle(0, 0, ViewW, ViewH),
-                new Rectangle(0, 0, 1, ViewH),
+                new Rectangle(0, 0, ViewW, ViewH),
                 Color.White);
             _spriteBatch.End();
+        }
 
-            // Vignette overlay
-            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend);
-            // Dark edges using 4 gradient rects
-            int vigSize = ViewW / 6;
-            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, vigSize, ViewH), Color.Black * 0.3f);
-            _spriteBatch.Draw(_pixel, new Rectangle(ViewW - vigSize, 0, vigSize, ViewH), Color.Black * 0.3f);
-            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, vigSize), Color.Black * 0.2f);
-            _spriteBatch.Draw(_pixel, new Rectangle(0, ViewH - vigSize, ViewW, vigSize), Color.Black * 0.2f);
+        // Pass 3: Scanlines (thin dark horizontal lines every 3 pixels)
+        _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend,
+            SamplerState.LinearWrap);
+        _spriteBatch.Draw(_scanlineTex,
+            new Rectangle(0, 0, ViewW, ViewH),
+            new Rectangle(0, 0, 1, ViewH),
+            Color.White);
+        _spriteBatch.End();
+
+        // Pass 4: Film grain (refreshed ~20fps for organic flicker)
+        _crtGrainTimer -= 1f / 60f;
+        if (_crtGrainTimer <= 0)
+        {
+            BuildCrtGrainTex();
+            _crtGrainTimer = 0.05f;
+        }
+        if (_crtGrainTex != null)
+        {
+            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend,
+                SamplerState.PointClamp);
+            _spriteBatch.Draw(_crtGrainTex,
+                new Rectangle(0, 0, ViewW, ViewH),
+                Color.White);
             _spriteBatch.End();
         }
+
+        // Pass 5: Vignette (smooth gradient darkening at edges)
+        _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend);
+        int vigW = ViewW / 5;
+        int vigH = ViewH / 5;
+        // Left
+        for (int i = 0; i < 4; i++)
+        {
+            int x = vigW * i / 4;
+            int w = vigW / 4 + 1;
+            int a = 40 - i * 10;
+            _spriteBatch.Draw(_pixel, new Rectangle(x, 0, w, ViewH), new Color(0, 0, 0, a));
+        }
+        // Right
+        for (int i = 0; i < 4; i++)
+        {
+            int x = ViewW - vigW + vigW * i / 4;
+            int w = vigW / 4 + 1;
+            int a = 10 + i * 10;
+            _spriteBatch.Draw(_pixel, new Rectangle(x, 0, w, ViewH), new Color(0, 0, 0, a));
+        }
+        // Top
+        for (int i = 0; i < 3; i++)
+        {
+            int y = vigH * i / 3;
+            int h = vigH / 3 + 1;
+            int a = 30 - i * 10;
+            _spriteBatch.Draw(_pixel, new Rectangle(0, y, ViewW, h), new Color(0, 0, 0, a));
+        }
+        // Bottom
+        for (int i = 0; i < 3; i++)
+        {
+            int y = ViewH - vigH + vigH * i / 3;
+            int h = vigH / 3 + 1;
+            int a = 10 + i * 10;
+            _spriteBatch.Draw(_pixel, new Rectangle(0, y, ViewW, h), new Color(0, 0, 0, a));
+        }
+        _spriteBatch.End();
+
+        // Pass 6: Brightness boost (subtle additive white)
+        _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Additive);
+        _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), new Color(15, 15, 15, 0));
+        _spriteBatch.End();
+    }
+
+    /// <summary>Build a tiling RGB slot mask texture matching the Flowerwall CRT look.</summary>
+    private void BuildCrtSlotMask(int cellSize)
+    {
+        int patW = cellSize * 4;
+        int patH = cellSize * 4;
+        var data = new Color[patW * patH];
+        float dim = 0.6f;        // off-channels at 60%
+        float allDim = 0.73f;    // 4th column: all slightly dimmed
+
+        for (int py = 0; py < patH; py++)
+        {
+            int lineIndex = (py / cellSize) % 4;
+            for (int px = 0; px < patW; px++)
+            {
+                int rgbIndex = ((px / cellSize) + lineIndex * 2) % 4;
+                float r, g, b;
+                switch (rgbIndex)
+                {
+                    case 0: r = 1f; g = dim; b = dim; break;
+                    case 1: r = dim; g = 1f; b = dim; break;
+                    case 2: r = dim; g = dim; b = 1f; break;
+                    default: r = allDim; g = allDim; b = allDim; break;
+                }
+                data[py * patW + px] = new Color(r, g, b, 1f);
+            }
+        }
+        _crtSlotMaskTex?.Dispose();
+        _crtSlotMaskTex = new Texture2D(GraphicsDevice, patW, patH);
+        _crtSlotMaskTex.SetData(data);
+    }
+
+    /// <summary>Build a noise texture for film grain (1/4 res, scaled up).</summary>
+    private void BuildCrtGrainTex()
+    {
+        int gw = Math.Max(ViewW / 4, 1);
+        int gh = Math.Max(ViewH / 4, 1);
+        var data = new Color[gw * gh];
+        for (int i = 0; i < data.Length; i++)
+        {
+            int noise = Random.Shared.Next(0, 35);
+            data[i] = new Color(0, 0, 0, noise);
+        }
+        if (_crtGrainTex == null || _crtGrainTex.Width != gw || _crtGrainTex.Height != gh)
+        {
+            _crtGrainTex?.Dispose();
+            _crtGrainTex = new Texture2D(GraphicsDevice, gw, gh);
+        }
+        _crtGrainTex.SetData(data);
     }
 
     private bool IsPlayerNearMetalTile()

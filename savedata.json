@@ -1,12 +1,12 @@
 {
-  "currentLevel": "surface-east",
-  "spawnX": 1360.4998,
-  "spawnY": 2235.3333,
+  "currentLevel": "ship-interior",
+  "spawnX": 5993.91,
+  "spawnY": 2295.3318,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 196.72942,
+  "playTime": 303.45337,
   "meleeInventory": [],
   "rangedInventory": [],
   "meleeIndex": 0,
@@ -21,7 +21,8 @@
   "rightActiveSlot1": true,
   "leftActiveSlot1": true,
   "collectedItems": [
-    "grapple-2"
+    "grapple-2",
+    "debug_grapple_639103216437212280"
   ],
   "windowSizeIndex": 0,
   "crtEnabled": false,
@@ -30,10 +31,10 @@
   "shelterLevel": "",
   "shelterX": 0,
   "shelterY": 0,
-  "deathCount": 0,
+  "deathCount": 1,
   "hp": 10,
-  "suitIntegrity": 31,
-  "battery": 55.82374,
+  "suitIntegrity": 30,
+  "battery": 75.32374,
   "bestiary": {
     "entries": {
       "forager": {
@@ -45,9 +46,15 @@
             "weather": "clear",
             "behavior": "fleeing",
             "biome": "The Living Forest"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "idle",
+            "biome": "The Living Forest"
           }
         ],
-        "sightCount": 2,
+        "sightCount": 6,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -104,10 +111,103 @@
         "loreText": null,
         "thoughts": null,
         "originalNature": null
+      },
+      "scavenger": {
+        "speciesName": "scavenger",
+        "classification": "scavenger",
+        "observations": [
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "moving",
+            "biome": "Ship Interior"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "idle",
+            "biome": "Ship Interior"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "fleeing",
+            "biome": "The Living Forest"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "idle",
+            "biome": "The Living Forest"
+          }
+        ],
+        "sightCount": 5,
+        "scanTier": 0,
+        "l2Scanned": false,
+        "detailedRole": null,
+        "temperament": null,
+        "weaknesses": null,
+        "resistances": null,
+        "l3Scanned": false,
+        "loreText": null,
+        "thoughts": null,
+        "originalNature": null
+      },
+      "leaper": {
+        "speciesName": "leaper",
+        "classification": "predator",
+        "observations": [
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "moving",
+            "biome": "The Living Forest"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "foraging",
+            "biome": "The Living Forest"
+          }
+        ],
+        "sightCount": 3,
+        "scanTier": 0,
+        "l2Scanned": false,
+        "detailedRole": null,
+        "temperament": null,
+        "weaknesses": null,
+        "resistances": null,
+        "l3Scanned": false,
+        "loreText": null,
+        "thoughts": null,
+        "originalNature": null
+      },
+      "skitter": {
+        "speciesName": "skitter",
+        "classification": "skittish",
+        "observations": [
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "fleeing",
+            "biome": "The Living Forest"
+          }
+        ],
+        "sightCount": 1,
+        "scanTier": 0,
+        "l2Scanned": false,
+        "detailedRole": null,
+        "temperament": null,
+        "weaknesses": null,
+        "resistances": null,
+        "l3Scanned": false,
+        "loreText": null,
+        "thoughts": null,
+        "originalNature": null
       }
     }
   },
-  "worldTime": 11.532542,
+  "worldTime": 13.412457,
   "evolutionFlags": [],
   "cipherScanUnlocked": false,
   "hasLantern": false,
