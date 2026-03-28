@@ -12,14 +12,13 @@ namespace Genesis;
 public class Wingbeater : Creature
 {
     public Vector2 SpawnPos;
-    public int ContactDamage = 2;
+    public override int ContactDamage => WingbeaterContactDamage;
+    private const int WingbeaterContactDamage = 2;
     public bool Passive = false;
     public const int Width = 20, Height = 14;
 
     public Vector2 KnockbackVel;
     private float _squashHoldTimer;
-
-    public float MeleeHitCooldown;
 
     private enum State { Hovering, Tracking, DiveBomb, Returning, Stunned }
     private State _state = State.Hovering;
@@ -43,6 +42,9 @@ public class Wingbeater : Creature
     // Stun after hitting ground/player
     private const float StunTime = 0.8f;
 
+    private Creature _huntTarget;
+    private float _huntCooldown;
+
     // Detection
     public float DetectRange = 200f;
     public float DiveRange = 180f;
@@ -60,19 +62,98 @@ public class Wingbeater : Creature
         SpeciesName = "wingbeater";
         Role = EcologicalRole.Predator;
         Needs = CreatureNeeds.Default;
+        DeathParticleColor = new Color(160, 60, 40);
+        HitColor = new Color(160, 60, 40);
         _stateTimer = 1f;
         _hoverPhase = pos.X * 0.1f;
+        HungerRate = 0.003f;
+        FatigueRate = 0.002f;
+        Needs.Hunger = 0.2f + (float)Random.Shared.NextDouble() * 0.3f;
+        Needs.Fatigue = (float)Random.Shared.NextDouble() * 0.2f;
     }
 
     public override int CreatureWidth => Width;
     public override int CreatureHeight => Height;
     public override Rectangle Rect => new((int)Position.X, (int)Position.Y, Width, Height);
 
-    public void Update(float dt, Vector2 playerPos, float floorY)
+    public override void Update(float dt, CreatureUpdateContext ctx)
     {
+        var playerPos = ctx.PlayerCenter;
+        var floorY = ctx.LevelBottom;
         if (!Alive) return;
 
         MeleeHitCooldown -= dt;
+
+        // --- Needs system ---
+        TickNeeds(dt);
+        float distToPlayer = Vector2.Distance(Position, playerPos);
+        Needs.Safety = Math.Min(Needs.Safety, MathHelper.Clamp(distToPlayer / 100f, 0f, 1f));
+        CurrentGoal = SelectGoal();
+
+        // Creature awareness — wingbeater is an active hunter
+        var (_, _, wbPrey, wbPreyDist) = ScanCreatures(ctx.NearbyCreatures, 100f, 200f);
+        if (CurrentGoal == CreatureGoal.Eat && wbPrey != null && wbPreyDist < 180f && _huntCooldown <= 0)
+        {
+            _huntTarget = wbPrey;
+            Dir = wbPrey.Position.X > Position.X ? 1 : -1;
+        }
+        else if (_huntTarget != null && (!_huntTarget.Alive || Vector2.Distance(Position, _huntTarget.Position) > 250f))
+        {
+            _huntTarget = null;
+        }
+
+        // Attack prey on contact
+        if (_huntTarget != null && _huntTarget.Alive && Rect.Intersects(_huntTarget.Rect))
+        {
+            _huntTarget.TakeHit(2, Dir * 50f, -40f);
+            _huntTarget = null;
+            _huntCooldown = 2f;
+            Needs.Hunger = MathHelper.Clamp(Needs.Hunger - 0.3f, 0f, 1f);
+        }
+        if (_huntCooldown > 0) _huntCooldown -= dt;
+
+        // Food seeking
+        if (CurrentGoal == CreatureGoal.Eat && !IsEating)
+        {
+            var food = FindFood(ctx.FoodSources);
+            if (food != null)
+            {
+                float distToFood = Vector2.Distance(Position, food.Position);
+                if (distToFood < 10f)
+                {
+                    IsEating = true;
+                    EatingTarget = food;
+                    EatTimer = 0f;
+                    Velocity = Vector2.Zero;
+                }
+                else
+                {
+                    Dir = food.Position.X > Position.X ? 1 : -1;
+                }
+            }
+        }
+        if (IsEating)
+        {
+            EatTimer += dt;
+            if (EatingTarget == null || EatingTarget.Depleted || Needs.Hunger < 0.15f)
+            {
+                IsEating = false;
+                EatingTarget = null;
+            }
+            else
+            {
+                float gained = EatingTarget.Eat(dt);
+                Needs.Hunger = MathHelper.Clamp(Needs.Hunger - gained, 0f, 1f);
+                Velocity = Vector2.Zero;
+                return;
+            }
+        }
+
+        // Goal-influenced detection ranges
+        float effectiveDetectRange = DetectRange;
+        if (CurrentGoal == CreatureGoal.Eat) effectiveDetectRange *= 1.3f;
+        else if (CurrentGoal == CreatureGoal.Rest) effectiveDetectRange *= 0.6f;
+        else if (CurrentGoal == CreatureGoal.Flee) effectiveDetectRange *= 0.4f;
 
         // Knockback
         if (KnockbackVel.LengthSquared() > 1f)
@@ -105,7 +186,7 @@ public class Wingbeater : Creature
                 Position.X = SpawnPos.X + MathF.Sin(_hoverPhase * 0.4f) * 15f;
                 _dir = dx > 0 ? 1 : -1;
 
-                if (dist < DetectRange && !Passive)
+                if (dist < effectiveDetectRange && !Passive)
                 {
                     _state = State.Tracking;
                     _stateTimer = TrackTime;
@@ -175,7 +256,7 @@ public class Wingbeater : Creature
         }
     }
 
-    public int CheckPlayerDamage(Rectangle playerRect)
+    public override int CheckPlayerDamage(Rectangle playerRect)
     {
         if (!Alive) return 0;
         if (_state != State.DiveBomb && _state != State.Hovering) return 0;

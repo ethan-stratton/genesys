@@ -14,8 +14,6 @@ public class Hopper : Creature
     public const int Width = 20, Height = 16;
     public float AggroRange = 180f;
     public bool Aggroed;
-    public float DamageCooldown;
-    public float MeleeHitCooldown;
     public Vector2 KnockbackVel;
     public float SquashResistance = 0.1f;
     private float _squashHoldTimer;
@@ -34,10 +32,12 @@ public class Hopper : Creature
     private const float RestTime = 0.6f;
     private const float WindUpTime = 0.2f;
     private const float LandingTime = 0.15f;
-    private const int ContactDamage = 1;
+    private const int HopContactDamage = 1;
 
     private int _hopCount;
     private int _dir;
+
+    public override int ContactDamage => HopContactDamage;
 
     public Hopper(Vector2 pos, float groundY)
     {
@@ -47,22 +47,34 @@ public class Hopper : Creature
         SpeciesName = "hopper";
         Role = EcologicalRole.Herbivore;
         Needs = CreatureNeeds.Default;
+        DeathParticleColor = new Color(100, 80, 60);
+        HitColor = new Color(100, 80, 60);
         _state = State.Grounded;
         _stateTimer = RestTime * 0.5f;
+        // Need rates & randomize
+        HungerRate = 0.0025f;
+        FatigueRate = 0.001f;
+        Needs.Hunger = 0.2f + (float)Random.Shared.NextDouble() * 0.3f;
+        Needs.Fatigue = (float)Random.Shared.NextDouble() * 0.2f;
     }
 
     public override int CreatureWidth => Width;
     public override int CreatureHeight => Height;
     public override Rectangle Rect => new((int)Position.X, (int)Position.Y, Width, Height);
 
-    public void Update(float dt, Vector2 playerCenter,
-        TileGrid tileGrid, int tileSize,
-        float levelBottom)
+    public override void Update(float dt, CreatureUpdateContext ctx)
     {
+        var playerCenter = ctx.PlayerCenter;
+        var tileGrid = ctx.TileGrid;
+        var tileSize = ctx.TileSize;
+        var levelBottom = ctx.LevelBottom;
         if (!Alive) return;
         if (DamageCooldown > 0) DamageCooldown -= dt;
         if (HitFlash > 0) HitFlash -= dt;
         if (MeleeHitCooldown > 0) MeleeHitCooldown -= dt;
+
+        // --- Needs system ---
+        TickNeeds(dt);
 
         if (KnockbackVel.LengthSquared() > 1f)
         {
@@ -74,6 +86,56 @@ public class Hopper : Creature
         else VisualScale = Vector2.Lerp(VisualScale, Vector2.One, 8f * dt);
 
         float dist = Vector2.Distance(playerCenter, Position + new Vector2(Width / 2f, Height / 2f));
+        // Safety from player proximity
+        Needs.Safety = MathHelper.Clamp(dist / 200f, 0f, 1f);
+        CurrentGoal = SelectGoal();
+
+        // Creature awareness
+        var (hopThreat, hopThreatDist, _, _) = ScanCreatures(ctx.NearbyCreatures, 200f, 0f);
+        if (hopThreat != null && hopThreatDist < 120f)
+        {
+            _dir = hopThreat.Position.X > Position.X ? -1 : 1;
+            Needs.Safety = Math.Min(Needs.Safety, 0.2f);
+        }
+        CurrentGoal = SelectGoal();
+
+        // Food seeking
+        if (CurrentGoal == CreatureGoal.Eat && !IsEating)
+        {
+            var food = FindFood(ctx.FoodSources);
+            if (food != null)
+            {
+                float distToFood = Vector2.Distance(Position, food.Position);
+                if (distToFood < 10f)
+                {
+                    IsEating = true;
+                    EatingTarget = food;
+                    EatTimer = 0f;
+                    Velocity = Vector2.Zero;
+                }
+                else
+                {
+                    _dir = food.Position.X > Position.X ? 1 : -1;
+                }
+            }
+        }
+        if (IsEating)
+        {
+            EatTimer += dt;
+            if (EatingTarget == null || EatingTarget.Depleted || Needs.Hunger < 0.15f)
+            {
+                IsEating = false;
+                EatingTarget = null;
+            }
+            else
+            {
+                float gained = EatingTarget.Eat(dt);
+                Needs.Hunger = MathHelper.Clamp(Needs.Hunger - gained, 0f, 1f);
+                Velocity = Vector2.Zero;
+                return;
+            }
+        }
+
         Aggroed = dist < AggroRange;
 
         float dx = playerCenter.X - (Position.X + Width / 2f);
@@ -101,8 +163,14 @@ public class Hopper : Creature
                     bool bigHop = _hopCount >= 3;
                     if (bigHop) _hopCount = 0;
 
-                    Velocity.Y = bigHop ? BigHopForce : SmallHopForce;
-                    Velocity.X = _dir * HopSpeedX * (bigHop ? 1.6f : 1f);
+                    // Goal-based hop modifiers
+                    float hopForceMult = CurrentGoal == CreatureGoal.Rest ? 0.75f
+                        : CurrentGoal == CreatureGoal.Flee ? 1.3f : 1f;
+                    float hopSpeedMult = CurrentGoal == CreatureGoal.Eat ? 1.15f
+                        : CurrentGoal == CreatureGoal.Flee ? 1.2f : 1f;
+
+                    Velocity.Y = (bigHop ? BigHopForce : SmallHopForce) * hopForceMult;
+                    Velocity.X = _dir * HopSpeedX * (bigHop ? 1.6f : 1f) * hopSpeedMult;
                     _state = State.Airborne;
                     _onGround = false;
                 }
@@ -129,22 +197,15 @@ public class Hopper : Creature
                 if (_stateTimer <= 0)
                 {
                     _state = State.Grounded;
-                    _stateTimer = RestTime;
+                    // Rest longer when tired, shorter when hungry
+                    float restMult = CurrentGoal == CreatureGoal.Rest ? 1.6f
+                        : CurrentGoal == CreatureGoal.Eat ? 0.6f : 1f;
+                    _stateTimer = RestTime * restMult;
                 }
                 break;
         }
     }
 
-    public int CheckPlayerDamage(Rectangle playerRect)
-    {
-        if (!Alive || DamageCooldown > 0) return 0;
-        if (Rect.Intersects(playerRect))
-        {
-            DamageCooldown = 1.0f;
-            return ContactDamage;
-        }
-        return 0;
-    }
 
     public override bool TakeHit(int damage, float knockbackX = 0, float knockbackY = 0)
     {

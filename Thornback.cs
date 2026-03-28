@@ -7,10 +7,10 @@ namespace Genesis;
 public class Thornback : Creature
 {
     public const int Width = 32, Height = 28;
-    public float DamageCooldown;
-    public float MeleeHitCooldown;
     public float SquashResistance = 0.7f;
     private float _squashHoldTimer;
+
+    public override int ContactDamage => 2;
 
     public Thornback(Vector2 pos)
     {
@@ -19,30 +19,83 @@ public class Thornback : Creature
         SpeciesName = "thornback";
         Role = EcologicalRole.Defensive;
         Needs = CreatureNeeds.Default;
+        DeathParticleColor = new Color(60, 100, 40);
+        HitColor = new Color(60, 100, 40);
+        HungerRate = 0.001f;
+        FatigueRate = 0.0005f;
+        Needs.Hunger = 0.2f + (float)Random.Shared.NextDouble() * 0.3f;
+        Needs.Fatigue = (float)Random.Shared.NextDouble() * 0.2f;
     }
 
     public override int CreatureWidth => Width;
     public override int CreatureHeight => Height;
     public override Rectangle Rect => new((int)Position.X, (int)Position.Y, Width, Height);
 
-    public void Update(float dt)
+    public override void Update(float dt, CreatureUpdateContext ctx)
     {
         if (!Alive) return;
         if (DamageCooldown > 0) DamageCooldown -= dt;
         if (HitFlash > 0) HitFlash -= dt;
         if (MeleeHitCooldown > 0) MeleeHitCooldown -= dt;
 
+        // --- Needs system ---
+        TickNeeds(dt);
+        float distToPlayer = Vector2.Distance(Position, ctx.PlayerCenter);
+        Needs.Safety = Math.Min(Needs.Safety, MathHelper.Clamp(distToPlayer / 80f, 0f, 1f));
+        CurrentGoal = SelectGoal();
+
+        // Food seeking (thornbacks eat slowly)
+        if (CurrentGoal == CreatureGoal.Eat && !IsEating)
+        {
+            var food = FindFood(ctx.FoodSources);
+            if (food != null)
+            {
+                float distToFood = Vector2.Distance(Position, food.Position);
+                if (distToFood < 10f)
+                {
+                    IsEating = true;
+                    EatingTarget = food;
+                    EatTimer = 0f;
+                }
+            }
+        }
+        if (IsEating)
+        {
+            EatTimer += dt;
+            if (EatingTarget == null || EatingTarget.Depleted || Needs.Hunger < 0.15f)
+            {
+                IsEating = false;
+                EatingTarget = null;
+            }
+            else
+            {
+                float gained = EatingTarget.Eat(dt, 0.15f); // slow eater
+                Needs.Hunger = MathHelper.Clamp(Needs.Hunger - gained, 0f, 1f);
+                return;
+            }
+        }
+
         if (_squashHoldTimer > 0) _squashHoldTimer -= dt;
         else VisualScale = Vector2.Lerp(VisualScale, Vector2.One, 8f * dt);
+
+        // When fleeing (very scared), slowly move away from player
+        if (CurrentGoal == CreatureGoal.Flee)
+        {
+            float dx = ctx.PlayerCenter.X - (Position.X + Width / 2f);
+            int fleeDir = dx > 0 ? -1 : 1;
+            Position.X += fleeDir * 8f * dt; // very slow movement
+        }
     }
 
-    public int CheckPlayerDamage(Rectangle playerRect)
+    /// <summary>Contact damage suppressed when resting.</summary>
+    public override int CheckPlayerDamage(Rectangle playerRect)
     {
         if (!Alive || DamageCooldown > 0) return 0;
+        if (CurrentGoal == CreatureGoal.Rest) return 0; // passive when resting
         if (Rect.Intersects(playerRect))
         {
             DamageCooldown = 0.5f;
-            return 2;
+            return ContactDamage;
         }
         return 0;
     }

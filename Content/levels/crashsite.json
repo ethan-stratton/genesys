@@ -72,9 +72,9 @@
         "I ran the numbers during descent. 0.1% survival probability. Rounded up.",
         "I lost telemetry when we hit atmosphere. How long was I offline?",
         "Never mind. Diagnostics later.",
-        "Suit's holding but I'm reading micro-fractures. We need to find shelter and patch up.",
-        "The ship should be nearby \u2014 if anything survived the impact, that's where we start.",
-        "Syncing to your suit transponder. Stay close. I'll keep scanning."
+        "Suit\u0027s holding but I\u0027m reading micro-fractures. We need to find shelter and patch up.",
+        "The ship should be nearby \u2014 if anything survived the impact, that\u0027s where we start.",
+        "Syncing to your suit transponder. Stay close. I\u0027ll keep scanning."
       ],
       "dialogueSpeakers": [
         "EVE",
@@ -96,110 +96,6 @@
       "type": "grapple",
       "x": 352,
       "y": 1760,
-      "w": 20,
-      "h": 20
-    },
-    {
-      "id": "knife-1",
-      "type": "knife",
-      "x": 832,
-      "y": -192,
-      "w": 20,
-      "h": 20
-    },
-    {
-      "id": "knife-4",
-      "type": "knife",
-      "x": 480,
-      "y": -192,
-      "w": 20,
-      "h": 20
-    },
-    {
-      "id": "knife-5",
-      "type": "knife",
-      "x": 832,
-      "y": -192,
-      "w": 20,
-      "h": 20
-    },
-    {
-      "id": "knife-11",
-      "type": "knife",
-      "x": 480,
-      "y": -192,
-      "w": 20,
-      "h": 20
-    },
-    {
-      "id": "knife-12",
-      "type": "knife",
-      "x": 800,
-      "y": -192,
-      "w": 20,
-      "h": 20
-    },
-    {
-      "id": "knife-13",
-      "type": "knife",
-      "x": 480,
-      "y": -192,
-      "w": 20,
-      "h": 20
-    },
-    {
-      "id": "knife-14",
-      "type": "knife",
-      "x": -32,
-      "y": -128,
-      "w": 20,
-      "h": 20
-    },
-    {
-      "id": "knife-15",
-      "type": "knife",
-      "x": 128,
-      "y": -256,
-      "w": 20,
-      "h": 20
-    },
-    {
-      "id": "knife-17",
-      "type": "knife",
-      "x": 672,
-      "y": -192,
-      "w": 20,
-      "h": 20
-    },
-    {
-      "id": "knife-18",
-      "type": "knife",
-      "x": 512,
-      "y": -192,
-      "w": 20,
-      "h": 20
-    },
-    {
-      "id": "knife-19",
-      "type": "knife",
-      "x": 352,
-      "y": -192,
-      "w": 20,
-      "h": 20
-    },
-    {
-      "id": "knife-20",
-      "type": "knife",
-      "x": 864,
-      "y": -192,
-      "w": 20,
-      "h": 20
-    },
-    {
-      "id": "knife-21",
-      "type": "knife",
-      "x": 352,
-      "y": -192,
       "w": 20,
       "h": 20
     }

@@ -65,8 +65,6 @@ public class Crawler : Creature
     public float Speed = 60f;
     public float ChaseSpeed = 100f;
     public float SwarmSpeed = 130f;
-    public float DamageCooldown;
-    public float MeleeHitCooldown;
     private bool _onGround;
     private bool _wasOnGround;
 
@@ -116,6 +114,7 @@ public class Crawler : Creature
             _ => (4f, 0.5f, -1f),
         };
         _bodyBobSpring?.SetParams(f, z, r);
+        ApplyVariantNeedRates();
     }
     public string ScanName => Variant switch
     {
@@ -193,6 +192,10 @@ public class Crawler : Creature
     public float DummyScaleX = 0f;
     public float DummyScaleY = 0f;
 
+    // Creature hunting
+    private Creature _huntTarget;
+    private float _huntTimer;
+
     // Latch-on behavior
     public bool IsLatched;
     public Vector2 LatchOffset;
@@ -230,15 +233,36 @@ public class Crawler : Creature
         _bugStateTimer = (float)_rng.NextDouble() * 2f;
         _walkSpeedMult = 0.6f + (float)_rng.NextDouble() * 0.8f; // 0.6–1.4x
         _antennaeTimer = (float)_rng.NextDouble() * 10f;
+        DeathParticleColor = new Color(120, 60, 20);
+        HitColor = new Color(120, 60, 20);
         InitLegs();
+        // Randomize starting needs so creatures desync
+        Needs.Hunger = 0.2f + (float)Random.Shared.NextDouble() * 0.3f;
+        Needs.Fatigue = (float)Random.Shared.NextDouble() * 0.2f;
+    }
+
+    /// <summary>Set species-specific need rates after variant is known. Call after ApplyVariantRole.</summary>
+    private void ApplyVariantNeedRates()
+    {
+        switch (Variant)
+        {
+            case CrawlerVariant.Forager: HungerRate = 0.003f; break;
+            case CrawlerVariant.Skitter: FatigueRate = 0.002f; break;
+            case CrawlerVariant.Leaper: HungerRate = 0.002f; FatigueRate = 0.0015f; break;
+            case CrawlerVariant.Bombardier: FatigueRate = 0.0008f; break;
+            case CrawlerVariant.Stalker: HungerRate = 0.0025f; break;
+            case CrawlerVariant.Spitter: FatigueRate = 0.0012f; break;
+        }
     }
 
     public override Rectangle Rect => new((int)Position.X, (int)Position.Y, EffectiveWidth, EffectiveHeight);
 
-    public void Update(float dt, Vector2 playerCenter,
-        TileGrid tileGrid, int tileSize,
-        float levelBottom)
+    public override void Update(float dt, CreatureUpdateContext ctx)
     {
+        var playerCenter = ctx.PlayerCenter;
+        var tileGrid = ctx.TileGrid;
+        var tileSize = ctx.TileSize;
+        var levelBottom = ctx.LevelBottom;
         // Cache tile grid for LOS checks
         if (tileGrid != null) { _tileGridRef = tileGrid; _tileSizeRef = tileSize; _hasTileGridRef = true; }
         
@@ -265,6 +289,104 @@ public class Crawler : Creature
         if (HitFlash > 0) HitFlash -= dt;
         if (_latchCooldown > 0) _latchCooldown -= dt;
         _antennaeTimer += dt;
+
+        // --- Needs system ---
+        TickNeeds(dt);
+        // Safety from player proximity (variant-specific safe distance)
+        float _safeDistForVariant = Variant switch
+        {
+            CrawlerVariant.Forager => 150f,
+            CrawlerVariant.Skitter => 200f,
+            CrawlerVariant.Leaper => 120f,
+            _ => 150f,
+        };
+        {
+            float distToPlayer = Vector2.Distance(Position, ctx.PlayerCenter);
+            float safetyFromPlayer = MathHelper.Clamp(distToPlayer / _safeDistForVariant, 0f, 1f);
+            Needs.Safety = Math.Min(Needs.Safety, safetyFromPlayer);
+            CurrentGoal = SelectGoal();
+        }
+
+        // Creature awareness
+        var (threat, threatDist, prey, preyDist) = ScanCreatures(ctx.NearbyCreatures, _safeDistForVariant, 180f);
+        switch (Variant)
+        {
+            case CrawlerVariant.Forager:
+                if (threat != null && threatDist < 80f)
+                    Dir = threat.Position.X > Position.X ? -1 : 1;
+                break;
+            case CrawlerVariant.Skitter:
+                if (threat != null && threatDist < 120f)
+                {
+                    Dir = threat.Position.X > Position.X ? -1 : 1;
+                    Needs.Safety = Math.Min(Needs.Safety, 0.1f);
+                }
+                break;
+            case CrawlerVariant.Leaper:
+            case CrawlerVariant.Stalker:
+            case CrawlerVariant.Spitter:
+                if (CurrentGoal == CreatureGoal.Eat && prey != null && preyDist < 150f)
+                {
+                    _huntTarget = prey;
+                    Dir = prey.Position.X > Position.X ? 1 : -1;
+                }
+                else
+                {
+                    _huntTarget = null;
+                }
+                break;
+            case CrawlerVariant.Bombardier:
+            case CrawlerVariant.Resonant:
+                break;
+        }
+        CurrentGoal = SelectGoal();
+
+        // Predator attack — damage prey on contact
+        if (_huntTarget != null && _huntTarget.Alive && Rect.Intersects(_huntTarget.Rect) && _huntTimer <= 0)
+        {
+            _huntTarget.TakeHit(1, Dir * 40f, -30f);
+            Needs.Hunger = MathHelper.Clamp(Needs.Hunger - 0.3f, 0f, 1f);
+            _huntTarget = null;
+            _huntTimer = 1.5f;
+        }
+        if (_huntTimer > 0) _huntTimer -= dt;
+
+        // Food seeking
+        if (CurrentGoal == CreatureGoal.Eat && !IsEating)
+        {
+            var food = FindFood(ctx.FoodSources);
+            if (food != null)
+            {
+                float distToFood = Vector2.Distance(Position, food.Position);
+                if (distToFood < 10f)
+                {
+                    IsEating = true;
+                    EatingTarget = food;
+                    EatTimer = 0f;
+                    Velocity = Vector2.Zero;
+                }
+                else
+                {
+                    Dir = food.Position.X > Position.X ? 1 : -1;
+                }
+            }
+        }
+        if (IsEating)
+        {
+            EatTimer += dt;
+            if (EatingTarget == null || EatingTarget.Depleted || Needs.Hunger < 0.15f)
+            {
+                IsEating = false;
+                EatingTarget = null;
+            }
+            else
+            {
+                float gained = EatingTarget.Eat(dt);
+                Needs.Hunger = MathHelper.Clamp(Needs.Hunger - gained, 0f, 1f);
+                Velocity = Vector2.Zero;
+                return;
+            }
+        }
 
         // Latched: skip all movement
         if (IsLatched)
@@ -316,15 +438,19 @@ public class Crawler : Creature
             bool canSeePlayer = !_hasTileGridRef || HasLineOfSight(
                 Position + new Vector2(Width / 2f, Height / 2f), playerCenter);
             
+            // Needs-influenced aggro range: fleeing creatures react from farther
+            float effectiveAggroRange = AggroRange;
+            if (CurrentGoal == CreatureGoal.Flee) effectiveAggroRange *= 1.3f;
+            
             if (Variant == CrawlerVariant.Leaper)
-                Aggroed = dist < AggroRange && canSeePlayer;
+                Aggroed = dist < effectiveAggroRange && canSeePlayer;
             else if (Variant == CrawlerVariant.Skitter)
-                Aggroed = false; // skitters don't aggro, they flee (handled below)
+                Aggroed = false;
             else
-                Aggroed = false; // foragers never aggro
+                Aggroed = false;
 
             // Skitter flee behavior
-            bool fleeing = Variant == CrawlerVariant.Skitter && dist < AggroRange && canSeePlayer;
+            bool fleeing = Variant == CrawlerVariant.Skitter && dist < effectiveAggroRange && canSeePlayer;
 
             // Keep flee timer alive
             if (fleeing) _fleeTimer = 1.5f + (float)_rng.NextDouble() * 1f; // flee 1.5-2.5s after last trigger
@@ -453,7 +579,9 @@ public class Crawler : Creature
                 switch (_bugState)
                 {
                     case BugState.Walking:
-                        Velocity.X = Dir * Speed * _walkSpeedMult;
+                        float goalSpeedMult = CurrentGoal == CreatureGoal.Eat ? 1.15f
+                            : CurrentGoal == CreatureGoal.Rest ? 0.7f : 1f;
+                        Velocity.X = Dir * Speed * _walkSpeedMult * goalSpeedMult;
 
                         // Edge detection
                         bool atLeft = Position.X <= SurfaceLeft + 1;
@@ -471,11 +599,15 @@ public class Crawler : Creature
                         if (_bugStateTimer <= 0)
                         {
                             float roll = (float)_rng.NextDouble();
-                            if (roll < 0.3f)
+                            // Needs influence: hungry creatures pause less, tired ones pause more
+                            float pauseChance = CurrentGoal == CreatureGoal.Eat ? 0.15f
+                                : CurrentGoal == CreatureGoal.Rest ? 0.5f : 0.3f;
+                            if (roll < pauseChance)
                             {
                                 // Pause
                                 _bugState = BugState.Paused;
                                 _pauseDuration = 0.4f + (float)_rng.NextDouble() * 1.5f;
+                                if (CurrentGoal == CreatureGoal.Rest) _pauseDuration *= 1.4f;
                                 _bugStateTimer = _pauseDuration;
                                 Velocity.X = 0;
                             }
@@ -658,7 +790,7 @@ public class Crawler : Creature
         PatrolRight = MathF.Min(PatrolRight, SurfaceRight);
     }
 
-    public int CheckPlayerDamage(Rectangle playerRect, float playerVelY = 0f)
+    public int CheckPlayerDamage(Rectangle playerRect, float playerVelY)
     {
         if (!Alive || DamageCooldown > 0) return 0;
         if (!Rect.Intersects(playerRect)) return 0;
@@ -679,6 +811,9 @@ public class Crawler : Creature
         DamageCooldown = 1.0f;
         return 5;
     }
+
+    /// <summary>Override base for unified loop — delegates to variant-aware version with 0 velY.</summary>
+    public override int CheckPlayerDamage(Rectangle playerRect) => CheckPlayerDamage(playerRect, 0f);
 
     public override bool TakeHit(int damage, float knockbackX = 0, float knockbackY = 0)
     {

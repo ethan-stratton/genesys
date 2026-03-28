@@ -10,7 +10,7 @@ using FontStashSharp;
 
 namespace Genesis;
 
-public enum WeaponType { None, Knife, Stick, Whip, Dagger, Sword, GreatSword, Axe, Club, GreatClub, Hammer, Sling, Bow, Gun, WoodShield }
+public enum WeaponType { None, Knife, Stick, Whip, Dagger, Sword, GreatSword, Axe, Club, GreatClub, Hammer, Sling, Bow, Gun, WoodShield, Torch }
 
 public class ItemPickup
 {
@@ -209,12 +209,15 @@ public class Game1 : Game
     private List<Thornback> _thornbacks = new();
     private List<Bird> _birds = new();
     private List<Wingbeater> _wingbeaters = new();
+    private List<Scavenger> _scavengers = new();
+    private List<FoodSource> _foodSources = new();
 
     // Unified creature list — ALL creatures go here. Typed lists above are derived views.
     private List<Creature> _creatures = new();
 
     private Random _rng;
 
+    private bool _debugEcosystem;
     private bool _isDead;
     private bool _isPaused;
     private float _deathFadeTimer; // fade to black on death
@@ -353,6 +356,12 @@ public class Game1 : Game
 
     // --- EVE Map Projection ---
     private bool _hasMapModule;          // player found the cartographic module
+    
+    // --- Light source items ---
+    private float _torchFuel = 100f;
+    private bool _hasLantern;
+    private bool _hasCipherHelmet;
+    private bool _cipherHelmetEquipped;
     private bool _eveProjectingMap;      // EVE is on ground projecting mini-map
     private Vector2 _eveMapGroundPos;    // where EVE landed to project
     private float _eveMapTimer;          // animation timer
@@ -666,6 +675,7 @@ public class Game1 : Game
 
     private WeaponType ActiveRight => _rightActiveSlot1 ? _rightHand1 : _rightHand2;
     private WeaponType ActiveLeft => _leftActiveSlot1 ? _leftHand1 : _leftHand2;
+    private bool TorchActive => ActiveRight == WeaponType.Torch || ActiveLeft == WeaponType.Torch;
 
     // --- Sidearm ammo system ---
     private const int SidearmClipSize = 12;
@@ -747,17 +757,18 @@ public class Game1 : Game
         ("Bird", new[] { "bird" }),
         ("Dummy", new[] { "dummy", "crit-dummy" }),
         ("Swarm", new[] { "swarm" }),
+        ("Scavenger", new[] { "scavenger" }),
     };
     private int _enemyCategoryCursor;
     private int _enemyVariantCursor;
     private bool _enemyVariantExpanded; // Right arrow expands variants
     private string SelectedEnemyType => EnemyCategories[_enemyCategoryCursor].variants[_enemyVariantCursor];
     private int _editorEnemyCursor; // legacy, unused now
-    private static readonly string[] ItemTypes = { "knife", "grapple", "stick", "dagger", "sword", "axe", "club", "hammer", "greatsword", "greatclub", "whip", "sling", "bow", "gun", "heart", "battery" };
+    private static readonly string[] ItemTypes = { "knife", "grapple", "stick", "dagger", "sword", "axe", "club", "hammer", "greatsword", "greatclub", "whip", "sling", "bow", "gun", "heart", "battery", "torch", "lantern", "cipher-helmet" };
     private int _editorItemCursor;
 
     // Item placement palette (P key in editor)
-    private static readonly string[] ItemPaletteTypes = { "knife", "grapple", "stick", "dagger", "sword", "axe", "club", "hammer", "greatsword", "greatclub", "whip", "sling", "bow", "gun", "heart", "battery", "shelter" };
+    private static readonly string[] ItemPaletteTypes = { "knife", "grapple", "stick", "dagger", "sword", "axe", "club", "hammer", "greatsword", "greatclub", "whip", "sling", "bow", "gun", "heart", "battery", "shelter", "torch", "lantern", "cipher-helmet" };
     private bool _itemPaletteOpen;
     private int _itemPaletteCursor;
     private bool _entityPaletteOpen;
@@ -863,11 +874,12 @@ public class Game1 : Game
 
         // Clear enemies (SpawnEnemiesFromLevel re-populates if needed)
         _swarms.Clear();
+        _foodSources.Clear();
         _creatures.Clear();
         _crawlers.Clear();
         _hoppers.Clear();
         _thornbacks.Clear();
-        _birds.Clear(); _wingbeaters.Clear();
+        _birds.Clear(); _wingbeaters.Clear(); _scavengers.Clear();
 
         // Load item pickups
         _itemPickups.Clear();
@@ -1020,16 +1032,18 @@ public class Game1 : Game
         }
         
         SpawnEnemiesFromLevel();
+        SpawnTestEcosystem();
     }
 
     private void SpawnEnemiesFromLevel()
     {
         _swarms.Clear();
+        _foodSources.Clear();
         _creatures.Clear();
         _crawlers.Clear();
         _hoppers.Clear();
         _thornbacks.Clear();
-        _birds.Clear(); _wingbeaters.Clear();
+        _birds.Clear(); _wingbeaters.Clear(); _scavengers.Clear();
         if (_rng == null) _rng = new Random();
 
         var tg = _level.TileGridInstance;
@@ -1100,6 +1114,11 @@ public class Game1 : Game
                     wb.Passive = e.Passive;
                     _wingbeaters.Add(wb); _creatures.Add(wb);
                     break;
+                case "scavenger":
+                    float scavSnapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Scavenger.Width, Scavenger.Height, tg, ts, walls, _level.Bounds.Bottom);
+                    var scav = new Scavenger(new Vector2(e.X, scavSnapY));
+                    _scavengers.Add(scav); _creatures.Add(scav);
+                    break;
                 case "dummy":
                     float dSnapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Crawler.Width, Crawler.Height, tg, ts, walls, _level.Bounds.Bottom);
                     var dummy = new Crawler(new Vector2(e.X, dSnapY), e.X - 10, e.X + 10, 0, 0);
@@ -1125,6 +1144,93 @@ public class Game1 : Game
                     critDummy.UpdateSurfaceEdges(tg, ts, bLeft, bRight);
                     _crawlers.Add(critDummy); _creatures.Add(critDummy);
                     break;
+            }
+        }
+    }
+
+    private float FindGroundY(TileGrid tg, int ts, float worldX, float topY, float bottomY)
+    {
+        int col = (int)(worldX / ts);
+        for (int row = (int)(topY / ts); row < (int)(bottomY / ts); row++)
+        {
+            var tile = tg.GetTileAt(col, row);
+            if (TileProperties.IsSolid(tile))
+                return row * ts;
+        }
+        return bottomY;
+    }
+
+    private void SpawnTestEcosystem()
+    {
+        var tg = _level.TileGridInstance;
+        int ts = _level.TileGrid?.TileSize ?? 32;
+        float left = _level.Bounds.Left;
+        float right = _level.Bounds.Right;
+        float bottom = _level.Bounds.Bottom;
+
+        // Scatter debris and plants on solid surfaces
+        for (float x = left + 50; x < right - 50; x += 80 + (float)_rng.NextDouble() * 60)
+        {
+            float groundY = FindGroundY(tg, ts, x, _level.Bounds.Top, bottom);
+            if (groundY < bottom - 10)
+            {
+                var type = _rng.NextDouble() < 0.5 ? FoodType.Debris : FoodType.Plant;
+                _foodSources.Add(new FoodSource(new Vector2(x, groundY - 4), type, 0.4f));
+            }
+        }
+
+        // Spawn test creatures if none exist
+        if (_creatures.Count == 0)
+        {
+            var spawnPositions = new List<Vector2>();
+            for (float x = left + 80; x < right - 80; x += 120)
+            {
+                float groundY = FindGroundY(tg, ts, x, _level.Bounds.Top, bottom);
+                if (groundY < bottom - 10)
+                    spawnPositions.Add(new Vector2(x, groundY));
+            }
+
+            if (spawnPositions.Count >= 4)
+            {
+                var pos = spawnPositions;
+                float bLeft = _level.Bounds.Left;
+                float bRight = _level.Bounds.Right;
+
+                // Two forager crawlers
+                for (int i = 0; i < Math.Min(2, pos.Count); i++)
+                {
+                    float snapY = EnemyPhysics.SnapToSurface(pos[i].X, pos[i].Y, Crawler.Width, Crawler.Height, tg, ts, _level.WallRects, bottom);
+                    var c = new Crawler(new Vector2(pos[i].X, snapY), bLeft, bRight, 0, 0, _rng);
+                    c.Variant = CrawlerVariant.Forager;
+                    c.ApplyVariantRole();
+                    c.UpdateSurfaceEdges(tg, ts, bLeft, bRight);
+                    _crawlers.Add(c); _creatures.Add(c);
+                }
+
+                // One scavenger
+                if (pos.Count > 2)
+                {
+                    float snapY = EnemyPhysics.SnapToSurface(pos[2].X, pos[2].Y, Scavenger.Width, Scavenger.Height, tg, ts, _level.WallRects, bottom);
+                    var scav = new Scavenger(new Vector2(pos[2].X, snapY));
+                    _scavengers.Add(scav); _creatures.Add(scav);
+                }
+
+                // One bird
+                if (pos.Count > 3)
+                {
+                    float snapY = EnemyPhysics.SnapToSurface(pos[3].X, pos[3].Y, Bird.Width, Bird.Height, tg, ts, _level.WallRects, bottom);
+                    var bird = new Bird(new Vector2(pos[3].X, snapY), 0, 0, _rng);
+                    bird.UpdateSurfaceEdges(tg, ts, bLeft, bRight);
+                    _birds.Add(bird); _creatures.Add(bird);
+                }
+
+                // One hopper
+                if (pos.Count > 4)
+                {
+                    float snapY = EnemyPhysics.SnapToSurface(pos[4].X, pos[4].Y, Hopper.Width, Hopper.Height, tg, ts, _level.WallRects, bottom);
+                    var hop = new Hopper(new Vector2(pos[4].X, snapY), snapY + Hopper.Height);
+                    _hoppers.Add(hop); _creatures.Add(hop);
+                }
             }
         }
     }
@@ -1268,6 +1374,29 @@ public class Game1 : Game
                     EveAlert("Lantern offline. Battery depleted.");
                 }
             }
+
+            // Cipher helmet battery drain
+            if (_cipherHelmetEquipped)
+            {
+                _player.Battery -= 0.2f * dt;
+                if (_player.Battery <= 0f)
+                {
+                    _player.Battery = 0f;
+                    _cipherHelmetEquipped = false;
+                    EveAlert("Cipher visor offline. Battery depleted.");
+                }
+            }
+
+            // Torch fuel drain
+            if (TorchActive && _torchFuel > 0)
+            {
+                _torchFuel -= 0.3f * dt;
+                if (_torchFuel <= 0f)
+                {
+                    _torchFuel = 0f;
+                    EveAlert("Torch burned out.");
+                }
+            }
         }
 
         // Music switching on state change
@@ -1400,6 +1529,10 @@ public class Game1 : Game
                                 _player.IsLyingDown = false;
                                 _player.HasGrapple = _saveData?.CollectedItems?.Any(id => id.StartsWith("grapple")) == true;
                                 _hasMapModule = _saveData?.CollectedItems?.Any(id => id.StartsWith("map-module")) == true;
+                                _hasLantern = _saveData.HasLantern;
+                                _hasCipherHelmet = _saveData.HasCipherHelmet;
+                                _cipherHelmetEquipped = _saveData.CipherHelmetEquipped;
+                                _torchFuel = _saveData.TorchFuel;
                                 _camera.Zoom = 1f;
                                 _camera.TargetZoom = 1f;
                                 _player.CurrentTier = (Player.MoveTier)Math.Clamp(_saveData.MoveTier, 0, 2);
@@ -1439,6 +1572,11 @@ public class Game1 : Game
                         _player.SuitIntegrity = 31f;
                         _player.Battery = 80f;
                         _hasMapModule = false;
+                        _hasLantern = false;
+                        _hasCipherHelmet = false;
+                        _torchFuel = 100f;
+                        _cipherHelmetEquipped = false;
+                        _lanternActive = false;
                         _prologueSkipped = false;
                         _eveDialogueExhausted = false;
                         ClearInventory();
@@ -1470,6 +1608,10 @@ public class Game1 : Game
             base.Update(gameTime);
             return;
         }
+
+        // F9: toggle ecosystem debug overlay (works in both editor and play mode)
+        if (kb.IsKeyDown(Keys.F9) && _prevKb.IsKeyUp(Keys.F9))
+            _debugEcosystem = !_debugEcosystem;
 
         // --- Editor state ---
         if (_gameState == GameState.Editing)
@@ -1604,13 +1746,20 @@ public class Game1 : Game
         // Lantern toggle with N
         if (kb.IsKeyDown(Keys.N) && _prevKb.IsKeyUp(Keys.N) && !_menuOpen && !_dialogueOpen && !_inventoryOpen)
         {
-            if (!_lanternActive && _player.Battery > 0)
+            if (_hasLantern)
             {
-                _lanternActive = true;
-                EveAlertOnce("Lantern online. Battery drain minimal.");
+                if (!_lanternActive && _player.Battery > 0)
+                {
+                    _lanternActive = true;
+                    if (_cipherHelmetEquipped)
+                    {
+                        _cipherHelmetEquipped = false;
+                    }
+                    EveAlertOnce("Lantern online. Battery drain minimal.");
+                }
+                else
+                    _lanternActive = false;
             }
-            else
-                _lanternActive = false;
         }
 
         // Toggle inventory with Tab or I
@@ -3027,260 +3176,180 @@ public class Game1 : Game
             }
         }
 
-        // Update crawlers
+        // --- Unified creature update ---
         if (_nextLatchDelay > 0) _nextLatchDelay -= dt;
         int latchedCount = 0;
-        foreach (var c in _crawlers) if (c.IsLatched) latchedCount++;
+        foreach (var c in _creatures) if (c is Crawler cr && cr.IsLatched) latchedCount++;
 
-        foreach (var c in _crawlers)
+        // Build context once per frame
+        var creatureCtx = new CreatureUpdateContext
         {
-            // Update latched crawlers: stick to player, deal tick damage
-            if (c.IsLatched)
-            {
-                c.Position = _player.Position + c.LatchOffset;
-                int tickDmg = c.UpdateLatch(dt);
-                if (tickDmg > 0 && _spawnInvincibility <= 0 && !_isDead)
-                {
-                    _lastDamageSource = "Crawler (latched)";
-                    _player.TakeDamage(tickDmg, 0);
-                }
-            }
+            Dt = dt,
+            PlayerCenter = playerCenter2,
+            PlayerVelocity = _player.Velocity,
+            TileGrid = _level.TileGridInstance,
+            TileSize = _level.TileGrid?.TileSize ?? 32,
+            LevelBottom = _level.Bounds.Bottom,
+            BoundsLeft = _level.Bounds.Left,
+            BoundsRight = _level.Bounds.Right,
+            FoodSources = _foodSources,
+            NearbyCreatures = _creatures,
+        };
 
-            c.Update(dt, playerCenter2,
-                _level.TileGridInstance, _level.TileGrid?.TileSize ?? 32,
-                _level.Bounds.Bottom);
-            
-            // Bombardier spray: spawn hot particles when spray fires
-            if (c.BombardierSprayed)
+        // Crawler-specific pre-update: latch behavior and bombardier spray
+        foreach (var creature in _creatures)
+        {
+            if (creature is Crawler c)
             {
-                var sprayOrigin = c.Position + new Vector2(c.EffectiveWidth / 2f, c.EffectiveHeight * 0.8f);
-                // Predict player position for aiming
-                var playerVel = _player.Velocity;
-                float leadTime = 0.3f;
-                var predicted = playerCenter2 + playerVel * leadTime;
-                var aimDir = predicted - sprayOrigin;
-                if (aimDir.Length() > 0.001f) aimDir = Vector2.Normalize(aimDir);
-                
-                for (int si = 0; si < 8; si++)
+                // Update latched crawlers: stick to player, deal tick damage
+                if (c.IsLatched)
                 {
-                    // Fan spread: ±25° around aim direction
-                    float spread = ((float)_rng.NextDouble() - 0.5f) * 0.87f; // ~±25°
-                    float cos = MathF.Cos(spread), sin = MathF.Sin(spread);
-                    var dir = new Vector2(aimDir.X * cos - aimDir.Y * sin, aimDir.X * sin + aimDir.Y * cos);
-                    float speed = 200f + (float)_rng.NextDouble() * 150f;
-                    _particles.Add(new Particle
+                    c.Position = _player.Position + c.LatchOffset;
+                    int tickDmg = c.UpdateLatch(dt);
+                    if (tickDmg > 0 && _spawnInvincibility <= 0 && !_isDead)
                     {
-                        Position = sprayOrigin + dir * 4f,
-                        Velocity = dir * speed + new Vector2(0, -30f), // slight upward arc
-                        Life = 0.6f + (float)_rng.NextDouble() * 0.3f,
-                        MaxLife = 0.9f,
-                        Color = new Color(255, 140 + _rng.Next(60), 20), // orange-hot
-                        Size = 2 + _rng.Next(2),
-                        DamagesPlayer = true,
-                        Damage = 1
-                    });
-                }
-                _shakeTimer = 0.08f; _shakeIntensity = 1.5f;
-            }
-
-            // Latch-on: aggroed crawler touches player → latches instead of contact damage
-            if (_spawnInvincibility <= 0 && !_isDead && !c.IsLatched)
-            {
-                if (c.CanLatch && latchedCount < MaxLatched && _nextLatchDelay <= 0
-                    && c.Rect.Intersects(playerRect2))
-                {
-                    c.Latch(_player.Position, _rng);
-                    latchedCount++;
-                    _nextLatchDelay = 0.4f; // stagger: 0.4s between latches
-                    _shakeTimer = 0.1f; _shakeIntensity = 2f;
-                    // EVE warns about latched crawlers
-                    if (_eveOrbActive)
-                    {
-                        string[] warns = {
-                            "Hostile organism attached! Shake it off!",
-                            "Crawler latched on! Use melee or dash!",
-                            "Parasite detected on suit! Remove it!",
-                            "Warning: biological attachment detected!"
-                        };
-                        EveAlert(warns[_rng.Next(warns.Length)], 2.5f);
-                    }
-                }
-                else
-                {
-                    // Normal contact damage for non-latchable crawlers (dummies, frozen, etc.)
-                    int dmg = c.CheckPlayerDamage(playerRect2, _player.Velocity.Y);
-                    if (dmg > 0) { _lastDamageSource = "Crawler"; _player.TakeDamage(dmg, _player.Position.X - c.Position.X); }
-                }
-            }
-            if (_player.MeleeTimer > 0 && c.Alive)
-            {
-                if (_player.MeleeHitbox.Intersects(c.Rect))
-                {
-                    bool finisher = _player.IsComboFinisher;
-                    if (c.IsDummy && c.AlwaysCrit) finisher = true;
-                    int prevHp = c.Hp;
-                    var ws = WeaponStats.Get(_player.CurrentWeapon);
-                    int dmg = finisher ? ws.FinisherDamage : ws.Damage;
-                    dmg = ApplyScanBonus(dmg, c.IsDummy ? "dummy" : c.Variant.ToString().ToLower());
-                    float kbDir = _player.FacingDir;
-                    bool killed = _knockbackEnabled
-                        ? c.TakeHit(dmg, kbDir * ws.KnockbackForce, ws.KnockbackUp)
-                        : c.TakeHit(dmg);
-                    bool didHit = c.Hp < prevHp || killed;
-                    if (didHit)
-                    {
-                        _player.RegisterComboHit();
-                        if (finisher) c.MeleeHitCooldown = 0.055f;
-                        var hitPt = new Vector2(c.Position.X + c.EffectiveWidth/2f, c.Position.Y + c.EffectiveHeight/2f);
-                        SpawnHitSpray(hitPt, _player.FacingDir, GetEnemyHitColor(c.IsDummy ? "dummy" : "crawler"), ws.Weight, finisher);
-                        if (killed)
-                        {
-                            if (_hitStopEnabled) _hitStopTimer = ws.HitStopKill;
-                            if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration * 1.5f; _shakeIntensity = ws.ShakeIntensity * 1.2f; }
-                            if (_deathParticlesEnabled) SpawnDeathParticles(new Vector2(c.Position.X + c.EffectiveWidth / 2f, c.Position.Y + c.EffectiveHeight / 2f), new Color(120, 60, 20));
-                        }
-                        else if (finisher)
-                        {
-                            if (_hitStopEnabled) _hitStopTimer = ws.HitStopFinisher;
-                            if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration * 1.2f; _shakeIntensity = ws.ShakeIntensity; }
-                        }
-                        else
-                        {
-                            if (_hitStopEnabled) _hitStopTimer = ws.HitStopNormal;
-                            if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration; _shakeIntensity = ws.ShakeIntensity * 0.8f; }
-                        }
+                        _lastDamageSource = "Crawler (latched)";
+                        _player.TakeDamage(tickDmg, 0);
                     }
                 }
             }
         }
 
-        // Update thornbacks
-        foreach (var t in _thornbacks)
+        // Unified update loop
+        foreach (var creature in _creatures)
+            creature.Update(dt, creatureCtx);
+
+        // Update food sources
+        foreach (var f in _foodSources) f.Update(dt);
+        _foodSources.RemoveAll(f => f.Depleted);
+
+        // Crawler-specific post-update: bombardier spray and latch-on
+        foreach (var creature in _creatures)
         {
-            t.Update(dt);
-            if (_spawnInvincibility <= 0 && !_isDead)
+            if (creature is Crawler c)
             {
-                int dmg = t.CheckPlayerDamage(playerRect2);
-                if (dmg > 0) { _lastDamageSource = "Thornback"; _player.TakeDamage(dmg, _player.Position.X - t.Position.X); }
-            }
-            if (_player.MeleeTimer > 0 && t.Alive)
-            {
-                if (_player.MeleeHitbox.Intersects(t.Rect))
+                // Bombardier spray: spawn hot particles when spray fires
+                if (c.BombardierSprayed)
                 {
-                    bool finisher = _player.IsComboFinisher;
-                    int prevHp = t.Hp;
-                    var ws = WeaponStats.Get(_player.CurrentWeapon);
-                    int dmg = finisher ? ws.FinisherDamage : ws.Damage;
-                    float kbDir = _player.FacingDir;
-                    dmg = ApplyScanBonus(dmg, "thornback");
-                    bool killed = _knockbackEnabled
-                        ? t.TakeHit(dmg, kbDir * ws.KnockbackForce, ws.KnockbackUp)
-                        : t.TakeHit(dmg);
-                    bool didHit = t.Hp < prevHp || killed;
-                    if (didHit)
+                    var sprayOrigin = c.Position + new Vector2(c.EffectiveWidth / 2f, c.EffectiveHeight * 0.8f);
+                    var playerVel = _player.Velocity;
+                    float leadTime = 0.3f;
+                    var predicted = playerCenter2 + playerVel * leadTime;
+                    var aimDir = predicted - sprayOrigin;
+                    if (aimDir.Length() > 0.001f) aimDir = Vector2.Normalize(aimDir);
+
+                    for (int si = 0; si < 8; si++)
                     {
-                        _player.RegisterComboHit();
-                        if (finisher) t.MeleeHitCooldown = 0.055f;
-                        var hitPt = new Vector2(t.Position.X + Thornback.Width/2f, t.Position.Y + Thornback.Height/2f);
-                        SpawnHitSpray(hitPt, _player.FacingDir, GetEnemyHitColor("thornback"), ws.Weight, finisher);
-                        if (killed)
+                        float spread = ((float)_rng.NextDouble() - 0.5f) * 0.87f;
+                        float cos = MathF.Cos(spread), sin = MathF.Sin(spread);
+                        var dir = new Vector2(aimDir.X * cos - aimDir.Y * sin, aimDir.X * sin + aimDir.Y * cos);
+                        float speed = 200f + (float)_rng.NextDouble() * 150f;
+                        _particles.Add(new Particle
                         {
-                            if (_hitStopEnabled) _hitStopTimer = ws.HitStopKill;
-                            if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration * 1.5f; _shakeIntensity = ws.ShakeIntensity * 1.2f; }
-                            if (_deathParticlesEnabled) SpawnDeathParticles(new Vector2(t.Position.X + Thornback.Width / 2f, t.Position.Y + Thornback.Height / 2f), new Color(60, 100, 40));
-                        }
-                        else if (finisher)
+                            Position = sprayOrigin + dir * 4f,
+                            Velocity = dir * speed + new Vector2(0, -30f),
+                            Life = 0.6f + (float)_rng.NextDouble() * 0.3f,
+                            MaxLife = 0.9f,
+                            Color = new Color(255, 140 + _rng.Next(60), 20),
+                            Size = 2 + _rng.Next(2),
+                            DamagesPlayer = true,
+                            Damage = 1
+                        });
+                    }
+                    _shakeTimer = 0.08f; _shakeIntensity = 1.5f;
+                }
+
+                // Latch-on: aggroed crawler touches player → latches instead of contact damage
+                if (_spawnInvincibility <= 0 && !_isDead && !c.IsLatched)
+                {
+                    if (c.CanLatch && latchedCount < MaxLatched && _nextLatchDelay <= 0
+                        && c.Rect.Intersects(playerRect2))
+                    {
+                        c.Latch(_player.Position, _rng);
+                        latchedCount++;
+                        _nextLatchDelay = 0.4f;
+                        _shakeTimer = 0.1f; _shakeIntensity = 2f;
+                        if (_eveOrbActive)
                         {
-                            if (_hitStopEnabled) _hitStopTimer = ws.HitStopFinisher;
-                            if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration * 1.2f; _shakeIntensity = ws.ShakeIntensity; }
+                            string[] warns = {
+                                "Hostile organism attached! Shake it off!",
+                                "Crawler latched on! Use melee or dash!",
+                                "Parasite detected on suit! Remove it!",
+                                "Warning: biological attachment detected!"
+                            };
+                            EveAlert(warns[_rng.Next(warns.Length)], 2.5f);
                         }
-                        else
-                        {
-                            if (_hitStopEnabled) _hitStopTimer = ws.HitStopNormal;
-                            if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration; _shakeIntensity = ws.ShakeIntensity * 0.8f; }
-                        }
+                    }
+                    else
+                    {
+                        // Normal contact damage for non-latchable crawlers
+                        int dmg = c.CheckPlayerDamage(playerRect2, _player.Velocity.Y);
+                        if (dmg > 0) { _lastDamageSource = "Crawler"; _player.TakeDamage(dmg, _player.Position.X - c.Position.X); }
                     }
                 }
             }
         }
 
-        // Update hoppers
-        foreach (var h in _hoppers)
+        // Unified contact damage (non-crawler creatures)
+        if (_spawnInvincibility <= 0 && !_isDead)
         {
-            h.Update(dt, playerCenter2,
-                _level.TileGridInstance, _level.TileGrid?.TileSize ?? 32,
-                _level.Bounds.Bottom);
-            if (_spawnInvincibility <= 0 && !_isDead)
+            foreach (var creature in _creatures)
             {
-                int dmg = h.CheckPlayerDamage(playerRect2);
-                if (dmg > 0) { _lastDamageSource = "Hopper"; _player.TakeDamage(dmg, _player.Position.X - h.Position.X); }
-            }
-            if (_player.MeleeTimer > 0 && h.Alive)
-            {
-                if (_player.MeleeHitbox.Intersects(h.Rect))
+                if (!creature.Alive || creature is Crawler) continue; // crawlers handled above
+                int dmg = creature.CheckPlayerDamage(playerRect2);
+                if (dmg > 0)
                 {
-                    bool finisher = _player.IsComboFinisher;
-                    int prevHp = h.Hp;
-                    var ws = WeaponStats.Get(_player.CurrentWeapon);
-                    int dmg = finisher ? ws.FinisherDamage : ws.Damage;
-                    float kbDir = _player.FacingDir;
-                    dmg = ApplyScanBonus(dmg, "hopper");
-                    bool killed = _knockbackEnabled
-                        ? h.TakeHit(dmg, kbDir * ws.KnockbackForce, ws.KnockbackUp)
-                        : h.TakeHit(dmg);
-                    bool didHit = h.Hp < prevHp || killed;
-                    if (didHit)
-                    {
-                        _player.RegisterComboHit();
-                        if (finisher) h.MeleeHitCooldown = 0.055f;
-                        var hitPt = new Vector2(h.Position.X + Hopper.Width/2f, h.Position.Y + Hopper.Height/2f);
-                        SpawnHitSpray(hitPt, _player.FacingDir, GetEnemyHitColor("hopper"), ws.Weight, finisher);
-                        if (killed)
-                        {
-                            if (_hitStopEnabled) _hitStopTimer = ws.HitStopKill;
-                            if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration * 1.5f; _shakeIntensity = ws.ShakeIntensity * 1.2f; }
-                            if (_deathParticlesEnabled) SpawnDeathParticles(new Vector2(h.Position.X + Hopper.Width / 2f, h.Position.Y + Hopper.Height / 2f), new Color(100, 80, 60));
-                        }
-                        else if (finisher)
-                        {
-                            if (_hitStopEnabled) _hitStopTimer = ws.HitStopFinisher;
-                            if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration * 1.2f; _shakeIntensity = ws.ShakeIntensity; }
-                        }
-                        else
-                        {
-                            if (_hitStopEnabled) _hitStopTimer = ws.HitStopNormal;
-                            if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration; _shakeIntensity = ws.ShakeIntensity * 0.8f; }
-                        }
-                    }
+                    _lastDamageSource = creature.SpeciesName;
+                    _player.TakeDamage(dmg, _player.Position.X - creature.Position.X);
+                    if (_player.Hp <= 0) { _isDead = true; LogDeath(); }
                 }
             }
         }
 
-        // Update birds (non-hostile ambient creatures)
-        foreach (var bird in _birds)
-            bird.Update(dt, playerCenter2,
-                _level.TileGridInstance, _level.TileGrid?.TileSize ?? 32,
-                _level.Bounds.Bottom);
-
-        // Melee hit detection for birds
+        // Unified melee hit detection
         if (_player.MeleeTimer > 0)
         {
-            foreach (var bird in _birds)
+            foreach (var creature in _creatures)
             {
-                if (!bird.Alive) continue;
-                if (_player.MeleeHitbox.Intersects(bird.Rect))
+                if (!creature.Alive || creature.MeleeHitCooldown > 0) continue;
+                if (!_player.MeleeHitbox.Intersects(creature.Rect)) continue;
+
+                bool finisher = _player.IsComboFinisher;
+                if (creature is Crawler cd && cd.IsDummy && cd.AlwaysCrit) finisher = true;
+                int prevHp = creature.Hp;
+                var ws = WeaponStats.Get(_player.CurrentWeapon);
+                int dmg = finisher ? ws.FinisherDamage : ws.Damage;
+                // Use species-specific scan name (crawler dummies use "dummy")
+                string scanName = creature is Crawler cs
+                    ? (cs.IsDummy ? "dummy" : cs.Variant.ToString().ToLower())
+                    : creature.SpeciesName;
+                dmg = ApplyScanBonus(dmg, scanName);
+                float kbDir = _player.FacingDir;
+                bool killed = _knockbackEnabled
+                    ? creature.TakeHit(dmg, kbDir * ws.KnockbackForce, ws.KnockbackUp)
+                    : creature.TakeHit(dmg);
+                bool didHit = creature.Hp < prevHp || killed;
+                if (didHit)
                 {
-                    var ws = WeaponStats.Get(_player.CurrentWeapon);
-                    float kbDir = _player.FacingDir;
-                    bool killed = bird.TakeHit(ws.Damage, kbDir * ws.KnockbackForce, ws.KnockbackUp);
+                    _player.RegisterComboHit();
+                    if (finisher) creature.MeleeHitCooldown = 0.055f;
+                    var hitPt = creature.Position + new Vector2(creature.CreatureWidth / 2f, creature.CreatureHeight / 2f);
+                    SpawnHitSpray(hitPt, _player.FacingDir, creature.HitColor, ws.Weight, finisher);
                     if (killed)
                     {
-                        _player.RegisterComboHit();
-                        var hitPt = new Vector2(bird.Position.X + Bird.Width / 2f, bird.Position.Y + Bird.Height / 2f);
-                        SpawnHitSpray(hitPt, _player.FacingDir, GetEnemyHitColor("bird"), ws.Weight, true);
                         if (_hitStopEnabled) _hitStopTimer = ws.HitStopKill;
                         if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration * 1.5f; _shakeIntensity = ws.ShakeIntensity * 1.2f; }
-                        if (_deathParticlesEnabled) SpawnDeathParticles(new Vector2(bird.Position.X + Bird.Width / 2f, bird.Position.Y + Bird.Height / 2f), new Color(110, 85, 55));
+                        if (_deathParticlesEnabled) SpawnDeathParticles(hitPt, creature.DeathParticleColor);
+                    }
+                    else if (finisher)
+                    {
+                        if (_hitStopEnabled) _hitStopTimer = ws.HitStopFinisher;
+                        if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration * 1.2f; _shakeIntensity = ws.ShakeIntensity; }
+                    }
+                    else
+                    {
+                        if (_hitStopEnabled) _hitStopTimer = ws.HitStopNormal;
+                        if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration; _shakeIntensity = ws.ShakeIntensity * 0.8f; }
                     }
                 }
             }
@@ -3295,8 +3364,7 @@ public class Game1 : Game
                 string area = _worldGraph?.GetRoom(_currentRoomId)?.AreaId ?? "unknown";
                 _areaKillCounts.TryGetValue(area, out int count);
                 _areaKillCounts[area] = count + 1;
-                // Check if passive/fleeing creature → EVE silence
-                bool isPassive = c is Crawler cr && (cr.Variant == CrawlerVariant.Forager || cr.Variant == CrawlerVariant.Skitter);
+                bool isPassive = c is Crawler cr2 && (cr2.Variant == CrawlerVariant.Forager || cr2.Variant == CrawlerVariant.Skitter);
                 if (isPassive)
                 {
                     _passiveCreatureKills++;
@@ -3305,77 +3373,69 @@ public class Game1 : Game
             }
         }
 
+        // Spawn corpses from dead creatures
+        foreach (var c in _creatures)
+        {
+            if (!c.Alive)
+            {
+                var corpsePos = c.Position + new Vector2(c.CreatureWidth / 2f, c.CreatureHeight / 2f);
+                _foodSources.Add(new FoodSource(corpsePos, FoodType.Corpse, 0.6f));
+            }
+        }
+
+        // Creature-on-creature contact damage (predators damage prey on overlap)
+        for (int i = 0; i < _creatures.Count; i++)
+        {
+            var a = _creatures[i];
+            if (!a.Alive || a.DamageCooldown > 0) continue;
+            if (a.Role is not (EcologicalRole.Predator or EcologicalRole.Apex)) continue;
+
+            for (int j = 0; j < _creatures.Count; j++)
+            {
+                if (i == j) continue;
+                var b = _creatures[j];
+                if (!b.Alive || b.DamageCooldown > 0) continue;
+                if (Creature.IsSameFaction(a, b)) continue;
+                if (!Creature.IsThreatTo(a, b)) continue;
+                if (!a.Rect.Intersects(b.Rect)) continue;
+
+                float kbDir = a.Position.X < b.Position.X ? 1f : -1f;
+                bool killed = b.TakeHit(1, kbDir * 40f, -25f);
+                b.DamageCooldown = 1f;
+
+                // Predator gets fed
+                a.Needs.Hunger = MathHelper.Clamp(a.Needs.Hunger - 0.3f, 0f, 1f);
+
+                if (killed)
+                {
+                    var hitPt = b.Position + new Vector2(b.CreatureWidth / 2f, b.CreatureHeight / 2f);
+                    if (_deathParticlesEnabled) SpawnDeathParticles(hitPt, b.DeathParticleColor);
+                }
+
+                break; // one hit per predator per frame
+            }
+        }
+
         _creatures.RemoveAll(c => !c.Alive);
-        // Sync typed lists (shrinking toward zero over time)
         _birds.RemoveAll(b => !b.Alive);
         _crawlers.RemoveAll(c => !c.Alive);
         _hoppers.RemoveAll(h => !h.Alive);
         _thornbacks.RemoveAll(t => !t.Alive);
         _wingbeaters.RemoveAll(w => !w.Alive);
-
-        // --- Wingbeater update ---
-        foreach (var wb in _wingbeaters)
-            wb.Update(dt, playerCenter2, _level.Bounds.Bottom);
-
-        // Melee hit detection for wingbeaters
-        if (_player.MeleeTimer > 0)
-        {
-            foreach (var wb in _wingbeaters)
-            {
-                if (!wb.Alive) continue;
-                if (_player.MeleeHitbox.Intersects(wb.Rect))
-                {
-                    var ws = WeaponStats.Get(_player.CurrentWeapon);
-                    float kbDir = _player.FacingDir;
-                    bool killed = wb.TakeHit(ws.Damage, kbDir * ws.KnockbackForce, ws.KnockbackUp);
-                    var hitPt = new Vector2(wb.Position.X + Wingbeater.Width / 2f, wb.Position.Y + Wingbeater.Height / 2f);
-                    SpawnHitSpray(hitPt, _player.FacingDir, GetEnemyHitColor("wingbeater"), ws.Weight, killed);
-                    if (killed)
-                    {
-                        _player.RegisterComboHit();
-                        if (_hitStopEnabled) _hitStopTimer = ws.HitStopKill;
-                        if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration * 1.5f; _shakeIntensity = ws.ShakeIntensity * 1.2f; }
-                        if (_deathParticlesEnabled) SpawnDeathParticles(hitPt, new Color(160, 60, 40));
-                    }
-                    else
-                    {
-                        if (_hitStopEnabled) _hitStopTimer = ws.HitStopNormal;
-                    }
-                }
-            }
-        }
-
-        // Wingbeater contact damage
-        if (!_isDead)
-        {
-            var playerRect3 = _player.CollisionRect;
-            foreach (var wb in _wingbeaters)
-            {
-                if (!wb.Alive) continue;
-                int wbDmg = wb.CheckPlayerDamage(playerRect3);
-                if (wbDmg > 0 && _spawnInvincibility <= 0f)
-                {
-                    _lastDamageSource = "Wingbeater";
-                    _player.TakeDamage(wbDmg, _player.Position.X - wb.Position.X);
-                    if (_player.Hp <= 0) { _isDead = true; LogDeath(); }
-                }
-            }
-        }
-
-        // (wingbeater death removal consolidated into unified RemoveAll block above)
+        _scavengers.RemoveAll(s => !s.Alive);
 
         // --- Ecosystem: Trophic Interactions ---
         _birdHuntTimer -= dt;
         if (_birdHuntTimer <= 0)
         {
-            _birdHuntTimer = 2f; // check every 2s
-            foreach (var bird in _birds)
+            _birdHuntTimer = 2f;
+            foreach (var bird in _creatures.OfType<Bird>())
             {
                 if (!bird.Alive) continue;
                 var bCenter = bird.Position + new Vector2(Bird.Width / 2f, Bird.Height / 2f);
                 Crawler nearestPrey = null;
-                float nearestDist = 200f;
-                foreach (var c in _crawlers)
+                float nearestDist = 80f;
+                foreach (var c in _creatures.OfType<Crawler>())
                 {
                     if (!c.Alive || c.IsDummy) continue;
                     var cCenter = c.Position + new Vector2(c.EffectiveWidth / 2f, c.EffectiveHeight / 2f);
@@ -3384,46 +3444,42 @@ public class Game1 : Game
                 }
                 if (nearestPrey != null)
                 {
-                    // Bird dive-kills the crawler
                     nearestPrey.TakeHit(999);
                     var killPos = nearestPrey.Position + new Vector2(nearestPrey.EffectiveWidth / 2f, nearestPrey.EffectiveHeight / 2f);
-                    SpawnDeathParticles(killPos, GetEnemyHitColor("crawler"), 6);
+                    SpawnDeathParticles(killPos, nearestPrey.HitColor, 6);
                 }
             }
         }
         // Crawlers flee from nearby birds
-        foreach (var c in _crawlers)
+        foreach (var c in _creatures.OfType<Crawler>())
         {
             if (!c.Alive || c.IsDummy) continue;
             var cCenter = c.Position + new Vector2(c.EffectiveWidth / 2f, c.EffectiveHeight / 2f);
-            foreach (var bird in _birds)
+            foreach (var bird in _creatures.OfType<Bird>())
             {
                 if (!bird.Alive) continue;
                 var bCenter = bird.Position + new Vector2(Bird.Width / 2f, Bird.Height / 2f);
                 if (Vector2.Distance(cCenter, bCenter) < 150f)
                 {
-                    // Flee: reverse direction away from bird
                     c.Dir = bCenter.X > cCenter.X ? -1 : 1;
                     break;
                 }
             }
         }
 
-        // Crawler Swarm: Leaper as pack leader — nearby crawlers mob the player
+        // Crawler Swarm: Leaper as pack leader
         _swarmDamageTimer -= dt;
         if (_swarmDamageTimer <= 0)
         {
             _swarmDamageTimer = 0.5f;
             var aliveCrawlers = new List<Crawler>();
-            foreach (var c in _crawlers)
+            foreach (var c in _creatures.OfType<Crawler>())
                 if (c.Alive && !c.IsDummy && !c.Frozen && !c.IsLatched) aliveCrawlers.Add(c);
 
-            // Find leapers that are aggroed (pack leaders)
             var aggroedLeapers = new List<Crawler>();
             foreach (var c in aliveCrawlers)
                 if (c.Variant == CrawlerVariant.Leaper && c.Aggroed) aggroedLeapers.Add(c);
 
-            // For each aggroed leaper, recruit nearby crawlers into swarm
             var swarmMembers = new HashSet<Crawler>();
             foreach (var leader in aggroedLeapers)
             {
@@ -3433,11 +3489,10 @@ public class Game1 : Game
                 {
                     if (other == leader) continue;
                     var oCenter = other.Position + new Vector2(other.EffectiveWidth / 2f, other.EffectiveHeight / 2f);
-                    if (Vector2.Distance(lCenter, oCenter) < 150f) // recruitment range
+                    if (Vector2.Distance(lCenter, oCenter) < 150f)
                         nearby.Add(other);
                 }
 
-                // Need at least 3 nearby (4 total with leader) to trigger swarm
                 if (nearby.Count >= 3)
                 {
                     swarmMembers.Add(leader);
@@ -3445,7 +3500,6 @@ public class Game1 : Game
                 }
             }
 
-            // Apply swarm state — once frenzied, PERMANENT (no undo)
             float playerTargetX = _player.Position.X + Player.SpriteW / 2f;
             bool swarmJustStarted = false;
             foreach (var c in aliveCrawlers)
@@ -3453,14 +3507,12 @@ public class Game1 : Game
                 if (swarmMembers.Contains(c) && !c.SwarmActive)
                     swarmJustStarted = true;
                 if (swarmMembers.Contains(c))
-                    c.SwarmActive = true; // permanent — never cleared
+                    c.SwarmActive = true;
 
-                // All frenzied crawlers track player
                 if (c.SwarmActive)
                 {
                     c.SwarmTargetX = playerTargetX;
 
-                    // Swarm damage: each swarmer touching player deals tick damage
                     if (_spawnInvincibility <= 0 && !_isDead)
                     {
                         var sRect = c.Rect;
@@ -3476,7 +3528,6 @@ public class Game1 : Game
                 }
             }
 
-            // EVE warns when swarm triggers
             if (swarmJustStarted && _eveOrbActive)
             {
                 var warns = new[] { "Multiple hostiles coordinating!", "They're swarming!", "They've gone feral — watch yourself!" };
@@ -3485,55 +3536,31 @@ public class Game1 : Game
             }
         }
 
-        // Bullets vs crawlers and thornbacks
+        // Unified bullet vs creatures
         foreach (var b in _bullets)
         {
             if (b.IsDead) continue;
             var bRect = new Rectangle((int)b.Position.X, (int)b.Position.Y, Bullet.Size, Bullet.Size);
             float bDir = b.Direction.X >= 0 ? 1f : -1f;
-            float bulletKb = 120f; // light knockback
+            float bulletKb = 120f;
             float bulletKbUp = -60f;
-            foreach (var c in _crawlers)
+
+            foreach (var creature in _creatures)
             {
-                if (c.Alive && bRect.Intersects(c.Rect))
-                {
-                    bool killed = _knockbackEnabled
-                        ? c.TakeHit(2, bDir * bulletKb, bulletKbUp)
-                        : c.TakeHit(2);
-                    var hitPt = new Vector2(c.Position.X + c.EffectiveWidth/2f, c.Position.Y + c.EffectiveHeight/2f);
-                    SpawnHitSpray(hitPt, (int)bDir, GetEnemyHitColor(c.IsDummy ? "dummy" : "crawler"), 1, false);
-                    if (killed && _deathParticlesEnabled) SpawnDeathParticles(hitPt, new Color(120, 60, 20));
-                    if (_hitStopEnabled) _hitStopTimer = 0.02f;
-                    b.IsDead = true; break;
-                }
+                if (!creature.Alive) continue;
+                if (!bRect.Intersects(creature.Rect)) continue;
+
+                bool killed = _knockbackEnabled
+                    ? creature.TakeHit(2, bDir * bulletKb, bulletKbUp)
+                    : creature.TakeHit(2);
+                var hitPt = creature.Position + new Vector2(creature.CreatureWidth / 2f, creature.CreatureHeight / 2f);
+                SpawnHitSpray(hitPt, (int)bDir, creature.HitColor, 1, false);
+                if (killed && _deathParticlesEnabled) SpawnDeathParticles(hitPt, creature.DeathParticleColor);
+                if (_hitStopEnabled) _hitStopTimer = 0.02f;
+                b.IsDead = true;
+                break;
             }
-            if (b.IsDead) continue;
-            foreach (var t in _thornbacks)
-            {
-                if (t.Alive && bRect.Intersects(t.Rect))
-                {
-                    t.TakeHit(1);
-                    var hitPt = new Vector2(t.Position.X + Thornback.Width/2f, t.Position.Y + Thornback.Height/2f);
-                    SpawnHitSpray(hitPt, (int)bDir, GetEnemyHitColor("thornback"), 1, false);
-                    if (_hitStopEnabled) _hitStopTimer = 0.02f;
-                    b.IsDead = true; break;
-                }
-            }
-            if (b.IsDead) continue;
-            foreach (var h in _hoppers)
-            {
-                if (h.Alive && bRect.Intersects(h.Rect))
-                {
-                    bool killed = _knockbackEnabled
-                        ? h.TakeHit(2, bDir * bulletKb, bulletKbUp)
-                        : h.TakeHit(2);
-                    var hitPt = new Vector2(h.Position.X + Hopper.Width/2f, h.Position.Y + Hopper.Height/2f);
-                    SpawnHitSpray(hitPt, (int)bDir, GetEnemyHitColor("hopper"), 1, false);
-                    if (killed && _deathParticlesEnabled) SpawnDeathParticles(hitPt, new Color(60, 120, 40));
-                    if (_hitStopEnabled) _hitStopTimer = 0.02f;
-                    b.IsDead = true; break;
-                }
-            }
+
             // Bullet vs breakable tiles
             if (!b.IsDead && _level.TileGridInstance != null)
             {
@@ -3584,23 +3611,34 @@ public class Game1 : Game
                 }
             }
         }
-        // Wall-splat check for knocked enemies
+
+        // Unified wall-splat check for knocked creatures
         if (_knockbackEnabled)
         {
-            foreach (var c in _crawlers)
+            foreach (var creature in _creatures)
             {
-                if (!c.Alive || c.KnockbackVel.LengthSquared() < 100f) continue;
-                float kbSpeed = c.KnockbackVel.Length();
+                if (!creature.Alive) continue;
+
+                // Get knockback vel - each type stores it differently
+                Vector2 kbVel = Vector2.Zero;
+                if (creature is Crawler cr3) kbVel = cr3.KnockbackVel;
+                else if (creature is Hopper hp) kbVel = hp.KnockbackVel;
+                else if (creature is Bird bd) kbVel = bd.KnockbackVel;
+                else if (creature is Wingbeater wb2) kbVel = wb2.KnockbackVel;
+                else continue; // no knockback for this type
+
+                if (kbVel.LengthSquared() < 100f) continue;
+                float kbSpeed = kbVel.Length();
                 bool hitWall = false;
-                if (c.Position.X < _level.Bounds.Left) { c.Position.X = _level.Bounds.Left; hitWall = true; }
-                if (c.Position.X + c.EffectiveWidth > _level.Bounds.Right) { c.Position.X = _level.Bounds.Right - c.EffectiveWidth; hitWall = true; }
-                var cRect = c.Rect;
+                if (creature.Position.X < _level.Bounds.Left) { creature.Position.X = _level.Bounds.Left; hitWall = true; }
+                if (creature.Position.X + creature.CreatureWidth > _level.Bounds.Right) { creature.Position.X = _level.Bounds.Right - creature.CreatureWidth; hitWall = true; }
+                var cRect = creature.Rect;
                 foreach (var wall in _level.WallRects)
                 {
                     if (cRect.Intersects(wall))
                     {
-                        if (c.KnockbackVel.X > 0) c.Position.X = wall.Left - c.EffectiveWidth;
-                        else c.Position.X = wall.Right;
+                        if (kbVel.X > 0) creature.Position.X = wall.Left - creature.CreatureWidth;
+                        else creature.Position.X = wall.Right;
                         hitWall = true;
                     }
                 }
@@ -3609,78 +3647,21 @@ public class Game1 : Game
                     int splatDmg = (int)(kbSpeed / 100f);
                     if (splatDmg > 0)
                     {
-                        bool killed = c.TakeHit(splatDmg);
+                        bool killed = creature.TakeHit(splatDmg);
                         if (_hitStopEnabled) _hitStopTimer = MathF.Max(_hitStopTimer, 0.08f);
                         if (_screenShakeEnabled) { _shakeTimer = 0.12f; _shakeIntensity = 8f; }
-                        if (_deathParticlesEnabled && killed) SpawnDeathParticles(new Vector2(c.Position.X + c.EffectiveWidth/2f, c.Position.Y + c.EffectiveHeight/2f), new Color(120, 60, 20));
-                        SpawnDustParticles(new Vector2(c.Position.X + (c.KnockbackVel.X > 0 ? Crawler.Width : 0), c.Position.Y + c.EffectiveHeight / 2f), 6);
+                        if (_deathParticlesEnabled && killed) SpawnDeathParticles(creature.Position + new Vector2(creature.CreatureWidth / 2f, creature.CreatureHeight / 2f), creature.DeathParticleColor);
+                        SpawnDustParticles(new Vector2(creature.Position.X + (kbVel.X > 0 ? creature.CreatureWidth : 0), creature.Position.Y + creature.CreatureHeight / 2f), 6);
                     }
-                    c.KnockbackVel = Vector2.Zero;
-                }
-            }
-            foreach (var h in _hoppers)
-            {
-                if (!h.Alive || h.KnockbackVel.LengthSquared() < 100f) continue;
-                float kbSpeed = h.KnockbackVel.Length();
-                bool hitWall = false;
-                if (h.Position.X < _level.Bounds.Left) { h.Position.X = _level.Bounds.Left; hitWall = true; }
-                if (h.Position.X + Hopper.Width > _level.Bounds.Right) { h.Position.X = _level.Bounds.Right - Hopper.Width; hitWall = true; }
-                var hRect = h.Rect;
-                foreach (var wall in _level.WallRects)
-                {
-                    if (hRect.Intersects(wall))
-                    {
-                        if (h.KnockbackVel.X > 0) h.Position.X = wall.Left - Hopper.Width;
-                        else h.Position.X = wall.Right;
-                        hitWall = true;
-                    }
-                }
-                if (hitWall)
-                {
-                    int splatDmg = (int)(kbSpeed / 100f);
-                    if (splatDmg > 0)
-                    {
-                        bool killed = h.TakeHit(splatDmg);
-                        if (_hitStopEnabled) _hitStopTimer = MathF.Max(_hitStopTimer, 0.08f);
-                        if (_screenShakeEnabled) { _shakeTimer = 0.12f; _shakeIntensity = 8f; }
-                        if (_deathParticlesEnabled && killed) SpawnDeathParticles(new Vector2(h.Position.X + Hopper.Width/2f, h.Position.Y + Hopper.Height/2f), new Color(100, 80, 60));
-                        SpawnDustParticles(new Vector2(h.Position.X + (h.KnockbackVel.X > 0 ? Hopper.Width : 0), h.Position.Y + Hopper.Height / 2f), 6);
-                    }
-                    h.KnockbackVel = Vector2.Zero;
-                }
-            }
-            foreach (var b in _birds)
-            {
-                if (!b.Alive || b.KnockbackVel.LengthSquared() < 100f) continue;
-                float kbSpeed = b.KnockbackVel.Length();
-                bool hitWall = false;
-                if (b.Position.X < _level.Bounds.Left) { b.Position.X = _level.Bounds.Left; hitWall = true; }
-                if (b.Position.X + Bird.Width > _level.Bounds.Right) { b.Position.X = _level.Bounds.Right - Bird.Width; hitWall = true; }
-                var bRect = b.Rect;
-                foreach (var wall in _level.WallRects)
-                {
-                    if (bRect.Intersects(wall))
-                    {
-                        if (b.KnockbackVel.X > 0) b.Position.X = wall.Left - Bird.Width;
-                        else b.Position.X = wall.Right;
-                        hitWall = true;
-                    }
-                }
-                if (hitWall)
-                {
-                    int splatDmg = (int)(kbSpeed / 100f);
-                    if (splatDmg > 0)
-                    {
-                        bool killed = b.TakeHit(splatDmg);
-                        if (_hitStopEnabled) _hitStopTimer = MathF.Max(_hitStopTimer, 0.08f);
-                        if (_screenShakeEnabled) { _shakeTimer = 0.12f; _shakeIntensity = 8f; }
-                        if (_deathParticlesEnabled && killed) SpawnDeathParticles(new Vector2(b.Position.X + Bird.Width/2f, b.Position.Y + Bird.Height/2f), new Color(80, 120, 160));
-                        SpawnDustParticles(new Vector2(b.Position.X + (b.KnockbackVel.X > 0 ? Bird.Width : 0), b.Position.Y + Bird.Height / 2f), 6);
-                    }
-                    b.KnockbackVel = Vector2.Zero;
+                    // Zero out knockback
+                    if (creature is Crawler cr4) cr4.KnockbackVel = Vector2.Zero;
+                    else if (creature is Hopper hp2) hp2.KnockbackVel = Vector2.Zero;
+                    else if (creature is Bird bd2) bd2.KnockbackVel = Vector2.Zero;
+                    else if (creature is Wingbeater wb3) wb3.KnockbackVel = Vector2.Zero;
                 }
             }
         }
+
         } // end _enemiesEnabled
 
         // Check HP death
@@ -4211,6 +4192,9 @@ public class Game1 : Game
                         case "knife": EquipMelee(WeaponType.Knife); break;
                         case "grapple": _player.HasGrapple = true; EveAlert("Partially functional. Battery drain, but better than nothing.", 4f); break;
                         case "map-module": _hasMapModule = true; EveAlert("Cartographic module. Damaged, but I can compensate.", 4f); break;
+                        case "torch": EquipMelee(WeaponType.Torch); EveAlert("A torch. Primitive, but it'll light the way.", 4f); break;
+                        case "lantern": _hasLantern = true; _lanternActive = true; EveAlert("Electric lantern recovered. N to toggle.", 4f); break;
+                        case "cipher-helmet": _hasCipherHelmet = true; EveAlert("Cipher-frequency visor. Equip in helmet slot via inventory.", 4f); break;
                         case "stick": EquipMelee(WeaponType.Stick); break;
                         case "whip": EquipMelee(WeaponType.Whip); break;
                         case "dagger": EquipMelee(WeaponType.Dagger); break;
@@ -4795,6 +4779,9 @@ public class Game1 : Game
                         {
                             _player.HasGrapple = _saveData.CollectedItems?.Any(id => id.StartsWith("grapple")) == true;
                             _hasMapModule = _saveData.CollectedItems?.Any(id => id.StartsWith("map-module")) == true;
+                            _hasLantern = _saveData.HasLantern;
+                            _hasCipherHelmet = _saveData.HasCipherHelmet;
+                            _torchFuel = _saveData.TorchFuel;
                             _player.CurrentTier = (Player.MoveTier)Math.Clamp(_saveData.MoveTier, 0, 2);
                             _player.ApplyTierConstants();
                             _wakeUpComplete = true;
@@ -5076,6 +5063,7 @@ public class Game1 : Game
         "bird" => new Color(80, 120, 160),
         "wingbeater" => new Color(160, 60, 40),
         "swarm" => Color.OrangeRed,
+        "scavenger" => new Color(90, 75, 60),
         _ => new Color(200, 50, 50)
     };
 
@@ -5086,6 +5074,7 @@ public class Game1 : Game
         Wingbeater => "wingbeater",
         Hopper => "hopper",
         Thornback => "thornback",
+        Scavenger => "scavenger",
         _ => "creature"
     };
 
@@ -5242,6 +5231,18 @@ public class Game1 : Game
         // Check time/underground buttons first (before tile placement consumes click)
         _editorTimeBtnClicked = false;
         UpdateEditorTimeButtons();
+
+        // Ecosystem debug toggle click (bottom-right button)
+        {
+            var ms = Mouse.GetState();
+            var ecoDebugRect = new Rectangle(ViewW - 60, ViewH - 20, 56, 16);
+            if (ecoDebugRect.Contains(ms.X, ms.Y) && ms.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released)
+            {
+                _debugEcosystem = !_debugEcosystem;
+                _editorTimeBtnClicked = true; // reuse flag to consume click
+            }
+        }
+
         // Ctrl+Z = undo
         if ((kb.IsKeyDown(Keys.LeftControl) || kb.IsKeyDown(Keys.RightControl)) && kb.IsKeyDown(Keys.Z) && _prevKb.IsKeyUp(Keys.Z))
             EditorUndo();
@@ -5572,7 +5573,10 @@ public class Game1 : Game
 
             // Left click = paint single OR start drag-fill (Ctrl+click = drag-fill rectangle)
             bool ctrlHeld = kb.IsKeyDown(Keys.LeftControl) || kb.IsKeyDown(Keys.RightControl);
-            if (mouse.LeftButton == ButtonState.Pressed && !kb.IsKeyDown(Keys.T) && !paletteClicked)
+            // ECO debug button area check
+            var _ecoRect = new Rectangle(ViewW - 60, ViewH - 20, 56, 16);
+            bool ecoClicked = _ecoRect.Contains(mouse.X, mouse.Y);
+            if (mouse.LeftButton == ButtonState.Pressed && !kb.IsKeyDown(Keys.T) && !paletteClicked && !ecoClicked)
             {
                 var (tx, ty) = tg.WorldToTile(tileSnappedX, tileSnappedY);
                 if (tx >= 0 && ty >= 0)
@@ -6524,6 +6528,10 @@ public class Game1 : Game
         _saveData.EvolutionFlags = _evolutionFlags;
         _saveData.CipherScanUnlocked = _cipherScanUnlocked;
         _saveData.WorldTime = _worldTime;
+        _saveData.HasLantern = _hasLantern;
+        _saveData.HasCipherHelmet = _hasCipherHelmet;
+        _saveData.CipherHelmetEquipped = _cipherHelmetEquipped;
+        _saveData.TorchFuel = _torchFuel;
     }
 
     // --- Day-Night Cycle Helpers ---
@@ -6636,10 +6644,25 @@ public class Game1 : Game
             var cipherRect = new Rectangle(btnX - 8, evoY, btnSize + 16, btnSize);
             if (cipherRect.Contains(ms.X, ms.Y) && ms.LeftButton == ButtonState.Pressed && _prevMouse.LeftButton == ButtonState.Released)
             {
-                _cipherScanUnlocked = !_cipherScanUnlocked;
-                _scanL2Available = true; // also enable L2 for testing
+                // Cycle: OFF → L2 only → L2+L3 → OFF
+                if (!_scanL2Available)
+                {
+                    _scanL2Available = true;
+                    _cipherScanUnlocked = false;
+                    SetEditorStatus("Scan: L2 ON");
+                }
+                else if (!_cipherScanUnlocked)
+                {
+                    _cipherScanUnlocked = true;
+                    SetEditorStatus("Scan: L2+L3 (Cipher) ON");
+                }
+                else
+                {
+                    _scanL2Available = false;
+                    _cipherScanUnlocked = false;
+                    SetEditorStatus("Scan: OFF");
+                }
                 _editorTimeBtnClicked = true;
-                SetEditorStatus(_cipherScanUnlocked ? "Cipher Scan ON" : "Cipher Scan OFF");
             }
         }
         // Keyboard shortcuts: Ctrl+1-4 for time
@@ -7420,6 +7443,7 @@ public class Game1 : Game
                 "dummy" => new Color(140, 100, 160),
                 "bird" => new Color(100, 130, 170),
                 "wingbeater" => new Color(160, 80, 80),
+                "scavenger" => new Color(90, 75, 60),
                 _ => Color.White
             };
             int size = e.Type == "thornback" ? 32 : (e.Type == "hopper" ? 20 : (e.Type == "swarm" ? 20 : 16));
@@ -7562,7 +7586,7 @@ public class Game1 : Game
         }
 
         // Toolbar
-        string[] toolNames = { "0:Flr", "1:Plt", "2:Rop", "3:Wal", "4:Spk", "5:Ext", "6:Spn", "7:WS", "8:OW", "9:Ceil", "Q:Tile", "", "", "Env" };
+        string[] toolNames = { "0:Rope", "1:Wall", "2:Spike", "3:Exit", "4:Spawn", "5:WSpk", "6:OWxit", "7:Tile", "8:Enemy", "9:Item", "Env" };
         float toolX = 10;
         for (int i = 0; i < toolNames.Length; i++)
         {
@@ -7587,6 +7611,14 @@ public class Game1 : Game
         // Status message
         if (_editorStatusTimer > 0)
             _spriteBatch.DrawString(_fontSmall, SafeText(_editorStatusMsg), new Vector2(10, ViewH - 30), Color.Yellow);
+
+        // Ecosystem debug toggle button (bottom-right, always visible in editor)
+        {
+            var ecoDebugRect = new Rectangle(ViewW - 60, ViewH - 20, 56, 16);
+            var ecoDebugColor = _debugEcosystem ? new Color(60, 180, 60) : new Color(80, 80, 80);
+            _spriteBatch.Draw(_pixel, ecoDebugRect, ecoDebugColor);
+            _spriteBatch.DrawString(_fontSmall, "ECO", new Vector2(ecoDebugRect.X + 4, ecoDebugRect.Y + 2), Color.White);
+        }
 
         // --- Editor time-of-day controls ---
         {
@@ -8119,6 +8151,22 @@ public class Game1 : Game
                 _equipPickerOpen = true;
                 _equipPickerIndex = 0;
             }
+
+            // Confirm on helmet slot toggles cipher helmet
+            bool isHelmetSlot = _equipCursorX == 1 && _equipCursorY == 0;
+            if (confirm && isHelmetSlot && _hasCipherHelmet)
+            {
+                _cipherHelmetEquipped = !_cipherHelmetEquipped;
+                if (_cipherHelmetEquipped)
+                {
+                    _lanternActive = false;
+                    EveAlertOnce("Cipher visor engaged.");
+                }
+                else
+                {
+                    EveAlertOnce("Cipher visor disengaged.");
+                }
+            }
         }
         else if (_invCategory == 3)
         {
@@ -8334,8 +8382,30 @@ public class Game1 : Game
         DrawEquipSlot(rsx, ry1, slotW, slotH, "R1", _rightHand1, _equipCursorX == 2 && _equipCursorY == 0, _rightActiveSlot1);
         DrawEquipSlot(rsx, ry2, slotW, slotH, "R2", _rightHand2, _equipCursorX == 2 && _equipCursorY == 1, !_rightActiveSlot1);
 
-        // Draw armor slots
-        DrawLockedSlot(helmetX, helmetY, slotW, slotH, "Helmet", _equipCursorX == 1 && _equipCursorY == 0);
+        // Draw armor slots - Helmet
+        {
+            bool hlSelected = _equipCursorX == 1 && _equipCursorY == 0;
+            if (!_hasCipherHelmet)
+            {
+                DrawLockedSlot(helmetX, helmetY, slotW, slotH, "Helmet", hlSelected);
+            }
+            else
+            {
+                var hlBg = hlSelected ? new Color(80, 60, 100) * 0.9f : new Color(30, 25, 40) * 0.7f;
+                _spriteBatch.Draw(_pixel, new Rectangle(helmetX, helmetY, slotW, slotH), hlBg);
+                DrawHollowRect(helmetX, helmetY, slotW, slotH, hlSelected ? new Color(180, 80, 220) : Color.White * 0.3f);
+                if (_cipherHelmetEquipped)
+                {
+                    DrawOutlinedString(_fontSmall, "Cipher", new Vector2(helmetX + 4, helmetY + 4), new Color(180, 80, 220));
+                    DrawOutlinedString(_fontSmall, "Helmet", new Vector2(helmetX + 4, helmetY + 18), new Color(180, 80, 220));
+                }
+                else
+                {
+                    DrawOutlinedString(_fontSmall, "Helmet", new Vector2(helmetX + 4, helmetY + 4), Color.Gray * 0.7f);
+                    DrawOutlinedString(_fontSmall, "[Empty]", new Vector2(helmetX + 4, helmetY + 18), Color.Gray * 0.5f);
+                }
+            }
+        }
         DrawLockedSlot(chestX, chestY, slotW, slotH, "Chest", _equipCursorX == 1 && _equipCursorY == 1);
         DrawLockedSlot(legsX, legsY, slotW, slotH, "Legs", _equipCursorX == 1 && _equipCursorY == 2);
 
@@ -11863,7 +11933,71 @@ public class Game1 : Game
         if (_enemiesEnabled)
         {
             foreach (var swarm in _swarms) swarm.Draw(_spriteBatch, _pixel);
+            foreach (var f in _foodSources) f.Draw(_spriteBatch, _pixel);
             foreach (var creature in _creatures) { if (!_enemySquashEnabled) creature.VisualScale = Vector2.One; creature.Draw(_spriteBatch, _pixel); }
+            // Debug: show eating state above creatures
+            if (_debugEcosystem)
+            {
+                foreach (var creature in _creatures)
+                {
+                    if (!creature.Alive) continue;
+                    var basePos = creature.Position + new Vector2(creature.CreatureWidth / 2f - 20, -28);
+
+                    // Species name + variant
+                    string name = creature.SpeciesName;
+                    if (creature is Crawler cr) name = cr.Variant.ToString();
+                    _spriteBatch.DrawString(_fontSmall, name, basePos, Color.White * 0.9f);
+
+                    // Goal
+                    string goalText = creature.CurrentGoal.ToString();
+                    var goalColor = creature.CurrentGoal switch
+                    {
+                        CreatureGoal.Eat => Color.Orange,
+                        CreatureGoal.Flee => Color.Red,
+                        CreatureGoal.Rest => Color.CornflowerBlue,
+                        CreatureGoal.Wander => Color.Gray,
+                        _ => Color.White,
+                    };
+                    _spriteBatch.DrawString(_fontSmall, goalText, basePos + new Vector2(0, 10), goalColor * 0.9f);
+
+                    // Hunger bar (orange)
+                    var hungerBarBg = new Rectangle((int)basePos.X, (int)basePos.Y + 20, 40, 3);
+                    var hungerBarFg = new Rectangle((int)basePos.X, (int)basePos.Y + 20, (int)(40 * creature.Needs.Hunger), 3);
+                    _spriteBatch.Draw(_pixel, hungerBarBg, Color.DarkGray * 0.5f);
+                    _spriteBatch.Draw(_pixel, hungerBarFg, Color.Orange * 0.8f);
+
+                    // Safety bar (green when safe, red when scared)
+                    var safetyBarBg = new Rectangle((int)basePos.X, (int)basePos.Y + 24, 40, 3);
+                    var safetyBarFg = new Rectangle((int)basePos.X, (int)basePos.Y + 24, (int)(40 * creature.Needs.Safety), 3);
+                    _spriteBatch.Draw(_pixel, safetyBarBg, Color.DarkGray * 0.5f);
+                    var safetyColor = creature.Needs.Safety > 0.5f ? Color.Green : Color.Red;
+                    _spriteBatch.Draw(_pixel, safetyBarFg, safetyColor * 0.8f);
+
+                    // Eating indicator
+                    if (creature.IsEating)
+                        _spriteBatch.DrawString(_fontSmall, "EATING", basePos + new Vector2(0, 28), Color.Yellow);
+                }
+
+                // Food source labels
+                foreach (var f in _foodSources)
+                {
+                    if (f.Depleted) continue;
+                    string fName = f.Type.ToString();
+                    var fPos = f.Position + new Vector2(-10, -10);
+                    _spriteBatch.DrawString(_fontSmall, fName, fPos, f.DrawColor * 0.7f);
+                }
+            }
+            else
+            {
+                foreach (var creature in _creatures)
+                {
+                    if (creature.IsEating && creature.Alive)
+                    {
+                        var textPos = creature.Position + new Vector2(creature.CreatureWidth / 2f - 12, -12);
+                        _spriteBatch.DrawString(_fontSmall, "eating", textPos, Color.Yellow * 0.8f);
+                    }
+                }
+            }
         }
 
         // --- EVE Scan overlays (world-space) ---
@@ -12450,9 +12584,19 @@ public class Game1 : Game
         var ambientColor = GetAmbientOverlay();
         if (ambientColor.A > 2)
         {
+            // Cipher helmet: reduce darkness significantly with green tint
+            Color overlayColor;
+            if (_cipherHelmetEquipped)
+            {
+                float a = ambientColor.A / 255f * 0.15f;
+                overlayColor = new Color((int)(30 * a), (int)(80 * a), (int)(30 * a)) * a;
+            }
+            else
+                overlayColor = ambientColor;
+
             // Dark overlay over entire scene
             _spriteBatch.Begin();
-            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), ambientColor);
+            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, ViewW, ViewH), overlayColor);
             _spriteBatch.End();
 
             // Additive lights punch through the darkness
@@ -12473,6 +12617,19 @@ public class Game1 : Game
                 float nightStr = ambientColor.A / 255f;
                 byte lc = (byte)(nightStr * 220);
                 _spriteBatch.Draw(_lightGradient, new Rectangle((int)sp.X - ls / 2, (int)sp.Y - ls / 2, ls, ls), new Color(lc, (int)(lc * 0.9f), (int)(lc * 0.65f)));
+            }
+
+            // Torch light (warm orange, slight flicker)
+            if (TorchActive && _torchFuel > 0)
+            {
+                float torchFlicker = 1f + (float)(_rng.NextDouble() * 0.10 - 0.05);
+                float tRadius = 160f * torchFlicker;
+                var tpc = _player.Position + new Vector2(Player.Width / 2f, _player.CurrentHeight / 2f);
+                var tsp = Vector2.Transform(tpc, _camera.TransformMatrix);
+                int ts = (int)(tRadius * 2);
+                float tNightStr = ambientColor.A / 255f;
+                byte tc = (byte)(tNightStr * 200);
+                _spriteBatch.Draw(_lightGradient, new Rectangle((int)tsp.X - ts / 2, (int)tsp.Y - ts / 2, ts, ts), new Color(tc, (int)(tc * 0.6f), (int)(tc * 0.2f)));
             }
 
             // Tech dash rocket glow
@@ -12539,6 +12696,16 @@ public class Game1 : Game
             _spriteBatch.Begin(blendState: BlendState.Additive);
             int gs = 80;
             _spriteBatch.Draw(_lightGradient, new Rectangle((int)sp.X - gs / 2, (int)sp.Y - gs / 2, gs, gs), new Color(60, 55, 20));
+            _spriteBatch.End();
+        }
+        // Small torch glow (subtle warm orange, always when lit)
+        if (TorchActive && _torchFuel > 0)
+        {
+            var pc = _player.Position + new Vector2(Player.Width / 2f, _player.CurrentHeight / 2f);
+            var sp = Vector2.Transform(pc, _camera.TransformMatrix);
+            _spriteBatch.Begin(blendState: BlendState.Additive);
+            int gs = 60;
+            _spriteBatch.Draw(_lightGradient, new Rectangle((int)sp.X - gs / 2, (int)sp.Y - gs / 2, gs, gs), new Color(50, 30, 10));
             _spriteBatch.End();
         }
         
@@ -12716,6 +12883,12 @@ public class Game1 : Game
             DrawOutlinedString(_font, $"BAT {(int)_player.Battery}%", new Vector2(hpBarX + hpBarW + 8, batBarY - 2), batColor * 0.9f);
             if (_lanternActive)
                 DrawOutlinedString(_fontSmall, "LANTERN", new Vector2(hpBarX + hpBarW + 8 + 80, batBarY), Color.Yellow * (0.8f + 0.2f * MathF.Sin(_totalTime * 4f)));
+            if (_cipherHelmetEquipped)
+                DrawOutlinedString(_fontSmall, "CIPHER", new Vector2(hpBarX + hpBarW + 8 + 80, batBarY), new Color(180, 80, 220) * (0.8f + 0.2f * MathF.Sin(_totalTime * 4f)));
+            if (TorchActive && _torchFuel > 0)
+            {
+                DrawOutlinedString(_fontSmall, $"TORCH {(int)_torchFuel}%", new Vector2(hpBarX + hpBarW + 8 + 80, batBarY + 14), Color.Orange * (0.8f + 0.2f * MathF.Sin(_totalTime * 3f)));
+            }
 
             // HUD glitch effect at low suit integrity
             if (_player.SuitIntegrity < 20f)

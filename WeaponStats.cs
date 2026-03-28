@@ -40,6 +40,7 @@ public static class WeaponStats
         WeaponType.Bow => new Stats { HitStopNormal = 0.02f, HitStopFinisher = 0.03f, HitStopKill = 0.04f, ShakeIntensity = 3f, ShakeDuration = 0.06f, KnockbackForce = 80f, KnockbackUp = -40f, Damage = 2, FinisherDamage = 3, IsRanged = true, DisplayName = "Bow", Weight = 0.2f, ActiveTime = 0.01f },
         WeaponType.Gun => new Stats { HitStopNormal = 0.03f, HitStopFinisher = 0.05f, HitStopKill = 0.06f, ShakeIntensity = 5f, ShakeDuration = 0.08f, KnockbackForce = 100f, KnockbackUp = -50f, Damage = 3, FinisherDamage = 4, IsRanged = true, DisplayName = "Gun", Weight = 0.3f, ActiveTime = 0.01f },
         WeaponType.WoodShield => new Stats { HitStopNormal = 0.03f, HitStopFinisher = 0.05f, HitStopKill = 0.06f, ShakeIntensity = 2f, ShakeDuration = 0.05f, KnockbackForce = 20f, KnockbackUp = -10f, Damage = 0, FinisherDamage = 0, DisplayName = "Wood Shield", Weight = 0.4f, ActiveTime = 0.01f, IsShield = true },
+        WeaponType.Torch => new Stats { HitStopNormal = 0f, HitStopFinisher = 0f, HitStopKill = 0f, ShakeIntensity = 0f, ShakeDuration = 0f, KnockbackForce = 0f, KnockbackUp = 0f, Damage = 0, FinisherDamage = 0, AttackSpeed = 0f, ComboWindow = 0f, ComboCooldown = 0f, DisplayName = "Torch", Weight = 0.1f, ActiveTime = 0f },
         _ => new Stats { HitStopNormal = 0.03f, HitStopFinisher = 0.05f, HitStopKill = 0.06f, ShakeIntensity = 5f, ShakeDuration = 0.1f, KnockbackForce = 100f, KnockbackUp = -50f, Damage = 1, FinisherDamage = 2, DisplayName = "Unknown", Weight = 0f, ActiveTime = 0.01f }
     };
 }

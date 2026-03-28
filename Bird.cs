@@ -75,15 +75,24 @@ public class Bird : Creature
         Needs = CreatureNeeds.Default;
         _rng = rng;
         _stateTimer = 1f + (float)rng.NextDouble() * 3f;
+        DeathParticleColor = new Color(110, 85, 55);
+        HitColor = new Color(110, 85, 55);
+        HungerRate = 0.003f;
+        FatigueRate = 0.0008f;
+        Needs.Hunger = 0.2f + (float)Random.Shared.NextDouble() * 0.3f;
+        Needs.Fatigue = (float)Random.Shared.NextDouble() * 0.2f;
     }
 
     public override int CreatureWidth => Width;
     public override int CreatureHeight => Height;
     public override Rectangle Rect => new((int)Position.X, (int)Position.Y, Width, Height);
 
-    public void Update(float dt, Vector2 playerPos,
-        TileGrid tileGrid, int tileSize, float levelBottom)
+    public override void Update(float dt, CreatureUpdateContext ctx)
     {
+        var playerPos = ctx.PlayerCenter;
+        var tileGrid = ctx.TileGrid;
+        var tileSize = ctx.TileSize;
+        var levelBottom = ctx.LevelBottom;
         if (!Alive) return;
 
         _tileGrid = tileGrid;
@@ -91,6 +100,60 @@ public class Bird : Creature
         
         
         _floorY = levelBottom;
+
+        // --- Needs system ---
+        TickNeeds(dt);
+        {
+            float distToPlayer = Vector2.Distance(Position, playerPos);
+            Needs.Safety = Math.Min(Needs.Safety, MathHelper.Clamp(distToPlayer / 120f, 0f, 1f));
+            CurrentGoal = SelectGoal();
+        }
+
+        // Creature awareness — birds flee from predators
+        var (creatureThreat, creatureThreatDist, _, _) = ScanCreatures(ctx.NearbyCreatures, 120f, 0f);
+        if (creatureThreat != null && creatureThreatDist < 80f)
+        {
+            Dir = creatureThreat.Position.X > Position.X ? -1 : 1;
+            Needs.Safety = Math.Min(Needs.Safety, 0.05f);
+            CurrentGoal = SelectGoal();
+        }
+
+        // Food seeking
+        if (CurrentGoal == CreatureGoal.Eat && !IsEating)
+        {
+            var food = FindFood(ctx.FoodSources);
+            if (food != null)
+            {
+                float distToFood = Vector2.Distance(Position, food.Position);
+                if (distToFood < 10f)
+                {
+                    IsEating = true;
+                    EatingTarget = food;
+                    EatTimer = 0f;
+                    Velocity = Vector2.Zero;
+                }
+                else
+                {
+                    Dir = food.Position.X > Position.X ? 1 : -1;
+                }
+            }
+        }
+        if (IsEating)
+        {
+            EatTimer += dt;
+            if (EatingTarget == null || EatingTarget.Depleted || Needs.Hunger < 0.15f)
+            {
+                IsEating = false;
+                EatingTarget = null;
+            }
+            else
+            {
+                float gained = EatingTarget.Eat(dt);
+                Needs.Hunger = MathHelper.Clamp(Needs.Hunger - gained, 0f, 1f);
+                Velocity = Vector2.Zero;
+                return;
+            }
+        }
 
         if (KnockbackVel.LengthSquared() > 1f)
         {
@@ -104,8 +167,12 @@ public class Bird : Creature
         float dist = Vector2.Distance(playerPos, Position + new Vector2(Width / 2f, Height / 2f));
         float dx = playerPos.X - (Position.X + Width / 2f);
 
+        // Goal-influenced flee ranges
+        float effectiveFleeRange = FleeRange * (CurrentGoal == CreatureGoal.Flee ? 0.7f : 1f);
+        float effectiveAlertRange = AlertRange * (CurrentGoal == CreatureGoal.Flee ? 0.7f : 1f);
+
         // React to player proximity
-        if (_state != State.Flying && _state != State.Fleeing && dist < FleeRange)
+        if (_state != State.Flying && _state != State.Fleeing && dist < effectiveFleeRange)
         {
             _state = State.Flying;
             Velocity.X = dx > 0 ? -_fleeSpeed : _fleeSpeed;
@@ -113,7 +180,7 @@ public class Bird : Creature
             _flightTime = 0;
             _dir = Velocity.X > 0 ? 1 : -1;
         }
-        else if (_state != State.Flying && _state != State.Fleeing && dist < AlertRange)
+        else if (_state != State.Flying && _state != State.Fleeing && dist < effectiveAlertRange)
         {
             if (_state != State.Fleeing)
             {
@@ -121,6 +188,22 @@ public class Bird : Creature
                 _dir = dx > 0 ? -1 : 1;
                 _stateTimer = 0.8f + (float)_rng.NextDouble() * 0.5f;
             }
+        }
+        // React to creature threats — take off immediately
+        else if (_state != State.Flying && creatureThreat != null && creatureThreatDist < 80f)
+        {
+            float cdx = creatureThreat.Position.X - (Position.X + Width / 2f);
+            _state = State.Flying;
+            Velocity.X = cdx > 0 ? -_fleeSpeed : _fleeSpeed;
+            Velocity.Y = -200f;
+            _flightTime = 0;
+            _dir = Velocity.X > 0 ? 1 : -1;
+        }
+
+        // If already fleeing/flying from creature threat, face away
+        if ((_state == State.Flying || _state == State.Fleeing) && creatureThreat != null)
+        {
+            _dir = creatureThreat.Position.X > Position.X ? -1 : 1;
         }
 
         _stateTimer -= dt;
@@ -131,10 +214,13 @@ public class Bird : Creature
                 if (_stateTimer <= 0)
                 {
                     float roll = (float)_rng.NextDouble();
-                    if (roll < 0.5f)
+                    // Hungry birds peck more, tired birds perch longer
+                    float peckChance = CurrentGoal == CreatureGoal.Eat ? 0.7f : CurrentGoal == CreatureGoal.Rest ? 0.2f : 0.5f;
+                    if (roll < peckChance)
                     {
                         _state = State.Pecking;
-                        _stateTimer = 1.5f + (float)_rng.NextDouble() * 2f;
+                        float peckDur = CurrentGoal == CreatureGoal.Eat ? 2.5f : 1.5f;
+                        _stateTimer = peckDur + (float)_rng.NextDouble() * 2f;
                         _peckTimer = 0;
                     }
                     else if (roll < 0.85f)
@@ -146,7 +232,8 @@ public class Bird : Creature
                     else
                     {
                         _dir = -_dir;
-                        _stateTimer = 1f + (float)_rng.NextDouble() * 2f;
+                        float perchDur = CurrentGoal == CreatureGoal.Rest ? 3f : 1f;
+                        _stateTimer = perchDur + (float)_rng.NextDouble() * 2f;
                     }
                 }
                 break;

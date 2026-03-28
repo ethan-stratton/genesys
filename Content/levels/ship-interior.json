@@ -17,12 +17,39 @@
   },
   "platforms": [],
   "ropes": [],
-  "walls": [],
+  "walls": [
+    {
+      "x": 2400,
+      "y": 6112,
+      "w": 32,
+      "h": 256,
+      "climbSide": 0
+    }
+  ],
   "spikes": [],
   "ceilings": [],
   "solidFloors": [],
   "wallSpikes": [],
-  "exits": [],
+  "exits": [
+    {
+      "x": 2464,
+      "y": 6240,
+      "w": 32,
+      "h": 96,
+      "targetLevel": "crashsite",
+      "id": "exit-to-crashsite",
+      "targetExitId": "exit-top"
+    },
+    {
+      "x": 4768,
+      "y": 3168,
+      "w": 32,
+      "h": 96,
+      "targetLevel": "surface-east",
+      "id": "exit-to-surface-east",
+      "targetExitId": "exit-to-ship"
+    }
+  ],
   "npcs": [],
   "items": [
     {
@@ -48,16 +75,152 @@
       "y": 512,
       "w": 20,
       "h": 20
+    },
+    {
+      "id": "lantern-3",
+      "type": "lantern",
+      "x": 2592,
+      "y": 6304,
+      "w": 20,
+      "h": 20
+    },
+    {
+      "id": "cipher-helmet-4",
+      "type": "cipher-helmet",
+      "x": 2688,
+      "y": 6304,
+      "w": 20,
+      "h": 20
+    },
+    {
+      "id": "torch-5",
+      "type": "torch",
+      "x": 2880,
+      "y": 6304,
+      "w": 20,
+      "h": 20
+    },
+    {
+      "id": "knife-6",
+      "type": "knife",
+      "x": 2560,
+      "y": 6688,
+      "w": 20,
+      "h": 20
+    },
+    {
+      "id": "knife-7",
+      "type": "knife",
+      "x": 2368,
+      "y": 6720,
+      "w": 20,
+      "h": 20
+    },
+    {
+      "id": "knife-8",
+      "type": "knife",
+      "x": 2368,
+      "y": 6720,
+      "w": 20,
+      "h": 20
+    },
+    {
+      "id": "knife-9",
+      "type": "knife",
+      "x": 2368,
+      "y": 6720,
+      "w": 20,
+      "h": 20
+    },
+    {
+      "id": "knife-10",
+      "type": "knife",
+      "x": 2592,
+      "y": 6720,
+      "w": 20,
+      "h": 20
+    },
+    {
+      "id": "knife-11",
+      "type": "knife",
+      "x": 2240,
+      "y": 6688,
+      "w": 20,
+      "h": 20
+    },
+    {
+      "id": "knife-12",
+      "type": "knife",
+      "x": 2848,
+      "y": 6656,
+      "w": 20,
+      "h": 20
+    },
+    {
+      "id": "knife-13",
+      "type": "knife",
+      "x": 2976,
+      "y": 6688,
+      "w": 20,
+      "h": 20
     }
   ],
   "objects": [],
   "enemies": [
     {
-      "id": "forager-0",
+      "id": "skitter-1",
+      "type": "skitter",
+      "x": 3872,
+      "y": 6272,
+      "count": 0,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
+    },
+    {
+      "id": "forager-1",
       "type": "forager",
-      "x": 2933.5073,
-      "y": 343,
-      "count": 1,
+      "x": 3552,
+      "y": 6240,
+      "count": 0,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
+    },
+    {
+      "id": "forager-2",
+      "type": "forager",
+      "x": 3648,
+      "y": 6240,
+      "count": 0,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
+    },
+    {
+      "id": "bird-3",
+      "type": "bird",
+      "x": 3712,
+      "y": 6304,
+      "count": 0,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
+    },
+    {
+      "id": "scavenger-4",
+      "type": "scavenger",
+      "x": 3136,
+      "y": 6336,
+      "count": 0,
       "scale": 1,
       "scaleX": 0,
       "scaleY": 0,
@@ -4219,7 +4382,7 @@
       0,
       0,
       0,
-      1,
+      0,
       0,
       0,
       0,
@@ -27623,15 +27786,15 @@
       0,
       0,
       0,
-      1,
       0,
       0,
       0,
       0,
-      1,
       0,
       0,
-      1,
+      0,
+      0,
+      0,
       0,
       0,
       0,

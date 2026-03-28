@@ -1,14 +1,15 @@
 {
   "currentLevel": "ship-interior",
-  "spawnX": 2464.766,
-  "spawnY": 907.3309,
+  "spawnX": 4135.863,
+  "spawnY": 6012.653,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 137.3106,
+  "playTime": 475.24475,
   "meleeInventory": [
-    "Knife"
+    "Knife",
+    "Torch"
   ],
   "rangedInventory": [
     "Gun"
@@ -17,20 +18,24 @@
   "rangedIndex": 0,
   "weaponInventory": [
     "Gun",
-    "Knife"
+    "Knife",
+    "Torch"
   ],
   "leftHand": "Knife",
   "rightHand": "Gun",
   "rightHand1": "Gun",
-  "rightHand2": "None",
+  "rightHand2": "Torch",
   "leftHand1": "Knife",
   "leftHand2": "Knife",
   "rightActiveSlot1": true,
-  "leftActiveSlot1": false,
+  "leftActiveSlot1": true,
   "collectedItems": [
     "gun-1",
     "knife-0",
-    "grapple-6"
+    "grapple-6",
+    "torch-5",
+    "cipher-helmet-4",
+    "lantern-3"
   ],
   "windowSizeIndex": 0,
   "crtEnabled": false,
@@ -42,11 +47,126 @@
   "deathCount": 0,
   "hp": 10,
   "suitIntegrity": 50,
-  "battery": 100,
+  "battery": 48.557735,
   "bestiary": {
-    "entries": {}
+    "entries": {
+      "skitter": {
+        "speciesName": "skitter",
+        "classification": "skittish",
+        "observations": [
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "idle",
+            "biome": "Ship Interior"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "fleeing",
+            "biome": "Ship Interior"
+          }
+        ],
+        "sightCount": 4,
+        "scanTier": 0,
+        "l2Scanned": true,
+        "detailedRole": null,
+        "temperament": null,
+        "weaknesses": null,
+        "resistances": null,
+        "l3Scanned": true,
+        "loreText": null,
+        "thoughts": null,
+        "originalNature": null
+      },
+      "forager": {
+        "speciesName": "forager",
+        "classification": "herbivore",
+        "observations": [
+          {
+            "time": "dawn",
+            "weather": "clear",
+            "behavior": "idle",
+            "biome": "Ship Interior"
+          },
+          {
+            "time": "dawn",
+            "weather": "clear",
+            "behavior": "fleeing",
+            "biome": "Ship Interior"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "idle",
+            "biome": "Ship Interior"
+          }
+        ],
+        "sightCount": 6,
+        "scanTier": 0,
+        "l2Scanned": false,
+        "detailedRole": null,
+        "temperament": null,
+        "weaknesses": null,
+        "resistances": null,
+        "l3Scanned": false,
+        "loreText": null,
+        "thoughts": null,
+        "originalNature": null
+      },
+      "scavenger": {
+        "speciesName": "scavenger",
+        "classification": "scavenger",
+        "observations": [
+          {
+            "time": "dawn",
+            "weather": "clear",
+            "behavior": "fleeing",
+            "biome": "Ship Interior"
+          }
+        ],
+        "sightCount": 1,
+        "scanTier": 0,
+        "l2Scanned": false,
+        "detailedRole": null,
+        "temperament": null,
+        "weaknesses": null,
+        "resistances": null,
+        "l3Scanned": false,
+        "loreText": null,
+        "thoughts": null,
+        "originalNature": null
+      },
+      "bird": {
+        "speciesName": "bird",
+        "classification": "prey species",
+        "observations": [
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "idle",
+            "biome": "Ship Interior"
+          }
+        ],
+        "sightCount": 1,
+        "scanTier": 0,
+        "l2Scanned": false,
+        "detailedRole": null,
+        "temperament": null,
+        "weaknesses": null,
+        "resistances": null,
+        "l3Scanned": false,
+        "loreText": null,
+        "thoughts": null,
+        "originalNature": null
+      }
+    }
   },
-  "worldTime": 13.112085,
+  "worldTime": 8.788613,
   "evolutionFlags": [],
-  "cipherScanUnlocked": false
+  "cipherScanUnlocked": false,
+  "hasLantern": true,
+  "hasCipherHelmet": true,
+  "cipherHelmetEquipped": false,
+  "torchFuel": 93.74344
 }

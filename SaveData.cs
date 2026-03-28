@@ -45,6 +45,10 @@ public class SaveData
     [JsonPropertyName("worldTime")] public float WorldTime { get; set; } = 8f;
     [JsonPropertyName("evolutionFlags")] public HashSet<string> EvolutionFlags { get; set; } = new();
     [JsonPropertyName("cipherScanUnlocked")] public bool CipherScanUnlocked { get; set; } = false;
+    [JsonPropertyName("hasLantern")] public bool HasLantern { get; set; } = false;
+    [JsonPropertyName("hasCipherHelmet")] public bool HasCipherHelmet { get; set; } = false;
+    [JsonPropertyName("cipherHelmetEquipped")] public bool CipherHelmetEquipped { get; set; } = false;
+    [JsonPropertyName("torchFuel")] public float TorchFuel { get; set; } = 100f;
 
     public void Save()
     {
