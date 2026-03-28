@@ -8646,11 +8646,11 @@ public class Game1 : Game
         for (int lny = helmetY + slotH; lny < bodyY - 80; lny += 2)
             _spriteBatch.Draw(_pixel, new Rectangle(bodyX, lny, 1, 1), lineColor);
 
-        // Chest: right side, aligned with torso
-        int chestX = bodyX + 50;
+        // Chest: left side, aligned with torso (mirroring helmet centered layout)
+        int chestX = bodyX - slotW - 50;
         int chestY = bodyY - 50;
-        // Line from torso to chest slot
-        for (int lnx = bodyX + 14; lnx < chestX; lnx += 2)
+        // Line from torso to chest slot (left side)
+        for (int lnx = chestX + slotW; lnx < bodyX - 14; lnx += 2)
             _spriteBatch.Draw(_pixel, new Rectangle(lnx, chestY + slotH / 2, 1, 1), lineColor);
 
         // Legs/Feet: below body, centered
