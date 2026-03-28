@@ -74,6 +74,7 @@ public class Crawler : Creature
 
     // Variant
     public CrawlerVariant Variant = CrawlerVariant.Forager;
+    private bool CanWallWalk => Variant is CrawlerVariant.Forager or CrawlerVariant.Skitter or CrawlerVariant.Stalker;
     
     /// <summary>Call after setting Variant to sync ecological role.</summary>
     public void ApplyVariantRole()
@@ -818,7 +819,7 @@ public class Crawler : Creature
             if (wallAhead)
             {
                 // Stalker: attempt wall climb instead of reversing
-                if (Variant == CrawlerVariant.Stalker && _gravDir == GravityDir.Down && tileGrid != null)
+                if (CanWallWalk && _gravDir == GravityDir.Down && tileGrid != null)
                 {
                     // Check for at least 3 solid tiles vertically above
                     int wallCol = (int)((Position.X + (Dir > 0 ? EffectiveWidth + 4 : -4)) / tileSize);
@@ -846,8 +847,36 @@ public class Crawler : Creature
             {
                 bool floorAhead = HasFloorAhead(tileGrid, tileSize,
                     new Vector2(Position.X + EffectiveWidth / 2f, Position.Y + EffectiveHeight), Dir);
-                if (!floorAhead && !AllowLedgeDrop) { TrySetDir(-Dir, force: true); NoteLedgeReversal(); }
-                // If AllowLedgeDrop, creature walks off the ledge naturally (gravity catches it)
+                if (!floorAhead)
+                {
+                    // Bug-type crawlers: walk down the wall at ledge edges instead of reversing
+                    if (CanWallWalk && _gravDir == GravityDir.Down && tileGrid != null)
+                    {
+                        // Check for solid wall below the ledge edge (at least 2 tiles deep)
+                        int edgeCol = (int)((Position.X + (Dir > 0 ? EffectiveWidth : 0)) / tileSize);
+                        int belowRow = (int)((Position.Y + EffectiveHeight) / tileSize);
+                        int solidBelow = 0;
+                        for (int r = belowRow; r <= belowRow + 2 && r < (tileGrid.Height); r++)
+                        {
+                            if (edgeCol >= 0 && edgeCol < tileGrid.Width
+                                && TileProperties.IsSolid(tileGrid.GetTileAt(edgeCol, r)))
+                                solidBelow++;
+                        }
+                        if (solidBelow >= 2)
+                        {
+                            // Transition to walking down the wall
+                            _gravDir = Dir > 0 ? GravityDir.Right : GravityDir.Left;
+                        }
+                        else
+                        {
+                            TrySetDir(-Dir, force: true); NoteLedgeReversal();
+                        }
+                    }
+                    else if (!AllowLedgeDrop)
+                    {
+                        TrySetDir(-Dir, force: true); NoteLedgeReversal();
+                    }
+                }
             }
         }
 
@@ -875,12 +904,12 @@ public class Crawler : Creature
             else { TrySetDir(-Dir, force: true); }
         }
 
-        // Wall/ceiling walking for Stalker
-        if (Variant == CrawlerVariant.Stalker && tileGrid != null)
+        // Wall/ceiling walking for bug-type crawlers
+        if (CanWallWalk && tileGrid != null)
             UpdateWallWalk(dt, tileGrid, tileSize);
 
         // Apply gravity and tile collision
-        if (Variant == CrawlerVariant.Stalker && _gravDir != GravityDir.Down)
+        if (CanWallWalk && _gravDir != GravityDir.Down)
         {
             ApplyWallWalkPhysics(dt, tileGrid, tileSize, levelBottom);
         }
