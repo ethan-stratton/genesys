@@ -462,6 +462,69 @@
       "y": 1600,
       "count": 8,
       "id": "eco-55"
+    },
+    {
+      "type": "centipede",
+      "x": 4300,
+      "y": 1800,
+      "id": "eco-56",
+      "count": 1
+    },
+    {
+      "type": "centipede",
+      "x": 5600,
+      "y": 1600,
+      "id": "eco-57",
+      "count": 1
+    },
+    {
+      "type": "centipede",
+      "x": 6700,
+      "y": 2000,
+      "id": "eco-58",
+      "count": 1
+    },
+    {
+      "type": "rain-beetle",
+      "x": 600,
+      "y": 2200,
+      "id": "eco-59",
+      "count": 1
+    },
+    {
+      "type": "rain-beetle",
+      "x": 1500,
+      "y": 2200,
+      "id": "eco-60",
+      "count": 1
+    },
+    {
+      "type": "rain-beetle",
+      "x": 2700,
+      "y": 2200,
+      "id": "eco-61",
+      "count": 1
+    },
+    {
+      "type": "rain-beetle",
+      "x": 3800,
+      "y": 2200,
+      "id": "eco-62",
+      "count": 1
+    },
+    {
+      "type": "rain-beetle",
+      "x": 5000,
+      "y": 2200,
+      "id": "eco-63",
+      "count": 1
+    },
+    {
+      "type": "rain-beetle",
+      "x": 7000,
+      "y": 2200,
+      "id": "eco-64",
+      "count": 1
     }
   ],
   "switches": [],
