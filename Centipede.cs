@@ -399,20 +399,43 @@ public class Centipede : Creature
                 new Rectangle((int)seg.Position.X, (int)seg.Position.Y, (int)w, (int)h),
                 null, segColor, seg.Angle, new Vector2(0.5f, 0.5f), SpriteEffects.None, 0);
 
-            // Legs (2 per segment, except head)
+            // Legs (2 per segment, except head and tail)
             if (i > 0 && i < SegmentCount - 1)
             {
-                float legPhase = _animTime * 8f + i * 0.5f;
-                float legSine = MathF.Sin(legPhase) * 3f;
+                // Metachronal wave: each segment pair offset so legs ripple back-to-front
+                float legPhase = _animTime * 10f + i * 0.7f;
+                float legSwing = MathF.Sin(legPhase); // -1 to 1: forward/back swing
+
                 float perpAngle = seg.Angle + MathF.PI / 2f;
                 Vector2 perpDir = new Vector2(MathF.Cos(perpAngle), MathF.Sin(perpAngle));
+                Vector2 fwdDir = new Vector2(MathF.Cos(seg.Angle), MathF.Sin(seg.Angle));
 
-                // Left leg
-                Vector2 legL = seg.Position + perpDir * (w * 0.5f + 1f + legSine);
-                sb.Draw(pixel, new Rectangle((int)legL.X, (int)legL.Y, 2, 1), LegColor);
-                // Right leg
-                Vector2 legR = seg.Position - perpDir * (w * 0.5f + 1f + legSine);
-                sb.Draw(pixel, new Rectangle((int)legR.X, (int)legR.Y, 2, 1), LegColor);
+                float legLen = w * 0.6f + 2f; // legs extend outward from body
+                float liftArc = MathF.Max(0, MathF.Sin(legPhase)) * 2f; // lift during forward stroke
+
+                for (int side = -1; side <= 1; side += 2)
+                {
+                    // Leg root: at segment edge
+                    Vector2 root = seg.Position + perpDir * (w * 0.35f) * side;
+                    // Leg tip: extends outward + swings forward/back + lifts
+                    Vector2 tip = root
+                        + perpDir * legLen * side                          // extend outward
+                        + fwdDir * legSwing * 2.5f                        // swing forward/back
+                        - new Vector2(0, liftArc * (side == 1 ? 1 : 0));  // alternate lift
+
+                    // Opposite side is on opposite phase
+                    if (side == -1)
+                    {
+                        float legSwing2 = MathF.Sin(legPhase + MathF.PI);
+                        float liftArc2 = MathF.Max(0, MathF.Sin(legPhase + MathF.PI)) * 2f;
+                        tip = root
+                            + perpDir * legLen * side
+                            + fwdDir * legSwing2 * 2.5f
+                            - new Vector2(0, liftArc2);
+                    }
+
+                    DrawLine(sb, pixel, root, tip, LegColor);
+                }
             }
         }
 
