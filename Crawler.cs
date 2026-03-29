@@ -226,9 +226,9 @@ public class Crawler : Creature
     // Wall/ceiling walking (Stalker only)
     private enum GravityDir { Down, Left, Right, Up }
     private GravityDir _gravDir = GravityDir.Down;
-    private GravityDir _prevGravDir = GravityDir.Down; // Issue #2: track transitions
+    private GravityDir _prevGravDir = GravityDir.Down;
     private float _wallCheckTimer;
-    private float _returnToSpawnTimer; // Issue #6: drift back to ecological zone
+    private float _returnToSpawnTimer;
     private Vector2 _spawnPos;
     public void SetSpawnPos(Vector2 pos) => _spawnPos = pos;
     private float _respawnTimer;
@@ -303,7 +303,7 @@ public class Crawler : Creature
         // Cache tile grid for LOS checks
         if (tileGrid != null) { _tileGridRef = tileGrid; _tileSizeRef = tileSize; _hasTileGridRef = true; }
         
-        // Issue #2: Refresh surface edges when returning from wall-walk to ground
+        // Refresh surface edges when transitioning from wall-walk back to ground
         if (_gravDir == GravityDir.Down && _prevGravDir != GravityDir.Down && _onGround && tileGrid != null)
         {
             float footY = Position.Y + EffectiveHeight;
@@ -315,7 +315,7 @@ public class Crawler : Creature
             SurfaceRight = edges.Right;
         }
         _prevGravDir = _gravDir;
-
+        
         if (!Alive)
         {
             if (IsDummy)
@@ -488,26 +488,12 @@ public class Crawler : Creature
                     EatingTarget = food;
                     EatTimer = 0f;
                     Velocity = Vector2.Zero;
-                    _path = null; // clear path on arrival
-                }
-                else if (distToFood > 100f)
-                {
-                    // Issue #4: Use pathfinding for distant food
-                    NavigateTo(food.Position, ctx);
-                    TrySetDir(food.Position.X > Position.X ? 1 : -1);
                 }
                 else
                 {
                     TrySetDir(food.Position.X > Position.X ? 1 : -1);
                 }
             }
-        }
-        // Issue #4: Pathfinding for hunt targets
-        if (_huntTarget != null && _huntTarget.Alive && CurrentGoal == CreatureGoal.Eat)
-        {
-            float huntDist = Vector2.Distance(Position, _huntTarget.Position);
-            if (huntDist > 100f)
-                NavigateTo(_huntTarget.Position, ctx);
         }
         if (IsEating)
         {
@@ -565,7 +551,7 @@ public class Crawler : Creature
         else
         {
             if (_jumpCooldown > 0) _jumpCooldown -= dt;
-            if (_returnToSpawnTimer > 0) _returnToSpawnTimer -= dt; // Issue #6: tick return timer
+            if (_returnToSpawnTimer > 0) _returnToSpawnTimer -= dt;
 
             float dist = Vector2.Distance(playerCenter, Position + new Vector2(Width / 2f, Height / 2f));
             float dx = playerCenter.X - (Position.X + Width / 2f);
@@ -678,42 +664,7 @@ public class Crawler : Creature
                 if (BurrowProgress > 0) { Velocity.X = 0; } // burrowing — don't move
                 else
                 {
-                // Issue #5: Smart flee — check terrain in both directions
-                if (fleeing && tileGrid != null)
-                {
-                    Vector2 footPos = new Vector2(Position.X + EffectiveWidth / 2f, Position.Y + EffectiveHeight);
-                    int solidRight = 0, solidLeft = 0;
-                    for (int t = 1; t <= 5; t++)
-                    {
-                        int tx = (int)((footPos.X + t * tileSize) / tileSize);
-                        int ty = (int)(footPos.Y / tileSize);
-                        if (tx >= 0 && tx < tileGrid.Width && ty >= 0 && ty < tileGrid.Height
-                            && TileProperties.IsSolid(tileGrid.GetTileAt(tx, ty)))
-                            solidRight++;
-                        tx = (int)((footPos.X - t * tileSize) / tileSize);
-                        if (tx >= 0 && tx < tileGrid.Width && ty >= 0 && ty < tileGrid.Height
-                            && TileProperties.IsSolid(tileGrid.GetTileAt(tx, ty)))
-                            solidLeft++;
-                    }
-                    // Flee toward more floor (more room to run)
-                    if (solidRight > solidLeft + 1) TrySetDir(1);
-                    else if (solidLeft > solidRight + 1) TrySetDir(-1);
-                    else if (solidLeft == 0 && solidRight == 0 && CanWallWalk)
-                    {
-                        // Both directions dead-end — climb nearest wall
-                        float wallDistRight = TileRaycast(tileGrid, tileSize, footPos, 1, 0, 80f);
-                        float wallDistLeft = TileRaycast(tileGrid, tileSize, footPos, -1, 0, 80f);
-                        if (wallDistRight < wallDistLeft)
-                            _gravDir = GravityDir.Right;
-                        else
-                            _gravDir = GravityDir.Left;
-                    }
-                    else
-                    {
-                        TrySetDir(dx > 0 ? -1 : 1); // fallback: away from player
-                    }
-                }
-                else if (fleeing) TrySetDir(dx > 0 ? -1 : 1); // no tile grid fallback
+                if (fleeing) TrySetDir(dx > 0 ? -1 : 1); // update direction only while player is near
                 float fleeSpeed = ChaseSpeed * 2f; // much faster flee
                 Velocity.X = Dir * fleeSpeed;
                 _fleeTimer -= dt;
@@ -724,7 +675,6 @@ public class Crawler : Creature
                     _bugStateTimer = 2f + (float)_rng.NextDouble() * 2f; // 2-4s calm down
                     _safeDistance = 0f;
                     Velocity.X = 0;
-                    // Issue #6: Start return-to-spawn drift
                     _returnToSpawnTimer = 30f + (float)_rng.NextDouble() * 30f;
                 }
                 } // end burrowing else
@@ -767,15 +717,6 @@ public class Crawler : Creature
                 switch (_bugState)
                 {
                     case BugState.Walking:
-                        // Issue #4: If following a path for goal-driven movement, use pathfinding
-                        if (_path != null && _pathIndex < _path.Count && 
-                            (CurrentGoal == CreatureGoal.Eat || _huntTarget != null))
-                        {
-                            float pathSpeed = Speed * _walkSpeedMult;
-                            UpdatePathFollow(dt, pathSpeed);
-                            Velocity.X = 0; // pathfinding moves Position directly
-                            break;
-                        }
                         float goalSpeedMult = CurrentGoal == CreatureGoal.Eat ? 1.15f
                             : CurrentGoal == CreatureGoal.Rest ? 0.7f : 1f;
                         goalSpeedMult *= MathHelper.Clamp(activity, 0.3f, 1f);
@@ -811,8 +752,7 @@ public class Crawler : Creature
                             }
                             else if (roll < 0.5f)
                             {
-                                // Change direction
-                                // Issue #6: Bias toward spawn origin after disturbances
+                                // Change direction — bias toward spawn after disturbances
                                 if (_returnToSpawnTimer > 0 && _rng.NextDouble() < 0.7)
                                     Dir = Position.X > SpawnOrigin.X ? -1 : 1;
                                 else
@@ -840,10 +780,8 @@ public class Crawler : Creature
                         if (_bugStateTimer <= 0)
                         {
                             _bugState = BugState.Walking;
-                            // Issue #6: Bias toward spawn when returning after disturbance
-                            if (_returnToSpawnTimer > 0 && _rng.NextDouble() < 0.7)
-                                Dir = Position.X > SpawnOrigin.X ? -1 : 1;
-                            else if (_rng.NextDouble() < 0.4)
+                            // Sometimes reverse after pausing
+                            if (_rng.NextDouble() < 0.4)
                                 Dir = -Dir;
                             _walkSpeedMult = 0.5f + (float)_rng.NextDouble() * 0.6f; // start slow after pause
                             _bugStateTimer = 1f + (float)_rng.NextDouble() * 2f;
@@ -1017,21 +955,6 @@ public class Crawler : Creature
             bool clamp = true;
             // Leapers in chase mode ignore surface edges (they'll drop)
             if (Variant == CrawlerVariant.Leaper && Aggroed) clamp = false;
-            // Issue #1: Wall-walkers don't need ground clamping when on walls/ceiling
-            if (CanWallWalk && _gravDir != GravityDir.Down) clamp = false;
-            // Issue #1: Skip clamping when about to transition to wall-walk (at ledge edge with wall below)
-            if (CanWallWalk && _gravDir == GravityDir.Down && tileGrid != null)
-            {
-                bool atEdge = Position.X <= SurfaceLeft + 2 || Position.X + EffectiveWidth >= SurfaceRight - 2;
-                if (atEdge)
-                {
-                    int edgeCol = (int)((Position.X + (Dir > 0 ? EffectiveWidth : 0)) / tileSize);
-                    int belowRow = (int)((Position.Y + EffectiveHeight) / tileSize);
-                    if (edgeCol >= 0 && edgeCol < tileGrid.Width && belowRow < tileGrid.Height
-                        && TileProperties.IsSolid(tileGrid.GetTileAt(edgeCol, belowRow)))
-                        clamp = false;
-                }
-            }
 
             if (clamp)
             {
@@ -1106,29 +1029,10 @@ public class Crawler : Creature
     {
         _wallCheckTimer -= dt;
         if (_wallCheckTimer > 0) return;
-        _wallCheckTimer = 0.05f; // Issue #3: 20 checks/sec instead of 2
+        _wallCheckTimer = 0.15f;
 
-        // Issue #3: Use leading edge instead of center for accurate transition detection
-        int cx, cy;
-        switch (_gravDir)
-        {
-            case GravityDir.Right:
-                cx = (int)((Position.X + EffectiveWidth) / ts); // right edge
-                cy = (int)((Position.Y + EffectiveHeight / 2f) / ts);
-                break;
-            case GravityDir.Left:
-                cx = (int)(Position.X / ts); // left edge
-                cy = (int)((Position.Y + EffectiveHeight / 2f) / ts);
-                break;
-            case GravityDir.Up:
-                cx = (int)((Position.X + EffectiveWidth / 2f) / ts);
-                cy = (int)(Position.Y / ts); // top edge
-                break;
-            default: // Down
-                cx = (int)((Position.X + (Dir > 0 ? EffectiveWidth : 0)) / ts); // bottom-front
-                cy = (int)((Position.Y + EffectiveHeight) / ts);
-                break;
-        }
+        int cx = (int)(Position.X / ts);
+        int cy = (int)(Position.Y / ts);
 
         switch (_gravDir)
         {
@@ -1137,26 +1041,16 @@ public class Crawler : Creature
                     _gravDir = Dir > 0 ? GravityDir.Right : GravityDir.Left;
                 break;
             case GravityDir.Right:
-                if (!TileProperties.IsSolid(tg.GetTileAt(cx, cy)))
-                {
-                    // Snap to hug the corner surface
-                    Position.Y = cy * ts;
+                if (!TileProperties.IsSolid(tg.GetTileAt(cx + 1, cy)))
                     _gravDir = GravityDir.Up;
-                }
                 break;
             case GravityDir.Up:
-                if (!TileProperties.IsSolid(tg.GetTileAt(cx, cy)))
-                {
-                    Position.X = cx * ts;
+                if (!TileProperties.IsSolid(tg.GetTileAt(cx, cy - 1)))
                     _gravDir = GravityDir.Down;
-                }
                 break;
             case GravityDir.Left:
-                if (!TileProperties.IsSolid(tg.GetTileAt(cx, cy)))
-                {
-                    Position.Y = cy * ts;
+                if (!TileProperties.IsSolid(tg.GetTileAt(cx - 1, cy)))
                     _gravDir = GravityDir.Up;
-                }
                 break;
         }
     }

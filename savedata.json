@@ -1,12 +1,12 @@
 {
-  "currentLevel": "ship-interior",
-  "spawnX": 6201.1665,
-  "spawnY": 2232,
+  "currentLevel": "crashsite",
+  "spawnX": 2448,
+  "spawnY": 2716,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 598.0981,
+  "playTime": 755.45966,
   "meleeInventory": [
     "GreatSword",
     "Torch"
@@ -45,7 +45,7 @@
   "deathCount": 2,
   "hp": 10,
   "suitIntegrity": 30,
-  "battery": 65.08703,
+  "battery": 52.421898,
   "bestiary": {
     "entries": {
       "forager": {
@@ -63,9 +63,21 @@
             "weather": "clear",
             "behavior": "idle",
             "biome": "The Living Forest"
+          },
+          {
+            "time": "night",
+            "weather": "clear",
+            "behavior": "idle",
+            "biome": "Untitled"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "idle",
+            "biome": "Crash Site"
           }
         ],
-        "sightCount": 6,
+        "sightCount": 11,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -179,9 +191,15 @@
             "weather": "clear",
             "behavior": "foraging",
             "biome": "The Living Forest"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "aggressive",
+            "biome": "The Living Forest"
           }
         ],
-        "sightCount": 3,
+        "sightCount": 4,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -208,9 +226,15 @@
             "weather": "clear",
             "behavior": "idle",
             "biome": "Ship Interior"
+          },
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "idle",
+            "biome": "Untitled"
           }
         ],
-        "sightCount": 2,
+        "sightCount": 3,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -224,7 +248,7 @@
       }
     }
   },
-  "worldTime": 19.486807,
+  "worldTime": 14.378895,
   "evolutionFlags": [],
   "cipherScanUnlocked": false,
   "hasLantern": true,
