@@ -269,6 +269,41 @@ public abstract class Creature
         CurrentGoal = SelectGoal();
     }
 
+    /// <summary>
+    /// Apply weather modifiers to velocity and needs. Call from subclass Update after movement calc.
+    /// </summary>
+    public void ApplyWeatherEffects(float dt, CreatureUpdateContext ctx)
+    {
+        // Rain: slower movement, increased hunger
+        if (ctx.IsRaining)
+        {
+            Velocity.X *= 0.7f;
+            Needs.Hunger = MathHelper.Clamp(Needs.Hunger + 0.002f * dt, 0f, 1f);
+        }
+        // Storm: even slower
+        if (ctx.IsStorming)
+        {
+            Velocity.X *= 0.5f;
+        }
+        // Cold: slower + more fatigue
+        if (ctx.Temperature < 0.3f)
+        {
+            Velocity.X *= 0.8f;
+            Needs.Fatigue = MathHelper.Clamp(Needs.Fatigue + 0.001f * dt, 0f, 1f);
+        }
+        // Rain burrowing for prey creatures
+        if (ctx.IsRaining && CanBurrow && BurrowProgress < 1f
+            && (Role == EcologicalRole.Herbivore || Role == EcologicalRole.Prey || Role == EcologicalRole.Flighty)
+            && Needs.Safety >= 0.5f) // only burrow if not in danger
+        {
+            // Encourage resting/burrowing
+            Needs.Fatigue = MathHelper.Clamp(Needs.Fatigue + 0.005f * dt, 0f, 1f);
+        }
+    }
+
+    // TODO: Slug slime trail slow effect — check in creature update loops:
+    // foreach slug in _slugs, if slug.IsOnSlimeTrail(creature.Position), creature.Velocity.X *= 0.7f;
+
     /// <summary>Find the nearest edible food source within range.</summary>
     public FoodSource FindFood(List<FoodSource> foods, float maxRange = 9999f)
     {

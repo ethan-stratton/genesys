@@ -217,6 +217,7 @@ public class Game1 : Game
     private List<Bird> _birds = new();
     private List<Wingbeater> _wingbeaters = new();
     private List<Scavenger> _scavengers = new();
+    private List<Slug> _slugs = new();
     private List<FoodSource> _foodSources = new();
 
     // Unified creature list — ALL creatures go here. Typed lists above are derived views.
@@ -904,7 +905,7 @@ public class Game1 : Game
         _crawlers.Clear();
         _hoppers.Clear();
         _thornbacks.Clear();
-        _birds.Clear(); _wingbeaters.Clear(); _scavengers.Clear();
+        _birds.Clear(); _wingbeaters.Clear(); _scavengers.Clear(); _slugs.Clear();
 
         // Load item pickups
         _itemPickups.Clear();
@@ -1069,7 +1070,7 @@ public class Game1 : Game
         _crawlers.Clear();
         _hoppers.Clear();
         _thornbacks.Clear();
-        _birds.Clear(); _wingbeaters.Clear(); _scavengers.Clear();
+        _birds.Clear(); _wingbeaters.Clear(); _scavengers.Clear(); _slugs.Clear();
         if (_rng == null) _rng = new Random();
 
         var tg = _level.TileGridInstance;
@@ -1091,6 +1092,19 @@ public class Game1 : Game
                 case "swarm":
                     _swarms.Add(new InsectSwarm(new Vector2(e.X, e.Y), e.Count > 0 ? e.Count : 10, _rng));
                     break;
+                case "firefly":
+                    _swarms.Add(new InsectSwarm(new Vector2(e.X, e.Y), e.Count > 0 ? e.Count : 15, _rng, SwarmVariant.Firefly));
+                    break;
+                case "mosquito":
+                    _swarms.Add(new InsectSwarm(new Vector2(e.X, e.Y), e.Count > 0 ? e.Count : 12, _rng, SwarmVariant.Mosquito));
+                    break;
+                case "slug":
+                {
+                    var slug = new Slug(new Vector2(e.X, e.Y), _rng);
+                    _slugs.Add(slug);
+                    _creatures.Add(slug);
+                    break;
+                }
                 case "crawler":
                 case "forager":
                 case "skitter":
@@ -3237,13 +3251,24 @@ public class Game1 : Game
         var playerRect2 = _player.CollisionRect;
         foreach (var swarm in _swarms)
         {
-            swarm.Update(dt, playerCenter2, _rng);
+            swarm.Update(dt, playerCenter2, _rng, _worldTime, _weather.IsRaining, TorchActive, _lanternActive && _player.Battery > 0);
 
             if (_spawnInvincibility <= 0 && !_isDead)
             {
                 int dmg = swarm.CheckPlayerDamage(playerRect2);
                 if (dmg > 0) { _lastDamageSource = "Swarm"; _player.TakeDamage(dmg, _player.Position.X - swarm.HomePosition.X); }
+
+                // Mosquito blood drain
+                if (swarm.Variant == SwarmVariant.Mosquito)
+                {
+                    float drain = swarm.CheckMosquitoDrain(playerRect2, dt, _player.WantsSprintParticles);
+                    if (drain >= 1f) { _lastDamageSource = "Mosquito"; _player.TakeDamage(1, 0); }
+                }
             }
+
+            // Add pending noise events from swarms
+            foreach (var noise in swarm.PendingNoises)
+                _noiseEvents.Add(noise);
 
             if (_player.MeleeTimer > 0)
             {

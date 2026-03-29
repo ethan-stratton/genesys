@@ -17,7 +17,15 @@
   },
   "platforms": [],
   "ropes": [],
-  "walls": [],
+  "walls": [
+    {
+      "x": 3520,
+      "y": 1344,
+      "w": 32,
+      "h": 512,
+      "climbSide": 0
+    }
+  ],
   "spikes": [],
   "ceilings": [],
   "solidFloors": [],

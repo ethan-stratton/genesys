@@ -60,24 +60,36 @@
       "type": "forager",
       "x": 800,
       "y": 1300,
-      "w": 32,
-      "h": 32
+      "count": 1,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "forager-2",
       "type": "forager",
       "x": 1600,
       "y": 1400,
-      "w": 32,
-      "h": 32
+      "count": 1,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     },
     {
       "id": "scavenger-1",
       "type": "scavenger",
       "x": 1200,
       "y": 2400,
-      "w": 32,
-      "h": 32
+      "count": 1,
+      "scale": 1,
+      "scaleX": 0,
+      "scaleY": 0,
+      "frozen": false,
+      "passive": false
     }
   ],
   "switches": [],
@@ -89,8 +101,20 @@
     "right": "surface-east",
     "up": "",
     "down": "",
-    "LeftZones": [],
-    "RightZones": [],
+    "LeftZones": [
+      {
+        "target": "ship-interior",
+        "from": 0,
+        "to": 1
+      }
+    ],
+    "RightZones": [
+      {
+        "target": "surface-east",
+        "from": 0,
+        "to": 1
+      }
+    ],
     "UpZones": [],
     "DownZones": []
   },
@@ -8105,5 +8129,5 @@
     ]
   },
   "visualLayers": [],
-  "isUnderground": true
+  "isUnderground": false
 }

@@ -1,39 +1,35 @@
 {
-  "currentLevel": "crashsite",
-  "spawnX": 2448,
-  "spawnY": 2716,
+  "currentLevel": "ship-interior",
+  "spawnX": 3723.5044,
+  "spawnY": 1567.9985,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 755.45966,
+  "playTime": 247.05046,
   "meleeInventory": [
-    "GreatSword",
-    "Torch"
+    "Knife"
   ],
-  "rangedInventory": [],
+  "rangedInventory": [
+    "Gun"
+  ],
   "meleeIndex": 0,
   "rangedIndex": 0,
   "weaponInventory": [
-    "GreatSword",
-    "Torch"
+    "Gun",
+    "Knife"
   ],
-  "leftHand": "None",
-  "rightHand": "GreatSword",
-  "rightHand1": "GreatSword",
+  "leftHand": "Knife",
+  "rightHand": "Gun",
+  "rightHand1": "Gun",
   "rightHand2": "None",
-  "leftHand1": "Torch",
+  "leftHand1": "Knife",
   "leftHand2": "None",
   "rightActiveSlot1": true,
-  "leftActiveSlot1": false,
+  "leftActiveSlot1": true,
   "collectedItems": [
-    "grapple-2",
-    "debug_grapple_639103216437212280",
-    "debug_greatsword_639103265972717510",
-    "debug_grapple_639103266563882930",
-    "lantern-3",
-    "torch-4",
-    "cipher-helmet-5"
+    "gun-1",
+    "knife-1"
   ],
   "windowSizeIndex": 0,
   "crtEnabled": false,
@@ -42,12 +38,35 @@
   "shelterLevel": "",
   "shelterX": 0,
   "shelterY": 0,
-  "deathCount": 2,
+  "deathCount": 0,
   "hp": 10,
-  "suitIntegrity": 30,
-  "battery": 52.421898,
+  "suitIntegrity": 31,
+  "battery": 90.249435,
   "bestiary": {
     "entries": {
+      "scavenger": {
+        "speciesName": "scavenger",
+        "classification": "scavenger",
+        "observations": [
+          {
+            "time": "day",
+            "weather": "clear",
+            "behavior": "idle",
+            "biome": "Untitled"
+          }
+        ],
+        "sightCount": 2,
+        "scanTier": 0,
+        "l2Scanned": false,
+        "detailedRole": null,
+        "temperament": null,
+        "weaknesses": null,
+        "resistances": null,
+        "l3Scanned": false,
+        "loreText": null,
+        "thoughts": null,
+        "originalNature": null
+      },
       "forager": {
         "speciesName": "forager",
         "classification": "herbivore",
@@ -56,185 +75,10 @@
             "time": "day",
             "weather": "clear",
             "behavior": "fleeing",
-            "biome": "The Living Forest"
-          },
-          {
-            "time": "day",
-            "weather": "clear",
-            "behavior": "idle",
-            "biome": "The Living Forest"
-          },
-          {
-            "time": "night",
-            "weather": "clear",
-            "behavior": "idle",
-            "biome": "Untitled"
-          },
-          {
-            "time": "day",
-            "weather": "clear",
-            "behavior": "idle",
-            "biome": "Crash Site"
-          }
-        ],
-        "sightCount": 11,
-        "scanTier": 0,
-        "l2Scanned": false,
-        "detailedRole": null,
-        "temperament": null,
-        "weaknesses": null,
-        "resistances": null,
-        "l3Scanned": false,
-        "loreText": null,
-        "thoughts": null,
-        "originalNature": null
-      },
-      "hopper": {
-        "speciesName": "hopper",
-        "classification": "herbivore",
-        "observations": [
-          {
-            "time": "day",
-            "weather": "clear",
-            "behavior": "idle",
-            "biome": "The Living Forest"
-          }
-        ],
-        "sightCount": 1,
-        "scanTier": 0,
-        "l2Scanned": false,
-        "detailedRole": null,
-        "temperament": null,
-        "weaknesses": null,
-        "resistances": null,
-        "l3Scanned": false,
-        "loreText": null,
-        "thoughts": null,
-        "originalNature": null
-      },
-      "bird": {
-        "speciesName": "bird",
-        "classification": "prey species",
-        "observations": [
-          {
-            "time": "day",
-            "weather": "clear",
-            "behavior": "idle",
-            "biome": "The Living Forest"
-          }
-        ],
-        "sightCount": 1,
-        "scanTier": 0,
-        "l2Scanned": false,
-        "detailedRole": null,
-        "temperament": null,
-        "weaknesses": null,
-        "resistances": null,
-        "l3Scanned": false,
-        "loreText": null,
-        "thoughts": null,
-        "originalNature": null
-      },
-      "scavenger": {
-        "speciesName": "scavenger",
-        "classification": "scavenger",
-        "observations": [
-          {
-            "time": "day",
-            "weather": "clear",
-            "behavior": "moving",
-            "biome": "Ship Interior"
-          },
-          {
-            "time": "day",
-            "weather": "clear",
-            "behavior": "idle",
-            "biome": "Ship Interior"
-          },
-          {
-            "time": "day",
-            "weather": "clear",
-            "behavior": "fleeing",
-            "biome": "The Living Forest"
-          },
-          {
-            "time": "day",
-            "weather": "clear",
-            "behavior": "idle",
-            "biome": "The Living Forest"
-          }
-        ],
-        "sightCount": 8,
-        "scanTier": 0,
-        "l2Scanned": false,
-        "detailedRole": null,
-        "temperament": null,
-        "weaknesses": null,
-        "resistances": null,
-        "l3Scanned": false,
-        "loreText": null,
-        "thoughts": null,
-        "originalNature": null
-      },
-      "leaper": {
-        "speciesName": "leaper",
-        "classification": "predator",
-        "observations": [
-          {
-            "time": "day",
-            "weather": "clear",
-            "behavior": "moving",
-            "biome": "The Living Forest"
-          },
-          {
-            "time": "day",
-            "weather": "clear",
-            "behavior": "foraging",
-            "biome": "The Living Forest"
-          },
-          {
-            "time": "day",
-            "weather": "clear",
-            "behavior": "aggressive",
-            "biome": "The Living Forest"
-          }
-        ],
-        "sightCount": 4,
-        "scanTier": 0,
-        "l2Scanned": false,
-        "detailedRole": null,
-        "temperament": null,
-        "weaknesses": null,
-        "resistances": null,
-        "l3Scanned": false,
-        "loreText": null,
-        "thoughts": null,
-        "originalNature": null
-      },
-      "skitter": {
-        "speciesName": "skitter",
-        "classification": "skittish",
-        "observations": [
-          {
-            "time": "day",
-            "weather": "clear",
-            "behavior": "fleeing",
-            "biome": "The Living Forest"
-          },
-          {
-            "time": "day",
-            "weather": "clear",
-            "behavior": "idle",
-            "biome": "Ship Interior"
-          },
-          {
-            "time": "day",
-            "weather": "clear",
-            "behavior": "idle",
             "biome": "Untitled"
           }
         ],
-        "sightCount": 3,
+        "sightCount": 1,
         "scanTier": 0,
         "l2Scanned": false,
         "detailedRole": null,
@@ -248,19 +92,19 @@
       }
     }
   },
-  "worldTime": 14.378895,
+  "worldTime": 9.894527,
   "evolutionFlags": [],
   "cipherScanUnlocked": false,
-  "hasLantern": true,
-  "hasCipherHelmet": true,
-  "cipherHelmetEquipped": true,
-  "torchFuel": 99.15047,
+  "hasLantern": false,
+  "hasCipherHelmet": false,
+  "cipherHelmetEquipped": false,
+  "torchFuel": 100,
   "hasChestPlate": true,
-  "chestPlateEquipped": true,
+  "chestPlateEquipped": false,
   "hasRocketBoots": true,
   "rocketBootsEquipped": true,
-  "durR1": 149,
+  "durR1": 300,
   "durR2": 0,
-  "durL1": 1000,
+  "durL1": 80,
   "durL2": 0
 }
