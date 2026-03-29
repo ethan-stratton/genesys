@@ -218,6 +218,8 @@ public class Game1 : Game
     private List<Wingbeater> _wingbeaters = new();
     private List<Scavenger> _scavengers = new();
     private List<Slug> _slugs = new();
+    private List<Centipede> _centipedes = new();
+    private List<RainBeetle> _rainBeetles = new();
     private List<FoodSource> _foodSources = new();
 
     // Unified creature list — ALL creatures go here. Typed lists above are derived views.
@@ -905,7 +907,7 @@ public class Game1 : Game
         _crawlers.Clear();
         _hoppers.Clear();
         _thornbacks.Clear();
-        _birds.Clear(); _wingbeaters.Clear(); _scavengers.Clear(); _slugs.Clear();
+        _birds.Clear(); _wingbeaters.Clear(); _scavengers.Clear(); _slugs.Clear(); _centipedes.Clear(); _rainBeetles.Clear();
 
         // Load item pickups
         _itemPickups.Clear();
@@ -1070,7 +1072,7 @@ public class Game1 : Game
         _crawlers.Clear();
         _hoppers.Clear();
         _thornbacks.Clear();
-        _birds.Clear(); _wingbeaters.Clear(); _scavengers.Clear(); _slugs.Clear();
+        _birds.Clear(); _wingbeaters.Clear(); _scavengers.Clear(); _slugs.Clear(); _centipedes.Clear(); _rainBeetles.Clear();
         if (_rng == null) _rng = new Random();
 
         var tg = _level.TileGridInstance;
@@ -1159,6 +1161,20 @@ public class Game1 : Game
                     var scav = new Scavenger(new Vector2(e.X, scavSnapY));
                     _scavengers.Add(scav); _creatures.Add(scav);
                     break;
+                case "centipede":
+                {
+                    float centSnapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Centipede.HeadW, Centipede.HeadH, tg, ts, walls, _level.Bounds.Bottom);
+                    var cent = new Centipede(new Vector2(e.X, centSnapY), _rng);
+                    _centipedes.Add(cent); _creatures.Add(cent);
+                    break;
+                }
+                case "rain-beetle":
+                {
+                    float rbSnapY = EnemyPhysics.SnapToSurface(e.X, e.Y, RainBeetle.Width, RainBeetle.Height, tg, ts, walls, _level.Bounds.Bottom);
+                    var rb = new RainBeetle(new Vector2(e.X, rbSnapY), _rng);
+                    _rainBeetles.Add(rb); _creatures.Add(rb);
+                    break;
+                }
                 case "dummy":
                     float dSnapY = EnemyPhysics.SnapToSurface(e.X, e.Y, Crawler.Width, Crawler.Height, tg, ts, walls, _level.Bounds.Bottom);
                     var dummy = new Crawler(new Vector2(e.X, dSnapY), e.X - 10, e.X + 10, 0, 0);
