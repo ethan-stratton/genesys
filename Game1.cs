@@ -84,6 +84,7 @@ public class Game1 : Game
     private string _roomTransDir;         // "left","right","up","down"
     private bool _roomTransFirstVisit;
     private bool _roomTransFlicker;       // tech suppression flicker on this room
+    private float _exitCooldown;           // prevents exit re-trigger after transition
 
     // Prologue phase durations (seconds)
     private static readonly float[] ProloguePhaseDurations = { 6f, 5f, 5f, 4f };
@@ -4834,149 +4835,9 @@ public class Game1 : Game
         }
 
         // === Edge-of-screen room transitions (Metroid style) ===
-        // Only transitions where tiles are open at the edge (not through solid walls)
-        if (!_isDead && !_roomTransitioning && _level.Neighbors != null)
-        {
-            var bounds = _level.Bounds;
-            float px = _player.Position.X;
-            float py = _player.Position.Y;
-            float pcx = px + Player.Width / 2f;
-            float pcy = py + Player.Height / 2f;
-            string neighbor = null;
-            string dir = null;
-            
-            var tg = _level.TileGridInstance;
-            float boundsW = bounds.Right - bounds.Left;
-            float boundsH = bounds.Bottom - bounds.Top;
-            
-            if (px < bounds.Left - 4 && _level.Neighbors.HasNeighbor("left"))
-            {
-                int checkX = bounds.Left + 2;
-                bool open = tg == null || !TileProperties.IsSolid(tg.GetTile(checkX, (int)pcy));
-                float edgePos = boundsH > 0 ? (pcy - bounds.Top) / boundsH : 0.5f;
-                string resolved = _level.Neighbors.ResolveEdge("left", edgePos);
-                if (open && resolved != "") { neighbor = resolved; dir = "left"; }
-            }
-            else if (px + Player.Width > bounds.Right + 4 && _level.Neighbors.HasNeighbor("right"))
-            {
-                int checkX = bounds.Right - 2;
-                bool open = tg == null || !TileProperties.IsSolid(tg.GetTile(checkX, (int)pcy));
-                float edgePos = boundsH > 0 ? (pcy - bounds.Top) / boundsH : 0.5f;
-                string resolved = _level.Neighbors.ResolveEdge("right", edgePos);
-                if (open && resolved != "") { neighbor = resolved; dir = "right"; }
-            }
-            else if (py < bounds.Top - 4 && _level.Neighbors.HasNeighbor("up"))
-            {
-                int checkY = bounds.Top + 2;
-                bool open = tg == null || !TileProperties.IsSolid(tg.GetTile((int)pcx, checkY));
-                float edgePos = boundsW > 0 ? (pcx - bounds.Left) / boundsW : 0.5f;
-                string resolved = _level.Neighbors.ResolveEdge("up", edgePos);
-                if (open && resolved != "") { neighbor = resolved; dir = "up"; }
-            }
-            else if (py + Player.Height > bounds.Bottom + 4 && _level.Neighbors.HasNeighbor("down"))
-            {
-                int checkY = bounds.Bottom - 2;
-                bool open = tg == null || !TileProperties.IsSolid(tg.GetTile((int)pcx, checkY));
-                float edgePos = boundsW > 0 ? (pcx - bounds.Left) / boundsW : 0.5f;
-                string resolved = _level.Neighbors.ResolveEdge("down", edgePos);
-                if (open && resolved != "") { neighbor = resolved; dir = "down"; }
-            }
-            
-            if (neighbor != null)
-            {
-                float savedAbsY = py;
-                float savedAbsX = px;
-                float savedVelX = _player.Velocity.X;
-                float savedVelY = _player.Velocity.Y;
-                
-                string nextPath = $"Content/levels/{neighbor}.json";
-                if (System.IO.File.Exists(nextPath))
-                {
-                    // Save old camera position for pan start
-                    _roomTransCamStart = _camera.Position;
-                    _roomTransDir = dir;
-                    
-                    // Calculate where the player will walk FROM (just inside the edge)
-                    // and the old viewport size for camera offset
-                    float oldViewW = _camera.EffectiveViewW;
-                    float oldViewH = _camera.EffectiveViewH;
-                    
-                    if (_saveData != null) { SyncInventoryToSave(); _saveData.Save(); }
-                    LoadLevel(nextPath);
-                    _editorSaveFile = nextPath;
-                    _camera = MakeCamera();
-                    Restart();
-                    
-                    var nb = _level.Bounds;
-                    
-                    // Player spawn on opposite edge
-                    switch (dir)
-                    {
-                        case "left":
-                            _roomTransPlayerEnd = new Vector2(nb.Right - Player.Width - 32, savedAbsY);
-                            _roomTransPlayerStart = new Vector2(nb.Right + 8, savedAbsY);
-                            break;
-                        case "right":
-                            _roomTransPlayerEnd = new Vector2(nb.Left + 32, savedAbsY);
-                            _roomTransPlayerStart = new Vector2(nb.Left - Player.Width - 8, savedAbsY);
-                            break;
-                        case "up":
-                            _roomTransPlayerEnd = new Vector2(savedAbsX, nb.Bottom - Player.Height - 32);
-                            _roomTransPlayerStart = new Vector2(savedAbsX, nb.Bottom + 8);
-                            break;
-                        case "down":
-                            _roomTransPlayerEnd = new Vector2(savedAbsX, nb.Top + 32);
-                            _roomTransPlayerStart = new Vector2(savedAbsX, nb.Top - Player.Height - 8);
-                            break;
-                    }
-                    
-                    // Clamp to new room bounds
-                    _roomTransPlayerEnd = new Vector2(
-                        MathHelper.Clamp(_roomTransPlayerEnd.X, nb.Left + 4, nb.Right - Player.Width - 4),
-                        MathHelper.Clamp(_roomTransPlayerEnd.Y, nb.Top + 4, nb.Bottom - Player.Height - 4));
-                    
-                    // Camera end: centered on player end position
-                    float evw = _camera.EffectiveViewW;
-                    float evh = _camera.EffectiveViewH;
-                    _roomTransCamEnd = new Vector2(
-                        MathHelper.Clamp(_roomTransPlayerEnd.X + Player.Width / 2f - evw / 2f,
-                            nb.Left, Math.Max(nb.Left, nb.Right - evw)),
-                        MathHelper.Clamp(_roomTransPlayerEnd.Y + Player.Height / 2f - evh / 2f,
-                            nb.Top, Math.Max(nb.Top, nb.Bottom - evh)));
-                    
-                    // Camera start: offset from end by one viewport in the transition direction
-                    switch (dir)
-                    {
-                        case "left":
-                            _roomTransCamStart = new Vector2(_roomTransCamEnd.X + evw, _roomTransCamEnd.Y);
-                            break;
-                        case "right":
-                            _roomTransCamStart = new Vector2(_roomTransCamEnd.X - evw, _roomTransCamEnd.Y);
-                            break;
-                        case "up":
-                            _roomTransCamStart = new Vector2(_roomTransCamEnd.X, _roomTransCamEnd.Y + evh);
-                            break;
-                        case "down":
-                            _roomTransCamStart = new Vector2(_roomTransCamEnd.X, _roomTransCamEnd.Y - evh);
-                            break;
-                    }
-                    
-                    // Duration scales with room size (bigger rooms = slightly slower pan)
-                    float roomSize = (dir == "left" || dir == "right") ? evw : evh;
-                    _roomTransDuration = MathHelper.Clamp(roomSize / 800f * 0.5f, 0.3f, 0.8f);
-                    _roomTransFirstVisit = false; // TODO: track visited rooms
-                    _roomTransFlicker = false;     // TODO: per-room flag from level data
-                    
-                    _roomTransTimer = 0f;
-                    _roomTransitioning = true;
-                    _player.Position = _roomTransPlayerStart;
-                    _player.Velocity = new Vector2(savedVelX, savedVelY);
-                    _camera.Position = _roomTransCamStart;
-                    _gameState = GameState.Playing;
-                }
-            }
-        }
-        
+        // Decrement exit cooldown
+        if (_exitCooldown > 0) _exitCooldown -= dt;
+
         // Update room transition pan
         if (_roomTransitioning)
         {
@@ -4999,12 +4860,13 @@ public class Game1 : Game
             if (t >= 1f)
             {
                 _roomTransitioning = false;
+                _exitCooldown = 0.5f;
                 _camera.SnapTo(_player.Position, Player.Width, Player.Height);
             }
         }
         
         // Exit collision — enter-trigger (only fires on transition from outside → inside)
-        if (!_isDead)
+        if (!_isDead && !_roomTransitioning && _exitCooldown <= 0)
         {
             var pRect = new Rectangle((int)_player.Position.X, (int)_player.Position.Y, Player.Width, Player.Height);
             if (_prevInExit.Length != _level.ExitRects.Length)
@@ -5046,6 +4908,26 @@ public class Game1 : Game
                         _gameState = GameState.Overworld;
                         break;
                     }
+
+                    // Determine transition direction: which level edge is this exit closest to?
+                    var exitRect = _level.ExitRects[i];
+                    float exitCX = exitRect.X + exitRect.Width / 2f;
+                    float exitCY = exitRect.Y + exitRect.Height / 2f;
+                    var lvlBounds = _level.Bounds;
+                    float distLeft = Math.Abs(exitCX - lvlBounds.Left);
+                    float distRight = Math.Abs(exitCX - lvlBounds.Right);
+                    float distTop = Math.Abs(exitCY - lvlBounds.Top);
+                    float distBottom = Math.Abs(exitCY - lvlBounds.Bottom);
+                    float minDist = Math.Min(Math.Min(distLeft, distRight), Math.Min(distTop, distBottom));
+                    string dir;
+                    if (minDist == distLeft) dir = "left";
+                    else if (minDist == distRight) dir = "right";
+                    else if (minDist == distTop) dir = "up";
+                    else dir = "down";
+
+                    float savedVelX = _player.Velocity.X;
+                    float savedVelY = _player.Velocity.Y;
+
                     string nextPath = $"Content/levels/{target}.json";
                     string _sourceLevel = System.IO.Path.GetFileNameWithoutExtension(_editorSaveFile);
                     if (System.IO.File.Exists(nextPath))
@@ -5080,64 +4962,148 @@ public class Game1 : Game
                                 _eveOrbActive = _saveData.Flags["eveOrbActive"];
                         }
 
-                        // Tunnel: reposition at target exit
+                        // Find the target exit in the new level
+                        int foundExit = -1;
+                        if (!string.IsNullOrEmpty(targetExitId))
                         {
-                            int foundExit = -1;
-                            
-                            // 1. Try matching by targetExitId (explicit link)
-                            if (!string.IsNullOrEmpty(targetExitId))
+                            for (int j = 0; j < _level.ExitIds.Length; j++)
                             {
-                                for (int j = 0; j < _level.ExitIds.Length; j++)
-                                {
-                                    if (_level.ExitIds[j] == targetExitId)
-                                    { foundExit = j; break; }
-                                }
+                                if (_level.ExitIds[j] == targetExitId)
+                                { foundExit = j; break; }
                             }
-                            
-                            // 2. Fallback: find exit whose targetLevel matches the level we came FROM
-                            if (foundExit < 0)
+                        }
+                        if (foundExit < 0)
+                        {
+                            for (int j = 0; j < _level.ExitTargets.Length; j++)
                             {
-                                for (int j = 0; j < _level.ExitTargets.Length; j++)
-                                {
-                                    if (_level.ExitTargets[j] == _sourceLevel)
-                                    { foundExit = j; break; }
-                                }
-                            }
-                            
-                            // 3. Reposition player at found exit
-                            if (foundExit >= 0)
-                            {
-                                var exitRect = _level.ExitRects[foundExit];
-                                float px = exitRect.X + (exitRect.Width - Player.Width) / 2f;
-                                float py = exitRect.Y + exitRect.Height - Player.Height;
-                                _player.Position = new Vector2(px, py);
-                                _camera.SnapTo(_player.Position, Player.Width, Player.Height);
+                                if (_level.ExitTargets[j] == _sourceLevel)
+                                { foundExit = j; break; }
                             }
                         }
 
-                        // Mark all exits in NEW level as "already inside" so enter-trigger doesn't re-fire
+                        // Compute spawn position next to target exit, offset by direction
+                        var nb = _level.Bounds;
+                        float spawnX, spawnY;
+                        if (foundExit >= 0)
+                        {
+                            var tgtRect = _level.ExitRects[foundExit];
+                            switch (dir)
+                            {
+                                case "left": // we left going left, so we arrive from the right
+                                    spawnX = tgtRect.X + tgtRect.Width + 16;
+                                    spawnY = tgtRect.Y + tgtRect.Height - Player.Height;
+                                    break;
+                                case "right": // we left going right, arrive from left
+                                    spawnX = tgtRect.X - Player.Width - 16;
+                                    spawnY = tgtRect.Y + tgtRect.Height - Player.Height;
+                                    break;
+                                case "up":
+                                    spawnX = tgtRect.X + (tgtRect.Width - Player.Width) / 2f;
+                                    spawnY = tgtRect.Y + tgtRect.Height + 16;
+                                    break;
+                                case "down":
+                                    spawnX = tgtRect.X + (tgtRect.Width - Player.Width) / 2f;
+                                    spawnY = tgtRect.Y - Player.Height - 16;
+                                    break;
+                                default:
+                                    spawnX = tgtRect.X + (tgtRect.Width - Player.Width) / 2f;
+                                    spawnY = tgtRect.Y + tgtRect.Height - Player.Height;
+                                    break;
+                            }
+                        }
+                        else
+                        {
+                            // No matching exit found — spawn at level start
+                            spawnX = _player.Position.X;
+                            spawnY = _player.Position.Y;
+                        }
+
+                        // Clamp to level bounds
+                        spawnX = MathHelper.Clamp(spawnX, nb.Left + 4, nb.Right - Player.Width - 4);
+                        spawnY = MathHelper.Clamp(spawnY, nb.Top + 4, nb.Bottom - Player.Height - 4);
+
+                        // Snap to ground
+                        spawnY = SnapToGround(spawnX, spawnY, Player.Width, Player.Height);
+                        spawnY = MathHelper.Clamp(spawnY, nb.Top + 4, nb.Bottom - Player.Height - 4);
+
+                        _roomTransPlayerEnd = new Vector2(spawnX, spawnY);
+
+                        // Player start: just outside screen edge so they slide in
+                        float evw = _camera.EffectiveViewW;
+                        float evh = _camera.EffectiveViewH;
+                        switch (dir)
+                        {
+                            case "left":
+                                _roomTransPlayerStart = new Vector2(spawnX + evw * 0.1f, spawnY);
+                                break;
+                            case "right":
+                                _roomTransPlayerStart = new Vector2(spawnX - evw * 0.1f, spawnY);
+                                break;
+                            case "up":
+                                _roomTransPlayerStart = new Vector2(spawnX, spawnY + evh * 0.1f);
+                                break;
+                            case "down":
+                                _roomTransPlayerStart = new Vector2(spawnX, spawnY - evh * 0.1f);
+                                break;
+                            default:
+                                _roomTransPlayerStart = new Vector2(spawnX, spawnY);
+                                break;
+                        }
+
+                        // Camera end: centered on player end position
+                        _roomTransCamEnd = new Vector2(
+                            MathHelper.Clamp(spawnX + Player.Width / 2f - evw / 2f,
+                                nb.Left, Math.Max(nb.Left, nb.Right - evw)),
+                            MathHelper.Clamp(spawnY + Player.Height / 2f - evh / 2f,
+                                nb.Top, Math.Max(nb.Top, nb.Bottom - evh)));
+
+                        // Camera start: offset by one viewport in transition direction
+                        switch (dir)
+                        {
+                            case "left":
+                                _roomTransCamStart = new Vector2(_roomTransCamEnd.X + evw, _roomTransCamEnd.Y);
+                                break;
+                            case "right":
+                                _roomTransCamStart = new Vector2(_roomTransCamEnd.X - evw, _roomTransCamEnd.Y);
+                                break;
+                            case "up":
+                                _roomTransCamStart = new Vector2(_roomTransCamEnd.X, _roomTransCamEnd.Y + evh);
+                                break;
+                            case "down":
+                                _roomTransCamStart = new Vector2(_roomTransCamEnd.X, _roomTransCamEnd.Y - evh);
+                                break;
+                            default:
+                                _roomTransCamStart = _roomTransCamEnd;
+                                break;
+                        }
+
+                        _roomTransDir = dir;
+                        _roomTransDuration = 0.4f;
+                        _roomTransFirstVisit = false;
+                        _roomTransFlicker = false;
+                        _roomTransTimer = 0f;
+                        _roomTransitioning = true;
+                        _player.Position = _roomTransPlayerStart;
+                        _player.Velocity = new Vector2(savedVelX, savedVelY);
+                        _camera.Position = _roomTransCamStart;
+                        _gameState = GameState.Playing;
+
+                        // Mark all exits as "already inside" to prevent re-trigger
                         _prevInExit = new bool[_level.ExitRects.Length];
                         for (int k = 0; k < _prevInExit.Length; k++)
                             _prevInExit[k] = true;
+                        _exitCooldown = 0.5f;
                         transitioned = true;
-                        _transitionActive = true;
-                        _transitionTimer = _transitionDuration;
 
                         if (_saveData != null)
                         {
                             _saveData.CurrentLevel = target;
-                            _saveData.SpawnX = _player.Position.X;
-                            _saveData.SpawnY = _player.Position.Y;
+                            _saveData.SpawnX = spawnX;
+                            _saveData.SpawnY = spawnY;
                             SyncInventoryToSave(); _saveData.Save();
                         }
                         if (_overworld != null)
                         {
-                            // Mark the level we just LEFT as cleared
-                            var srcNode = _overworld.FindNode(System.IO.Path.GetFileNameWithoutExtension(
-                                _editorSaveFile.Replace($"Content/levels/{target}.json", "")));
-                            // Actually, _editorSaveFile is already updated. Use the source level name.
-                            // We need to track it before LoadLevel overwrites _editorSaveFile.
-                            // (handled by _sourceLevel below)
                             if (_sourceLevel != null)
                             {
                                 var srcN = _overworld.FindNode(_sourceLevel);
@@ -6705,6 +6671,25 @@ public class Game1 : Game
         }
         
         return bestY;
+    }
+
+    /// <summary>Snap a spawn position downward to the nearest solid ground tile.</summary>
+    private float SnapToGround(float x, float y, int width, int height)
+    {
+        var tg = _level.TileGridInstance;
+        if (tg == null) return y;
+        int ts = tg.TileSize;
+        int startTileY = (int)(y / ts);
+        int tileX = (int)((x + width / 2f) / ts);
+        for (int ty = startTileY; ty < Math.Min(startTileY + 10, tg.Height); ty++)
+        {
+            if (tileX >= 0 && tileX < tg.Width && ty >= 0 && ty < tg.Height
+                && TileProperties.IsSolid(tg.GetTileAt(tileX, ty)))
+            {
+                return ty * ts - height;
+            }
+        }
+        return y;
     }
 
     /// <summary>Find the left/right edges of the surface at the given foot position.</summary>

@@ -249,8 +249,8 @@ public class ExitData
 {
     [JsonPropertyName("x")] public int X { get; set; }
     [JsonPropertyName("y")] public int Y { get; set; }
-    [JsonPropertyName("w")] public int W { get; set; } = 20;
-    [JsonPropertyName("h")] public int H { get; set; } = 48;
+    [JsonPropertyName("w")] public int W { get; set; } = 64;
+    [JsonPropertyName("h")] public int H { get; set; } = 96;
     [JsonPropertyName("targetLevel")] public string TargetLevel { get; set; } = "";
     [JsonPropertyName("id")] public string Id { get; set; } = "";
     [JsonPropertyName("targetExitId")] public string TargetExitId { get; set; } = "";
