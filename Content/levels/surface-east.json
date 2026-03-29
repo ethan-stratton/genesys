@@ -72,544 +72,396 @@
   "objects": [],
   "enemies": [
     {
-      "id": "forager-1",
+      "type": "mosquito",
+      "x": 300,
+      "y": 2100,
+      "count": 12,
+      "id": "eco-0"
+    },
+    {
+      "type": "mosquito",
+      "x": 800,
+      "y": 2100,
+      "count": 8,
+      "id": "eco-1"
+    },
+    {
+      "type": "slug",
+      "x": 200,
+      "y": 2200,
+      "id": "eco-2",
+      "count": 1
+    },
+    {
+      "type": "slug",
+      "x": 500,
+      "y": 2200,
+      "id": "eco-3",
+      "count": 1
+    },
+    {
+      "type": "slug",
+      "x": 900,
+      "y": 2200,
+      "id": "eco-4",
+      "count": 1
+    },
+    {
       "type": "forager",
       "x": 400,
       "y": 2200,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
+      "id": "eco-5",
+      "count": 1
     },
     {
-      "id": "forager-2",
       "type": "forager",
       "x": 700,
       "y": 2200,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
+      "id": "eco-6",
+      "count": 1
     },
     {
-      "id": "hopper-3",
-      "type": "hopper",
-      "x": 1000,
-      "y": 2180,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": true
-    },
-    {
-      "id": "leaper-4",
-      "type": "leaper",
-      "x": 1350,
-      "y": 1760,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
-    },
-    {
-      "id": "leaper-5",
-      "type": "leaper",
-      "x": 1600,
-      "y": 2200,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
-    },
-    {
-      "id": "leaper-6",
-      "type": "leaper",
-      "x": 1700,
-      "y": 2200,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
-    },
-    {
-      "id": "scavenger-7",
-      "type": "scavenger",
-      "x": 1500,
-      "y": 2200,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
-    },
-    {
-      "id": "bird-8",
-      "type": "bird",
-      "x": 2400,
-      "y": 1200,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": true
-    },
-    {
-      "id": "wingbeater-9",
-      "type": "wingbeater",
-      "x": 3100,
-      "y": 400,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": true
-    },
-    {
-      "id": "hopper-10",
-      "type": "hopper",
-      "x": 3850,
-      "y": 2140,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": true
-    },
-    {
-      "id": "hopper-11",
-      "type": "hopper",
-      "x": 3950,
-      "y": 2140,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": true
-    },
-    {
-      "id": "hopper-12",
-      "type": "hopper",
-      "x": 4050,
-      "y": 2140,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": true
-    },
-    {
-      "id": "hopper-13",
-      "type": "hopper",
-      "x": 4150,
-      "y": 2140,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": true
-    },
-    {
-      "id": "forager-14",
       "type": "forager",
-      "x": 3400,
-      "y": 1760,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
-    },
-    {
-      "id": "forager-15",
-      "type": "forager",
-      "x": 4000,
-      "y": 1760,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
-    },
-    {
-      "id": "forager-16",
-      "type": "forager",
-      "x": 5100,
-      "y": 1760,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
-    },
-    {
-      "id": "skitter-17",
-      "type": "skitter",
-      "x": 4600,
-      "y": 2140,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
-    },
-    {
-      "id": "stalker-18",
-      "type": "stalker",
-      "x": 4800,
-      "y": 1120,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
-    },
-    {
-      "id": "leaper-19",
-      "type": "leaper",
-      "x": 6800,
-      "y": 2140,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
-    },
-    {
-      "id": "leaper-20",
-      "type": "leaper",
-      "x": 6900,
-      "y": 2140,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
-    },
-    {
-      "id": "leaper-21",
-      "type": "leaper",
-      "x": 7000,
-      "y": 2140,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
-    },
-    {
-      "id": "leaper-22",
-      "type": "leaper",
-      "x": 7100,
-      "y": 2140,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
-    },
-    {
-      "id": "bird-23",
-      "type": "bird",
-      "x": 6200,
-      "y": 800,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": true
-    },
-    {
-      "id": "bird-24",
-      "type": "bird",
-      "x": 6300,
-      "y": 900,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": true
-    },
-    {
-      "id": "scavenger-25",
-      "type": "scavenger",
-      "x": 7400,
-      "y": 1750,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
-    },
-    {
-      "id": "forager-26",
-      "type": "forager",
-      "x": 300,
+      "x": 1100,
       "y": 2200,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
+      "id": "eco-7",
+      "count": 1
     },
     {
-      "id": "hopper-27",
       "type": "hopper",
       "x": 1200,
       "y": 2180,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": true
+      "id": "eco-8",
+      "count": 1
     },
     {
-      "id": "hopper-28",
       "type": "hopper",
-      "x": 4500,
-      "y": 1280,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": true
+      "x": 1400,
+      "y": 2180,
+      "id": "eco-9",
+      "count": 1
     },
     {
-      "id": "hopper-29",
-      "type": "hopper",
-      "x": 4700,
-      "y": 1280,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": true
-    },
-    {
-      "id": "hopper-30",
-      "type": "hopper",
-      "x": 5000,
-      "y": 1280,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": true
-    },
-    {
-      "id": "forager-31",
-      "type": "forager",
-      "x": 3600,
-      "y": 1900,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
-    },
-    {
-      "id": "forager-32",
-      "type": "forager",
-      "x": 4400,
-      "y": 1900,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
-    },
-    {
-      "id": "forager-33",
-      "type": "forager",
-      "x": 5300,
-      "y": 1900,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
-    },
-    {
-      "id": "leaper-34",
-      "type": "leaper",
-      "x": 6500,
-      "y": 2140,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
-    },
-    {
-      "id": "leaper-35",
-      "type": "leaper",
-      "x": 6600,
-      "y": 2140,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
-    },
-    {
-      "id": "forager-36",
-      "type": "forager",
-      "x": 6000,
-      "y": 2140,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
-    },
-    {
-      "id": "forager-37",
-      "type": "forager",
-      "x": 6100,
-      "y": 2140,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
-    },
-    {
-      "id": "scavenger-38",
       "type": "scavenger",
-      "x": 5900,
-      "y": 2140,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
+      "x": 1600,
+      "y": 2200,
+      "id": "eco-10",
+      "count": 1
     },
     {
-      "id": "skitter-39",
-      "type": "skitter",
-      "x": 7200,
-      "y": 2140,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
+      "type": "leaper",
+      "x": 1800,
+      "y": 2200,
+      "id": "eco-11",
+      "count": 1
     },
     {
-      "id": "thornback-40",
-      "type": "thornback",
-      "x": 5500,
-      "y": 2140,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
-    },
-    {
-      "id": "thornback-41",
-      "type": "thornback",
-      "x": 6400,
-      "y": 2140,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
-    },
-    {
-      "id": "bird-42",
-      "type": "bird",
-      "x": 2800,
-      "y": 600,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": true
-    },
-    {
-      "id": "hopper-43",
       "type": "hopper",
       "x": 2200,
       "y": 2100,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": true
+      "id": "eco-12",
+      "count": 1
     },
     {
-      "id": "leaper-44",
-      "type": "leaper",
-      "x": 1900,
-      "y": 2200,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
+      "type": "hopper",
+      "x": 2400,
+      "y": 2100,
+      "id": "eco-13",
+      "count": 1
     },
     {
-      "id": "forager-45",
+      "type": "hopper",
+      "x": 2600,
+      "y": 2100,
+      "id": "eco-14",
+      "count": 1
+    },
+    {
+      "type": "hopper",
+      "x": 2800,
+      "y": 2100,
+      "id": "eco-15",
+      "count": 1
+    },
+    {
+      "type": "hopper",
+      "x": 3000,
+      "y": 2100,
+      "id": "eco-16",
+      "count": 1
+    },
+    {
       "type": "forager",
-      "x": 1800,
+      "x": 2500,
       "y": 2200,
-      "count": 0,
-      "scale": 1,
-      "scaleX": 0,
-      "scaleY": 0,
-      "frozen": false,
-      "passive": false
+      "id": "eco-17",
+      "count": 1
+    },
+    {
+      "type": "forager",
+      "x": 3200,
+      "y": 2200,
+      "id": "eco-18",
+      "count": 1
+    },
+    {
+      "type": "forager",
+      "x": 3600,
+      "y": 2200,
+      "id": "eco-19",
+      "count": 1
+    },
+    {
+      "type": "bird",
+      "x": 2400,
+      "y": 800,
+      "id": "eco-20",
+      "count": 1
+    },
+    {
+      "type": "bird",
+      "x": 2900,
+      "y": 600,
+      "id": "eco-21",
+      "count": 1
+    },
+    {
+      "type": "bird",
+      "x": 3400,
+      "y": 900,
+      "id": "eco-22",
+      "count": 1
+    },
+    {
+      "type": "firefly",
+      "x": 2300,
+      "y": 1600,
+      "count": 15,
+      "id": "eco-23"
+    },
+    {
+      "type": "firefly",
+      "x": 3000,
+      "y": 1400,
+      "count": 12,
+      "id": "eco-24"
+    },
+    {
+      "type": "firefly",
+      "x": 3700,
+      "y": 1700,
+      "count": 10,
+      "id": "eco-25"
+    },
+    {
+      "type": "slug",
+      "x": 3500,
+      "y": 2200,
+      "id": "eco-26",
+      "count": 1
+    },
+    {
+      "type": "stalker",
+      "x": 4200,
+      "y": 1100,
+      "id": "eco-27",
+      "count": 1
+    },
+    {
+      "type": "stalker",
+      "x": 5200,
+      "y": 1200,
+      "id": "eco-28",
+      "count": 1
+    },
+    {
+      "type": "skitter",
+      "x": 4400,
+      "y": 2140,
+      "id": "eco-29",
+      "count": 1
+    },
+    {
+      "type": "skitter",
+      "x": 4800,
+      "y": 2140,
+      "id": "eco-30",
+      "count": 1
+    },
+    {
+      "type": "forager",
+      "x": 4600,
+      "y": 2000,
+      "id": "eco-31",
+      "count": 1
+    },
+    {
+      "type": "forager",
+      "x": 5000,
+      "y": 2000,
+      "id": "eco-32",
+      "count": 1
+    },
+    {
+      "type": "forager",
+      "x": 5400,
+      "y": 2000,
+      "id": "eco-33",
+      "count": 1
+    },
+    {
+      "type": "scavenger",
+      "x": 4500,
+      "y": 2140,
+      "id": "eco-34",
+      "count": 1
+    },
+    {
+      "type": "scavenger",
+      "x": 5100,
+      "y": 2140,
+      "id": "eco-35",
+      "count": 1
+    },
+    {
+      "type": "firefly",
+      "x": 4300,
+      "y": 1500,
+      "count": 20,
+      "id": "eco-36"
+    },
+    {
+      "type": "firefly",
+      "x": 5000,
+      "y": 1300,
+      "count": 15,
+      "id": "eco-37"
+    },
+    {
+      "type": "slug",
+      "x": 4700,
+      "y": 2200,
+      "id": "eco-38",
+      "count": 1
+    },
+    {
+      "type": "slug",
+      "x": 5300,
+      "y": 2200,
+      "id": "eco-39",
+      "count": 1
+    },
+    {
+      "type": "hopper",
+      "x": 4900,
+      "y": 2100,
+      "id": "eco-40",
+      "count": 1
+    },
+    {
+      "type": "hopper",
+      "x": 5500,
+      "y": 2100,
+      "id": "eco-41",
+      "count": 1
+    },
+    {
+      "type": "swarm",
+      "x": 4100,
+      "y": 1800,
+      "count": 8,
+      "id": "eco-42"
+    },
+    {
+      "type": "leaper",
+      "x": 6200,
+      "y": 2140,
+      "id": "eco-43",
+      "count": 1
+    },
+    {
+      "type": "leaper",
+      "x": 6500,
+      "y": 2140,
+      "id": "eco-44",
+      "count": 1
+    },
+    {
+      "type": "leaper",
+      "x": 6800,
+      "y": 2140,
+      "id": "eco-45",
+      "count": 1
+    },
+    {
+      "type": "thornback",
+      "x": 6400,
+      "y": 2100,
+      "id": "eco-46",
+      "count": 1
+    },
+    {
+      "type": "thornback",
+      "x": 7200,
+      "y": 2100,
+      "id": "eco-47",
+      "count": 1
+    },
+    {
+      "type": "wingbeater",
+      "x": 7000,
+      "y": 400,
+      "id": "eco-48",
+      "count": 1
+    },
+    {
+      "type": "mosquito",
+      "x": 7400,
+      "y": 1800,
+      "count": 10,
+      "id": "eco-49"
+    },
+    {
+      "type": "scavenger",
+      "x": 7500,
+      "y": 2140,
+      "id": "eco-50",
+      "count": 1
+    },
+    {
+      "type": "forager",
+      "x": 6100,
+      "y": 2200,
+      "id": "eco-51",
+      "count": 1
+    },
+    {
+      "type": "forager",
+      "x": 6600,
+      "y": 2200,
+      "id": "eco-52",
+      "count": 1
+    },
+    {
+      "type": "bird",
+      "x": 6300,
+      "y": 700,
+      "id": "eco-53",
+      "count": 1
+    },
+    {
+      "type": "slug",
+      "x": 7300,
+      "y": 2200,
+      "id": "eco-54",
+      "count": 1
+    },
+    {
+      "type": "firefly",
+      "x": 7600,
+      "y": 1600,
+      "count": 8,
+      "id": "eco-55"
     }
   ],
   "switches": [],
