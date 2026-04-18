@@ -134,6 +134,26 @@ public class Camera
         newY = MathHelper.Clamp(newY, _worldTop, MathF.Max(_worldTop, _worldBottom - evh));
         
         Position = new Vector2(newX, newY);
+
+        // --- Trauma shake ---
+        if (_trauma > 0)
+        {
+            _trauma = MathF.Max(_trauma - _traumaDecay * dt, 0f);
+            float shake = _trauma * _trauma; // nonlinear
+            float noise1 = MathF.Sin(100f + _noiseTime * 25f);
+            float noise2 = MathF.Sin(200f + _noiseTime * 30f);
+            float noise3 = MathF.Sin(300f + _noiseTime * 35f);
+            ShakeOffsetX = _shakeOffsetMax * shake * noise1;
+            ShakeOffsetY = _shakeOffsetMax * shake * noise2;
+            ShakeAngle = _shakeAngleMax * shake * noise3;
+        }
+        else
+        {
+            ShakeOffsetX = 0;
+            ShakeOffsetY = 0;
+            ShakeAngle = 0;
+        }
+        _noiseTime += dt;
     }
     
     public void SnapTo(Vector2 playerPos, int playerWidth, int playerHeight, bool unclamped = false)
@@ -154,6 +174,24 @@ public class Camera
         if (_biasInitialized) { _biasSpring.Reset(0f); }
     }
     
+    // --- Trauma-based screen shake ---
+    private float _trauma;
+    private float _traumaDecay = 1.2f;
+    private float _shakeAngleMax = 3f;
+    private float _shakeOffsetMax = 6f;
+    private float _noiseTime;
+    public float ShakeOffsetX, ShakeOffsetY, ShakeAngle;
+    public bool ShakeEnabled = true;
+
+    public void AddTrauma(float amount)
+    {
+        _trauma = MathF.Min(_trauma + amount, 1f);
+    }
+
+    public Matrix ShakeMatrix => ShakeEnabled
+        ? Matrix.CreateRotationZ(MathHelper.ToRadians(ShakeAngle)) * Matrix.CreateTranslation(ShakeOffsetX, ShakeOffsetY, 0)
+        : Matrix.Identity;
+
     public Matrix TransformMatrix =>
         Matrix.CreateTranslation(-Position.X, -Position.Y, 0) *
         Matrix.CreateScale(Zoom, Zoom, 1f);

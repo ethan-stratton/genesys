@@ -1,98 +1,41 @@
 {
-  "currentLevel": "ship-interior",
-  "spawnX": 3723.5044,
-  "spawnY": 1567.9985,
+  "currentLevel": "crashsite",
+  "spawnX": 1200,
+  "spawnY": 1050,
   "unlockedAbilities": [],
   "flags": {
     "eveOrbActive": true
   },
-  "playTime": 247.05046,
-  "meleeInventory": [
-    "Knife"
-  ],
-  "rangedInventory": [
-    "Gun"
-  ],
+  "playTime": 14.983279,
+  "meleeInventory": [],
+  "rangedInventory": [],
   "meleeIndex": 0,
   "rangedIndex": 0,
-  "weaponInventory": [
-    "Gun",
-    "Knife"
-  ],
-  "leftHand": "Knife",
-  "rightHand": "Gun",
-  "rightHand1": "Gun",
+  "weaponInventory": [],
+  "leftHand": "None",
+  "rightHand": "None",
+  "rightHand1": "None",
   "rightHand2": "None",
-  "leftHand1": "Knife",
+  "leftHand1": "None",
   "leftHand2": "None",
   "rightActiveSlot1": true,
   "leftActiveSlot1": true,
-  "collectedItems": [
-    "gun-1",
-    "knife-1"
-  ],
+  "collectedItems": [],
   "windowSizeIndex": 0,
   "crtEnabled": false,
-  "moveTier": 2,
+  "moveTier": 0,
   "upgrades": [],
   "shelterLevel": "",
   "shelterX": 0,
   "shelterY": 0,
   "deathCount": 0,
-  "hp": 10,
+  "hp": 3,
   "suitIntegrity": 31,
-  "battery": 90.249435,
+  "battery": 80,
   "bestiary": {
-    "entries": {
-      "scavenger": {
-        "speciesName": "scavenger",
-        "classification": "scavenger",
-        "observations": [
-          {
-            "time": "day",
-            "weather": "clear",
-            "behavior": "idle",
-            "biome": "Untitled"
-          }
-        ],
-        "sightCount": 2,
-        "scanTier": 0,
-        "l2Scanned": false,
-        "detailedRole": null,
-        "temperament": null,
-        "weaknesses": null,
-        "resistances": null,
-        "l3Scanned": false,
-        "loreText": null,
-        "thoughts": null,
-        "originalNature": null
-      },
-      "forager": {
-        "speciesName": "forager",
-        "classification": "herbivore",
-        "observations": [
-          {
-            "time": "day",
-            "weather": "clear",
-            "behavior": "fleeing",
-            "biome": "Untitled"
-          }
-        ],
-        "sightCount": 1,
-        "scanTier": 0,
-        "l2Scanned": false,
-        "detailedRole": null,
-        "temperament": null,
-        "weaknesses": null,
-        "resistances": null,
-        "l3Scanned": false,
-        "loreText": null,
-        "thoughts": null,
-        "originalNature": null
-      }
-    }
+    "entries": {}
   },
-  "worldTime": 9.894527,
+  "worldTime": 8.249767,
   "evolutionFlags": [],
   "cipherScanUnlocked": false,
   "hasLantern": false,
@@ -100,11 +43,11 @@
   "cipherHelmetEquipped": false,
   "torchFuel": 100,
   "hasChestPlate": true,
-  "chestPlateEquipped": false,
+  "chestPlateEquipped": true,
   "hasRocketBoots": true,
   "rocketBootsEquipped": true,
-  "durR1": 300,
+  "durR1": 0,
   "durR2": 0,
-  "durL1": 80,
+  "durL1": 0,
   "durL2": 0
 }

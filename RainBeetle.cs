@@ -17,6 +17,7 @@ public class RainBeetle : Creature
     // Underground lifecycle
     public bool IsUnderground = true;
     public float EmergeProgress; // 0 = underground, 1 = fully out
+    private float EmergeVisual => Easing.SmoothStop3(EmergeProgress);
     private bool _isEmerging;
     private bool _isBurrowing;
     private float _surfaceTimer;
@@ -291,6 +292,13 @@ public class RainBeetle : Creature
         // Update legs
         UpdateLegs(dt);
 
+        // Idle body bob
+        if (_onGround && !_isHunkered && !_isFlipped && !_isMating && EmergeProgress >= 1f)
+        {
+            float bob = MathF.Sin(_animTime * 6f) * 0.5f;
+            Position.Y += bob;
+        }
+
         // Food seeking
         if (CurrentGoal == CreatureGoal.Eat)
         {
@@ -345,7 +353,7 @@ public class RainBeetle : Creature
                     leg.StepTimer = 1f;
                     leg.Stepping = false;
                 }
-                float t = leg.StepTimer;
+                float t = Easing.SmoothStep(leg.StepTimer);
                 leg.FootActual = Vector2.Lerp(leg.FootActual, leg.FootTarget, t);
                 leg.FootActual.Y -= MathF.Sin(t * MathF.PI) * 3f; // step arc
             }
@@ -394,7 +402,7 @@ public class RainBeetle : Creature
         // Dirt mound during emerge/burrow
         if (EmergeProgress < 1f && (_isEmerging || _isBurrowing))
         {
-            float moundSize = _isEmerging ? MathHelper.Clamp(EmergeProgress * 3f, 0f, 1f) : EmergeProgress;
+            float moundSize = _isEmerging ? MathHelper.Clamp(EmergeVisual * 3f, 0f, 1f) : EmergeVisual;
             int mw = (int)(24 * moundSize);
             int mh = (int)(8 * moundSize);
             sb.Draw(pixel, new Rectangle(bx + Width / 2 - mw / 2, by + Height - mh, mw, mh / 3), MoundColor);
@@ -445,7 +453,7 @@ public class RainBeetle : Creature
         // Antennae
         for (int side = -1; side <= 1; side += 2)
         {
-            float antY = drawY + visibleH / 2f + side * 3f + MathF.Sin(_animTime * 4f + side) * 1f;
+            float antY = drawY + visibleH / 2f + side * 3f + MathF.Sin(_animTime * 3.5f + side * 1.2f) * 2f + MathF.Sin(_animTime * 7f + side) * 0.5f;
             int antX = Dir > 0 ? headX + headW : headX - 4;
             sb.Draw(pixel, new Rectangle(antX, (int)antY, 4, 1), AntennaColor);
         }
@@ -458,6 +466,9 @@ public class RainBeetle : Creature
         // Top half
         sb.Draw(pixel, new Rectangle(elytraX, drawY, elytraW, halfH), bodyColor);
         sb.Draw(pixel, new Rectangle(elytraX, drawY, elytraW, 1), ElytraHighlight); // highlight strip
+        float shimmer = (MathF.Sin(_animTime * 2f) + 1f) * 0.5f;
+        Color shimmerColor = Color.Lerp(ElytraHighlight, new Color(60, 180, 120), shimmer * 0.3f);
+        sb.Draw(pixel, new Rectangle(elytraX + 2, drawY + 1, elytraW - 4, 1), shimmerColor * 0.5f);
         // Bottom half
         sb.Draw(pixel, new Rectangle(elytraX, drawY + halfH, elytraW, elytraH - halfH), bodyColor);
         // Center line (split between elytra)

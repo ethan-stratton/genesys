@@ -23,14 +23,14 @@
       "x": 350,
       "y": 250,
       "level": "the-descent",
-      "discovered": true,
+      "discovered": false,
       "cleared": false,
       "connections": [
         "test-arena",
         "the-gauntlet",
         "crashsite"
       ],
-      "ShownName": "The Descent"
+      "ShownName": "???"
     },
     {
       "id": "the-gauntlet",
@@ -82,13 +82,13 @@
       "x": 100,
       "y": 250,
       "level": "crashsite",
-      "discovered": true,
-      "cleared": true,
+      "discovered": false,
+      "cleared": false,
       "connections": [
         "test-arena",
         "the-descent"
       ],
-      "ShownName": "Crash Site"
+      "ShownName": "???"
     }
   ],
   "startNode": "test-arena"

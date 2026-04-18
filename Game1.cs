@@ -163,8 +163,6 @@ public class Game1 : Game
 
     // Hit feedback
     private float _hitStopTimer;
-    private float _shakeTimer;
-    private float _shakeIntensity;
 
     // Hit feedback toggles
     private bool _hitStopEnabled = true;
@@ -204,7 +202,6 @@ public class Game1 : Game
     private float _playerPrevVelY;
     private bool _playerWasDashing;
     private bool _playerWasGrappleFiring;
-    private Random _shakeRng = new();
     private List<NoiseEvent> _noiseEvents = new();
     private float _prevPlayerMeleeTimer;
     private float _footstepTimer;
@@ -781,11 +778,16 @@ public class Game1 : Game
     private static readonly (string category, string[] variants)[] EnemyCategories = {
         ("Crawler", new[] { "forager", "skitter", "leaper", "bombardier" }),
         ("Evolved", new[] { "stalker", "spitter", "mimic", "resonant" }),
+        ("Centipede", new[] { "centipede" }),
+        ("Thornback", new[] { "thornback" }),
+        ("Hopper", new[] { "hopper" }),
         ("Wingbeater", new[] { "wingbeater" }),
         ("Bird", new[] { "bird" }),
-        ("Dummy", new[] { "dummy", "crit-dummy" }),
-        ("Swarm", new[] { "swarm" }),
+        ("Swarm", new[] { "swarm", "firefly", "mosquito" }),
         ("Scavenger", new[] { "scavenger" }),
+        ("Slug", new[] { "slug" }),
+        ("Rain Beetle", new[] { "rain-beetle" }),
+        ("Dummy", new[] { "dummy", "crit-dummy" }),
     };
     private int _enemyCategoryCursor;
     private int _enemyVariantCursor;
@@ -843,7 +845,7 @@ public class Game1 : Game
             new() { Label = "Blade Dash", Get = () => _enableBladeDash, Toggle = () => _enableBladeDash = !_enableBladeDash },
             new() { Label = "EVE Orb", Get = () => _eveOrbActive, Toggle = () => _eveOrbActive = !_eveOrbActive },
             new() { Label = "Hit Stop", Get = () => _hitStopEnabled, Toggle = () => _hitStopEnabled = !_hitStopEnabled },
-            new() { Label = "Screen Shake", Get = () => _screenShakeEnabled, Toggle = () => _screenShakeEnabled = !_screenShakeEnabled },
+            new() { Label = "Screen Shake", Get = () => _screenShakeEnabled, Toggle = () => { _screenShakeEnabled = !_screenShakeEnabled; _camera.ShakeEnabled = _screenShakeEnabled; } },
             new() { Label = "Enemy Squash", Get = () => _enemySquashEnabled, Toggle = () => _enemySquashEnabled = !_enemySquashEnabled },
             new() { Label = "Knockback", Get = () => _knockbackEnabled, Toggle = () => _knockbackEnabled = !_knockbackEnabled },
             new() { Label = "Death Particles", Get = () => _deathParticlesEnabled, Toggle = () => _deathParticlesEnabled = !_deathParticlesEnabled },
@@ -2779,7 +2781,7 @@ public class Game1 : Game
 
         // Hitstop: decrement timer and skip entity updates if active
         if (_hitStopTimer > 0) _hitStopTimer -= dt;
-        if (_shakeTimer > 0) _shakeTimer -= dt;
+        
 
         bool hitStopped = _hitStopTimer > 0;
 
@@ -2797,8 +2799,7 @@ public class Game1 : Game
         if (_player.GroundPoundLanded)
         {
             _player.GroundPoundLanded = false;
-            _shakeTimer = 0.25f;
-            _shakeIntensity = 8f;
+            _camera.AddTrauma(0.5f);
             // Spawn dust particles
             float px = _player.Position.X + Player.Width / 2f;
             float py = _player.Position.Y + Player.Height;
@@ -3013,8 +3014,7 @@ public class Game1 : Game
                 w.Position.Y += 80f; // force downward
                 w.Velocity = new Vector2(w.Velocity.X * 0.5f, 500f);
                 w.TakeHit(3, 0f, 60f); // damage + knockback down, triggers aggro
-                _shakeTimer = 0.15f;
-                _shakeIntensity = 3f;
+                _camera.AddTrauma(0.2f);
                 EveAlert("Hollow bones. They can't take that.", 3f);
                 _player.ReleaseGrapple();
                 done = true;
@@ -3475,7 +3475,7 @@ public class Game1 : Game
                             Damage = 1
                         });
                     }
-                    _shakeTimer = 0.08f; _shakeIntensity = 1.5f;
+                    _camera.AddTrauma(0.1f);
                 }
 
                 // Latch-on: aggroed crawler touches player → latches instead of contact damage
@@ -3487,7 +3487,7 @@ public class Game1 : Game
                         c.Latch(_player.Position, _rng);
                         latchedCount++;
                         _nextLatchDelay = 0.4f;
-                        _shakeTimer = 0.1f; _shakeIntensity = 2f;
+                        _camera.AddTrauma(0.15f);
                         if (_eveOrbActive)
                         {
                             string[] warns = {
@@ -3586,19 +3586,19 @@ public class Game1 : Game
                     if (killed)
                     {
                         if (_hitStopEnabled) _hitStopTimer = ws.HitStopKill;
-                        if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration * 1.5f; _shakeIntensity = ws.ShakeIntensity * 1.2f; }
+                        if (_screenShakeEnabled) { _camera.AddTrauma(0.5f); }
                         if (_deathParticlesEnabled) SpawnDeathParticles(hitPt, creature.DeathParticleColor);
                         _noiseEvents.Add(new NoiseEvent(hitPt, 150f, 0.5f, "SKREE", new Color(200, 60, 60), 1.2f));
                     }
                     else if (finisher)
                     {
                         if (_hitStopEnabled) _hitStopTimer = ws.HitStopFinisher;
-                        if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration * 1.2f; _shakeIntensity = ws.ShakeIntensity; }
+                        if (_screenShakeEnabled) { _camera.AddTrauma(0.35f); }
                     }
                     else
                     {
                         if (_hitStopEnabled) _hitStopTimer = ws.HitStopNormal;
-                        if (_screenShakeEnabled) { _shakeTimer = ws.ShakeDuration; _shakeIntensity = ws.ShakeIntensity * 0.8f; }
+                        if (_screenShakeEnabled) { _camera.AddTrauma(0.25f); }
                     }
 
                     // Durability decrement
@@ -3817,7 +3817,7 @@ public class Game1 : Game
             {
                 var warns = new[] { "Multiple hostiles coordinating!", "They're swarming!", "They've gone feral — watch yourself!" };
                 EveAlert(warns[_rng.Next(warns.Length)], 3f);
-                _shakeTimer = 0.15f; _shakeIntensity = 2f;
+                _camera.AddTrauma(0.15f);
             }
         }
 
@@ -3934,7 +3934,7 @@ public class Game1 : Game
                     {
                         bool killed = creature.TakeHit(splatDmg);
                         if (_hitStopEnabled) _hitStopTimer = MathF.Max(_hitStopTimer, 0.08f);
-                        if (_screenShakeEnabled) { _shakeTimer = 0.12f; _shakeIntensity = 8f; }
+                        if (_screenShakeEnabled) { _camera.AddTrauma(0.5f); }
                         if (_deathParticlesEnabled && killed) SpawnDeathParticles(creature.Position + new Vector2(creature.CreatureWidth / 2f, creature.CreatureHeight / 2f), creature.DeathParticleColor);
                         SpawnDustParticles(new Vector2(creature.Position.X + (kbVel.X > 0 ? creature.CreatureWidth : 0), creature.Position.Y + creature.CreatureHeight / 2f), 6);
                     }
@@ -4016,7 +4016,7 @@ public class Game1 : Game
                 if (pRect.Intersects(_player.CollisionRect))
                 {
                     _player.Hp -= p.Damage;
-                    _shakeTimer = 0.05f; _shakeIntensity = 1f;
+                    _camera.AddTrauma(0.07f);
                     _particles.RemoveAt(i);
                     continue;
                 }
@@ -4415,7 +4415,7 @@ public class Game1 : Game
 
                 // Heal + feedback
                 _player.Hp = _player.MaxHp;
-                _shakeTimer = 0.1f; _shakeIntensity = 1f;
+                _camera.AddTrauma(0.07f);
                 EveAlertOnce("Shelter secured. Biosigns stabilizing.", 3f);
 
                 // Fade effect
@@ -4494,7 +4494,7 @@ public class Game1 : Game
                             if (_eveOrbActive) EveAlert(_enableRopeClimb ? "Rope ascension enabled!" : "Rope ascension disabled.", 2f); break;
                     }
                     // Screen shake + particles for feedback
-                    if (_screenShakeEnabled) { _shakeTimer = 0.15f; _shakeIntensity = 3f; }
+                    if (_screenShakeEnabled) { _camera.AddTrauma(0.2f); }
                     SpawnDustParticles(new Vector2(sw.X + sw.W / 2f, sw.Y + sw.H / 2f), 10);
                     break;
                 }
@@ -7490,13 +7490,7 @@ public class Game1 : Game
         var mouse = Mouse.GetState();
 
         // World-space rendering with camera (+ screen shake)
-        var shakeOffset = Matrix.Identity;
-        if (_shakeTimer > 0)
-        {
-            float sx = (float)(_shakeRng.NextDouble() * 2 - 1) * _shakeIntensity;
-            float sy = (float)(_shakeRng.NextDouble() * 2 - 1) * _shakeIntensity;
-            shakeOffset = Matrix.CreateTranslation(sx, sy, 0);
-        }
+        var shakeOffset = _camera.ShakeMatrix;
         _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.NonPremultiplied, SamplerState.PointClamp, transformMatrix: _camera.TransformMatrix * shakeOffset);
 
         int bL = _level.Bounds.Left;
@@ -10882,7 +10876,7 @@ public class Game1 : Game
             {
                 _lightningTimer = 2f + (float)_rng.NextDouble() * 5f;
                 _lightningFlash = 0.3f;
-                if (_screenShakeEnabled) { _shakeTimer = 0.2f; _shakeIntensity = 4f; }
+                if (_screenShakeEnabled) { _camera.AddTrauma(0.3f); }
             }
             if (_lightningFlash > 0) _lightningFlash -= dt * 2f;
         }
@@ -12170,13 +12164,7 @@ public class Game1 : Game
         if (_isDead) GraphicsDevice.Clear(Color.DarkRed);
 
         // --- World rendering (camera transform + screen shake) ---
-        var shakeOff = Matrix.Identity;
-        if (_shakeTimer > 0)
-        {
-            float sx = (float)(_shakeRng.NextDouble() * 2 - 1) * _shakeIntensity;
-            float sy = (float)(_shakeRng.NextDouble() * 2 - 1) * _shakeIntensity;
-            shakeOff = Matrix.CreateTranslation(sx, sy, 0);
-        }
+        var shakeOff = _camera.ShakeMatrix;
 
         // --- Parallax background layers ---
         DrawParallaxBackground(shakeOff);
@@ -12416,13 +12404,7 @@ public class Game1 : Game
         // Noise-based water shader pass (draws all Water tiles with noise overlay)
         if (_useShaderWater && _level.TileGridInstance != null)
         {
-            var shakeOff2 = Matrix.Identity;
-            if (_shakeTimer > 0)
-            {
-                float sx2 = (float)(_shakeRng.NextDouble() * 2 - 1) * _shakeIntensity;
-                float sy2 = (float)(_shakeRng.NextDouble() * 2 - 1) * _shakeIntensity;
-                shakeOff2 = Matrix.CreateTranslation(sx2, sy2, 0);
-            }
+            var shakeOff2 = _camera.ShakeMatrix;
             DrawWaterShaderPass(_level.TileGridInstance, _camera.TransformMatrix * shakeOff2);
         }
 
@@ -14272,3 +14254,4 @@ public class Game1 : Game
         return best;
     }
 }
+

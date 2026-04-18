@@ -2,3 +2,7 @@ bin/
 obj/
 .vs/
 *.user
+
+# Design docs (local only)
+*.md
+!README.md
